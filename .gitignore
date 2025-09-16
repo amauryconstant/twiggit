@@ -11,6 +11,9 @@ twiggit
 coverage.out
 coverage.html
 
+# Test binaries
+*.test
+
 # Go build cache
 .cache/
 
