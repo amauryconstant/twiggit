@@ -1,0 +1,42 @@
+[tools]
+go = "1.25.1"
+golangci-lint = "latest"
+
+[tasks."test:all"]
+description = "Run all tests with coverage"
+run = "go test -coverprofile=coverage.out ./..."
+
+[tasks."test:single"]
+description = "Run single test - usage: mise run test:single TestName ./pkg/module"
+run = "go test -run $1 $2"
+
+[tasks."test:coverage"]
+description = "Show test coverage report (requires existing coverage.out)"
+run = "go tool cover -html=coverage.out -o coverage.html"
+
+[tasks."lint:check"]
+description = "Run linting and formatting checks"
+run = "golangci-lint run"
+
+[tasks."lint:fix"]
+description = "Auto-fix linting issues"
+run = "golangci-lint run --fix"
+
+[tasks."build:cli"]
+description = "Build the CLI binary"
+run = "go build -o bin/twiggit main.go"
+
+[tasks."build:clean"]
+description = "Clean build artifacts"
+run = "rm -rf bin/ coverage.out coverage.html"
+
+[tasks."dev:run"]
+description = "Test CLI structure"
+run = "go run main.go --help"
+
+[tasks."dev:tidy"]
+description = "Clean up go.mod and go.sum"
+run = "go mod tidy"
+
+[env]
+CGO_ENABLED = "0"
