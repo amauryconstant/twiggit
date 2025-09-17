@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"os"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/amaury/twiggit/internal/domain"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/test/mocks"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -75,11 +77,11 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 			targetPath: "/tmp/test-worktree",
 			setupMocks: func(m *mocks.GitClientMock) {
 				// Mock repository validation
-				m.On("IsGitRepository", "test-project").Return(true, nil)
+				m.On("IsGitRepository", mock.Anything, "test-project").Return(true, nil)
 				// Mock branch existence check
-				m.On("BranchExists", "test-project", "feature-branch").Return(true)
+				m.On("BranchExists", mock.Anything, "test-project", "feature-branch").Return(true)
 				// Mock worktree creation
-				m.On("CreateWorktree", "test-project", "feature-branch", "/tmp/test-worktree").Return(nil)
+				m.On("CreateWorktree", mock.Anything, "test-project", "feature-branch", "/tmp/test-worktree").Return(nil)
 			},
 			expectError: false,
 		},
@@ -89,9 +91,9 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 			branch:     "new-feature",
 			targetPath: "/tmp/new-worktree",
 			setupMocks: func(m *mocks.GitClientMock) {
-				m.On("IsGitRepository", "test-project").Return(true, nil)
-				m.On("BranchExists", "test-project", "new-feature").Return(false)
-				m.On("CreateWorktree", "test-project", "new-feature", "/tmp/new-worktree").Return(nil)
+				m.On("IsGitRepository", mock.Anything, "test-project").Return(true, nil)
+				m.On("BranchExists", mock.Anything, "test-project", "new-feature").Return(false)
+				m.On("CreateWorktree", mock.Anything, "test-project", "new-feature", "/tmp/new-worktree").Return(nil)
 			},
 			expectError: false,
 		},
@@ -123,7 +125,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 			branch:     "feature",
 			targetPath: "/tmp/test-worktree",
 			setupMocks: func(m *mocks.GitClientMock) {
-				m.On("IsGitRepository", "not-a-repo").Return(false, nil)
+				m.On("IsGitRepository", mock.Anything, "not-a-repo").Return(false, nil)
 			},
 			expectError: true,
 			errorType:   domain.ErrNotRepository,
@@ -150,7 +152,8 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 
 			tt.setupMocks(s.MockGit)
 
-			err := s.Service.Create(tt.project, tt.branch, tt.targetPath)
+			ctx := context.Background()
+			err := s.Service.Create(ctx, tt.project, tt.branch, tt.targetPath)
 
 			if tt.expectError {
 				s.Require().Error(err)
@@ -184,15 +187,15 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 			force:        false,
 			setupMocks: func(m *mocks.GitClientMock, path string) {
 				// Mock worktree status check
-				m.On("GetWorktreeStatus", path).Return(&domain.WorktreeInfo{
+				m.On("GetWorktreeStatus", mock.Anything, path).Return(&domain.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: true,
 				}, nil)
 				// Mock uncommitted changes check
-				m.On("HasUncommittedChanges", path).Return(false)
+				m.On("HasUncommittedChanges", mock.Anything, path).Return(false)
 				// Mock repository root discovery
-				m.On("GetRepositoryRoot", path).Return("/tmp/test-repo", nil)
+				m.On("GetRepositoryRoot", mock.Anything, path).Return("/tmp/test-repo", nil)
 				// Mock worktree removal
-				m.On("RemoveWorktree", "/tmp/test-repo", path, false).Return(nil)
+				m.On("RemoveWorktree", mock.Anything, "/tmp/test-repo", path, false).Return(nil)
 			},
 			setupCwd:    func() (string, func()) { return "/different/dir", func() {} },
 			expectError: false,
@@ -202,10 +205,10 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 			worktreePath: "/tmp/dirty-worktree",
 			force:        false,
 			setupMocks: func(m *mocks.GitClientMock, path string) {
-				m.On("GetWorktreeStatus", path).Return(&domain.WorktreeInfo{
+				m.On("GetWorktreeStatus", mock.Anything, path).Return(&domain.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: false,
 				}, nil)
-				m.On("HasUncommittedChanges", path).Return(true)
+				m.On("HasUncommittedChanges", mock.Anything, path).Return(true)
 			},
 			setupCwd:    func() (string, func()) { return "/different/dir", func() {} },
 			expectError: true,
@@ -217,8 +220,8 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 			force:        true,
 			setupMocks: func(m *mocks.GitClientMock, path string) {
 				// No validation calls for forced removal
-				m.On("GetRepositoryRoot", path).Return("/tmp/test-repo", nil)
-				m.On("RemoveWorktree", "/tmp/test-repo", path, true).Return(nil)
+				m.On("GetRepositoryRoot", mock.Anything, path).Return("/tmp/test-repo", nil)
+				m.On("RemoveWorktree", mock.Anything, "/tmp/test-repo", path, true).Return(nil)
 			},
 			setupCwd:    func() (string, func()) { return "/different/dir", func() {} },
 			expectError: false,
@@ -228,7 +231,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 			worktreePath: "/tmp/non-existent",
 			force:        false,
 			setupMocks: func(m *mocks.GitClientMock, path string) {
-				m.On("GetWorktreeStatus", path).Return((*domain.WorktreeInfo)(nil),
+				m.On("GetWorktreeStatus", mock.Anything, path).Return((*domain.WorktreeInfo)(nil),
 					errors.New("worktree not found"))
 			},
 			setupCwd:    func() (string, func()) { return "/different/dir", func() {} },
@@ -262,7 +265,8 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 
 			tt.setupMocks(s.MockGit, tt.worktreePath)
 
-			err := s.Service.Remove(tt.worktreePath, tt.force)
+			ctx := context.Background()
+			err := s.Service.Remove(ctx, tt.worktreePath, tt.force)
 
 			if tt.expectError {
 				s.Require().Error(err)
@@ -304,7 +308,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 				}
 			},
 			setupMocks: func(m *mocks.GitClientMock, currentDir string) {
-				m.On("GetWorktreeStatus", currentDir).Return(&domain.WorktreeInfo{
+				m.On("GetWorktreeStatus", mock.Anything, currentDir).Return(&domain.WorktreeInfo{
 					Path: currentDir, Branch: "main", Clean: true,
 				}, nil)
 			},
@@ -327,7 +331,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 				}
 			},
 			setupMocks: func(m *mocks.GitClientMock, currentDir string) {
-				m.On("GetWorktreeStatus", currentDir).Return((*domain.WorktreeInfo)(nil),
+				m.On("GetWorktreeStatus", mock.Anything, currentDir).Return((*domain.WorktreeInfo)(nil),
 					errors.New("not a worktree"))
 			},
 			expectError: true,
@@ -346,7 +350,8 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 
 			tt.setupMocks(s.MockGit, currentDir)
 
-			worktree, err := s.Service.GetCurrent()
+			ctx := context.Background()
+			worktree, err := s.Service.GetCurrent(ctx)
 
 			if tt.expectError {
 				s.Require().Error(err)
@@ -379,10 +384,10 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 				return "/different/directory", func() {}
 			},
 			setupMocks: func(m *mocks.GitClientMock, path string) {
-				m.On("GetWorktreeStatus", path).Return(&domain.WorktreeInfo{
+				m.On("GetWorktreeStatus", mock.Anything, path).Return(&domain.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: true,
 				}, nil)
-				m.On("HasUncommittedChanges", path).Return(false)
+				m.On("HasUncommittedChanges", mock.Anything, path).Return(false)
 			},
 			expectError: false,
 		},
@@ -395,10 +400,10 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 				return "/different/directory", func() {}
 			},
 			setupMocks: func(m *mocks.GitClientMock, path string) {
-				m.On("GetWorktreeStatus", path).Return(&domain.WorktreeInfo{
+				m.On("GetWorktreeStatus", mock.Anything, path).Return(&domain.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: false,
 				}, nil)
-				m.On("HasUncommittedChanges", path).Return(true)
+				m.On("HasUncommittedChanges", mock.Anything, path).Return(true)
 			},
 			expectError: true,
 			errorType:   domain.ErrUncommittedChanges,
@@ -427,7 +432,8 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 
 			tt.setupMocks(s.MockGit, tt.worktreePath)
 
-			err := s.Service.ValidateRemoval(tt.worktreePath)
+			ctx := context.Background()
+			err := s.Service.ValidateRemoval(ctx, tt.worktreePath)
 
 			if tt.expectError {
 				s.Require().Error(err)

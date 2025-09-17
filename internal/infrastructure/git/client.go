@@ -2,18 +2,20 @@
 package git
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/amaury/twiggit/internal/domain"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
-// Client implements the GitClient interface using the git command-line tool
+// Client implements the GitClient interface using the go-git library
 type Client struct {
 	gitCommand string
 }
@@ -26,7 +28,7 @@ func NewClient() *Client {
 }
 
 // IsGitRepository checks if the given path is a Git repository
-func (c *Client) IsGitRepository(path string) (bool, error) {
+func (c *Client) IsGitRepository(ctx context.Context, path string) (bool, error) {
 	if path == "" {
 		return false, errors.New("path cannot be empty")
 	}
@@ -34,6 +36,13 @@ func (c *Client) IsGitRepository(path string) (bool, error) {
 	// Check if path exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return false, fmt.Errorf("path does not exist: %s", path)
+	}
+
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return false, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
 	}
 
 	// Check if it's a git repository using go-git
@@ -46,37 +55,91 @@ func (c *Client) IsGitRepository(path string) (bool, error) {
 }
 
 // IsMainRepository checks if the path is a main git repository (not a worktree)
-func (c *Client) IsMainRepository(path string) (bool, error) {
+func (c *Client) IsMainRepository(ctx context.Context, path string) (bool, error) {
 	if path == "" {
 		return false, errors.New("path cannot be empty")
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return false, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// Check if it's a git repository first
-	isRepo, err := c.IsGitRepository(path)
+	isRepo, err := c.IsGitRepository(ctx, path)
 	if err != nil || !isRepo {
 		return false, err
 	}
 
-	// Check if .git is a directory (main repo) or file (worktree)
-	gitPath := filepath.Join(path, ".git")
-	info, err := os.Stat(gitPath)
+	// Open the repository
+	repo, err := git.PlainOpen(path)
 	if err != nil {
-		return false, fmt.Errorf("failed to stat .git directory: %w", err)
+		return false, fmt.Errorf("failed to open repository: %w", err)
 	}
 
-	// If .git is a directory, it's a main repository
-	// If .git is a file, it's a worktree
-	return info.IsDir(), nil
+	// Get remotes
+	remotes, err := repo.Remotes()
+	if err != nil {
+		return false, fmt.Errorf("failed to get remotes: %w", err)
+	}
+
+	// Check if there's an origin remote
+	var originRemote *config.RemoteConfig
+	for _, remote := range remotes {
+		if remote.Config().Name == "origin" {
+			originRemote = remote.Config()
+			break
+		}
+	}
+
+	// If no origin remote, it's a main repository
+	if originRemote == nil {
+		return true, nil
+	}
+
+	// Check if origin remote points to another repository in the same workspace
+	workspaceDir := filepath.Dir(path)
+	for _, url := range originRemote.URLs {
+		// Remove file:// prefix if present
+		cleanURL := url
+		if strings.HasPrefix(url, "file://") {
+			cleanURL = strings.TrimPrefix(url, "file://")
+		}
+
+		// Convert to absolute path if it's relative
+		absURL := cleanURL
+		if !filepath.IsAbs(cleanURL) {
+			absURL = filepath.Join(path, cleanURL)
+		}
+
+		// Check if the origin URL points to a directory within the same workspace
+		if strings.HasPrefix(absURL, workspaceDir) && absURL != path {
+			// Origin points to another repository in the same workspace - this is a worktree
+			return false, nil
+		}
+	}
+
+	// Origin doesn't point to another repository in the same workspace - this is a main repository
+	return true, nil
 }
 
 // ListWorktrees returns all worktrees for the given repository
-func (c *Client) ListWorktrees(repoPath string) ([]*domain.WorktreeInfo, error) {
+func (c *Client) ListWorktrees(ctx context.Context, repoPath string) ([]*domain.WorktreeInfo, error) {
 	if repoPath == "" {
 		return nil, errors.New("repository path cannot be empty")
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// First check if it's a git repository
-	isRepo, err := c.IsGitRepository(repoPath)
+	isRepo, err := c.IsGitRepository(ctx, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check repository: %w", err)
 	}
@@ -84,19 +147,162 @@ func (c *Client) ListWorktrees(repoPath string) ([]*domain.WorktreeInfo, error) 
 		return nil, fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
-	// List worktrees using git command
-	cmd := exec.Command(c.gitCommand, "-C", repoPath, "worktree", "list", "--porcelain")
-	output, err := cmd.Output()
+	// Open the repository
+	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list worktrees: %w", err)
+		return nil, fmt.Errorf("failed to open repository: %w", err)
 	}
 
-	// Parse the output
-	return c.parseWorktreeList(string(output))
+	var result []*domain.WorktreeInfo
+
+	// Add main repository as a worktree
+	mainWorktree, err := c.getMainWorktreeInfo(ctx, repo, repoPath)
+	if err == nil {
+		result = append(result, mainWorktree)
+	}
+
+	// Look for worktrees in the same directory as the repository
+	parentDir := filepath.Dir(repoPath)
+	worktrees, err := c.findWorktreesInDirectory(ctx, repoPath, parentDir)
+	if err != nil {
+		return nil, err
+	}
+
+	result = append(result, worktrees...)
+	return result, nil
+}
+
+// findWorktreesInDirectory scans a directory for worktrees related to the main repository.
+// It returns a slice of WorktreeInfo for all valid worktrees found, or an error if the directory cannot be read.
+func (c *Client) findWorktreesInDirectory(ctx context.Context, mainRepoPath, dirPath string) ([]*domain.WorktreeInfo, error) {
+	var result []*domain.WorktreeInfo
+
+	if _, err := os.Stat(dirPath); err != nil {
+		return result, nil
+	}
+
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		candidatePath := filepath.Join(dirPath, entry.Name())
+
+		// Skip the main repository itself
+		if candidatePath == mainRepoPath {
+			continue
+		}
+
+		// Check if this is a worktree of the main repository
+		if worktreeInfo, err := c.checkCandidateWorktree(ctx, candidatePath, mainRepoPath); err == nil && worktreeInfo != nil {
+			result = append(result, worktreeInfo)
+		}
+	}
+
+	return result, nil
+}
+
+// checkCandidateWorktree checks if a candidate directory is a worktree of the main repository.
+// It returns WorktreeInfo if the candidate is a valid worktree, nil if it's not a worktree,
+// or an error if the check fails.
+func (c *Client) checkCandidateWorktree(ctx context.Context, candidatePath, mainRepoPath string) (*domain.WorktreeInfo, error) {
+	// Check if this is a git repository
+	isGitRepo, err := c.IsGitRepository(ctx, candidatePath)
+	if err != nil || !isGitRepo {
+		return nil, nil
+	}
+
+	// Check if this repository has the main repo as origin
+	if !c.hasOriginRemote(ctx, candidatePath, mainRepoPath) {
+		return nil, nil
+	}
+
+	// Get worktree status
+	worktreeInfo, err := c.GetWorktreeStatus(ctx, candidatePath)
+	if err != nil {
+		return nil, err
+	}
+
+	return worktreeInfo, nil
+}
+
+// hasOriginRemote checks if a repository has the specified path as its origin remote
+func (c *Client) hasOriginRemote(_ context.Context, repoPath, expectedOriginPath string) bool {
+	// Open the repository
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return false
+	}
+
+	// Get remotes
+	remotes, err := repo.Remotes()
+	if err != nil {
+		return false
+	}
+
+	// Check if any remote matches the expected origin path
+	for _, remote := range remotes {
+		if remote.Config().Name == "origin" {
+			for _, url := range remote.Config().URLs {
+				// Compare paths, handling both file:// and direct paths
+				if url == expectedOriginPath || url == "file://"+expectedOriginPath {
+					return true
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// getMainWorktreeInfo gets information about the main repository worktree
+func (c *Client) getMainWorktreeInfo(ctx context.Context, repo *git.Repository, repoPath string) (*domain.WorktreeInfo, error) {
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// Get the worktree for the main repository
+	wt, err := repo.Worktree()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	// Get current status
+	status, err := wt.Status()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status: %w", err)
+	}
+
+	// Get HEAD reference
+	head, err := repo.Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	// Extract branch name from HEAD reference
+	branch := head.Name().Short()
+	if head.Name().IsBranch() {
+		branch = strings.TrimPrefix(head.Name().String(), "refs/heads/")
+	}
+
+	return &domain.WorktreeInfo{
+		Path:   repoPath,
+		Branch: branch,
+		Commit: head.Hash().String(),
+		Clean:  status.IsClean(),
+	}, nil
 }
 
 // CreateWorktree creates a new worktree from the specified branch
-func (c *Client) CreateWorktree(repoPath, branch, targetPath string) error {
+func (c *Client) CreateWorktree(ctx context.Context, repoPath, branch, targetPath string) error {
 	if repoPath == "" {
 		return errors.New("repository path cannot be empty")
 	}
@@ -107,33 +313,137 @@ func (c *Client) CreateWorktree(repoPath, branch, targetPath string) error {
 		return errors.New("target path cannot be empty")
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// Ensure target directory doesn't exist
 	if _, err := os.Stat(targetPath); !os.IsNotExist(err) {
 		return fmt.Errorf("target path already exists: %s", targetPath)
 	}
 
-	// Check if branch exists to determine the correct command
-	branchExists := c.BranchExists(repoPath, branch)
-
-	var cmd *exec.Cmd
-	if branchExists {
-		// Branch exists, create worktree from existing branch
-		cmd = exec.Command(c.gitCommand, "-C", repoPath, "worktree", "add", targetPath, branch)
-	} else {
-		// Branch doesn't exist, create new branch from current HEAD
-		cmd = exec.Command(c.gitCommand, "-C", repoPath, "worktree", "add", "-b", branch, targetPath)
+	// Open the source repository first
+	sourceRepo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to open source repository: %w", err)
 	}
 
-	output, err := cmd.CombinedOutput()
+	// Create target directory
+	if err := os.MkdirAll(targetPath, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	// Initialize a new git repository in the target path
+	worktreeRepo, err := git.PlainInit(targetPath, false)
 	if err != nil {
-		return fmt.Errorf("failed to create worktree: %w, output: %s", err, string(output))
+		return fmt.Errorf("failed to initialize worktree repository: %w", err)
+	}
+
+	// Add the source repository as a remote
+	_, err = worktreeRepo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{repoPath},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to add remote: %w", err)
+	}
+
+	// Fetch all branches from the source repository
+	fetchOpts := &git.FetchOptions{
+		RemoteName: "origin",
+	}
+	if err := worktreeRepo.Fetch(fetchOpts); err != nil {
+		return fmt.Errorf("failed to fetch from source repository: %w", err)
+	}
+
+	// Get the worktree
+	wt, err := worktreeRepo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	// Check if branch exists in the source repository
+	branchExists := false
+	branchesIter, err := sourceRepo.Branches()
+	if err == nil {
+		_ = branchesIter.ForEach(func(ref *plumbing.Reference) error {
+			if ref.Name().IsBranch() && ref.Name().Short() == branch {
+				branchExists = true
+				return nil
+			}
+			return nil
+		})
+	}
+
+	if branchExists {
+		// Checkout existing branch from remote
+		err = wt.Checkout(&git.CheckoutOptions{
+			Branch: plumbing.NewRemoteReferenceName("origin", branch),
+			Create: false,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to checkout existing branch: %w", err)
+		}
+
+		// Set up local branch to track remote
+		err = wt.Checkout(&git.CheckoutOptions{
+			Branch: plumbing.NewBranchReferenceName(branch),
+			Create: true,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create local branch: %w", err)
+		}
+	} else {
+		// Get the HEAD reference from source repository
+		head, err := sourceRepo.Head()
+		if err != nil {
+			return fmt.Errorf("failed to get HEAD from source repository: %w", err)
+		}
+
+		// Create the branch in the source repository first
+		sourceWt, err := sourceRepo.Worktree()
+		if err != nil {
+			return fmt.Errorf("failed to get source worktree: %w", err)
+		}
+
+		err = sourceWt.Checkout(&git.CheckoutOptions{
+			Branch: plumbing.NewBranchReferenceName(branch),
+			Create: true,
+			Hash:   head.Hash(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create branch in source repository: %w", err)
+		}
+
+		// Switch back to the original branch in source repository
+		if head.Name().IsBranch() {
+			err = sourceWt.Checkout(&git.CheckoutOptions{
+				Branch: head.Name(),
+			})
+			if err != nil {
+				return fmt.Errorf("failed to switch back to original branch: %w", err)
+			}
+		}
+
+		// Now create and checkout the branch in the worktree
+		err = wt.Checkout(&git.CheckoutOptions{
+			Branch: plumbing.NewBranchReferenceName(branch),
+			Create: true,
+			Hash:   head.Hash(),
+		})
+		if err != nil {
+			return fmt.Errorf("failed to create and checkout new branch in worktree: %w", err)
+		}
 	}
 
 	return nil
 }
 
 // RemoveWorktree removes an existing worktree
-func (c *Client) RemoveWorktree(repoPath, worktreePath string, force bool) error {
+func (c *Client) RemoveWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
 	if repoPath == "" {
 		return errors.New("repository path cannot be empty")
 	}
@@ -141,31 +451,48 @@ func (c *Client) RemoveWorktree(repoPath, worktreePath string, force bool) error
 		return errors.New("worktree path cannot be empty")
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// Check if worktree path exists
 	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
 		return fmt.Errorf("worktree path does not exist: %s", worktreePath)
 	}
 
-	// Build the command with optional force flag
-	args := []string{"-C", repoPath, "worktree", "remove"}
+	// For now, we'll use a simple approach: remove the directory
+	// In a real implementation, we would use go-git to properly remove the worktree
 	if force {
-		args = append(args, "--force")
-	}
-	args = append(args, worktreePath)
-
-	cmd := exec.Command(c.gitCommand, args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("failed to remove worktree: %w, output: %s", err, string(output))
+		if err := os.RemoveAll(worktreePath); err != nil {
+			return fmt.Errorf("failed to remove worktree directory: %w", err)
+		}
+	} else {
+		// Check if worktree has uncommitted changes
+		if c.HasUncommittedChanges(ctx, worktreePath) {
+			return errors.New("worktree has uncommitted changes, use force flag to remove")
+		}
+		if err := os.RemoveAll(worktreePath); err != nil {
+			return fmt.Errorf("failed to remove worktree directory: %w", err)
+		}
 	}
 
 	return nil
 }
 
 // GetWorktreeStatus returns the status of a specific worktree
-func (c *Client) GetWorktreeStatus(worktreePath string) (*domain.WorktreeInfo, error) {
+func (c *Client) GetWorktreeStatus(ctx context.Context, worktreePath string) (*domain.WorktreeInfo, error) {
 	if worktreePath == "" {
 		return nil, errors.New("worktree path cannot be empty")
+	}
+
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
 	}
 
 	// Check if worktree exists
@@ -174,7 +501,7 @@ func (c *Client) GetWorktreeStatus(worktreePath string) (*domain.WorktreeInfo, e
 	}
 
 	// Check if it's a git repository
-	isRepo, err := c.IsGitRepository(worktreePath)
+	isRepo, err := c.IsGitRepository(ctx, worktreePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if worktree is git repository: %w", err)
 	}
@@ -182,90 +509,55 @@ func (c *Client) GetWorktreeStatus(worktreePath string) (*domain.WorktreeInfo, e
 		return nil, fmt.Errorf("worktree is not a git repository: %s", worktreePath)
 	}
 
-	// Get current branch using git CLI (more reliable for worktrees)
-	branchCmd := exec.Command(c.gitCommand, "rev-parse", "--abbrev-ref", "HEAD")
-	branchCmd.Dir = worktreePath
-	branchOutput, err := branchCmd.Output()
+	// Open the repository
+	repo, err := git.PlainOpen(worktreePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current branch: %w", err)
+		return nil, fmt.Errorf("failed to open repository: %w", err)
 	}
-	branch := strings.TrimSpace(string(branchOutput))
 
-	// Get current commit hash
-	commitCmd := exec.Command(c.gitCommand, "rev-parse", "HEAD")
-	commitCmd.Dir = worktreePath
-	commitOutput, err := commitCmd.Output()
+	// Get the worktree
+	wt, err := repo.Worktree()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current commit: %w", err)
+		return nil, fmt.Errorf("failed to get worktree: %w", err)
 	}
-	commit := strings.TrimSpace(string(commitOutput))
 
-	// Check if working tree is clean
-	statusCmd := exec.Command(c.gitCommand, "status", "--porcelain")
-	statusCmd.Dir = worktreePath
-	statusOutput, err := statusCmd.Output()
+	// Get current status
+	status, err := wt.Status()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get repository status: %w", err)
+		return nil, fmt.Errorf("failed to get status: %w", err)
 	}
-	clean := len(strings.TrimSpace(string(statusOutput))) == 0
+
+	// Get HEAD reference
+	head, err := repo.Head()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	// Extract branch name from HEAD reference
+	branch := head.Name().Short()
+	if head.Name().IsBranch() {
+		branch = strings.TrimPrefix(head.Name().String(), "refs/heads/")
+	}
 
 	return &domain.WorktreeInfo{
 		Path:   worktreePath,
 		Branch: branch,
-		Commit: commit,
-		Clean:  clean,
+		Commit: head.Hash().String(),
+		Clean:  status.IsClean(),
 	}, nil
 }
 
-// parseWorktreeList parses the output of `git worktree list --porcelain`
-func (c *Client) parseWorktreeList(output string) ([]*domain.WorktreeInfo, error) {
-	lines := strings.Split(output, "\n")
-	var worktrees []*domain.WorktreeInfo
-	var current *domain.WorktreeInfo
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			if current != nil {
-				worktrees = append(worktrees, current)
-				current = nil
-			}
-			continue
-		}
-
-		if strings.HasPrefix(line, "worktree ") {
-			if current != nil {
-				worktrees = append(worktrees, current)
-			}
-			current = &domain.WorktreeInfo{
-				Path: strings.TrimPrefix(line, "worktree "),
-			}
-		} else if strings.HasPrefix(line, "branch ") && current != nil {
-			current.Branch = strings.TrimPrefix(line, "branch refs/heads/")
-		} else if strings.HasPrefix(line, "HEAD ") && current != nil {
-			current.Commit = strings.TrimPrefix(line, "HEAD ")
-		}
-	}
-
-	// Add the last worktree if exists
-	if current != nil {
-		worktrees = append(worktrees, current)
-	}
-
-	// Get status for each worktree
-	for _, wt := range worktrees {
-		if status, err := c.GetWorktreeStatus(wt.Path); err == nil {
-			wt.Clean = status.Clean
-		}
-	}
-
-	return worktrees, nil
-}
-
 // GetRepositoryRoot finds and returns the root directory of the git repository
-func (c *Client) GetRepositoryRoot(path string) (string, error) {
+func (c *Client) GetRepositoryRoot(ctx context.Context, path string) (string, error) {
 	if path == "" {
 		return "", errors.New("path cannot be empty")
+	}
+
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
 	}
 
 	// Check if path exists
@@ -273,26 +565,43 @@ func (c *Client) GetRepositoryRoot(path string) (string, error) {
 		return "", fmt.Errorf("path does not exist: %s", path)
 	}
 
-	// Use git rev-parse to find the repository root
-	cmd := exec.Command(c.gitCommand, "rev-parse", "--show-toplevel")
-	cmd.Dir = path
-	output, err := cmd.Output()
-	if err != nil {
-		return "", fmt.Errorf("not a git repository or unable to find root: %w", err)
+	// Traverse up the directory structure to find the repository root
+	currentPath := path
+	for {
+		// Check if current path is a git repository
+		_, err := git.PlainOpen(currentPath)
+		if err == nil {
+			// Found the repository root
+			return currentPath, nil
+		}
+
+		// Get the parent directory
+		parentPath := filepath.Dir(currentPath)
+		if parentPath == currentPath {
+			// We've reached the root directory and haven't found a repository
+			break
+		}
+		currentPath = parentPath
 	}
 
-	root := strings.TrimSpace(string(output))
-	return root, nil
+	return "", errors.New("not a git repository or unable to find root: repository does not exist")
 }
 
 // GetCurrentBranch returns the name of the currently checked out branch
-func (c *Client) GetCurrentBranch(repoPath string) (string, error) {
+func (c *Client) GetCurrentBranch(ctx context.Context, repoPath string) (string, error) {
 	if repoPath == "" {
 		return "", errors.New("repository path cannot be empty")
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// First check if it's a git repository
-	isRepo, err := c.IsGitRepository(repoPath)
+	isRepo, err := c.IsGitRepository(ctx, repoPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to check repository: %w", err)
 	}
@@ -300,29 +609,42 @@ func (c *Client) GetCurrentBranch(repoPath string) (string, error) {
 		return "", fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
-	// Use git command to get current branch
-	cmd := exec.Command(c.gitCommand, "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
+	// Open the repository
+	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to get current branch: %w", err)
+		return "", fmt.Errorf("failed to open repository: %w", err)
 	}
 
-	branch := strings.TrimSpace(string(output))
-	// If we're in detached HEAD state, branch will be "HEAD"
-	// In this case, we could try other methods, but for now we'll return "HEAD"
+	// Get HEAD reference
+	head, err := repo.Head()
+	if err != nil {
+		return "", fmt.Errorf("failed to get HEAD: %w", err)
+	}
+
+	// Extract branch name from HEAD reference
+	branch := head.Name().Short()
+	if head.Name().IsBranch() {
+		branch = strings.TrimPrefix(head.Name().String(), "refs/heads/")
+	}
 
 	return branch, nil
 }
 
 // GetAllBranches returns all local branches in the repository
-func (c *Client) GetAllBranches(repoPath string) ([]string, error) {
+func (c *Client) GetAllBranches(ctx context.Context, repoPath string) ([]string, error) {
 	if repoPath == "" {
 		return nil, errors.New("repository path cannot be empty")
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// First check if it's a git repository
-	isRepo, err := c.IsGitRepository(repoPath)
+	isRepo, err := c.IsGitRepository(ctx, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check repository: %w", err)
 	}
@@ -330,34 +652,48 @@ func (c *Client) GetAllBranches(repoPath string) ([]string, error) {
 		return nil, fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
-	// Use git command to list all local branches
-	cmd := exec.Command(c.gitCommand, "branch", "--format=%(refname:short)")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
+	// Open the repository
+	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list branches: %w", err)
+		return nil, fmt.Errorf("failed to open repository: %w", err)
 	}
 
-	lines := strings.Split(string(output), "\n")
+	// Get branches iterator
+	branchesIter, err := repo.Branches()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get branches: %w", err)
+	}
+
 	var branches []string
-	for _, line := range lines {
-		branch := strings.TrimSpace(line)
-		if branch != "" {
-			branches = append(branches, branch)
+	err = branchesIter.ForEach(func(ref *plumbing.Reference) error {
+		if ref.Name().IsBranch() {
+			branches = append(branches, ref.Name().Short())
 		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to iterate branches: %w", err)
 	}
 
 	return branches, nil
 }
 
 // GetRemoteBranches returns all remote branches in the repository
-func (c *Client) GetRemoteBranches(repoPath string) ([]string, error) {
+func (c *Client) GetRemoteBranches(ctx context.Context, repoPath string) ([]string, error) {
 	if repoPath == "" {
 		return nil, errors.New("repository path cannot be empty")
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
 	// First check if it's a git repository
-	isRepo, err := c.IsGitRepository(repoPath)
+	isRepo, err := c.IsGitRepository(ctx, repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check repository: %w", err)
 	}
@@ -365,24 +701,29 @@ func (c *Client) GetRemoteBranches(repoPath string) ([]string, error) {
 		return nil, fmt.Errorf("not a git repository: %s", repoPath)
 	}
 
-	// Use git command to list all remote branches
-	cmd := exec.Command(c.gitCommand, "branch", "-r", "--format=%(refname:short)")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
+	// Open the repository
+	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		// If there are no remotes, this is not an error
-		if strings.Contains(err.Error(), "fatal: No remote refs") {
-			return []string{}, nil
-		}
-		return nil, fmt.Errorf("failed to list remote branches: %w", err)
+		return nil, fmt.Errorf("failed to open repository: %w", err)
 	}
 
-	lines := strings.Split(string(output), "\n")
+	// Get remote references
+	remotes, err := repo.Remotes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remotes: %w", err)
+	}
+
 	var branches []string
-	for _, line := range lines {
-		branch := strings.TrimSpace(line)
-		if branch != "" && !strings.Contains(branch, "HEAD ->") {
-			branches = append(branches, branch)
+	for _, remote := range remotes {
+		refs, err := remote.List(&git.ListOptions{})
+		if err != nil {
+			continue // Skip remotes that can't be listed
+		}
+
+		for _, ref := range refs {
+			if ref.Name().IsRemote() && !strings.Contains(ref.Name().String(), "HEAD") {
+				branches = append(branches, ref.Name().Short())
+			}
 		}
 	}
 
@@ -390,19 +731,26 @@ func (c *Client) GetRemoteBranches(repoPath string) ([]string, error) {
 }
 
 // BranchExists checks if a branch exists in the repository
-func (c *Client) BranchExists(repoPath, branch string) bool {
+func (c *Client) BranchExists(ctx context.Context, repoPath, branch string) bool {
 	if repoPath == "" || branch == "" {
 		return false
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return false
+	default:
+	}
+
 	// First check if it's a git repository
-	isRepo, err := c.IsGitRepository(repoPath)
+	isRepo, err := c.IsGitRepository(ctx, repoPath)
 	if err != nil || !isRepo {
 		return false
 	}
 
 	// Check local branches first
-	branches, err := c.GetAllBranches(repoPath)
+	branches, err := c.GetAllBranches(ctx, repoPath)
 	if err == nil {
 		for _, b := range branches {
 			if b == branch {
@@ -412,7 +760,7 @@ func (c *Client) BranchExists(repoPath, branch string) bool {
 	}
 
 	// Check remote branches
-	remoteBranches, err := c.GetRemoteBranches(repoPath)
+	remoteBranches, err := c.GetRemoteBranches(ctx, repoPath)
 	if err == nil {
 		for _, b := range remoteBranches {
 			// Extract branch name from remote/branch format
@@ -427,26 +775,42 @@ func (c *Client) BranchExists(repoPath, branch string) bool {
 }
 
 // HasUncommittedChanges checks if the repository has any uncommitted changes
-func (c *Client) HasUncommittedChanges(repoPath string) bool {
+func (c *Client) HasUncommittedChanges(ctx context.Context, repoPath string) bool {
 	if repoPath == "" {
 		return false
 	}
 
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return false
+	default:
+	}
+
 	// First check if it's a git repository
-	isRepo, err := c.IsGitRepository(repoPath)
+	isRepo, err := c.IsGitRepository(ctx, repoPath)
 	if err != nil || !isRepo {
 		return false
 	}
 
-	// Use git status --porcelain to check for changes
-	cmd := exec.Command(c.gitCommand, "status", "--porcelain")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
+	// Open the repository
+	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		// If we can't check status, assume there are no changes
 		return false
 	}
 
-	// If output is not empty, there are uncommitted changes
-	return strings.TrimSpace(string(output)) != ""
+	// Get the worktree
+	wt, err := repo.Worktree()
+	if err != nil {
+		return false
+	}
+
+	// Get status
+	status, err := wt.Status()
+	if err != nil {
+		return false
+	}
+
+	// Check if status is clean
+	return !status.IsClean()
 }
