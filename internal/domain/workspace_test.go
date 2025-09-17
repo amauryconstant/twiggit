@@ -240,7 +240,7 @@ func (s *WorkspaceTestSuite) TestWorkspace_EnhancedFeatures() {
 
 		// This should fail initially - we need to add path validation
 		isValid, err := workspace.ValidatePathExists()
-		s.Error(err)
+		s.Require().Error(err)
 		s.False(isValid)
 	})
 
@@ -318,7 +318,7 @@ func (s *WorkspaceTestSuite) TestWorkspace_EnhancedFeatures() {
 
 		// This should fail initially - we need to add project discovery
 		discovered, err := workspace.DiscoverProjects()
-		s.NoError(err) // Should not fail for minimal implementation
+		s.Require().NoError(err) // Should not fail for minimal implementation
 		s.Empty(discovered)
 	})
 

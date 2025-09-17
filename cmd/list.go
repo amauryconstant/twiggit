@@ -1,3 +1,4 @@
+// Package cmd contains the CLI command definitions for twiggit
 package cmd
 
 import (
@@ -23,7 +24,7 @@ Examples:
   twiggit list
   twiggit list --all-projects
   twiggit list --format=json`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// TODO: Implement list logic
 			fmt.Println("List command - not yet implemented")
 			return nil

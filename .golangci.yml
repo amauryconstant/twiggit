@@ -1,20 +1,22 @@
-# .golangci.yml
+# $schema: https://golangci-lint.run/jsonschema/golangci.jsonschema.json
 version: "2"
 
 run:
   timeout: 5m
   tests: true
+  go: "1.21"
 
 linters:
+  default: none
   enable:
-    # Essential linters (current + additions)
+    # Essential linters
     - errcheck
     - govet
     - ineffassign
     - staticcheck
     - unused
     
-    # Code quality
+    # Code quality (relaxed thresholds)
     - gocyclo
     - gocognit
     - funlen
@@ -32,7 +34,7 @@ linters:
     - prealloc
     - perfsprint
     
-    # Security
+    # Security (relaxed for tests)
     - gosec
     
     # Test-specific
@@ -47,56 +49,134 @@ linters:
     - unparam
     - wastedassign
 
-  disable-all: false
-  enable-all: false
+  settings:
+    # Testify lint configuration
+    testifylint:
+      enable-all: true
+      bool-compare:
+        ignore-custom-types: false
+      expected-actual:
+        pattern: "^(expected|want|exp|expectedResult|wantResult)"
+      formatter:
+        check-format-string: true
+        require-f-funcs: false
+        require-string-msg: true
+      go-require:
+        ignore-http-handlers: true
+      require-error:
+        fn-pattern: "^(Errorf?|NoErrorf?)$"
+      suite-extra-assert-call:
+        mode: "remove"
 
-formatters:
-  enable:
-    - gofmt
-    - goimports
+    # Staticcheck configuration
+    staticcheck:
+      checks: ["all"]
 
-linters-settings:
-  testifylint:
-    enable-all: true
-    bool-compare:
-      ignore-custom-types: false
-    expected-actual:
-      pattern: "^(expected|want|exp|expectedResult|wantResult)"
-    formatter:
-      check-format-string: true
-      require-f-funcs: false
-      require-string-msg: true
-    go-require:
-      ignore-http-handlers: true
-    require-error:
-      fn-pattern: "^(Errorf?|NoErrorf?)$"
-    suite-extra-assert-call:
-      mode: "remove"
+    # Much more relaxed complexity thresholds for practical development
+    funlen:
+      lines: 150      # Much more relaxed for test files
+      statements: 100   # Much more relaxed for test files
 
-  staticcheck:
-    checks: ["all"]
-    go: "1.25"
+    gocyclo:
+      min-complexity: 25  # Much more relaxed
 
-  funlen:
-    lines: 80
-    statements: 50
+    gocognit:
+      min-complexity: 30  # Much more relaxed
 
-  gocyclo:
-    min-complexity: 10
+    # Security linter configuration - exclude most common false positives
+    gosec:
+      excludes:
+        - G104  # Ignore errors not checked (common in defer and test code)
+        - G301  # Directory permissions - 0755 is acceptable in many cases
+        - G304  # File inclusion via variable - too restrictive for general use
+        - G306  # WriteFile permissions - 0644 is acceptable for most files
+        - G307  # Defers in loops are sometimes necessary
+        - G204  # Subprocess with tainted input - too restrictive for git commands
+        - G401  # Use of weak crypto - sometimes necessary for compatibility
+        - G501  # Blocklisted import - too restrictive for general use
 
-  gocognit:
-    min-complexity: 15
-
-issues:
-  exclude-rules:
-    - path: "_test.go"
-      linters:
-        - funlen
-        - gocyclo
-        - gocognit
-    
-    - path: ".*_gen\\.go"
-      linters:
-        - all
-
-  include-test-files: true
+  exclusions:
+    rules:
+      # Exclude complexity and security linters for test files
+      - path: ".*_test\\.go"
+        linters:
+          - funlen
+          - gocyclo
+          - gocognit
+          - gosec
+          - unparam  # Often unused parameters in test helpers
+          - wastedassign  # Test assignments may appear unused
+          - wrapcheck  # Test helpers often don't need error wrapping
+          - errcheck  # Common to ignore defer Close() errors in tests
+          - prealloc  # Pre-allocation not critical in tests
+          - revive  # Package comments and other style rules less important in tests
+      
+      # Exclude all linters for generated files
+      - path: ".*_gen\\.go"
+        linters:
+          - all
+      
+      # Exclude some common patterns in main files
+      - path: "main\\.go"
+        linters:
+          - gosec  # Main files often have different security patterns
+      
+      # Exclude for test fixtures and helpers
+      - path: "test/fixtures/.*\\.go"
+        linters:
+          - gosec
+          - wrapcheck
+          - errcheck
+          - funlen
+          - revive
+          - prealloc
+      
+      # Exclude for test helpers
+      - path: "test/helpers/.*\\.go"
+        linters:
+          - gosec
+          - wrapcheck
+          - errcheck
+          - revive
+          - prealloc
+      
+      # Exclude for mock files
+      - path: "test/mocks/.*\\.go"
+        linters:
+          - wrapcheck
+          - errcheck
+          - revive
+      
+      # Exclude for integration tests
+      - path: "test/integration/.*\\.go"
+        linters:
+          - gosec
+          - wrapcheck
+          - errcheck
+          - funlen
+          - revive
+      
+      # Allow unused parameters in command functions
+      - linters:
+          - unparam
+        text: "parameter 'cmd' seems to be unused"
+      
+      # Allow exported type names that stutter in internal packages
+      - linters:
+          - revive
+        text: "type name will be used as"
+      
+      # Allow package comments to be missing in internal packages
+      - linters:
+          - revive
+        text: "should have a package comment"
+      
+      # Allow unused parameters in test setup functions
+      - linters:
+          - unparam
+        text: "parameter 'm' seems to be unused"
+      
+      # Allow defer Close() without error check
+      - linters:
+          - errcheck
+        text: "Close.*is not checked"

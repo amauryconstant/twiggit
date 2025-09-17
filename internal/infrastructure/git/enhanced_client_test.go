@@ -115,10 +115,10 @@ func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_GetRepositoryRoot() {
 			root, err := s.Client.GetRepositoryRoot(path)
 
 			if tt.expectError {
-				s.Error(err)
+				s.Require().Error(err)
 				s.Empty(root)
 			} else {
-				s.NoError(err)
+				s.Require().NoError(err)
 				s.NotEmpty(root)
 				// Verify the root is actually a git repository
 				isRepo, _ := s.Client.IsGitRepository(root)
@@ -136,7 +136,7 @@ func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_GetCurrentBranch() {
 
 		branch, err := s.Client.GetCurrentBranch(repoPath)
 
-		s.NoError(err)
+		s.Require().NoError(err)
 		// Should be either "main" or "master" depending on git version
 		s.Contains([]string{"main", "master"}, branch)
 	})
@@ -167,7 +167,7 @@ func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_GetAllBranches() {
 
 		branches, err := s.Client.GetAllBranches(repoPath)
 
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.GreaterOrEqual(len(branches), 4) // main/master + 3 test branches
 
 		// Check that our test branches are included
@@ -198,7 +198,7 @@ func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_GetRemoteBranches() {
 
 		branches, err := s.Client.GetRemoteBranches(repoPath)
 
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.Empty(branches)
 	})
 
@@ -303,17 +303,17 @@ func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_Integration() {
 
 		// Test repository root
 		root, err := s.Client.GetRepositoryRoot(repoPath)
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.Equal(repoPath, root)
 
 		// Test current branch
 		currentBranch, err := s.Client.GetCurrentBranch(repoPath)
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.NotEmpty(currentBranch)
 
 		// Test all branches
 		allBranches, err := s.Client.GetAllBranches(repoPath)
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.GreaterOrEqual(len(allBranches), 3) // main/master + 2 test branches
 
 		// Test branch existence
@@ -329,16 +329,16 @@ func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_Integration() {
 		// Create worktree and test it
 		worktreePath := filepath.Join(repoPath, "worktrees", "feature-a-wt")
 		err = s.Client.CreateWorktree(repoPath, "feature-a", worktreePath)
-		s.NoError(err)
+		s.Require().NoError(err)
 
 		// Verify worktree was created
 		worktrees, err := s.Client.ListWorktrees(repoPath)
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.GreaterOrEqual(len(worktrees), 2) // main repo + new worktree
 
 		// Clean up
 		err = s.Client.RemoveWorktree(repoPath, worktreePath, false)
-		s.NoError(err)
+		s.Require().NoError(err)
 	})
 }
 

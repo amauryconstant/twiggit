@@ -1,6 +1,7 @@
-package types
+// Package domain contains core business entities and interfaces for twiggit
+package domain
 
-import "fmt"
+import "errors"
 
 // WorktreeInfo represents information about a Git worktree
 type WorktreeInfo struct {
@@ -17,10 +18,10 @@ type WorktreeInfo struct {
 // Validate checks if the WorktreeInfo is valid
 func (w *WorktreeInfo) Validate() error {
 	if w.Path == "" {
-		return fmt.Errorf("path cannot be empty")
+		return errors.New("path cannot be empty")
 	}
 	if w.Branch == "" {
-		return fmt.Errorf("branch cannot be empty")
+		return errors.New("branch cannot be empty")
 	}
 	return nil
 }

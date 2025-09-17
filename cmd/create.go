@@ -1,3 +1,4 @@
+// Package cmd contains the CLI command definitions for twiggit
 package cmd
 
 import (
@@ -21,7 +22,7 @@ Examples:
   twiggit create --from=main hotfix/critical-bug
   twiggit create  # Interactive mode`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// TODO: Implement create logic
 			fmt.Println("Create command - not yet implemented")
 			return nil

@@ -1,3 +1,4 @@
+// Package helpers contains test utilities for twiggit
 package helpers
 
 import (

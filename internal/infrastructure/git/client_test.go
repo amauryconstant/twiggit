@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/amaury/twiggit/pkg/types"
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -575,13 +575,13 @@ func (s *GitClientTestSuite) TestGitClient_RemoveWorktree() {
 func (s *GitClientTestSuite) TestWorktreeInfo_Validation() {
 	testCases := []struct {
 		name        string
-		worktree    types.WorktreeInfo
+		worktree    domain.WorktreeInfo
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "valid worktree info",
-			worktree: types.WorktreeInfo{
+			worktree: domain.WorktreeInfo{
 				Path:   "/valid/path",
 				Branch: "main",
 				Commit: "abc123",
@@ -591,7 +591,7 @@ func (s *GitClientTestSuite) TestWorktreeInfo_Validation() {
 		},
 		{
 			name: "empty path",
-			worktree: types.WorktreeInfo{
+			worktree: domain.WorktreeInfo{
 				Path:   "",
 				Branch: "main",
 				Commit: "abc123",
@@ -601,7 +601,7 @@ func (s *GitClientTestSuite) TestWorktreeInfo_Validation() {
 		},
 		{
 			name: "empty branch",
-			worktree: types.WorktreeInfo{
+			worktree: domain.WorktreeInfo{
 				Path:   "/valid/path",
 				Branch: "",
 				Commit: "abc123",

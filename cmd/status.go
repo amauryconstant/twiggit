@@ -1,3 +1,4 @@
+// Package cmd contains the CLI command definitions for twiggit
 package cmd
 
 import (
@@ -23,7 +24,7 @@ Examples:
   twiggit status
   twiggit status --global
   twiggit status --project myproject`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// TODO: Implement status logic
 			fmt.Println("Status command - not yet implemented")
 			return nil

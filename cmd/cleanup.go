@@ -1,3 +1,4 @@
+// Package cmd contains the CLI command definitions for twiggit
 package cmd
 
 import (
@@ -27,7 +28,7 @@ Examples:
   twiggit cleanup
   twiggit cleanup --dry-run
   twiggit cleanup --force --merged-only`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// TODO: Implement cleanup logic
 			fmt.Println("Cleanup command - not yet implemented")
 			return nil

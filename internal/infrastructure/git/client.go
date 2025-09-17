@@ -1,13 +1,15 @@
+// Package git provides Git client implementations for twiggit
 package git
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
-	"github.com/amaury/twiggit/pkg/types"
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/go-git/go-git/v5"
 )
 
@@ -26,7 +28,7 @@ func NewClient() *Client {
 // IsGitRepository checks if the given path is a Git repository
 func (c *Client) IsGitRepository(path string) (bool, error) {
 	if path == "" {
-		return false, fmt.Errorf("path cannot be empty")
+		return false, errors.New("path cannot be empty")
 	}
 
 	// Check if path exists
@@ -46,7 +48,7 @@ func (c *Client) IsGitRepository(path string) (bool, error) {
 // IsMainRepository checks if the path is a main git repository (not a worktree)
 func (c *Client) IsMainRepository(path string) (bool, error) {
 	if path == "" {
-		return false, fmt.Errorf("path cannot be empty")
+		return false, errors.New("path cannot be empty")
 	}
 
 	// Check if it's a git repository first
@@ -59,7 +61,7 @@ func (c *Client) IsMainRepository(path string) (bool, error) {
 	gitPath := filepath.Join(path, ".git")
 	info, err := os.Stat(gitPath)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to stat .git directory: %w", err)
 	}
 
 	// If .git is a directory, it's a main repository
@@ -68,9 +70,9 @@ func (c *Client) IsMainRepository(path string) (bool, error) {
 }
 
 // ListWorktrees returns all worktrees for the given repository
-func (c *Client) ListWorktrees(repoPath string) ([]*types.WorktreeInfo, error) {
+func (c *Client) ListWorktrees(repoPath string) ([]*domain.WorktreeInfo, error) {
 	if repoPath == "" {
-		return nil, fmt.Errorf("repository path cannot be empty")
+		return nil, errors.New("repository path cannot be empty")
 	}
 
 	// First check if it's a git repository
@@ -96,13 +98,13 @@ func (c *Client) ListWorktrees(repoPath string) ([]*types.WorktreeInfo, error) {
 // CreateWorktree creates a new worktree from the specified branch
 func (c *Client) CreateWorktree(repoPath, branch, targetPath string) error {
 	if repoPath == "" {
-		return fmt.Errorf("repository path cannot be empty")
+		return errors.New("repository path cannot be empty")
 	}
 	if branch == "" {
-		return fmt.Errorf("branch name cannot be empty")
+		return errors.New("branch name cannot be empty")
 	}
 	if targetPath == "" {
-		return fmt.Errorf("target path cannot be empty")
+		return errors.New("target path cannot be empty")
 	}
 
 	// Ensure target directory doesn't exist
@@ -124,7 +126,7 @@ func (c *Client) CreateWorktree(repoPath, branch, targetPath string) error {
 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to create worktree: %v, output: %s", err, string(output))
+		return fmt.Errorf("failed to create worktree: %w, output: %s", err, string(output))
 	}
 
 	return nil
@@ -133,10 +135,10 @@ func (c *Client) CreateWorktree(repoPath, branch, targetPath string) error {
 // RemoveWorktree removes an existing worktree
 func (c *Client) RemoveWorktree(repoPath, worktreePath string, force bool) error {
 	if repoPath == "" {
-		return fmt.Errorf("repository path cannot be empty")
+		return errors.New("repository path cannot be empty")
 	}
 	if worktreePath == "" {
-		return fmt.Errorf("worktree path cannot be empty")
+		return errors.New("worktree path cannot be empty")
 	}
 
 	// Check if worktree path exists
@@ -154,16 +156,16 @@ func (c *Client) RemoveWorktree(repoPath, worktreePath string, force bool) error
 	cmd := exec.Command(c.gitCommand, args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to remove worktree: %v, output: %s", err, string(output))
+		return fmt.Errorf("failed to remove worktree: %w, output: %s", err, string(output))
 	}
 
 	return nil
 }
 
 // GetWorktreeStatus returns the status of a specific worktree
-func (c *Client) GetWorktreeStatus(worktreePath string) (*types.WorktreeInfo, error) {
+func (c *Client) GetWorktreeStatus(worktreePath string) (*domain.WorktreeInfo, error) {
 	if worktreePath == "" {
-		return nil, fmt.Errorf("worktree path cannot be empty")
+		return nil, errors.New("worktree path cannot be empty")
 	}
 
 	// Check if worktree exists
@@ -207,7 +209,7 @@ func (c *Client) GetWorktreeStatus(worktreePath string) (*types.WorktreeInfo, er
 	}
 	clean := len(strings.TrimSpace(string(statusOutput))) == 0
 
-	return &types.WorktreeInfo{
+	return &domain.WorktreeInfo{
 		Path:   worktreePath,
 		Branch: branch,
 		Commit: commit,
@@ -216,10 +218,10 @@ func (c *Client) GetWorktreeStatus(worktreePath string) (*types.WorktreeInfo, er
 }
 
 // parseWorktreeList parses the output of `git worktree list --porcelain`
-func (c *Client) parseWorktreeList(output string) ([]*types.WorktreeInfo, error) {
+func (c *Client) parseWorktreeList(output string) ([]*domain.WorktreeInfo, error) {
 	lines := strings.Split(output, "\n")
-	var worktrees []*types.WorktreeInfo
-	var current *types.WorktreeInfo
+	var worktrees []*domain.WorktreeInfo
+	var current *domain.WorktreeInfo
 
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -235,7 +237,7 @@ func (c *Client) parseWorktreeList(output string) ([]*types.WorktreeInfo, error)
 			if current != nil {
 				worktrees = append(worktrees, current)
 			}
-			current = &types.WorktreeInfo{
+			current = &domain.WorktreeInfo{
 				Path: strings.TrimPrefix(line, "worktree "),
 			}
 		} else if strings.HasPrefix(line, "branch ") && current != nil {
@@ -263,7 +265,7 @@ func (c *Client) parseWorktreeList(output string) ([]*types.WorktreeInfo, error)
 // GetRepositoryRoot finds and returns the root directory of the git repository
 func (c *Client) GetRepositoryRoot(path string) (string, error) {
 	if path == "" {
-		return "", fmt.Errorf("path cannot be empty")
+		return "", errors.New("path cannot be empty")
 	}
 
 	// Check if path exists
@@ -286,7 +288,7 @@ func (c *Client) GetRepositoryRoot(path string) (string, error) {
 // GetCurrentBranch returns the name of the currently checked out branch
 func (c *Client) GetCurrentBranch(repoPath string) (string, error) {
 	if repoPath == "" {
-		return "", fmt.Errorf("repository path cannot be empty")
+		return "", errors.New("repository path cannot be empty")
 	}
 
 	// First check if it's a git repository
@@ -316,7 +318,7 @@ func (c *Client) GetCurrentBranch(repoPath string) (string, error) {
 // GetAllBranches returns all local branches in the repository
 func (c *Client) GetAllBranches(repoPath string) ([]string, error) {
 	if repoPath == "" {
-		return nil, fmt.Errorf("repository path cannot be empty")
+		return nil, errors.New("repository path cannot be empty")
 	}
 
 	// First check if it's a git repository
@@ -351,7 +353,7 @@ func (c *Client) GetAllBranches(repoPath string) ([]string, error) {
 // GetRemoteBranches returns all remote branches in the repository
 func (c *Client) GetRemoteBranches(repoPath string) ([]string, error) {
 	if repoPath == "" {
-		return nil, fmt.Errorf("repository path cannot be empty")
+		return nil, errors.New("repository path cannot be empty")
 	}
 
 	// First check if it's a git repository

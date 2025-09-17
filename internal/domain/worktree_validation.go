@@ -1,4 +1,4 @@
-package types
+package domain
 
 import (
 	"fmt"
@@ -229,7 +229,7 @@ func ValidatePathWritable(path string) *ValidationResult {
 			ErrPathNotWritable,
 			"parent directory does not exist",
 			path,
-		).WithSuggestion(fmt.Sprintf("Create the parent directory: %s", parentDir)))
+		).WithSuggestion("Create the parent directory: " + parentDir))
 		return result
 	}
 

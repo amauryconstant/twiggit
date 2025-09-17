@@ -1,3 +1,4 @@
+// Package cmd contains the CLI command definitions for twiggit
 package cmd
 
 import (
@@ -20,7 +21,7 @@ Examples:
   twiggit switch /path/to/worktree
   twiggit switch  # Interactive mode`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			// TODO: Implement switch logic
 			fmt.Println("Switch command - not yet implemented")
 			return nil

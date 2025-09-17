@@ -1,6 +1,8 @@
+// Package domain contains core business entities and interfaces for twiggit
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"os"
 )
@@ -22,10 +24,10 @@ type Project struct {
 // NewProject creates a new Project instance with validation
 func NewProject(name, gitRepo string) (*Project, error) {
 	if name == "" {
-		return nil, fmt.Errorf("project name cannot be empty")
+		return nil, errors.New("project name cannot be empty")
 	}
 	if gitRepo == "" {
-		return nil, fmt.Errorf("git repository path cannot be empty")
+		return nil, errors.New("git repository path cannot be empty")
 	}
 
 	return &Project{
