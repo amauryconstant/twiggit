@@ -159,3 +159,147 @@ func TestWorkspace_GetWorktreeByPath(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "worktree not found")
 }
+
+func TestWorkspace_EnhancedFeatures(t *testing.T) {
+	t.Run("should validate workspace path existence", func(t *testing.T) {
+		workspace, err := NewWorkspace("/non/existent/workspace")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add path validation
+		isValid, err := workspace.ValidatePathExists()
+		assert.Error(t, err)
+		assert.False(t, isValid)
+	})
+
+	t.Run("should provide workspace statistics", func(t *testing.T) {
+		workspace, err := NewWorkspace("/workspace")
+		require.NoError(t, err)
+
+		// Add projects with worktrees
+		project1, _ := NewProject("project1", "/repo1")
+		project2, _ := NewProject("project2", "/repo2")
+
+		worktree1, _ := NewWorktree("/path1", "main")
+		worktree2, _ := NewWorktree("/path2", "feature")
+		worktree3, _ := NewWorktree("/path3", "develop")
+
+		require.NoError(t, project1.AddWorktree(worktree1))
+		require.NoError(t, project1.AddWorktree(worktree2))
+		require.NoError(t, project2.AddWorktree(worktree3))
+
+		require.NoError(t, workspace.AddProject(project1))
+		require.NoError(t, workspace.AddProject(project2))
+
+		// This should fail initially - we need to add statistics
+		stats := workspace.GetStatistics()
+		assert.NotNil(t, stats)
+		assert.Equal(t, 2, stats.ProjectCount)
+		assert.Equal(t, 3, stats.TotalWorktreeCount)
+		assert.Equal(t, 3, stats.UnknownWorktreeCount)
+		assert.Equal(t, 0, stats.CleanWorktreeCount)
+		assert.Equal(t, 0, stats.DirtyWorktreeCount)
+		assert.Equal(t, 3, len(stats.AllBranches))
+	})
+
+	t.Run("should support workspace configuration", func(t *testing.T) {
+		workspace, err := NewWorkspace("/workspace")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add configuration support
+		workspace.SetConfig("scan-depth", 3)
+		workspace.SetConfig("exclude-patterns", []string{".git", "node_modules"})
+		workspace.SetConfig("auto-discover", true)
+
+		value, exists := workspace.GetConfig("scan-depth")
+		assert.True(t, exists)
+		assert.Equal(t, 3, value)
+
+		value, exists = workspace.GetConfig("auto-discover")
+		assert.True(t, exists)
+		assert.Equal(t, true, value)
+
+		patterns, exists := workspace.GetConfig("exclude-patterns")
+		assert.True(t, exists)
+		assert.Equal(t, []string{".git", "node_modules"}, patterns)
+
+		_, exists = workspace.GetConfig("non-existent")
+		assert.False(t, exists)
+	})
+
+	t.Run("should provide workspace health check", func(t *testing.T) {
+		workspace, err := NewWorkspace("/workspace")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add health check
+		health := workspace.GetHealth()
+		assert.NotNil(t, health)
+		assert.Equal(t, "unhealthy", health.Status)
+		assert.Contains(t, health.Issues, "workspace path not validated")
+		assert.Equal(t, 0, health.ProjectCount)
+		assert.Equal(t, 0, health.WorktreeCount)
+	})
+
+	t.Run("should support project discovery", func(t *testing.T) {
+		workspace, err := NewWorkspace("/workspace")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add project discovery
+		discovered, err := workspace.DiscoverProjects()
+		assert.NoError(t, err) // Should not fail for minimal implementation
+		assert.Empty(t, discovered)
+	})
+
+	t.Run("should support workspace metadata", func(t *testing.T) {
+		workspace, err := NewWorkspace("/workspace")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add metadata support
+		workspace.SetMetadata("created-at", "2023-01-01")
+		workspace.SetMetadata("last-scanned", "2023-01-02")
+		workspace.SetMetadata("version", "1.0.0")
+
+		value, exists := workspace.GetMetadata("created-at")
+		assert.True(t, exists)
+		assert.Equal(t, "2023-01-01", value)
+
+		value, exists = workspace.GetMetadata("version")
+		assert.True(t, exists)
+		assert.Equal(t, "1.0.0", value)
+
+		_, exists = workspace.GetMetadata("non-existent")
+		assert.False(t, exists)
+	})
+
+	t.Run("should support worktree search and filtering", func(t *testing.T) {
+		workspace, err := NewWorkspace("/workspace")
+		require.NoError(t, err)
+
+		// Add projects with worktrees
+		project1, _ := NewProject("project1", "/repo1")
+		project2, _ := NewProject("project2", "/repo2")
+
+		worktree1, _ := NewWorktree("/path1", "main")
+		worktree2, _ := NewWorktree("/path2", "feature-1")
+		worktree3, _ := NewWorktree("/path3", "feature-2")
+
+		require.NoError(t, project1.AddWorktree(worktree1))
+		require.NoError(t, project1.AddWorktree(worktree2))
+		require.NoError(t, project2.AddWorktree(worktree3))
+
+		require.NoError(t, workspace.AddProject(project1))
+		require.NoError(t, workspace.AddProject(project2))
+
+		// This should fail initially - we need to add search functionality
+		mainWorktrees := workspace.FindWorktreesByBranch("main")
+		assert.Len(t, mainWorktrees, 1)
+
+		featureWorktrees := workspace.FindWorktreesByBranchPattern("feature-*")
+		assert.Len(t, featureWorktrees, 2)
+
+		project1Worktrees := workspace.FindWorktreesByProject("project1")
+		assert.Len(t, project1Worktrees, 2)
+
+		cleanWorktrees := workspace.FindWorktreesByStatus(StatusClean)
+		assert.Len(t, cleanWorktrees, 0) // None are clean yet
+	})
+}

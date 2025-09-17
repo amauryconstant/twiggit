@@ -27,18 +27,23 @@ func (w *WorktreeInfo) Validate() error {
 
 // GitClient interface defines Git operations for worktree management
 type GitClient interface {
-	// IsGitRepository checks if the given path is a Git repository
+	// Repository operations
 	IsGitRepository(path string) (bool, error)
+	IsMainRepository(path string) (bool, error)
+	GetRepositoryRoot(path string) (string, error)
 
-	// ListWorktrees returns all worktrees for the given repository
+	// Worktree operations
 	ListWorktrees(repoPath string) ([]*WorktreeInfo, error)
-
-	// CreateWorktree creates a new worktree from the specified branch
 	CreateWorktree(repoPath, branch, targetPath string) error
-
-	// RemoveWorktree removes an existing worktree
-	RemoveWorktree(repoPath, worktreePath string) error
-
-	// GetWorktreeStatus returns the status of a specific worktree
+	RemoveWorktree(repoPath, worktreePath string, force bool) error
 	GetWorktreeStatus(worktreePath string) (*WorktreeInfo, error)
+
+	// Branch operations
+	GetCurrentBranch(repoPath string) (string, error)
+	GetAllBranches(repoPath string) ([]string, error)
+	GetRemoteBranches(repoPath string) ([]string, error)
+	BranchExists(repoPath, branch string) bool
+
+	// Status operations
+	HasUncommittedChanges(repoPath string) bool
 }
