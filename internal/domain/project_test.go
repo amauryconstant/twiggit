@@ -3,12 +3,29 @@ package domain
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestProject_NewProject(t *testing.T) {
-	tests := []struct {
+// ProjectTestSuite provides hybrid suite setup for project tests
+type ProjectTestSuite struct {
+	suite.Suite
+	Project   *Project
+	Workspace *Workspace
+}
+
+// SetupTest initializes domain objects for each test
+func (s *ProjectTestSuite) SetupTest() {
+	var err error
+	s.Project, err = NewProject("test-project", "/repo/path")
+	s.Require().NoError(err)
+
+	s.Workspace, err = NewWorkspace("/test/workspace")
+	s.Require().NoError(err)
+}
+
+// TestProject_NewProject tests project creation with table-driven approach
+func (s *ProjectTestSuite) TestProject_NewProject() {
+	testCases := []struct {
 		name         string
 		projectName  string
 		gitRepo      string
@@ -37,239 +54,467 @@ func TestProject_NewProject(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			project, err := NewProject(tt.projectName, tt.gitRepo)
 
 			if tt.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMessage)
-				assert.Nil(t, project)
+				s.Require().Error(err)
+				s.Contains(err.Error(), tt.errorMessage)
+				s.Nil(project)
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, project)
-				assert.Equal(t, tt.projectName, project.Name)
-				assert.Equal(t, tt.gitRepo, project.GitRepo)
-				assert.Empty(t, project.Worktrees)
+				s.Require().NoError(err)
+				s.Require().NotNil(project)
+				s.Equal(tt.projectName, project.Name)
+				s.Equal(tt.gitRepo, project.GitRepo)
+				s.Empty(project.Worktrees)
 			}
 		})
 	}
 }
 
-func TestProject_AddWorktree(t *testing.T) {
-	project, err := NewProject("test-project", "/repo/path")
-	require.NoError(t, err)
+// TestProject_AddWorktree tests adding worktrees with table-driven approach
+func (s *ProjectTestSuite) TestProject_AddWorktree() {
+	testCases := []struct {
+		name           string
+		setupWorktrees func() []*Worktree
+		addWorktree    *Worktree
+		expectError    bool
+		errorMessage   string
+		finalCount     int
+	}{
+		{
+			name: "should add first worktree",
+			setupWorktrees: func() []*Worktree {
+				return []*Worktree{}
+			},
+			addWorktree: func() *Worktree {
+				worktree, err := NewWorktree("/worktree/path", "feature-branch")
+				s.Require().NoError(err)
+				return worktree
+			}(),
+			expectError: false,
+			finalCount:  1,
+		},
+		{
+			name: "should add second worktree",
+			setupWorktrees: func() []*Worktree {
+				worktree, err := NewWorktree("/worktree/path", "feature-branch")
+				s.Require().NoError(err)
+				return []*Worktree{worktree}
+			},
+			addWorktree: func() *Worktree {
+				worktree, err := NewWorktree("/another/path", "main")
+				s.Require().NoError(err)
+				return worktree
+			}(),
+			expectError: false,
+			finalCount:  2,
+		},
+		{
+			name: "should reject duplicate worktree path",
+			setupWorktrees: func() []*Worktree {
+				worktree, err := NewWorktree("/worktree/path", "feature-branch")
+				s.Require().NoError(err)
+				return []*Worktree{worktree}
+			},
+			addWorktree: func() *Worktree {
+				worktree, err := NewWorktree("/worktree/path", "different-branch")
+				s.Require().NoError(err)
+				return worktree
+			}(),
+			expectError:  true,
+			errorMessage: "worktree already exists at path",
+			finalCount:   1,
+		},
+	}
 
-	worktree, err := NewWorktree("/worktree/path", "feature-branch")
-	require.NoError(t, err)
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			// Setup project with initial worktrees
+			s.Project.Worktrees = tt.setupWorktrees()
 
-	// Add first worktree
-	err = project.AddWorktree(worktree)
-	require.NoError(t, err)
-	assert.Len(t, project.Worktrees, 1)
-	assert.Equal(t, worktree, project.Worktrees[0])
+			// Add worktree
+			err := s.Project.AddWorktree(tt.addWorktree)
 
-	// Add second worktree
-	worktree2, err := NewWorktree("/another/path", "main")
-	require.NoError(t, err)
+			if tt.expectError {
+				s.Require().Error(err)
+				s.Contains(err.Error(), tt.errorMessage)
+			} else {
+				s.Require().NoError(err)
+			}
 
-	err = project.AddWorktree(worktree2)
-	require.NoError(t, err)
-	assert.Len(t, project.Worktrees, 2)
-
-	// Try to add duplicate worktree path
-	duplicateWorktree, err := NewWorktree("/worktree/path", "different-branch")
-	require.NoError(t, err)
-
-	err = project.AddWorktree(duplicateWorktree)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "worktree already exists at path")
-	assert.Len(t, project.Worktrees, 2) // Should not be added
+			// Verify final state
+			s.Len(s.Project.Worktrees, tt.finalCount)
+		})
+	}
 }
 
-func TestProject_RemoveWorktree(t *testing.T) {
-	project, err := NewProject("test-project", "/repo/path")
-	require.NoError(t, err)
+// TestProject_RemoveWorktree tests removing worktrees with table-driven approach
+func (s *ProjectTestSuite) TestProject_RemoveWorktree() {
+	testCases := []struct {
+		name           string
+		setupWorktrees func() []*Worktree
+		removePath     string
+		expectError    bool
+		errorMessage   string
+		finalCount     int
+	}{
+		{
+			name: "should remove existing worktree",
+			setupWorktrees: func() []*Worktree {
+				worktree, err := NewWorktree("/worktree/path", "feature-branch")
+				s.Require().NoError(err)
+				return []*Worktree{worktree}
+			},
+			removePath:  "/worktree/path",
+			expectError: false,
+			finalCount:  0,
+		},
+		{
+			name: "should handle non-existent worktree",
+			setupWorktrees: func() []*Worktree {
+				worktree, err := NewWorktree("/worktree/path", "feature-branch")
+				s.Require().NoError(err)
+				return []*Worktree{worktree}
+			},
+			removePath:   "/nonexistent/path",
+			expectError:  true,
+			errorMessage: "worktree not found at path",
+			finalCount:   1,
+		},
+		{
+			name: "should handle empty worktree list",
+			setupWorktrees: func() []*Worktree {
+				return []*Worktree{}
+			},
+			removePath:   "/nonexistent/path",
+			expectError:  true,
+			errorMessage: "worktree not found at path",
+			finalCount:   0,
+		},
+	}
 
-	worktree, err := NewWorktree("/worktree/path", "feature-branch")
-	require.NoError(t, err)
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			// Setup project with initial worktrees
+			s.Project.Worktrees = tt.setupWorktrees()
 
-	err = project.AddWorktree(worktree)
-	require.NoError(t, err)
+			// Remove worktree
+			err := s.Project.RemoveWorktree(tt.removePath)
 
-	// Remove existing worktree
-	err = project.RemoveWorktree("/worktree/path")
-	require.NoError(t, err)
-	assert.Empty(t, project.Worktrees)
+			if tt.expectError {
+				s.Require().Error(err)
+				s.Contains(err.Error(), tt.errorMessage)
+			} else {
+				s.Require().NoError(err)
+			}
 
-	// Try to remove non-existent worktree
-	err = project.RemoveWorktree("/nonexistent/path")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "worktree not found at path")
+			// Verify final state
+			s.Len(s.Project.Worktrees, tt.finalCount)
+		})
+	}
 }
 
-func TestProject_GetWorktree(t *testing.T) {
-	project, err := NewProject("test-project", "/repo/path")
-	require.NoError(t, err)
+// TestProject_GetWorktree tests getting worktrees with table-driven approach
+func (s *ProjectTestSuite) TestProject_GetWorktree() {
+	testCases := []struct {
+		name             string
+		setupWorktrees   func() []*Worktree
+		getPath          string
+		expectError      bool
+		errorMessage     string
+		expectedWorktree *Worktree
+	}{
+		{
+			name: "should get existing worktree",
+			setupWorktrees: func() []*Worktree {
+				worktree, err := NewWorktree("/worktree/path", "feature-branch")
+				s.Require().NoError(err)
+				return []*Worktree{worktree}
+			},
+			getPath:     "/worktree/path",
+			expectError: false,
+			expectedWorktree: func() *Worktree {
+				worktree, err := NewWorktree("/worktree/path", "feature-branch")
+				s.Require().NoError(err)
+				return worktree
+			}(),
+		},
+		{
+			name: "should handle non-existent worktree",
+			setupWorktrees: func() []*Worktree {
+				worktree, err := NewWorktree("/worktree/path", "feature-branch")
+				s.Require().NoError(err)
+				return []*Worktree{worktree}
+			},
+			getPath:          "/nonexistent/path",
+			expectError:      true,
+			errorMessage:     "worktree not found at path",
+			expectedWorktree: nil,
+		},
+		{
+			name: "should handle empty worktree list",
+			setupWorktrees: func() []*Worktree {
+				return []*Worktree{}
+			},
+			getPath:          "/nonexistent/path",
+			expectError:      true,
+			errorMessage:     "worktree not found at path",
+			expectedWorktree: nil,
+		},
+	}
 
-	worktree, err := NewWorktree("/worktree/path", "feature-branch")
-	require.NoError(t, err)
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			// Setup project with initial worktrees
+			s.Project.Worktrees = tt.setupWorktrees()
 
-	err = project.AddWorktree(worktree)
-	require.NoError(t, err)
+			// Get worktree
+			found, err := s.Project.GetWorktree(tt.getPath)
 
-	// Get existing worktree
-	found, err := project.GetWorktree("/worktree/path")
-	require.NoError(t, err)
-	assert.Equal(t, worktree, found)
-
-	// Get non-existent worktree
-	_, err = project.GetWorktree("/nonexistent/path")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "worktree not found at path")
+			if tt.expectError {
+				s.Require().Error(err)
+				s.Contains(err.Error(), tt.errorMessage)
+				s.Nil(found)
+			} else {
+				s.Require().NoError(err)
+				s.Require().NotNil(found)
+				s.Equal(tt.expectedWorktree.Path, found.Path)
+				s.Equal(tt.expectedWorktree.Branch, found.Branch)
+			}
+		})
+	}
 }
 
-func TestProject_ListBranches(t *testing.T) {
-	project, err := NewProject("test-project", "/repo/path")
-	require.NoError(t, err)
+// TestProject_ListBranches tests branch listing with table-driven approach
+func (s *ProjectTestSuite) TestProject_ListBranches() {
+	testCases := []struct {
+		name             string
+		setupWorktrees   func() []*Worktree
+		expectedCount    int
+		expectedBranches []string
+	}{
+		{
+			name: "should handle empty project",
+			setupWorktrees: func() []*Worktree {
+				return []*Worktree{}
+			},
+			expectedCount:    0,
+			expectedBranches: []string{},
+		},
+		{
+			name: "should list single branch",
+			setupWorktrees: func() []*Worktree {
+				worktree, err := NewWorktree("/path1", "main")
+				s.Require().NoError(err)
+				return []*Worktree{worktree}
+			},
+			expectedCount:    1,
+			expectedBranches: []string{"main"},
+		},
+		{
+			name: "should list multiple branches with deduplication",
+			setupWorktrees: func() []*Worktree {
+				worktree1, err := NewWorktree("/path1", "main")
+				s.Require().NoError(err)
+				worktree2, err := NewWorktree("/path2", "feature-1")
+				s.Require().NoError(err)
+				worktree3, err := NewWorktree("/path3", "feature-2")
+				s.Require().NoError(err)
+				worktree4, err := NewWorktree("/path4", "main") // Duplicate branch
+				s.Require().NoError(err)
+				return []*Worktree{worktree1, worktree2, worktree3, worktree4}
+			},
+			expectedCount:    3,
+			expectedBranches: []string{"main", "feature-1", "feature-2"},
+		},
+	}
 
-	// Empty project
-	branches := project.ListBranches()
-	assert.Empty(t, branches)
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			// Setup project with initial worktrees
+			s.Project.Worktrees = tt.setupWorktrees()
 
-	// Add worktrees
-	worktree1, _ := NewWorktree("/path1", "main")
-	worktree2, _ := NewWorktree("/path2", "feature-1")
-	worktree3, _ := NewWorktree("/path3", "feature-2")
-	worktree4, _ := NewWorktree("/path4", "main") // Duplicate branch
+			// List branches
+			branches := s.Project.ListBranches()
 
-	require.NoError(t, project.AddWorktree(worktree1))
-	require.NoError(t, project.AddWorktree(worktree2))
-	require.NoError(t, project.AddWorktree(worktree3))
-	require.NoError(t, project.AddWorktree(worktree4))
-
-	branches = project.ListBranches()
-	assert.Len(t, branches, 3) // Should deduplicate
-	assert.Contains(t, branches, "main")
-	assert.Contains(t, branches, "feature-1")
-	assert.Contains(t, branches, "feature-2")
+			// Verify results
+			s.Len(branches, tt.expectedCount)
+			for _, expectedBranch := range tt.expectedBranches {
+				s.Contains(branches, expectedBranch)
+			}
+		})
+	}
 }
 
-func TestProject_EnhancedFeatures(t *testing.T) {
-	t.Run("should support project metadata", func(t *testing.T) {
-		project, err := NewProject("test-project", "/repo/path")
-		require.NoError(t, err)
+// TestProject_EnhancedFeatures tests enhanced project features with table-driven approach
+func (s *ProjectTestSuite) TestProject_EnhancedFeatures() {
+	testCases := []struct {
+		name         string
+		setupProject func() *Project
+		testFunc     func(*Project)
+		expectError  bool
+		errorMessage string
+	}{
+		{
+			name: "should support project metadata",
+			setupProject: func() *Project {
+				project, err := NewProject("test-project", "/repo/path")
+				s.Require().NoError(err)
+				return project
+			},
+			testFunc: func(project *Project) {
+				// This should fail initially - we need to add metadata support
+				project.SetMetadata("description", "A test project")
+				project.SetMetadata("owner", "team-a")
+				project.SetMetadata("created-at", "2023-01-01")
 
-		// This should fail initially - we need to add metadata support
-		project.SetMetadata("description", "A test project")
-		project.SetMetadata("owner", "team-a")
-		project.SetMetadata("created-at", "2023-01-01")
+				value, exists := project.GetMetadata("description")
+				s.True(exists)
+				s.Equal("A test project", value)
 
-		value, exists := project.GetMetadata("description")
-		assert.True(t, exists)
-		assert.Equal(t, "A test project", value)
+				value, exists = project.GetMetadata("owner")
+				s.True(exists)
+				s.Equal("team-a", value)
 
-		value, exists = project.GetMetadata("owner")
-		assert.True(t, exists)
-		assert.Equal(t, "team-a", value)
+				_, exists = project.GetMetadata("non-existent")
+				s.False(exists)
+			},
+			expectError: false,
+		},
+		{
+			name: "should validate git repository existence",
+			setupProject: func() *Project {
+				project, err := NewProject("test-project", "/non/existent/repo")
+				s.Require().NoError(err)
+				return project
+			},
+			testFunc: func(project *Project) {
+				// This should fail initially - we need to add git repo validation
+				isValid, err := project.ValidateGitRepoExists()
+				s.Error(err)
+				s.False(isValid)
+			},
+			expectError: false,
+		},
+		{
+			name: "should provide worktree statistics",
+			setupProject: func() *Project {
+				project, err := NewProject("test-project", "/repo/path")
+				s.Require().NoError(err)
 
-		_, exists = project.GetMetadata("non-existent")
-		assert.False(t, exists)
-	})
+				// Add some worktrees
+				worktree1, _ := NewWorktree("/path1", "main")
+				worktree2, _ := NewWorktree("/path2", "feature-1")
+				worktree3, _ := NewWorktree("/path3", "feature-2")
 
-	t.Run("should validate git repository existence", func(t *testing.T) {
-		project, err := NewProject("test-project", "/non/existent/repo")
-		require.NoError(t, err)
+				s.Require().NoError(project.AddWorktree(worktree1))
+				s.Require().NoError(project.AddWorktree(worktree2))
+				s.Require().NoError(project.AddWorktree(worktree3))
+				return project
+			},
+			testFunc: func(project *Project) {
+				// This should fail initially - we need to add statistics
+				stats := project.GetWorktreeStatistics()
+				s.NotNil(stats)
+				s.Equal(3, stats.TotalCount)
+				s.Equal(3, stats.UnknownCount) // All start as unknown
+				s.Equal(0, stats.CleanCount)
+				s.Equal(0, stats.DirtyCount)
+				s.Len(stats.Branches, 3)
+			},
+			expectError: false,
+		},
+		{
+			name: "should provide project health check",
+			setupProject: func() *Project {
+				project, err := NewProject("test-project", "/repo/path")
+				s.Require().NoError(err)
+				return project
+			},
+			testFunc: func(project *Project) {
+				// This should fail initially - we need to add health check
+				health := project.GetHealth()
+				s.NotNil(health)
+				s.Equal("unhealthy", health.Status)
+				s.Contains(health.Issues, "git repository not validated")
+				s.Equal(0, health.WorktreeCount)
+			},
+			expectError: false,
+		},
+		{
+			name: "should support project configuration",
+			setupProject: func() *Project {
+				project, err := NewProject("test-project", "/repo/path")
+				s.Require().NoError(err)
+				return project
+			},
+			testFunc: func(project *Project) {
+				// This should fail initially - we need to add configuration support
+				project.SetConfig("max-worktrees", 10)
+				project.SetConfig("auto-cleanup", true)
+				project.SetConfig("default-branch", "main")
 
-		// This should fail initially - we need to add git repo validation
-		isValid, err := project.ValidateGitRepoExists()
-		assert.Error(t, err)
-		assert.False(t, isValid)
-	})
+				value, exists := project.GetConfig("max-worktrees")
+				s.True(exists)
+				s.Equal(10, value)
 
-	t.Run("should provide worktree statistics", func(t *testing.T) {
-		project, err := NewProject("test-project", "/repo/path")
-		require.NoError(t, err)
+				value, exists = project.GetConfig("auto-cleanup")
+				s.True(exists)
+				s.Equal(true, value)
 
-		// Add some worktrees
-		worktree1, _ := NewWorktree("/path1", "main")
-		worktree2, _ := NewWorktree("/path2", "feature-1")
-		worktree3, _ := NewWorktree("/path3", "feature-2")
+				value, exists = project.GetConfig("default-branch")
+				s.True(exists)
+				s.Equal("main", value)
 
-		require.NoError(t, project.AddWorktree(worktree1))
-		require.NoError(t, project.AddWorktree(worktree2))
-		require.NoError(t, project.AddWorktree(worktree3))
+				_, exists = project.GetConfig("non-existent")
+				s.False(exists)
+			},
+			expectError: false,
+		},
+		{
+			name: "should support worktree filtering",
+			setupProject: func() *Project {
+				project, err := NewProject("test-project", "/repo/path")
+				s.Require().NoError(err)
 
-		// This should fail initially - we need to add statistics
-		stats := project.GetWorktreeStatistics()
-		assert.NotNil(t, stats)
-		assert.Equal(t, 3, stats.TotalCount)
-		assert.Equal(t, 3, stats.UnknownCount) // All start as unknown
-		assert.Equal(t, 0, stats.CleanCount)
-		assert.Equal(t, 0, stats.DirtyCount)
-		assert.Equal(t, 3, len(stats.Branches))
-	})
+				// Add worktrees with different branches
+				worktree1, _ := NewWorktree("/path1", "main")
+				worktree2, _ := NewWorktree("/path2", "feature-1")
+				worktree3, _ := NewWorktree("/path3", "feature-2")
+				worktree4, _ := NewWorktree("/path4", "main")
 
-	t.Run("should provide project health check", func(t *testing.T) {
-		project, err := NewProject("test-project", "/repo/path")
-		require.NoError(t, err)
+				s.Require().NoError(project.AddWorktree(worktree1))
+				s.Require().NoError(project.AddWorktree(worktree2))
+				s.Require().NoError(project.AddWorktree(worktree3))
+				s.Require().NoError(project.AddWorktree(worktree4))
+				return project
+			},
+			testFunc: func(project *Project) {
+				// This should fail initially - we need to add filtering
+				mainWorktrees := project.GetWorktreesByBranch("main")
+				s.Len(mainWorktrees, 2)
 
-		// This should fail initially - we need to add health check
-		health := project.GetHealth()
-		assert.NotNil(t, health)
-		assert.Equal(t, "unhealthy", health.Status)
-		assert.Contains(t, health.Issues, "git repository not validated")
-		assert.Equal(t, 0, health.WorktreeCount)
-	})
+				featureWorktrees := project.GetWorktreesByBranch("feature-1")
+				s.Len(featureWorktrees, 1)
 
-	t.Run("should support project configuration", func(t *testing.T) {
-		project, err := NewProject("test-project", "/repo/path")
-		require.NoError(t, err)
+				cleanWorktrees := project.GetWorktreesByStatus(StatusClean)
+				s.Empty(cleanWorktrees) // None are clean yet
+			},
+			expectError: false,
+		},
+	}
 
-		// This should fail initially - we need to add configuration support
-		project.SetConfig("max-worktrees", 10)
-		project.SetConfig("auto-cleanup", true)
-		project.SetConfig("default-branch", "main")
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			project := tt.setupProject()
+			tt.testFunc(project)
+		})
+	}
+}
 
-		value, exists := project.GetConfig("max-worktrees")
-		assert.True(t, exists)
-		assert.Equal(t, 10, value)
-
-		value, exists = project.GetConfig("auto-cleanup")
-		assert.True(t, exists)
-		assert.Equal(t, true, value)
-
-		value, exists = project.GetConfig("default-branch")
-		assert.True(t, exists)
-		assert.Equal(t, "main", value)
-
-		_, exists = project.GetConfig("non-existent")
-		assert.False(t, exists)
-	})
-
-	t.Run("should support worktree filtering", func(t *testing.T) {
-		project, err := NewProject("test-project", "/repo/path")
-		require.NoError(t, err)
-
-		// Add worktrees with different branches
-		worktree1, _ := NewWorktree("/path1", "main")
-		worktree2, _ := NewWorktree("/path2", "feature-1")
-		worktree3, _ := NewWorktree("/path3", "feature-2")
-		worktree4, _ := NewWorktree("/path4", "main")
-
-		require.NoError(t, project.AddWorktree(worktree1))
-		require.NoError(t, project.AddWorktree(worktree2))
-		require.NoError(t, project.AddWorktree(worktree3))
-		require.NoError(t, project.AddWorktree(worktree4))
-
-		// This should fail initially - we need to add filtering
-		mainWorktrees := project.GetWorktreesByBranch("main")
-		assert.Len(t, mainWorktrees, 2)
-
-		featureWorktrees := project.GetWorktreesByBranch("feature-1")
-		assert.Len(t, featureWorktrees, 1)
-
-		cleanWorktrees := project.GetWorktreesByStatus(StatusClean)
-		assert.Len(t, cleanWorktrees, 0) // None are clean yet
-	})
+// Test suite entry point
+func TestProjectSuite(t *testing.T) {
+	suite.Run(t, new(ProjectTestSuite))
 }

@@ -22,14 +22,6 @@ run = "golangci-lint run"
 description = "Auto-fix linting issues"
 run = "golangci-lint run --fix"
 
-[tasks."lint:testify"]
-description = "Run testifylint specifically for test code analysis"
-run = "golangci-lint run --enable-only testifylint"
-
-[tasks."lint:testify:fix"]
-description = "Auto-fix testifylint issues in test code"
-run = "golangci-lint run --enable-only testifylint --fix"
-
 [tasks."build:cli"]
 description = "Build the CLI binary"
 run = "go build -o bin/twiggit main.go"

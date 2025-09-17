@@ -6,37 +6,60 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/amaury/twiggit/internal/testutil"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/amaury/twiggit/test/helpers"
+	"github.com/stretchr/testify/suite"
 )
 
+// EnhancedGitClientTestSuite provides hybrid suite setup for enhanced git client tests
+type EnhancedGitClientTestSuite struct {
+	suite.Suite
+	Client  *Client
+	TempDir string
+	Cleanup func()
+}
+
+// SetupTest initializes infrastructure components for each test
+func (s *EnhancedGitClientTestSuite) SetupTest() {
+	s.Client = NewClient()
+	s.TempDir = s.T().TempDir()
+	s.Cleanup = func() {
+		_ = os.RemoveAll(s.TempDir)
+	}
+}
+
+// TearDownTest cleans up infrastructure test resources
+func (s *EnhancedGitClientTestSuite) TearDownTest() {
+	if s.Cleanup != nil {
+		s.Cleanup()
+	}
+}
+
 // Helper function to create a test git repository
-func createTestGitRepo(t *testing.T) string {
-	repo := testutil.NewGitRepo(t, "twiggit-git-test-*")
-	t.Cleanup(repo.Cleanup)
+func (s *EnhancedGitClientTestSuite) createTestGitRepo() string {
+	repo := helpers.NewGitRepo(s.T(), "twiggit-git-test-*")
+	s.T().Cleanup(repo.Cleanup)
 	return repo.Path
 }
 
 // Helper function to create test branches
-func createTestBranches(t *testing.T, repoPath string, branches []string) {
+func (s *EnhancedGitClientTestSuite) createTestBranches(repoPath string, branches []string) {
 	for _, branch := range branches {
 		cmd := exec.Command("git", "checkout", "-b", branch)
 		cmd.Dir = repoPath
-		require.NoError(t, cmd.Run(), "Failed to create branch %s", branch)
+		s.Require().NoError(cmd.Run(), "Failed to create branch %s", branch)
 
 		// Make a small change and commit
 		testFile := filepath.Join(repoPath, branch+".txt")
 		err := os.WriteFile(testFile, []byte("test content"), 0644)
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		cmd = exec.Command("git", "add", ".")
 		cmd.Dir = repoPath
-		require.NoError(t, cmd.Run())
+		s.Require().NoError(cmd.Run())
 
 		cmd = exec.Command("git", "commit", "-m", "Add "+branch+".txt")
 		cmd.Dir = repoPath
-		require.NoError(t, cmd.Run())
+		s.Require().NoError(cmd.Run())
 	}
 
 	// Switch back to main branch
@@ -46,14 +69,13 @@ func createTestBranches(t *testing.T, repoPath string, branches []string) {
 		// Try master if main doesn't exist
 		cmd = exec.Command("git", "checkout", "master")
 		cmd.Dir = repoPath
-		require.NoError(t, cmd.Run())
+		s.Require().NoError(cmd.Run())
 	}
 }
 
-func TestEnhancedGitClient_GetRepositoryRoot(t *testing.T) {
-	client := NewClient()
-
-	tests := []struct {
+// TestEnhancedGitClient_GetRepositoryRoot tests repository root detection with table-driven approach
+func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_GetRepositoryRoot() {
+	testCases := []struct {
 		name        string
 		setupPath   func() string
 		expectError bool
@@ -61,16 +83,16 @@ func TestEnhancedGitClient_GetRepositoryRoot(t *testing.T) {
 		{
 			name: "should return root for repository root",
 			setupPath: func() string {
-				return createTestGitRepo(t)
+				return s.createTestGitRepo()
 			},
 			expectError: false,
 		},
 		{
 			name: "should return root for subdirectory in repository",
 			setupPath: func() string {
-				repoPath := createTestGitRepo(t)
+				repoPath := s.createTestGitRepo()
 				subDir := filepath.Join(repoPath, "subdir", "nested")
-				require.NoError(t, os.MkdirAll(subDir, 0755))
+				s.Require().NoError(os.MkdirAll(subDir, 0755))
 				return subDir
 			},
 			expectError: false,
@@ -85,70 +107,68 @@ func TestEnhancedGitClient_GetRepositoryRoot(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			path := tt.setupPath()
 			defer func() { _ = os.RemoveAll(path) }()
 
-			root, err := client.GetRepositoryRoot(path)
+			root, err := s.Client.GetRepositoryRoot(path)
 
 			if tt.expectError {
-				assert.Error(t, err)
-				assert.Empty(t, root)
+				s.Error(err)
+				s.Empty(root)
 			} else {
-				assert.NoError(t, err)
-				assert.NotEmpty(t, root)
+				s.NoError(err)
+				s.NotEmpty(root)
 				// Verify the root is actually a git repository
-				isRepo, _ := client.IsGitRepository(root)
-				assert.True(t, isRepo)
+				isRepo, _ := s.Client.IsGitRepository(root)
+				s.True(isRepo)
 			}
 		})
 	}
 }
 
-func TestEnhancedGitClient_GetCurrentBranch(t *testing.T) {
-	client := NewClient()
-
-	t.Run("should return current branch name", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+// TestEnhancedGitClient_GetCurrentBranch tests current branch detection with sub-tests
+func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_GetCurrentBranch() {
+	s.Run("should return current branch name", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
-		branch, err := client.GetCurrentBranch(repoPath)
+		branch, err := s.Client.GetCurrentBranch(repoPath)
 
-		assert.NoError(t, err)
+		s.NoError(err)
 		// Should be either "main" or "master" depending on git version
-		assert.Contains(t, []string{"main", "master"}, branch)
+		s.Contains([]string{"main", "master"}, branch)
 	})
 
-	t.Run("should return error for non-repository", func(t *testing.T) {
-		tempDir, cleanup := testutil.TempDir(t, "non-repo-*")
+	s.Run("should return error for non-repository", func() {
+		tempDir, cleanup := helpers.TempDir(s.T(), "non-repo-*")
 		defer cleanup()
 
-		_, err := client.GetCurrentBranch(tempDir)
-		assert.Error(t, err)
+		_, err := s.Client.GetCurrentBranch(tempDir)
+		s.Error(err)
 	})
 
-	t.Run("should return error for empty path", func(t *testing.T) {
-		_, err := client.GetCurrentBranch("")
-		assert.Error(t, err)
+	s.Run("should return error for empty path", func() {
+		_, err := s.Client.GetCurrentBranch("")
+		s.Error(err)
 	})
 }
 
-func TestEnhancedGitClient_GetAllBranches(t *testing.T) {
-	client := NewClient()
-
-	t.Run("should return all local branches", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+// TestEnhancedGitClient_GetAllBranches tests branch listing with sub-tests
+func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_GetAllBranches() {
+	s.Run("should return all local branches", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
 		// Create test branches
 		testBranches := []string{"feature-1", "feature-2", "bugfix"}
-		createTestBranches(t, repoPath, testBranches)
+		s.createTestBranches(repoPath, testBranches)
 
-		branches, err := client.GetAllBranches(repoPath)
+		branches, err := s.Client.GetAllBranches(repoPath)
 
-		assert.NoError(t, err)
-		assert.GreaterOrEqual(t, len(branches), 4) // main/master + 3 test branches
+		s.NoError(err)
+		s.GreaterOrEqual(len(branches), 4) // main/master + 3 test branches
 
 		// Check that our test branches are included
 		branchMap := make(map[string]bool)
@@ -157,171 +177,172 @@ func TestEnhancedGitClient_GetAllBranches(t *testing.T) {
 		}
 
 		for _, testBranch := range testBranches {
-			assert.True(t, branchMap[testBranch], "Branch %s should be in the list", testBranch)
+			s.True(branchMap[testBranch], "Branch %s should be in the list", testBranch)
 		}
 	})
 
-	t.Run("should return error for non-repository", func(t *testing.T) {
-		tempDir, cleanup := testutil.TempDir(t, "non-repo-*")
+	s.Run("should return error for non-repository", func() {
+		tempDir, cleanup := helpers.TempDir(s.T(), "non-repo-*")
 		defer cleanup()
 
-		_, err := client.GetAllBranches(tempDir)
-		assert.Error(t, err)
+		_, err := s.Client.GetAllBranches(tempDir)
+		s.Error(err)
 	})
 }
 
-func TestEnhancedGitClient_GetRemoteBranches(t *testing.T) {
-	client := NewClient()
-
-	t.Run("should return empty list for repository with no remotes", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+// TestEnhancedGitClient_GetRemoteBranches tests remote branch listing with sub-tests
+func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_GetRemoteBranches() {
+	s.Run("should return empty list for repository with no remotes", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
-		branches, err := client.GetRemoteBranches(repoPath)
+		branches, err := s.Client.GetRemoteBranches(repoPath)
 
-		assert.NoError(t, err)
-		assert.Empty(t, branches)
+		s.NoError(err)
+		s.Empty(branches)
 	})
 
-	t.Run("should return error for non-repository", func(t *testing.T) {
-		tempDir, cleanup := testutil.TempDir(t, "non-repo-*")
+	s.Run("should return error for non-repository", func() {
+		tempDir, cleanup := helpers.TempDir(s.T(), "non-repo-*")
 		defer cleanup()
 
-		_, err := client.GetRemoteBranches(tempDir)
-		assert.Error(t, err)
+		_, err := s.Client.GetRemoteBranches(tempDir)
+		s.Error(err)
 	})
 }
 
-func TestEnhancedGitClient_BranchExists(t *testing.T) {
-	client := NewClient()
-
-	t.Run("should return true for existing branch", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+// TestEnhancedGitClient_BranchExists tests branch existence checking with sub-tests
+func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_BranchExists() {
+	s.Run("should return true for existing branch", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
 		// Create test branch
-		createTestBranches(t, repoPath, []string{"test-branch"})
+		s.createTestBranches(repoPath, []string{"test-branch"})
 
-		exists := client.BranchExists(repoPath, "test-branch")
-		assert.True(t, exists)
+		exists := s.Client.BranchExists(repoPath, "test-branch")
+		s.True(exists)
 	})
 
-	t.Run("should return false for non-existing branch", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+	s.Run("should return false for non-existing branch", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
-		exists := client.BranchExists(repoPath, "non-existing-branch")
-		assert.False(t, exists)
+		exists := s.Client.BranchExists(repoPath, "non-existing-branch")
+		s.False(exists)
 	})
 
-	t.Run("should return false for non-repository", func(t *testing.T) {
-		tempDir, cleanup := testutil.TempDir(t, "non-repo-*")
+	s.Run("should return false for non-repository", func() {
+		tempDir, cleanup := helpers.TempDir(s.T(), "non-repo-*")
 		defer cleanup()
 
-		exists := client.BranchExists(tempDir, "any-branch")
-		assert.False(t, exists)
+		exists := s.Client.BranchExists(tempDir, "any-branch")
+		s.False(exists)
 	})
 }
 
-func TestEnhancedGitClient_HasUncommittedChanges(t *testing.T) {
-	client := NewClient()
-
-	t.Run("should return false for clean repository", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+// TestEnhancedGitClient_HasUncommittedChanges tests uncommitted changes detection with sub-tests
+func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_HasUncommittedChanges() {
+	s.Run("should return false for clean repository", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
-		hasChanges := client.HasUncommittedChanges(repoPath)
-		assert.False(t, hasChanges)
+		hasChanges := s.Client.HasUncommittedChanges(repoPath)
+		s.False(hasChanges)
 	})
 
-	t.Run("should return true for repository with uncommitted changes", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+	s.Run("should return true for repository with uncommitted changes", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
 		// Make uncommitted changes
 		testFile := filepath.Join(repoPath, "new-file.txt")
 		err := os.WriteFile(testFile, []byte("new content"), 0644)
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
-		hasChanges := client.HasUncommittedChanges(repoPath)
-		assert.True(t, hasChanges)
+		hasChanges := s.Client.HasUncommittedChanges(repoPath)
+		s.True(hasChanges)
 	})
 
-	t.Run("should return true for repository with modified files", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+	s.Run("should return true for repository with modified files", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
 		// Modify existing file
 		testFile := filepath.Join(repoPath, "README.md")
 		err := os.WriteFile(testFile, []byte("# Modified README\n"), 0644)
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
-		hasChanges := client.HasUncommittedChanges(repoPath)
-		assert.True(t, hasChanges)
+		hasChanges := s.Client.HasUncommittedChanges(repoPath)
+		s.True(hasChanges)
 	})
 
-	t.Run("should return false for non-repository", func(t *testing.T) {
-		tempDir, cleanup := testutil.TempDir(t, "non-repo-*")
+	s.Run("should return false for non-repository", func() {
+		tempDir, cleanup := helpers.TempDir(s.T(), "non-repo-*")
 		defer cleanup()
 
-		hasChanges := client.HasUncommittedChanges(tempDir)
-		assert.False(t, hasChanges)
+		hasChanges := s.Client.HasUncommittedChanges(tempDir)
+		s.False(hasChanges)
 	})
 }
 
-func TestEnhancedGitClient_Integration(t *testing.T) {
-	client := NewClient()
-
-	t.Run("should work together for complete repository analysis", func(t *testing.T) {
-		repoPath := createTestGitRepo(t)
+// TestEnhancedGitClient_Integration tests complete repository analysis with sub-tests
+func (s *EnhancedGitClientTestSuite) TestEnhancedGitClient_Integration() {
+	s.Run("should work together for complete repository analysis", func() {
+		repoPath := s.createTestGitRepo()
 		defer func() { _ = os.RemoveAll(repoPath) }()
 
 		// Create test branches
 		testBranches := []string{"feature-a", "feature-b"}
-		createTestBranches(t, repoPath, testBranches)
+		s.createTestBranches(repoPath, testBranches)
 
 		// Test repository detection
-		isRepo, err := client.IsGitRepository(repoPath)
-		assert.NoError(t, err)
-		assert.True(t, isRepo)
+		isRepo, err := s.Client.IsGitRepository(repoPath)
+		s.Require().NoError(err)
+		s.True(isRepo)
 
 		// Test repository root
-		root, err := client.GetRepositoryRoot(repoPath)
-		assert.NoError(t, err)
-		assert.Equal(t, repoPath, root)
+		root, err := s.Client.GetRepositoryRoot(repoPath)
+		s.NoError(err)
+		s.Equal(repoPath, root)
 
 		// Test current branch
-		currentBranch, err := client.GetCurrentBranch(repoPath)
-		assert.NoError(t, err)
-		assert.NotEmpty(t, currentBranch)
+		currentBranch, err := s.Client.GetCurrentBranch(repoPath)
+		s.NoError(err)
+		s.NotEmpty(currentBranch)
 
 		// Test all branches
-		allBranches, err := client.GetAllBranches(repoPath)
-		assert.NoError(t, err)
-		assert.GreaterOrEqual(t, len(allBranches), 3) // main/master + 2 test branches
+		allBranches, err := s.Client.GetAllBranches(repoPath)
+		s.NoError(err)
+		s.GreaterOrEqual(len(allBranches), 3) // main/master + 2 test branches
 
 		// Test branch existence
 		for _, branch := range testBranches {
-			exists := client.BranchExists(repoPath, branch)
-			assert.True(t, exists, "Branch %s should exist", branch)
+			exists := s.Client.BranchExists(repoPath, branch)
+			s.True(exists, "Branch %s should exist", branch)
 		}
 
 		// Test uncommitted changes (should be clean)
-		hasChanges := client.HasUncommittedChanges(repoPath)
-		assert.False(t, hasChanges)
+		hasChanges := s.Client.HasUncommittedChanges(repoPath)
+		s.False(hasChanges)
 
 		// Create worktree and test it
 		worktreePath := filepath.Join(repoPath, "worktrees", "feature-a-wt")
-		err = client.CreateWorktree(repoPath, "feature-a", worktreePath)
-		assert.NoError(t, err)
+		err = s.Client.CreateWorktree(repoPath, "feature-a", worktreePath)
+		s.NoError(err)
 
 		// Verify worktree was created
-		worktrees, err := client.ListWorktrees(repoPath)
-		assert.NoError(t, err)
-		assert.GreaterOrEqual(t, len(worktrees), 2) // main repo + new worktree
+		worktrees, err := s.Client.ListWorktrees(repoPath)
+		s.NoError(err)
+		s.GreaterOrEqual(len(worktrees), 2) // main repo + new worktree
 
 		// Clean up
-		err = client.RemoveWorktree(repoPath, worktreePath, false)
-		assert.NoError(t, err)
+		err = s.Client.RemoveWorktree(repoPath, worktreePath, false)
+		s.NoError(err)
 	})
+}
+
+// TestEnhancedGitClientSuite runs the enhanced git client test suite
+func TestEnhancedGitClientSuite(t *testing.T) {
+	suite.Run(t, new(EnhancedGitClientTestSuite))
 }

@@ -1,6 +1,7 @@
 package worktree
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,14 +9,39 @@ import (
 	"time"
 
 	"github.com/amaury/twiggit/pkg/types"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
 // MockGitClient for testing
 type MockGitClient struct {
 	mock.Mock
+}
+
+// DiscoveryServiceTestSuite provides hybrid suite setup for discovery service tests
+type DiscoveryServiceTestSuite struct {
+	suite.Suite
+	GitClient *MockGitClient
+	Service   *DiscoveryService
+	TempDir   string
+	Cleanup   func()
+}
+
+// SetupTest initializes infrastructure components for each test
+func (s *DiscoveryServiceTestSuite) SetupTest() {
+	s.GitClient = &MockGitClient{}
+	s.Service = NewDiscoveryService(s.GitClient)
+	s.TempDir = s.T().TempDir()
+	s.Cleanup = func() {
+		_ = os.RemoveAll(s.TempDir)
+	}
+}
+
+// TearDownTest cleans up infrastructure test resources
+func (s *DiscoveryServiceTestSuite) TearDownTest() {
+	if s.Cleanup != nil {
+		s.Cleanup()
+	}
 }
 
 func (m *MockGitClient) IsGitRepository(path string) (bool, error) {
@@ -78,18 +104,20 @@ func (m *MockGitClient) HasUncommittedChanges(repoPath string) bool {
 	return args.Bool(0)
 }
 
-func TestDiscoveryService_NewDiscoveryService(t *testing.T) {
+// TestDiscoveryService_NewDiscoveryService tests service creation
+func (s *DiscoveryServiceTestSuite) TestDiscoveryService_NewDiscoveryService() {
 	gitClient := &MockGitClient{}
 
 	service := NewDiscoveryService(gitClient)
 
-	assert.NotNil(t, service)
-	assert.Equal(t, gitClient, service.gitClient)
-	assert.Equal(t, defaultConcurrency, service.concurrency)
+	s.NotNil(service)
+	s.Equal(gitClient, service.gitClient)
+	s.Equal(defaultConcurrency, service.concurrency)
 }
 
-func TestDiscoveryService_DiscoverWorktrees(t *testing.T) {
-	tests := []struct {
+// TestDiscoveryService_DiscoverWorktrees tests worktree discovery with table-driven approach
+func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
+	testCases := []struct {
 		name          string
 		workspacePath string
 		setupMocks    func(*MockGitClient, string)
@@ -101,9 +129,9 @@ func TestDiscoveryService_DiscoverWorktrees(t *testing.T) {
 			workspacePath: "/tmp/test-workspace",
 			setupMocks: func(m *MockGitClient, workspacePath string) {
 				// Setup directory structure in test
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, "project1"), 0755))
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, "project1", "worktree1"), 0755))
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, "project1", "worktree2"), 0755))
+				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "project1"), 0755))
+				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "project1", "worktree1"), 0755))
+				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "project1", "worktree2"), 0755))
 
 				// Mock git repository detection
 				m.On("IsGitRepository", filepath.Join(workspacePath, "project1")).Return(true, nil)
@@ -135,7 +163,7 @@ func TestDiscoveryService_DiscoverWorktrees(t *testing.T) {
 			name:          "should handle empty workspace gracefully",
 			workspacePath: "/tmp/empty-workspace",
 			setupMocks: func(m *MockGitClient, workspacePath string) {
-				require.NoError(t, os.MkdirAll(workspacePath, 0755))
+				s.Require().NoError(os.MkdirAll(workspacePath, 0755))
 			},
 			expectedCount: 0,
 			expectError:   false,
@@ -149,8 +177,8 @@ func TestDiscoveryService_DiscoverWorktrees(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &MockGitClient{}
 			service := NewDiscoveryService(mockGit)
@@ -166,19 +194,20 @@ func TestDiscoveryService_DiscoverWorktrees(t *testing.T) {
 
 			// Assert
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Error(err)
 			} else {
-				assert.NoError(t, err)
-				assert.Len(t, worktrees, tt.expectedCount)
+				s.NoError(err)
+				s.Len(worktrees, tt.expectedCount)
 			}
 
-			mockGit.AssertExpectations(t)
+			mockGit.AssertExpectations(s.T())
 		})
 	}
 }
 
-func TestDiscoveryService_AnalyzeWorktree(t *testing.T) {
-	tests := []struct {
+// TestDiscoveryService_AnalyzeWorktree tests worktree analysis with table-driven approach
+func (s *DiscoveryServiceTestSuite) TestDiscoveryService_AnalyzeWorktree() {
+	testCases := []struct {
 		name        string
 		path        string
 		setupMocks  func(*MockGitClient)
@@ -204,7 +233,7 @@ func TestDiscoveryService_AnalyzeWorktree(t *testing.T) {
 			setupMocks: func(m *MockGitClient) {
 				m.On("GetWorktreeStatus", "/invalid/path").Return(
 					(*types.WorktreeInfo)(nil),
-					assert.AnError)
+					errors.New("mock error"))
 			},
 			expectError: true,
 		},
@@ -218,8 +247,8 @@ func TestDiscoveryService_AnalyzeWorktree(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &MockGitClient{}
 			service := NewDiscoveryService(mockGit)
@@ -230,21 +259,22 @@ func TestDiscoveryService_AnalyzeWorktree(t *testing.T) {
 
 			// Assert
 			if tt.expectError {
-				assert.Error(t, err)
-				assert.Nil(t, worktree)
+				s.Error(err)
+				s.Nil(worktree)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, worktree)
-				assert.Equal(t, tt.path, worktree.Path)
+				s.NoError(err)
+				s.NotNil(worktree)
+				s.Equal(tt.path, worktree.Path)
 			}
 
-			mockGit.AssertExpectations(t)
+			mockGit.AssertExpectations(s.T())
 		})
 	}
 }
 
-func TestDiscoveryService_DiscoverProjects(t *testing.T) {
-	tests := []struct {
+// TestDiscoveryService_DiscoverProjects tests project discovery with table-driven approach
+func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
+	testCases := []struct {
 		name          string
 		workspacePath string
 		setupMocks    func(*MockGitClient, string)
@@ -256,9 +286,9 @@ func TestDiscoveryService_DiscoverProjects(t *testing.T) {
 			workspacePath: "/tmp/test-workspace",
 			setupMocks: func(m *MockGitClient, workspacePath string) {
 				// Create test directory structure
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, "project1"), 0755))
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, "project2"), 0755))
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, "not-a-project"), 0755))
+				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "project1"), 0755))
+				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "project2"), 0755))
+				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "not-a-project"), 0755))
 
 				// Mock main repository detection
 				m.On("IsMainRepository", filepath.Join(workspacePath, "project1")).Return(true, nil)
@@ -280,7 +310,7 @@ func TestDiscoveryService_DiscoverProjects(t *testing.T) {
 			name:          "should handle workspace with no git repositories",
 			workspacePath: "/tmp/no-repos",
 			setupMocks: func(m *MockGitClient, workspacePath string) {
-				require.NoError(t, os.MkdirAll(filepath.Join(workspacePath, "regular-dir"), 0755))
+				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "regular-dir"), 0755))
 				m.On("IsMainRepository", filepath.Join(workspacePath, "regular-dir")).Return(false, nil)
 			},
 			expectedCount: 0,
@@ -288,8 +318,8 @@ func TestDiscoveryService_DiscoverProjects(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &MockGitClient{}
 			service := NewDiscoveryService(mockGit)
@@ -305,19 +335,20 @@ func TestDiscoveryService_DiscoverProjects(t *testing.T) {
 
 			// Assert
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Error(err)
 			} else {
-				assert.NoError(t, err)
-				assert.Len(t, projects, tt.expectedCount)
+				s.NoError(err)
+				s.Len(projects, tt.expectedCount)
 			}
 
-			mockGit.AssertExpectations(t)
+			mockGit.AssertExpectations(s.T())
 		})
 	}
 }
 
-func TestDiscoveryService_Performance(t *testing.T) {
-	t.Run("should handle concurrent discovery efficiently", func(t *testing.T) {
+// TestDiscoveryService_Performance tests performance with sub-tests
+func (s *DiscoveryServiceTestSuite) TestDiscoveryService_Performance() {
+	s.Run("should handle concurrent discovery efficiently", func() {
 		// Setup
 		mockGit := &MockGitClient{}
 		service := NewDiscoveryService(mockGit)
@@ -330,7 +361,7 @@ func TestDiscoveryService_Performance(t *testing.T) {
 		projectCount := 10
 		for i := 0; i < projectCount; i++ {
 			projectPath := filepath.Join(workspacePath, fmt.Sprintf("project%d", i))
-			require.NoError(t, os.MkdirAll(projectPath, 0755))
+			s.Require().NoError(os.MkdirAll(projectPath, 0755))
 
 			// Mock each as main repository
 			mockGit.On("IsMainRepository", projectPath).Return(true, nil)
@@ -345,11 +376,16 @@ func TestDiscoveryService_Performance(t *testing.T) {
 		duration := time.Since(start)
 
 		// Assert
-		require.NoError(t, err)
-		assert.Len(t, projects, projectCount)
+		s.Require().NoError(err)
+		s.Len(projects, projectCount)
 		// Should complete quickly with concurrency
-		assert.Less(t, duration, time.Second, "Discovery should complete quickly with concurrent processing")
+		s.Less(duration, time.Second, "Discovery should complete quickly with concurrent processing")
 
-		mockGit.AssertExpectations(t)
+		mockGit.AssertExpectations(s.T())
 	})
+}
+
+// TestDiscoveryServiceSuite runs the discovery service test suite
+func TestDiscoveryServiceSuite(t *testing.T) {
+	suite.Run(t, new(DiscoveryServiceTestSuite))
 }

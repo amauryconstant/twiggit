@@ -6,42 +6,50 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestValidationResult_AddError(t *testing.T) {
+// ValidationTestSuite provides test setup for validation tests
+type ValidationTestSuite struct {
+	suite.Suite
+}
+
+func TestValidationSuite(t *testing.T) {
+	suite.Run(t, new(ValidationTestSuite))
+}
+
+func (s *ValidationTestSuite) TestValidationResult_AddError() {
 	result := NewValidationResult()
-	assert.True(t, result.Valid)
+	s.True(result.Valid)
 
 	err := NewWorktreeError(ErrInvalidBranchName, "test error", "")
 	result.AddError(err)
 
-	assert.False(t, result.Valid)
-	assert.Len(t, result.Errors, 1)
-	assert.Equal(t, err, result.Errors[0])
+	s.False(result.Valid)
+	s.Len(result.Errors, 1)
+	s.Equal(err, result.Errors[0])
 }
 
-func TestValidationResult_AddWarning(t *testing.T) {
+func (s *ValidationTestSuite) TestValidationResult_AddWarning() {
 	result := NewValidationResult()
 	result.AddWarning("test warning")
 
-	assert.True(t, result.Valid) // Warnings don't affect validity
-	assert.Len(t, result.Warnings, 1)
-	assert.Contains(t, result.Warnings, "test warning")
+	s.True(result.Valid) // Warnings don't affect validity
+	s.Len(result.Warnings, 1)
+	s.Contains(result.Warnings, "test warning")
 }
 
-func TestValidationResult_HasErrors(t *testing.T) {
+func (s *ValidationTestSuite) TestValidationResult_HasErrors() {
 	result := NewValidationResult()
-	assert.False(t, result.HasErrors())
+	s.False(result.HasErrors())
 
 	result.AddError(NewWorktreeError(ErrValidation, "test", ""))
-	assert.True(t, result.HasErrors())
+	s.True(result.HasErrors())
 }
 
-func TestValidationResult_FirstError(t *testing.T) {
+func (s *ValidationTestSuite) TestValidationResult_FirstError() {
 	result := NewValidationResult()
-	assert.Nil(t, result.FirstError())
+	s.NoError(result.FirstError())
 
 	err1 := NewWorktreeError(ErrValidation, "first error", "")
 	err2 := NewWorktreeError(ErrValidation, "second error", "")
@@ -49,10 +57,10 @@ func TestValidationResult_FirstError(t *testing.T) {
 	result.AddError(err1)
 	result.AddError(err2)
 
-	assert.Equal(t, err1, result.FirstError())
+	s.Equal(err1, result.FirstError())
 }
 
-func TestValidateBranchName(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateBranchName() {
 	tests := []struct {
 		name        string
 		branchName  string
@@ -85,23 +93,23 @@ func TestValidateBranchName(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			result := ValidateBranchName(tt.branchName)
 
-			assert.Equal(t, tt.expectValid, result.Valid, "Validation result should match expected")
+			s.Equal(tt.expectValid, result.Valid, "Validation result should match expected")
 
 			if !tt.expectValid {
-				assert.True(t, result.HasErrors(), "Should have errors when invalid")
-				assert.True(t, IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
+				s.True(result.HasErrors(), "Should have errors when invalid")
+				s.True(IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
 				if tt.description != "" {
-					assert.Contains(t, result.FirstError().Error(), tt.description, "Error should contain expected description")
+					s.Contains(result.FirstError().Error(), tt.description, "Error should contain expected description")
 				}
 			}
 		})
 	}
 }
 
-func TestValidatePath(t *testing.T) {
+func (s *ValidationTestSuite) TestValidatePath() {
 	tests := []struct {
 		name        string
 		path        string
@@ -119,26 +127,26 @@ func TestValidatePath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			result := ValidatePath(tt.path)
 
-			assert.Equal(t, tt.expectValid, result.Valid, "Validation result should match expected")
+			s.Equal(tt.expectValid, result.Valid, "Validation result should match expected")
 
 			if !tt.expectValid {
-				assert.True(t, result.HasErrors(), "Should have errors when invalid")
-				assert.True(t, IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
+				s.True(result.HasErrors(), "Should have errors when invalid")
+				s.True(IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
 				if tt.description != "" {
-					assert.Contains(t, result.FirstError().Error(), tt.description, "Error should contain expected description")
+					s.Contains(result.FirstError().Error(), tt.description, "Error should contain expected description")
 				}
 			}
 		})
 	}
 }
 
-func TestValidatePathWritable(t *testing.T) {
+func (s *ValidationTestSuite) TestValidatePathWritable() {
 	// Create a temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "twiggit-test-*")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tests := []struct {
@@ -158,7 +166,7 @@ func TestValidatePathWritable(t *testing.T) {
 			name: "path already exists",
 			setupPath: func() string {
 				existingPath := filepath.Join(tempDir, "existing")
-				require.NoError(t, os.MkdirAll(existingPath, 0755))
+				s.Require().NoError(os.MkdirAll(existingPath, 0755))
 				return existingPath
 			},
 			expectValid: false,
@@ -183,24 +191,24 @@ func TestValidatePathWritable(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			path := tt.setupPath()
 			result := ValidatePathWritable(path)
 
-			assert.Equal(t, tt.expectValid, result.Valid, "Validation result should match expected")
+			s.Equal(tt.expectValid, result.Valid, "Validation result should match expected")
 
 			if !tt.expectValid {
-				assert.True(t, result.HasErrors(), "Should have errors when invalid")
-				assert.True(t, IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
+				s.True(result.HasErrors(), "Should have errors when invalid")
+				s.True(IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
 			}
 		})
 	}
 }
 
-func TestValidateWorktreeCreation(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateWorktreeCreation() {
 	// Create a temporary directory for testing
 	tempDir, err := os.MkdirTemp("", "twiggit-test-*")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	tests := []struct {
@@ -236,42 +244,42 @@ func TestValidateWorktreeCreation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			result := ValidateWorktreeCreation(tt.branchName, tt.targetPath)
 
-			assert.Equal(t, tt.expectValid, result.Valid, "Validation result should match expected")
+			s.Equal(tt.expectValid, result.Valid, "Validation result should match expected")
 
 			if !tt.expectValid {
-				assert.True(t, result.HasErrors(), "Should have errors when invalid")
+				s.True(result.HasErrors(), "Should have errors when invalid")
 			}
 		})
 	}
 }
 
-func TestValidateBranchName_EdgeCases(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateBranchName_EdgeCases() {
 	// Test UTF-8 handling
-	t.Run("valid UTF-8 characters", func(t *testing.T) {
+	s.Run("valid UTF-8 characters", func() {
 		result := ValidateBranchName("feature-🚀")
 		// This should be valid as it contains valid UTF-8 but may fail regex
 		// The exact behavior depends on git's rules for Unicode in branch names
-		assert.False(t, result.Valid) // Based on our regex, this should be invalid
+		s.False(result.Valid) // Based on our regex, this should be invalid
 	})
 
-	t.Run("invalid UTF-8", func(t *testing.T) {
+	s.Run("invalid UTF-8", func() {
 		invalidUTF8 := "feature-" + string([]byte{0xff, 0xfe})
 		result := ValidateBranchName(invalidUTF8)
-		assert.False(t, result.Valid)
-		assert.True(t, IsErrorType(result.FirstError(), ErrInvalidBranchName))
-		assert.Contains(t, result.FirstError().Error(), "invalid UTF-8")
+		s.False(result.Valid)
+		s.True(IsErrorType(result.FirstError(), ErrInvalidBranchName))
+		s.Contains(result.FirstError().Error(), "invalid UTF-8")
 	})
 
-	t.Run("single character branch", func(t *testing.T) {
+	s.Run("single character branch", func() {
 		result := ValidateBranchName("a")
-		assert.True(t, result.Valid)
+		s.True(result.Valid)
 	})
 
-	t.Run("branch with all allowed characters", func(t *testing.T) {
+	s.Run("branch with all allowed characters", func() {
 		result := ValidateBranchName("abc123._-/xyz")
-		assert.True(t, result.Valid)
+		s.True(result.Valid)
 	})
 }
