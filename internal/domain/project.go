@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 // Project represents a Git project aggregate containing multiple worktrees
 type Project struct {
@@ -10,6 +13,10 @@ type Project struct {
 	GitRepo string
 	// Worktrees contains all worktrees belonging to this project
 	Worktrees []*Worktree
+	// Metadata stores additional project information
+	Metadata map[string]string
+	// Config stores project configuration
+	Config map[string]interface{}
 }
 
 // NewProject creates a new Project instance with validation
@@ -25,6 +32,8 @@ func NewProject(name, gitRepo string) (*Project, error) {
 		Name:      name,
 		GitRepo:   gitRepo,
 		Worktrees: make([]*Worktree, 0),
+		Metadata:  make(map[string]string),
+		Config:    make(map[string]interface{}),
 	}, nil
 }
 
@@ -76,4 +85,116 @@ func (p *Project) ListBranches() []string {
 		branches = append(branches, branch)
 	}
 	return branches
+}
+
+// SetMetadata sets a metadata key-value pair
+func (p *Project) SetMetadata(key, value string) {
+	p.Metadata[key] = value
+}
+
+// GetMetadata retrieves a metadata value by key
+func (p *Project) GetMetadata(key string) (string, bool) {
+	value, exists := p.Metadata[key]
+	return value, exists
+}
+
+// ValidateGitRepoExists checks if the git repository path exists
+func (p *Project) ValidateGitRepoExists() (bool, error) {
+	if _, err := os.Stat(p.GitRepo); os.IsNotExist(err) {
+		return false, fmt.Errorf("git repository path does not exist: %s", p.GitRepo)
+	}
+	return true, nil
+}
+
+// WorktreeStatistics represents statistics about project worktrees
+type WorktreeStatistics struct {
+	TotalCount   int
+	UnknownCount int
+	CleanCount   int
+	DirtyCount   int
+	Branches     []string
+}
+
+// GetWorktreeStatistics returns statistics about project worktrees
+func (p *Project) GetWorktreeStatistics() *WorktreeStatistics {
+	stats := &WorktreeStatistics{
+		Branches: p.ListBranches(),
+	}
+
+	for _, worktree := range p.Worktrees {
+		stats.TotalCount++
+		switch worktree.Status {
+		case StatusUnknown:
+			stats.UnknownCount++
+		case StatusClean:
+			stats.CleanCount++
+		case StatusDirty:
+			stats.DirtyCount++
+		}
+	}
+
+	return stats
+}
+
+// ProjectHealth represents health status of a project
+type ProjectHealth struct {
+	Status        string
+	Issues        []string
+	WorktreeCount int
+}
+
+// GetHealth returns health status of the project
+func (p *Project) GetHealth() *ProjectHealth {
+	health := &ProjectHealth{
+		Status:        "unknown",
+		Issues:        make([]string, 0),
+		WorktreeCount: len(p.Worktrees),
+	}
+
+	// Check if git repo exists
+	if exists, err := p.ValidateGitRepoExists(); err != nil || !exists {
+		health.Issues = append(health.Issues, "git repository not validated")
+	}
+
+	// Determine overall status
+	if len(health.Issues) == 0 {
+		health.Status = "healthy"
+	} else {
+		health.Status = "unhealthy"
+	}
+
+	return health
+}
+
+// SetConfig sets a configuration key-value pair
+func (p *Project) SetConfig(key string, value interface{}) {
+	p.Config[key] = value
+}
+
+// GetConfig retrieves a configuration value by key
+func (p *Project) GetConfig(key string) (interface{}, bool) {
+	value, exists := p.Config[key]
+	return value, exists
+}
+
+// GetWorktreesByBranch returns all worktrees for a specific branch
+func (p *Project) GetWorktreesByBranch(branch string) []*Worktree {
+	var result []*Worktree
+	for _, worktree := range p.Worktrees {
+		if worktree.Branch == branch {
+			result = append(result, worktree)
+		}
+	}
+	return result
+}
+
+// GetWorktreesByStatus returns all worktrees with a specific status
+func (p *Project) GetWorktreesByStatus(status WorktreeStatus) []*Worktree {
+	var result []*Worktree
+	for _, worktree := range p.Worktrees {
+		if worktree.Status == status {
+			result = append(result, worktree)
+		}
+	}
+	return result
 }

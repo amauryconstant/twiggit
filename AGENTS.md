@@ -1,18 +1,22 @@
 # Agent Guidelines for twiggit
 
 ## Build/Test Commands
-- `go run main.go --help` - Test CLI structure
-- `go test -race -coverprofile=coverage.out ./...` - Run all tests with coverage
-- `go test -run TestFunctionName ./pkg/module` - Run single test
+- `mise run dev:run` - Test CLI structure
+- `mise run test:all` - Run all tests with coverage
+- `mise run test:single TestName ./pkg/module` - Run single test
+- `mise run test:coverage` - Show test coverage report (requires existing coverage.out)
 - `go test -tags=integration ./test/integration/...` - Run integration tests
-- `golangci-lint run` - Run linting and formatting checks
+- `mise run lint:check` - Run linting and formatting checks
+- `mise run lint:fix` - Auto-fix linting issues
+- `mise run build:cli` - Build the CLI binary
+- `mise run build:clean` - Clean build artifacts
+- `mise run dev:tidy` - Clean up go.mod and go.sum
 
 ## Development Principles
 
 ### Test-Driven Development (TDD)
 - Write tests BEFORE implementation code (Red-Green-Refactor cycle)
 - All new features must start with failing tests
-- Maintain high test coverage (>95%) as a safety net for refactoring
 - Use tests as living documentation for expected behavior
 - Refactor confidently with test coverage as validation
 
@@ -64,11 +68,10 @@
 - Use error checking patterns consistently across the codebase
 
 ### Testing Patterns
-- **TDD Workflow**: Write failing test first, then implement minimal code to pass
-- Unit tests: >95% coverage with mocked dependencies, test behavior not implementation
+
+- Unit tests: good coverage with mocked dependencies, test behavior not implementation
 - Integration tests: Real git repositories in temporary directories
 - Use testify for assertions and mock generation
-- Table-driven tests for multiple scenarios
 - Tests should be fast, isolated, and repeatable
 - Use test doubles (mocks, stubs) to isolate units under test
 

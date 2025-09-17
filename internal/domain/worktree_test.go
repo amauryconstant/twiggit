@@ -101,3 +101,91 @@ func TestWorktree_String(t *testing.T) {
 	assert.Contains(t, result, "/home/user/project/feature")
 	assert.Contains(t, result, "unknown")
 }
+
+func TestWorktree_EnhancedFeatures(t *testing.T) {
+	t.Run("should support commit hash tracking", func(t *testing.T) {
+		worktree, err := NewWorktree("/test/path", "main")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add Commit field
+		err = worktree.SetCommit("abc123def456")
+		assert.NoError(t, err)
+		assert.Equal(t, "abc123def456", worktree.GetCommit())
+	})
+
+	t.Run("should validate path existence", func(t *testing.T) {
+		// Test with non-existent path
+		worktree, err := NewWorktree("/non/existent/path", "main")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add path validation
+		isValid, err := worktree.ValidatePathExists()
+		assert.Error(t, err)
+		assert.False(t, isValid)
+	})
+
+	t.Run("should support status aging", func(t *testing.T) {
+		worktree, err := NewWorktree("/test/path", "main")
+		require.NoError(t, err)
+
+		// Set initial status
+		err = worktree.UpdateStatus(StatusClean)
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add status aging
+		isStale := worktree.IsStatusStale()
+		assert.False(t, isStale) // Should not be stale immediately
+
+		// This should fail initially - we need to add stale threshold configuration
+		isStale = worktree.IsStatusStaleWithThreshold(time.Hour)
+		assert.False(t, isStale)
+	})
+
+	t.Run("should support equality comparison", func(t *testing.T) {
+		worktree1, err := NewWorktree("/test/path", "main")
+		require.NoError(t, err)
+
+		worktree2, err := NewWorktree("/test/path", "main")
+		require.NoError(t, err)
+
+		worktree3, err := NewWorktree("/different/path", "main")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add equality methods
+		assert.True(t, worktree1.Equals(worktree2))
+		assert.False(t, worktree1.Equals(worktree3))
+		assert.True(t, worktree1.SameLocationAs(worktree2))
+		assert.False(t, worktree1.SameLocationAs(worktree3))
+	})
+
+	t.Run("should support worktree metadata", func(t *testing.T) {
+		worktree, err := NewWorktree("/test/path", "main")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add metadata support
+		worktree.SetMetadata("last-checked-by", "user1")
+		worktree.SetMetadata("priority", "high")
+
+		value, exists := worktree.GetMetadata("last-checked-by")
+		assert.True(t, exists)
+		assert.Equal(t, "user1", value)
+
+		value, exists = worktree.GetMetadata("priority")
+		assert.True(t, exists)
+		assert.Equal(t, "high", value)
+
+		_, exists = worktree.GetMetadata("non-existent")
+		assert.False(t, exists)
+	})
+
+	t.Run("should support worktree health check", func(t *testing.T) {
+		worktree, err := NewWorktree("/test/path", "main")
+		require.NoError(t, err)
+
+		// This should fail initially - we need to add health check
+		health := worktree.GetHealth()
+		assert.NotNil(t, health)
+		assert.Equal(t, "unhealthy", health.Status)
+		assert.Contains(t, health.Issues, "path not validated")
+	})
+}
