@@ -8,6 +8,8 @@
 - `go test -tags=integration ./test/integration/...` - Run integration tests
 - `mise run lint:check` - Run linting and formatting checks
 - `mise run lint:fix` - Auto-fix linting issues
+- `mise run lint:testify` - Run testifylint specifically for test code analysis
+- `mise run lint:testify:fix` - Auto-fix testifylint issues in test code
 - `mise run build:cli` - Build the CLI binary
 - `mise run build:clean` - Clean build artifacts
 - `mise run dev:tidy` - Clean up go.mod and go.sum
