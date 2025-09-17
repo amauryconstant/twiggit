@@ -5,49 +5,91 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestConfig_NewConfig(t *testing.T) {
+// ConfigTestSuite provides hybrid suite setup for config tests
+type ConfigTestSuite struct {
+	suite.Suite
+	originalEnv map[string]string
+}
+
+// SetupTest saves original environment variables for each test
+func (s *ConfigTestSuite) SetupTest() {
+	s.originalEnv = make(map[string]string)
+	envVars := []string{
+		"TWIGGIT_WORKSPACE",
+		"TWIGGIT_PROJECT",
+		"TWIGGIT_VERBOSE",
+		"TWIGGIT_QUIET",
+		"XDG_CONFIG_HOME",
+		"HOME",
+	}
+
+	for _, env := range envVars {
+		if value := os.Getenv(env); value != "" {
+			s.originalEnv[env] = value
+		}
+	}
+}
+
+// TearDownTest restores original environment variables
+func (s *ConfigTestSuite) TearDownTest() {
+	for env := range s.originalEnv {
+		_ = os.Setenv(env, s.originalEnv[env])
+	}
+
+	// Unset any env vars that weren't originally set
+	envVars := []string{
+		"TWIGGIT_WORKSPACE",
+		"TWIGGIT_PROJECT",
+		"TWIGGIT_VERBOSE",
+		"TWIGGIT_QUIET",
+		"XDG_CONFIG_HOME",
+	}
+
+	for _, env := range envVars {
+		if _, exists := s.originalEnv[env]; !exists {
+			_ = os.Unsetenv(env)
+		}
+	}
+}
+
+// TestConfig_NewConfig tests config creation with default values
+func (s *ConfigTestSuite) TestConfig_NewConfig() {
 	config := NewConfig()
-	require.NotNil(t, config)
+	s.Require().NotNil(config)
 
 	// Test default values
-	assert.Equal(t, filepath.Join(os.Getenv("HOME"), "Workspaces"), config.Workspace)
-	assert.Equal(t, "", config.Project)
-	assert.False(t, config.Verbose)
-	assert.False(t, config.Quiet)
+	s.Equal(filepath.Join(os.Getenv("HOME"), "Workspaces"), config.Workspace)
+	s.Empty(config.Project)
+	s.False(config.Verbose)
+	s.False(config.Quiet)
 }
 
-func TestConfig_LoadFromEnvironment(t *testing.T) {
+// TestConfig_LoadFromEnvironment tests loading config from environment variables
+func (s *ConfigTestSuite) TestConfig_LoadFromEnvironment() {
 	// Set environment variables
-	require.NoError(t, os.Setenv("TWIGGIT_WORKSPACE", "/custom/workspace"))
-	require.NoError(t, os.Setenv("TWIGGIT_PROJECT", "my-project"))
-	require.NoError(t, os.Setenv("TWIGGIT_VERBOSE", "true"))
-	require.NoError(t, os.Setenv("TWIGGIT_QUIET", "false"))
-
-	defer func() {
-		_ = os.Unsetenv("TWIGGIT_WORKSPACE")
-		_ = os.Unsetenv("TWIGGIT_PROJECT")
-		_ = os.Unsetenv("TWIGGIT_VERBOSE")
-		_ = os.Unsetenv("TWIGGIT_QUIET")
-	}()
+	s.Require().NoError(os.Setenv("TWIGGIT_WORKSPACE", "/custom/workspace"))
+	s.Require().NoError(os.Setenv("TWIGGIT_PROJECT", "my-project"))
+	s.Require().NoError(os.Setenv("TWIGGIT_VERBOSE", "true"))
+	s.Require().NoError(os.Setenv("TWIGGIT_QUIET", "false"))
 
 	config, err := LoadConfig()
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	assert.Equal(t, "/custom/workspace", config.Workspace)
-	assert.Equal(t, "my-project", config.Project)
-	assert.True(t, config.Verbose)
-	assert.False(t, config.Quiet)
+	s.Equal("/custom/workspace", config.Workspace)
+	s.Equal("my-project", config.Project)
+	s.True(config.Verbose)
+	s.False(config.Quiet)
 }
 
-func TestConfig_LoadFromFile(t *testing.T) {
+// TestConfig_LoadFromFile tests loading config from file
+func (s *ConfigTestSuite) TestConfig_LoadFromFile() {
 	// Create temporary config file in the expected XDG structure
-	tempDir := t.TempDir()
+	tempDir := s.T().TempDir()
 	configDir := filepath.Join(tempDir, "twiggit")
-	require.NoError(t, os.MkdirAll(configDir, 0755))
+	s.Require().NoError(os.MkdirAll(configDir, 0755))
 	configFile := filepath.Join(configDir, "config.yaml")
 
 	configContent := `workspace: /file/workspace
@@ -56,33 +98,26 @@ verbose: true
 quiet: false
 `
 	err := os.WriteFile(configFile, []byte(configContent), 0644)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Set XDG_CONFIG_HOME to temp directory
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	require.NoError(t, os.Setenv("XDG_CONFIG_HOME", tempDir))
-	defer func() {
-		if originalXDG == "" {
-			_ = os.Unsetenv("XDG_CONFIG_HOME")
-		} else {
-			_ = os.Setenv("XDG_CONFIG_HOME", originalXDG)
-		}
-	}()
+	s.Require().NoError(os.Setenv("XDG_CONFIG_HOME", tempDir))
 
 	config, err := LoadConfig()
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	assert.Equal(t, "/file/workspace", config.Workspace)
-	assert.Equal(t, "file-project", config.Project)
-	assert.True(t, config.Verbose)
-	assert.False(t, config.Quiet)
+	s.Equal("/file/workspace", config.Workspace)
+	s.Equal("file-project", config.Project)
+	s.True(config.Verbose)
+	s.False(config.Quiet)
 }
 
-func TestConfig_EnvironmentOverridesFile(t *testing.T) {
+// TestConfig_EnvironmentOverridesFile tests that environment variables override file values
+func (s *ConfigTestSuite) TestConfig_EnvironmentOverridesFile() {
 	// Create temporary config file
-	tempDir := t.TempDir()
+	tempDir := s.T().TempDir()
 	configFile := filepath.Join(tempDir, "twiggit", "config.yaml")
-	require.NoError(t, os.MkdirAll(filepath.Dir(configFile), 0755))
+	s.Require().NoError(os.MkdirAll(filepath.Dir(configFile), 0755))
 
 	configContent := `
 workspace: /file/workspace
@@ -90,31 +125,26 @@ project: file-project
 verbose: false
 `
 	err := os.WriteFile(configFile, []byte(configContent), 0644)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Set environment variables to override file values
-	require.NoError(t, os.Setenv("XDG_CONFIG_HOME", tempDir))
-	require.NoError(t, os.Setenv("TWIGGIT_WORKSPACE", "/env/workspace"))
-	require.NoError(t, os.Setenv("TWIGGIT_VERBOSE", "true"))
-
-	defer func() {
-		_ = os.Unsetenv("XDG_CONFIG_HOME")
-		_ = os.Unsetenv("TWIGGIT_WORKSPACE")
-		_ = os.Unsetenv("TWIGGIT_VERBOSE")
-	}()
+	s.Require().NoError(os.Setenv("XDG_CONFIG_HOME", tempDir))
+	s.Require().NoError(os.Setenv("TWIGGIT_WORKSPACE", "/env/workspace"))
+	s.Require().NoError(os.Setenv("TWIGGIT_VERBOSE", "true"))
 
 	config, err := LoadConfig()
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Environment should override file
-	assert.Equal(t, "/env/workspace", config.Workspace)
-	assert.True(t, config.Verbose)
+	s.Equal("/env/workspace", config.Workspace)
+	s.True(config.Verbose)
 	// File value should be used where env not set
-	assert.Equal(t, "file-project", config.Project)
+	s.Equal("file-project", config.Project)
 }
 
-func TestConfig_Validate(t *testing.T) {
-	tests := []struct {
+// TestConfig_Validate tests config validation with table-driven approach
+func (s *ConfigTestSuite) TestConfig_Validate() {
+	testCases := []struct {
 		name        string
 		config      *Config
 		expectError bool
@@ -149,32 +179,38 @@ func TestConfig_Validate(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			err := tt.config.Validate()
 
 			if tt.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMsg)
+				s.Require().Error(err)
+				s.Contains(err.Error(), tt.errorMsg)
 			} else {
-				require.NoError(t, err)
+				s.Require().NoError(err)
 			}
 		})
 	}
 }
 
-func TestConfig_XDGConfigPaths(t *testing.T) {
+// TestConfig_XDGConfigPaths tests XDG config path resolution
+func (s *ConfigTestSuite) TestConfig_XDGConfigPaths() {
 	config := &Config{}
 	paths := config.getConfigPaths()
 
 	// Should include XDG_CONFIG_HOME path
 	homeConfig := filepath.Join(os.Getenv("HOME"), ".config", "twiggit", "config.yaml")
-	assert.Contains(t, paths, homeConfig)
+	s.Contains(paths, homeConfig)
 
 	// Should include legacy home path
 	legacyConfig := filepath.Join(os.Getenv("HOME"), ".twiggit.yaml")
-	assert.Contains(t, paths, legacyConfig)
+	s.Contains(paths, legacyConfig)
 
 	// Should have at least these 2 paths
-	assert.GreaterOrEqual(t, len(paths), 2)
+	s.GreaterOrEqual(len(paths), 2)
+}
+
+// TestConfigSuite runs the config test suite
+func TestConfigSuite(t *testing.T) {
+	suite.Run(t, new(ConfigTestSuite))
 }

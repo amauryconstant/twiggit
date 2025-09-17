@@ -1,37 +1,70 @@
 package worktree
 
 import (
+	"errors"
 	"os"
 	"testing"
 
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/pkg/types"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/amaury/twiggit/test/mocks"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestOperationsService_NewOperationsService(t *testing.T) {
-	gitClient := &MockGitClient{}
-	discoveryService := NewDiscoveryService(gitClient)
-	config := &config.Config{
-		Workspace: "/tmp/test",
-	}
-
-	service := NewOperationsService(gitClient, discoveryService, config)
-
-	assert.NotNil(t, service)
-	assert.Equal(t, gitClient, service.gitClient)
-	assert.Equal(t, discoveryService, service.discovery)
-	assert.Equal(t, config, service.config)
+// BaseWorktreeTestSuite provides common setup for worktree operations tests
+type BaseWorktreeTestSuite struct {
+	suite.Suite
+	MockGit *mocks.GitClientMock
+	Service *OperationsService
+	Config  *config.Config
 }
 
-func TestOperationsService_Create(t *testing.T) {
-	tests := []struct {
+// SetupTest initializes worktree service and mocks for each test
+func (s *BaseWorktreeTestSuite) SetupTest() {
+	s.MockGit = &mocks.GitClientMock{}
+	s.Config = &config.Config{Workspace: s.T().TempDir()}
+
+	discovery := NewDiscoveryService(s.MockGit)
+	s.Service = NewOperationsService(s.MockGit, discovery, s.Config)
+}
+
+// TearDownTest validates mock expectations and cleans up
+func (s *BaseWorktreeTestSuite) TearDownTest() {
+	if s.MockGit != nil {
+		s.MockGit.AssertExpectations(s.T())
+	}
+}
+
+// WorktreeOperationsTestSuite provides hybrid suite setup for worktree operations tests
+type WorktreeOperationsTestSuite struct {
+	BaseWorktreeTestSuite
+	DiscoveryService *DiscoveryService
+}
+
+// SetupTest initializes worktree service and mocks for each test
+func (s *WorktreeOperationsTestSuite) SetupTest() {
+	s.BaseWorktreeTestSuite.SetupTest()
+	s.DiscoveryService = NewDiscoveryService(s.MockGit)
+	// Recreate service with the correct discovery service
+	s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
+}
+
+// TestOperationsService_NewOperationsService tests service creation
+func (s *WorktreeOperationsTestSuite) TestOperationsService_NewOperationsService() {
+	s.Require().NotNil(s.Service)
+	s.Equal(s.MockGit, s.Service.gitClient)
+	s.Equal(s.DiscoveryService, s.Service.discovery)
+	s.Equal(s.Config, s.Service.config)
+}
+
+// TestOperationsService_Create tests worktree creation with table-driven approach
+func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
+	testCases := []struct {
 		name        string
 		project     string
 		branch      string
 		targetPath  string
-		setupMocks  func(*MockGitClient)
+		setupMocks  func(*mocks.GitClientMock)
 		expectError bool
 		errorType   types.ErrorType
 	}{
@@ -40,7 +73,7 @@ func TestOperationsService_Create(t *testing.T) {
 			project:    "test-project",
 			branch:     "feature-branch",
 			targetPath: "/tmp/test-worktree",
-			setupMocks: func(m *MockGitClient) {
+			setupMocks: func(m *mocks.GitClientMock) {
 				// Mock repository validation
 				m.On("IsGitRepository", "test-project").Return(true, nil)
 				// Mock branch existence check
@@ -55,7 +88,7 @@ func TestOperationsService_Create(t *testing.T) {
 			project:    "test-project",
 			branch:     "new-feature",
 			targetPath: "/tmp/new-worktree",
-			setupMocks: func(m *MockGitClient) {
+			setupMocks: func(m *mocks.GitClientMock) {
 				m.On("IsGitRepository", "test-project").Return(true, nil)
 				m.On("BranchExists", "test-project", "new-feature").Return(false)
 				m.On("CreateWorktree", "test-project", "new-feature", "/tmp/new-worktree").Return(nil)
@@ -67,7 +100,7 @@ func TestOperationsService_Create(t *testing.T) {
 			project:    "test-project",
 			branch:     "invalid branch name",
 			targetPath: "/tmp/test-worktree",
-			setupMocks: func(m *MockGitClient) {
+			setupMocks: func(m *mocks.GitClientMock) {
 				// Validation will fail before git operations
 			},
 			expectError: true,
@@ -78,7 +111,7 @@ func TestOperationsService_Create(t *testing.T) {
 			project:    "test-project",
 			branch:     "valid-branch",
 			targetPath: "relative/path",
-			setupMocks: func(m *MockGitClient) {
+			setupMocks: func(m *mocks.GitClientMock) {
 				// Validation will fail before git operations
 			},
 			expectError: true,
@@ -89,7 +122,7 @@ func TestOperationsService_Create(t *testing.T) {
 			project:    "not-a-repo",
 			branch:     "feature",
 			targetPath: "/tmp/test-worktree",
-			setupMocks: func(m *MockGitClient) {
+			setupMocks: func(m *mocks.GitClientMock) {
 				m.On("IsGitRepository", "not-a-repo").Return(false, nil)
 			},
 			expectError: true,
@@ -100,7 +133,7 @@ func TestOperationsService_Create(t *testing.T) {
 			project:    "",
 			branch:     "feature",
 			targetPath: "/tmp/test-worktree",
-			setupMocks: func(m *MockGitClient) {
+			setupMocks: func(m *mocks.GitClientMock) {
 				// No mocks needed for empty project
 			},
 			expectError: true,
@@ -108,40 +141,39 @@ func TestOperationsService_Create(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			mockGit := &MockGitClient{}
-			discoveryService := NewDiscoveryService(mockGit)
-			config := &config.Config{
-				Workspace: "/tmp/test",
-			}
-			service := NewOperationsService(mockGit, discoveryService, config)
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			// Reset mock for each test case
+			s.MockGit = &mocks.GitClientMock{}
+			s.DiscoveryService = NewDiscoveryService(s.MockGit)
+			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
 
-			tt.setupMocks(mockGit)
+			tt.setupMocks(s.MockGit)
 
-			err := service.Create(tt.project, tt.branch, tt.targetPath)
+			err := s.Service.Create(tt.project, tt.branch, tt.targetPath)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Require().Error(err)
 				if tt.errorType != types.ErrUnknown {
-					assert.True(t, types.IsErrorType(err, tt.errorType),
+					s.True(types.IsErrorType(err, tt.errorType),
 						"Expected error type %v, got: %v", tt.errorType, err)
 				}
 			} else {
-				assert.NoError(t, err)
+				s.Require().NoError(err)
 			}
 
-			mockGit.AssertExpectations(t)
+			s.MockGit.AssertExpectations(s.T())
 		})
 	}
 }
 
-func TestOperationsService_Remove(t *testing.T) {
-	tests := []struct {
+// TestOperationsService_Remove tests worktree removal with table-driven approach
+func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
+	testCases := []struct {
 		name         string
 		worktreePath string
 		force        bool
-		setupMocks   func(*MockGitClient, string)
+		setupMocks   func(*mocks.GitClientMock, string)
 		setupCwd     func() (string, func())
 		expectError  bool
 		errorType    types.ErrorType
@@ -150,7 +182,7 @@ func TestOperationsService_Remove(t *testing.T) {
 			name:         "should remove clean worktree safely",
 			worktreePath: "/tmp/test-worktree",
 			force:        false,
-			setupMocks: func(m *MockGitClient, path string) {
+			setupMocks: func(m *mocks.GitClientMock, path string) {
 				// Mock worktree status check
 				m.On("GetWorktreeStatus", path).Return(&types.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: true,
@@ -169,7 +201,7 @@ func TestOperationsService_Remove(t *testing.T) {
 			name:         "should refuse to remove worktree with uncommitted changes",
 			worktreePath: "/tmp/dirty-worktree",
 			force:        false,
-			setupMocks: func(m *MockGitClient, path string) {
+			setupMocks: func(m *mocks.GitClientMock, path string) {
 				m.On("GetWorktreeStatus", path).Return(&types.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: false,
 				}, nil)
@@ -183,7 +215,7 @@ func TestOperationsService_Remove(t *testing.T) {
 			name:         "should remove dirty worktree when forced",
 			worktreePath: "/tmp/dirty-worktree",
 			force:        true,
-			setupMocks: func(m *MockGitClient, path string) {
+			setupMocks: func(m *mocks.GitClientMock, path string) {
 				// No validation calls for forced removal
 				m.On("GetRepositoryRoot", path).Return("/tmp/test-repo", nil)
 				m.On("RemoveWorktree", "/tmp/test-repo", path, true).Return(nil)
@@ -195,9 +227,9 @@ func TestOperationsService_Remove(t *testing.T) {
 			name:         "should return error for non-existent worktree",
 			worktreePath: "/tmp/non-existent",
 			force:        false,
-			setupMocks: func(m *MockGitClient, path string) {
+			setupMocks: func(m *mocks.GitClientMock, path string) {
 				m.On("GetWorktreeStatus", path).Return((*types.WorktreeInfo)(nil),
-					assert.AnError)
+					errors.New("worktree not found"))
 			},
 			setupCwd:    func() (string, func()) { return "/different/dir", func() {} },
 			expectError: true,
@@ -207,15 +239,15 @@ func TestOperationsService_Remove(t *testing.T) {
 			name:         "should return error for empty path",
 			worktreePath: "",
 			force:        false,
-			setupMocks:   func(m *MockGitClient, path string) {},
+			setupMocks:   func(m *mocks.GitClientMock, path string) {},
 			setupCwd:     func() (string, func()) { return "/different/dir", func() {} },
 			expectError:  true,
 			errorType:    types.ErrValidation,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			// Setup working directory if needed
 			var cleanup func()
 			if tt.setupCwd != nil {
@@ -223,52 +255,55 @@ func TestOperationsService_Remove(t *testing.T) {
 				defer cleanup()
 			}
 
-			mockGit := &MockGitClient{}
-			discoveryService := NewDiscoveryService(mockGit)
-			config := &config.Config{
-				Workspace: "/tmp/test",
-			}
-			service := NewOperationsService(mockGit, discoveryService, config)
+			// Reset mock for each test case
+			s.MockGit = &mocks.GitClientMock{}
+			s.DiscoveryService = NewDiscoveryService(s.MockGit)
+			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
 
-			tt.setupMocks(mockGit, tt.worktreePath)
+			tt.setupMocks(s.MockGit, tt.worktreePath)
 
-			err := service.Remove(tt.worktreePath, tt.force)
+			err := s.Service.Remove(tt.worktreePath, tt.force)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Require().Error(err)
 				if tt.errorType != types.ErrUnknown {
-					assert.True(t, types.IsErrorType(err, tt.errorType),
+					s.True(types.IsErrorType(err, tt.errorType),
 						"Expected error type %v, got: %v", tt.errorType, err)
 				}
 			} else {
-				assert.NoError(t, err)
+				s.Require().NoError(err)
 			}
 
-			mockGit.AssertExpectations(t)
+			s.MockGit.AssertExpectations(s.T())
 		})
 	}
 }
 
-func TestOperationsService_GetCurrent(t *testing.T) {
-	tests := []struct {
+// TestOperationsService_GetCurrent tests current worktree retrieval with table-driven approach
+func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
+	testCases := []struct {
 		name        string
 		setupCwd    func() (string, func())
-		setupMocks  func(*MockGitClient, string)
+		setupMocks  func(*mocks.GitClientMock, string)
 		expectError bool
 	}{
 		{
 			name: "should return current worktree information",
 			setupCwd: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "current-test-*")
-				require.NoError(t, err)
+				if err != nil {
+					panic(err)
+				}
 				originalWd, _ := os.Getwd()
-				require.NoError(t, os.Chdir(tempDir))
+				if err := os.Chdir(tempDir); err != nil {
+					panic(err)
+				}
 				return tempDir, func() {
 					_ = os.Chdir(originalWd)
 					_ = os.RemoveAll(tempDir)
 				}
 			},
-			setupMocks: func(m *MockGitClient, currentDir string) {
+			setupMocks: func(m *mocks.GitClientMock, currentDir string) {
 				m.On("GetWorktreeStatus", currentDir).Return(&types.WorktreeInfo{
 					Path: currentDir, Branch: "main", Clean: true,
 				}, nil)
@@ -279,58 +314,61 @@ func TestOperationsService_GetCurrent(t *testing.T) {
 			name: "should return error for non-worktree directory",
 			setupCwd: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "non-worktree-*")
-				require.NoError(t, err)
+				if err != nil {
+					panic(err)
+				}
 				originalWd, _ := os.Getwd()
-				require.NoError(t, os.Chdir(tempDir))
+				if err := os.Chdir(tempDir); err != nil {
+					panic(err)
+				}
 				return tempDir, func() {
 					_ = os.Chdir(originalWd)
 					_ = os.RemoveAll(tempDir)
 				}
 			},
-			setupMocks: func(m *MockGitClient, currentDir string) {
+			setupMocks: func(m *mocks.GitClientMock, currentDir string) {
 				m.On("GetWorktreeStatus", currentDir).Return((*types.WorktreeInfo)(nil),
-					assert.AnError)
+					errors.New("not a worktree"))
 			},
 			expectError: true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			currentDir, cleanup := tt.setupCwd()
 			defer cleanup()
 
-			mockGit := &MockGitClient{}
-			discoveryService := NewDiscoveryService(mockGit)
-			config := &config.Config{
-				Workspace: "/tmp/test",
-			}
-			service := NewOperationsService(mockGit, discoveryService, config)
+			// Reset mock for each test case
+			s.MockGit = &mocks.GitClientMock{}
+			s.DiscoveryService = NewDiscoveryService(s.MockGit)
+			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
 
-			tt.setupMocks(mockGit, currentDir)
+			tt.setupMocks(s.MockGit, currentDir)
 
-			worktree, err := service.GetCurrent()
+			worktree, err := s.Service.GetCurrent()
 
 			if tt.expectError {
-				assert.Error(t, err)
-				assert.Nil(t, worktree)
+				s.Require().Error(err)
+				s.Nil(worktree)
 			} else {
-				assert.NoError(t, err)
-				assert.NotNil(t, worktree)
-				assert.Equal(t, currentDir, worktree.Path)
+				s.Require().NoError(err)
+				s.NotNil(worktree)
+				s.Equal(currentDir, worktree.Path)
 			}
 
-			mockGit.AssertExpectations(t)
+			s.MockGit.AssertExpectations(s.T())
 		})
 	}
 }
 
-func TestOperationsService_ValidateRemoval(t *testing.T) {
-	tests := []struct {
+// TestOperationsService_ValidateRemoval tests worktree removal validation with table-driven approach
+func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
+	testCases := []struct {
 		name         string
 		worktreePath string
 		setupCwd     func() (string, func())
-		setupMocks   func(*MockGitClient, string)
+		setupMocks   func(*mocks.GitClientMock, string)
 		expectError  bool
 		errorType    types.ErrorType
 	}{
@@ -340,7 +378,7 @@ func TestOperationsService_ValidateRemoval(t *testing.T) {
 			setupCwd: func() (string, func()) {
 				return "/different/directory", func() {}
 			},
-			setupMocks: func(m *MockGitClient, path string) {
+			setupMocks: func(m *mocks.GitClientMock, path string) {
 				m.On("GetWorktreeStatus", path).Return(&types.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: true,
 				}, nil)
@@ -356,7 +394,7 @@ func TestOperationsService_ValidateRemoval(t *testing.T) {
 			setupCwd: func() (string, func()) {
 				return "/different/directory", func() {}
 			},
-			setupMocks: func(m *MockGitClient, path string) {
+			setupMocks: func(m *mocks.GitClientMock, path string) {
 				m.On("GetWorktreeStatus", path).Return(&types.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: false,
 				}, nil)
@@ -367,8 +405,8 @@ func TestOperationsService_ValidateRemoval(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			currentDir, cleanup := tt.setupCwd()
 			defer cleanup()
 
@@ -377,33 +415,36 @@ func TestOperationsService_ValidateRemoval(t *testing.T) {
 			if currentDir != "/different/directory" {
 				// Only change if it's a real directory
 				if _, err := os.Stat(currentDir); err == nil {
-					require.NoError(t, os.Chdir(currentDir))
+					s.Require().NoError(os.Chdir(currentDir))
 					defer func() { _ = os.Chdir(originalWd) }()
 				}
 			}
 
-			mockGit := &MockGitClient{}
-			discoveryService := NewDiscoveryService(mockGit)
-			config := &config.Config{
-				Workspace: "/tmp/test",
-			}
-			service := NewOperationsService(mockGit, discoveryService, config)
+			// Reset mock for each test case
+			s.MockGit = &mocks.GitClientMock{}
+			s.DiscoveryService = NewDiscoveryService(s.MockGit)
+			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
 
-			tt.setupMocks(mockGit, tt.worktreePath)
+			tt.setupMocks(s.MockGit, tt.worktreePath)
 
-			err := service.ValidateRemoval(tt.worktreePath)
+			err := s.Service.ValidateRemoval(tt.worktreePath)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Require().Error(err)
 				if tt.errorType != types.ErrUnknown {
-					assert.True(t, types.IsErrorType(err, tt.errorType),
+					s.True(types.IsErrorType(err, tt.errorType),
 						"Expected error type %v, got: %v", tt.errorType, err)
 				}
 			} else {
-				assert.NoError(t, err)
+				s.Require().NoError(err)
 			}
 
-			mockGit.AssertExpectations(t)
+			s.MockGit.AssertExpectations(s.T())
 		})
 	}
+}
+
+// TestWorktreeOperationsSuite runs the worktree operations test suite
+func TestWorktreeOperationsSuite(t *testing.T) {
+	suite.Run(t, new(WorktreeOperationsTestSuite))
 }

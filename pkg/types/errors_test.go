@@ -4,10 +4,19 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestErrorType_String(t *testing.T) {
+// ErrorsTestSuite provides test setup for error type tests
+type ErrorsTestSuite struct {
+	suite.Suite
+}
+
+func TestErrorsSuite(t *testing.T) {
+	suite.Run(t, new(ErrorsTestSuite))
+}
+
+func (s *ErrorsTestSuite) TestErrorType_String() {
 	tests := []struct {
 		name     string
 		errType  ErrorType
@@ -27,13 +36,13 @@ func TestErrorType_String(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.errType.String())
+		s.Run(tt.name, func() {
+			s.Equal(tt.expected, tt.errType.String())
 		})
 	}
 }
 
-func TestWorktreeError_Error(t *testing.T) {
+func (s *ErrorsTestSuite) TestWorktreeError_Error() {
 	tests := []struct {
 		name     string
 		err      *WorktreeError
@@ -60,13 +69,13 @@ func TestWorktreeError_Error(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, tt.err.Error())
+		s.Run(tt.name, func() {
+			s.Equal(tt.expected, tt.err.Error())
 		})
 	}
 }
 
-func TestWorktreeError_Unwrap(t *testing.T) {
+func (s *ErrorsTestSuite) TestWorktreeError_Unwrap() {
 	cause := errors.New("underlying error")
 	err := &WorktreeError{
 		Type:    ErrGitCommand,
@@ -74,10 +83,10 @@ func TestWorktreeError_Unwrap(t *testing.T) {
 		Cause:   cause,
 	}
 
-	assert.Equal(t, cause, err.Unwrap())
+	s.Equal(cause, err.Unwrap())
 }
 
-func TestWorktreeError_WithSuggestion(t *testing.T) {
+func (s *ErrorsTestSuite) TestWorktreeError_WithSuggestion() {
 	err := &WorktreeError{
 		Type:        ErrInvalidBranchName,
 		Message:     "invalid branch name",
@@ -86,11 +95,11 @@ func TestWorktreeError_WithSuggestion(t *testing.T) {
 
 	result := err.WithSuggestion("Use alphanumeric characters only")
 
-	assert.Equal(t, err, result) // Should return the same instance
-	assert.Contains(t, err.Suggestions, "Use alphanumeric characters only")
+	s.Equal(err, result) // Should return the same instance
+	s.Contains(err.Suggestions, "Use alphanumeric characters only")
 }
 
-func TestWorktreeError_WithCode(t *testing.T) {
+func (s *ErrorsTestSuite) TestWorktreeError_WithCode() {
 	err := &WorktreeError{
 		Type:    ErrValidation,
 		Message: "validation failed",
@@ -98,32 +107,32 @@ func TestWorktreeError_WithCode(t *testing.T) {
 
 	result := err.WithCode("VALIDATION_001")
 
-	assert.Equal(t, err, result) // Should return the same instance
-	assert.Equal(t, "VALIDATION_001", err.Code)
+	s.Equal(err, result) // Should return the same instance
+	s.Equal("VALIDATION_001", err.Code)
 }
 
-func TestNewWorktreeError(t *testing.T) {
+func (s *ErrorsTestSuite) TestNewWorktreeError() {
 	err := NewWorktreeError(ErrWorktreeNotFound, "worktree not found", "/tmp/path")
 
-	assert.Equal(t, ErrWorktreeNotFound, err.Type)
-	assert.Equal(t, "worktree not found", err.Message)
-	assert.Equal(t, "/tmp/path", err.Path)
-	assert.Empty(t, err.Suggestions)
-	assert.Nil(t, err.Cause)
+	s.Equal(ErrWorktreeNotFound, err.Type)
+	s.Equal("worktree not found", err.Message)
+	s.Equal("/tmp/path", err.Path)
+	s.Empty(err.Suggestions)
+	s.NoError(err.Cause)
 }
 
-func TestWrapError(t *testing.T) {
+func (s *ErrorsTestSuite) TestWrapError() {
 	cause := errors.New("filesystem error")
 	err := WrapError(ErrPathNotWritable, "cannot write to path", "/tmp/path", cause)
 
-	assert.Equal(t, ErrPathNotWritable, err.Type)
-	assert.Equal(t, "cannot write to path", err.Message)
-	assert.Equal(t, "/tmp/path", err.Path)
-	assert.Equal(t, cause, err.Cause)
-	assert.Empty(t, err.Suggestions)
+	s.Equal(ErrPathNotWritable, err.Type)
+	s.Equal("cannot write to path", err.Message)
+	s.Equal("/tmp/path", err.Path)
+	s.Equal(cause, err.Cause)
+	s.Empty(err.Suggestions)
 }
 
-func TestIsErrorType(t *testing.T) {
+func (s *ErrorsTestSuite) TestIsErrorType() {
 	worktreeErr := &WorktreeError{
 		Type:    ErrWorktreeExists,
 		Message: "test error",
@@ -144,25 +153,25 @@ func TestIsErrorType(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			result := IsErrorType(tt.err, tt.errType)
-			assert.Equal(t, tt.expected, result)
+			s.Equal(tt.expected, result)
 		})
 	}
 }
 
-func TestWorktreeError_Chaining(t *testing.T) {
+func (s *ErrorsTestSuite) TestWorktreeError_Chaining() {
 	// Test method chaining
 	err := NewWorktreeError(ErrInvalidBranchName, "invalid name", "/path").
 		WithSuggestion("Use valid characters").
 		WithSuggestion("Avoid special characters").
 		WithCode("BRANCH_001")
 
-	assert.Equal(t, ErrInvalidBranchName, err.Type)
-	assert.Equal(t, "invalid name", err.Message)
-	assert.Equal(t, "/path", err.Path)
-	assert.Equal(t, "BRANCH_001", err.Code)
-	assert.Len(t, err.Suggestions, 2)
-	assert.Contains(t, err.Suggestions, "Use valid characters")
-	assert.Contains(t, err.Suggestions, "Avoid special characters")
+	s.Equal(ErrInvalidBranchName, err.Type)
+	s.Equal("invalid name", err.Message)
+	s.Equal("/path", err.Path)
+	s.Equal("BRANCH_001", err.Code)
+	s.Len(err.Suggestions, 2)
+	s.Contains(err.Suggestions, "Use valid characters")
+	s.Contains(err.Suggestions, "Avoid special characters")
 }

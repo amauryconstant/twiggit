@@ -1,34 +1,50 @@
-package mise
+package integration
 
 import (
 	"os"
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/amaury/twiggit/test/helpers"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestMiseIntegration_NewMiseIntegration(t *testing.T) {
-	integration := NewMiseIntegration()
-
-	assert.NotNil(t, integration)
-	assert.Equal(t, "mise", integration.execPath)
-	assert.True(t, integration.enabled) // Should be enabled by default if mise is available
+type MiseIntegrationTestSuite struct {
+	suite.Suite
 }
 
-func TestMiseIntegration_IsAvailable(t *testing.T) {
-	integration := NewMiseIntegration()
+func (s *MiseIntegrationTestSuite) SetupTest() {
+	// Setup code if needed
+}
+
+func (s *MiseIntegrationTestSuite) TearDownTest() {
+	// Cleanup code if needed
+}
+
+func TestMiseIntegrationSuite(t *testing.T) {
+	suite.Run(t, new(MiseIntegrationTestSuite))
+}
+
+func (s *MiseIntegrationTestSuite) TestNewMiseIntegration() {
+	integration := helpers.NewMiseIntegration()
+
+	s.NotNil(integration)
+	s.True(integration.IsAvailable()) // Should check availability instead of accessing execPath directly
+	s.True(integration.IsEnabled())   // Should use public method instead of accessing enabled directly
+}
+
+func (s *MiseIntegrationTestSuite) TestIsAvailable() {
+	integration := helpers.NewMiseIntegration()
 
 	// This test depends on system state, but we can test the method exists
 	available := integration.IsAvailable()
 
-	// Result depends on whether mise is installed on the system
-	// Just ensure the method works without panicking
-	assert.IsType(t, true, available)
+	// Result depends on whether mise is installed on system
+	// Just ensure that method works without panicking
+	s.IsType(true, available)
 }
 
-func TestMiseIntegration_SetupWorktree(t *testing.T) {
+func (s *MiseIntegrationTestSuite) TestSetupWorktree() {
 	tests := []struct {
 		name            string
 		setupSourceRepo func() (string, func())
@@ -40,7 +56,7 @@ func TestMiseIntegration_SetupWorktree(t *testing.T) {
 			name: "should copy .mise.local.toml from source to target",
 			setupSourceRepo: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-source-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				// Create .mise.local.toml in source
 				miseFile := filepath.Join(tempDir, ".mise.local.toml")
@@ -52,13 +68,13 @@ python = "3.11"
 [env]
 NODE_ENV = "development"
 `), 0644)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			setupTarget: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-target-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			expectError: false,
@@ -68,25 +84,25 @@ NODE_ENV = "development"
 			name: "should copy mise/config.local.toml pattern",
 			setupSourceRepo: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-source-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				// Create mise/config.local.toml in source
 				miseDir := filepath.Join(tempDir, "mise")
 				err = os.MkdirAll(miseDir, 0755)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				configFile := filepath.Join(miseDir, "config.local.toml")
 				err = os.WriteFile(configFile, []byte(`
 [tools]
 go = "1.21"
 `), 0644)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			setupTarget: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-target-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			expectError: false,
@@ -96,13 +112,13 @@ go = "1.21"
 			name: "should handle missing config files gracefully",
 			setupSourceRepo: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-source-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 				// No mise config files
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			setupTarget: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-target-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			expectError: false,
@@ -112,7 +128,7 @@ go = "1.21"
 			name: "should return error for non-existent target",
 			setupSourceRepo: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-source-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			setupTarget: func() (string, func()) {
@@ -124,34 +140,34 @@ go = "1.21"
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			sourceRepo, cleanupSource := tt.setupSourceRepo()
 			defer cleanupSource()
 
 			targetPath, cleanupTarget := tt.setupTarget()
 			defer cleanupTarget()
 
-			integration := NewMiseIntegration()
+			integration := helpers.NewMiseIntegration()
 
 			err := integration.SetupWorktree(sourceRepo, targetPath)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Error(err)
 			} else {
-				assert.NoError(t, err)
+				s.NoError(err)
 
 				// Check that expected files were copied
 				for _, expectedFile := range tt.expectFiles {
 					targetFile := filepath.Join(targetPath, expectedFile)
 					_, err := os.Stat(targetFile)
-					assert.NoError(t, err, "Expected file %s should exist in target", expectedFile)
+					s.NoError(err, "Expected file %s should exist in target", expectedFile)
 				}
 			}
 		})
 	}
 }
 
-func TestMiseIntegration_TrustDirectory(t *testing.T) {
+func (s *MiseIntegrationTestSuite) TestTrustDirectory() {
 	tests := []struct {
 		name        string
 		setupDir    func() (string, func())
@@ -161,7 +177,7 @@ func TestMiseIntegration_TrustDirectory(t *testing.T) {
 			name: "should handle trust operation gracefully",
 			setupDir: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-trust-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			expectError: false, // Should not error even if mise is not available
@@ -176,25 +192,25 @@ func TestMiseIntegration_TrustDirectory(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			dirPath, cleanup := tt.setupDir()
 			defer cleanup()
 
-			integration := NewMiseIntegration()
+			integration := helpers.NewMiseIntegration()
 
 			err := integration.TrustDirectory(dirPath)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Error(err)
 			} else {
 				// Should not error (may be no-op if mise not available)
-				assert.NoError(t, err)
+				s.NoError(err)
 			}
 		})
 	}
 }
 
-func TestMiseIntegration_DetectConfigFiles(t *testing.T) {
+func (s *MiseIntegrationTestSuite) TestDetectConfigFiles() {
 	tests := []struct {
 		name          string
 		setupRepo     func() (string, func())
@@ -204,11 +220,11 @@ func TestMiseIntegration_DetectConfigFiles(t *testing.T) {
 			name: "should detect .mise.local.toml",
 			setupRepo: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-detect-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				miseFile := filepath.Join(tempDir, ".mise.local.toml")
 				err = os.WriteFile(miseFile, []byte("# test config"), 0644)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
@@ -218,15 +234,15 @@ func TestMiseIntegration_DetectConfigFiles(t *testing.T) {
 			name: "should detect mise/config.local.toml",
 			setupRepo: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-detect-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				miseDir := filepath.Join(tempDir, "mise")
 				err = os.MkdirAll(miseDir, 0755)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				configFile := filepath.Join(miseDir, "config.local.toml")
 				err = os.WriteFile(configFile, []byte("# test config"), 0644)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
@@ -236,21 +252,21 @@ func TestMiseIntegration_DetectConfigFiles(t *testing.T) {
 			name: "should detect both config patterns",
 			setupRepo: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-detect-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				// Create .mise.local.toml
 				miseFile := filepath.Join(tempDir, ".mise.local.toml")
 				err = os.WriteFile(miseFile, []byte("# test config"), 0644)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				// Create mise/config.local.toml
 				miseDir := filepath.Join(tempDir, "mise")
 				err = os.MkdirAll(miseDir, 0755)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				configFile := filepath.Join(miseDir, "config.local.toml")
 				err = os.WriteFile(configFile, []byte("# test config"), 0644)
-				require.NoError(t, err)
+				s.Require().NoError(err)
 
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
@@ -260,7 +276,7 @@ func TestMiseIntegration_DetectConfigFiles(t *testing.T) {
 			name: "should return empty for no config files",
 			setupRepo: func() (string, func()) {
 				tempDir, err := os.MkdirTemp("", "mise-detect-*")
-				require.NoError(t, err)
+				s.Require().NoError(err)
 				return tempDir, func() { _ = os.RemoveAll(tempDir) }
 			},
 			expectedFiles: []string{},
@@ -268,24 +284,24 @@ func TestMiseIntegration_DetectConfigFiles(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			repoPath, cleanup := tt.setupRepo()
 			defer cleanup()
 
-			integration := NewMiseIntegration()
+			integration := helpers.NewMiseIntegration()
 
 			configFiles := integration.DetectConfigFiles(repoPath)
 
-			assert.ElementsMatch(t, tt.expectedFiles, configFiles)
+			s.ElementsMatch(tt.expectedFiles, configFiles)
 		})
 	}
 }
 
-func TestMiseIntegration_CopyConfigFiles(t *testing.T) {
-	t.Run("should copy files preserving directory structure", func(t *testing.T) {
+func (s *MiseIntegrationTestSuite) TestCopyConfigFiles() {
+	s.Run("should copy files preserving directory structure", func() {
 		// Setup source directory with config files
 		sourceDir, err := os.MkdirTemp("", "mise-copy-source-*")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 		defer func() { _ = os.RemoveAll(sourceDir) }()
 
 		// Create .mise.local.toml
@@ -293,41 +309,41 @@ func TestMiseIntegration_CopyConfigFiles(t *testing.T) {
 		miseContent := []byte(`[tools]
 node = "20.0.0"`)
 		err = os.WriteFile(miseFile, miseContent, 0644)
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// Create mise/config.local.toml
 		miseDir := filepath.Join(sourceDir, "mise")
 		err = os.MkdirAll(miseDir, 0755)
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		configFile := filepath.Join(miseDir, "config.local.toml")
 		configContent := []byte(`[tools]
 go = "1.21"`)
 		err = os.WriteFile(configFile, configContent, 0644)
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// Setup target directory
 		targetDir, err := os.MkdirTemp("", "mise-copy-target-*")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 		defer func() { _ = os.RemoveAll(targetDir) }()
 
-		integration := NewMiseIntegration()
+		integration := helpers.NewMiseIntegration()
 
-		// Copy the files
+		// Copy files
 		configFiles := []string{".mise.local.toml", "mise/config.local.toml"}
 		err = integration.CopyConfigFiles(sourceDir, targetDir, configFiles)
 
-		assert.NoError(t, err)
+		s.NoError(err)
 
 		// Verify files were copied correctly
 		targetMiseFile := filepath.Join(targetDir, ".mise.local.toml")
 		copiedMiseContent, err := os.ReadFile(targetMiseFile)
-		assert.NoError(t, err)
-		assert.Equal(t, miseContent, copiedMiseContent)
+		s.NoError(err)
+		s.Equal(miseContent, copiedMiseContent)
 
 		targetConfigFile := filepath.Join(targetDir, "mise", "config.local.toml")
 		copiedConfigContent, err := os.ReadFile(targetConfigFile)
-		assert.NoError(t, err)
-		assert.Equal(t, configContent, copiedConfigContent)
+		s.NoError(err)
+		s.Equal(configContent, copiedConfigContent)
 	})
 }

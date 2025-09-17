@@ -1,4 +1,4 @@
-package mise
+package helpers
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-// MiseIntegration handles integration with the Mise development environment tool
+// MiseIntegration handles integration with Mise development environment tool
 type MiseIntegration struct {
 	execPath string
 	enabled  bool
@@ -20,7 +20,7 @@ func NewMiseIntegration() *MiseIntegration {
 		enabled:  true,
 	}
 
-	// Check if mise is available on the system
+	// Check if mise is available on system
 	if !integration.IsAvailable() {
 		integration.enabled = false
 	}
@@ -28,7 +28,7 @@ func NewMiseIntegration() *MiseIntegration {
 	return integration
 }
 
-// IsAvailable checks if mise is available on the system
+// IsAvailable checks if mise is available on system
 func (mi *MiseIntegration) IsAvailable() bool {
 	_, err := exec.LookPath(mi.execPath)
 	return err == nil
@@ -54,11 +54,10 @@ func (mi *MiseIntegration) SetupWorktree(sourceRepoPath, worktreePath string) er
 		return fmt.Errorf("failed to copy mise config files: %w", err)
 	}
 
-	// Trust the new worktree directory if mise is available
+	// Trust new worktree directory if mise is available
 	if mi.enabled {
 		if err := mi.TrustDirectory(worktreePath); err != nil {
 			// Don't fail the entire operation if trust fails
-			// Log error in a real implementation
 			_ = err
 		}
 	}

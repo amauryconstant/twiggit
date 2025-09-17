@@ -1,14 +1,78 @@
 package domain
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestWorkspace_NewWorkspace(t *testing.T) {
-	tests := []struct {
+// DomainTestSuite provides common setup for domain layer tests
+type DomainTestSuite struct {
+	suite.Suite
+	Project   *Project
+	Workspace *Workspace
+}
+
+// SetupTest initializes domain objects for each test
+func (s *DomainTestSuite) SetupTest() {
+	var err error
+	s.Project, err = NewProject("test-project", "/repo/path")
+	s.Require().NoError(err)
+
+	s.Workspace, err = NewWorkspace("/test/workspace")
+	s.Require().NoError(err)
+}
+
+// TableTestRunner provides a generic way to run table-driven tests within testify suites
+type TableTestRunner[T any] struct {
+	suite *suite.Suite
+	tests []T
+	run   func(T)
+}
+
+// NewTableTestRunner creates a new table test runner for the given test cases
+func NewTableTestRunner[T any](s *suite.Suite, tests []T, run func(T)) *TableTestRunner[T] {
+	return &TableTestRunner[T]{
+		suite: s,
+		tests: tests,
+		run:   run,
+	}
+}
+
+// Run executes all table-driven tests using the suite's Run method
+func (r *TableTestRunner[T]) Run() {
+	for _, tt := range r.tests {
+		testName := r.getTestName(tt)
+		r.suite.Run(testName, func() {
+			r.run(tt)
+		})
+	}
+}
+
+// getTestName extracts a meaningful test name from the test case
+func (r *TableTestRunner[T]) getTestName(testCase T) string {
+	// Try to get name from struct field
+	v := reflect.ValueOf(testCase)
+	if v.Kind() == reflect.Struct {
+		if field := v.FieldByName("Name"); field.IsValid() && field.Kind() == reflect.String {
+			return field.String()
+		}
+	}
+
+	// Fallback to type name and index
+	return fmt.Sprintf("%T", testCase)
+}
+
+// WorkspaceTestSuite provides hybrid suite setup for workspace tests
+type WorkspaceTestSuite struct {
+	DomainTestSuite
+}
+
+// TestWorkspace_NewWorkspace tests workspace creation with table-driven approach
+func (s *WorkspaceTestSuite) TestWorkspace_NewWorkspace() {
+	testCases := []struct {
 		name         string
 		path         string
 		expectError  bool
@@ -27,96 +91,103 @@ func TestWorkspace_NewWorkspace(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			workspace, err := NewWorkspace(tt.path)
+	NewTableTestRunner(&s.Suite, testCases, func(tt struct {
+		name         string
+		path         string
+		expectError  bool
+		errorMessage string
+	}) {
+		workspace, err := NewWorkspace(tt.path)
 
-			if tt.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMessage)
-				assert.Nil(t, workspace)
-			} else {
-				require.NoError(t, err)
-				require.NotNil(t, workspace)
-				assert.Equal(t, tt.path, workspace.Path)
-				assert.Empty(t, workspace.Projects)
-			}
-		})
-	}
+		if tt.expectError {
+			s.Require().Error(err)
+			s.Contains(err.Error(), tt.errorMessage)
+			s.Nil(workspace)
+		} else {
+			s.Require().NoError(err)
+			s.Require().NotNil(workspace)
+			s.Equal(tt.path, workspace.Path)
+			s.Empty(workspace.Projects)
+		}
+	}).Run()
 }
 
-func TestWorkspace_AddProject(t *testing.T) {
+// TestWorkspace_AddProject tests project addition to workspace
+func (s *WorkspaceTestSuite) TestWorkspace_AddProject() {
 	workspace, err := NewWorkspace("/workspace")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	project, err := NewProject("test-project", "/repo/path")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Add first project
 	err = workspace.AddProject(project)
-	require.NoError(t, err)
-	assert.Len(t, workspace.Projects, 1)
-	assert.Equal(t, project, workspace.Projects[0])
+	s.Require().NoError(err)
+	s.Len(workspace.Projects, 1)
+	s.Equal(project, workspace.Projects[0])
 
 	// Try to add duplicate project
 	duplicateProject, err := NewProject("test-project", "/different/repo")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	err = workspace.AddProject(duplicateProject)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "project already exists")
-	assert.Len(t, workspace.Projects, 1) // Should not be added
+	s.Require().Error(err)
+	s.Contains(err.Error(), "project already exists")
+	s.Len(workspace.Projects, 1) // Should not be added
 }
 
-func TestWorkspace_RemoveProject(t *testing.T) {
+// TestWorkspace_RemoveProject tests project removal from workspace
+func (s *WorkspaceTestSuite) TestWorkspace_RemoveProject() {
 	workspace, err := NewWorkspace("/workspace")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	project, err := NewProject("test-project", "/repo/path")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	err = workspace.AddProject(project)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Remove existing project
 	err = workspace.RemoveProject("test-project")
-	require.NoError(t, err)
-	assert.Empty(t, workspace.Projects)
+	s.Require().NoError(err)
+	s.Empty(workspace.Projects)
 
 	// Try to remove non-existent project
 	err = workspace.RemoveProject("nonexistent-project")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "project not found")
+	s.Require().Error(err)
+	s.Contains(err.Error(), "project not found")
 }
 
-func TestWorkspace_GetProject(t *testing.T) {
+// TestWorkspace_GetProject tests project retrieval from workspace
+func (s *WorkspaceTestSuite) TestWorkspace_GetProject() {
 	workspace, err := NewWorkspace("/workspace")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	project, err := NewProject("test-project", "/repo/path")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	err = workspace.AddProject(project)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Get existing project
 	found, err := workspace.GetProject("test-project")
-	require.NoError(t, err)
-	assert.Equal(t, project, found)
+	s.Require().NoError(err)
+	s.Equal(project, found)
 
 	// Get non-existent project
 	_, err = workspace.GetProject("nonexistent-project")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "project not found")
+	s.Require().Error(err)
+	s.Contains(err.Error(), "project not found")
 }
 
-func TestWorkspace_ListAllWorktrees(t *testing.T) {
+// TestWorkspace_ListAllWorktrees tests listing all worktrees in workspace
+func (s *WorkspaceTestSuite) TestWorkspace_ListAllWorktrees() {
 	workspace, err := NewWorkspace("/workspace")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Empty workspace
 	worktrees := workspace.ListAllWorktrees()
-	assert.Empty(t, worktrees)
+	s.Empty(worktrees)
 
 	// Add projects with worktrees
 	project1, _ := NewProject("project1", "/repo1")
@@ -126,54 +197,56 @@ func TestWorkspace_ListAllWorktrees(t *testing.T) {
 	worktree2, _ := NewWorktree("/path2", "feature")
 	worktree3, _ := NewWorktree("/path3", "develop")
 
-	require.NoError(t, project1.AddWorktree(worktree1))
-	require.NoError(t, project1.AddWorktree(worktree2))
-	require.NoError(t, project2.AddWorktree(worktree3))
+	s.Require().NoError(project1.AddWorktree(worktree1))
+	s.Require().NoError(project1.AddWorktree(worktree2))
+	s.Require().NoError(project2.AddWorktree(worktree3))
 
-	require.NoError(t, workspace.AddProject(project1))
-	require.NoError(t, workspace.AddProject(project2))
+	s.Require().NoError(workspace.AddProject(project1))
+	s.Require().NoError(workspace.AddProject(project2))
 
 	worktrees = workspace.ListAllWorktrees()
-	assert.Len(t, worktrees, 3)
-	assert.Contains(t, worktrees, worktree1)
-	assert.Contains(t, worktrees, worktree2)
-	assert.Contains(t, worktrees, worktree3)
+	s.Len(worktrees, 3)
+	s.Contains(worktrees, worktree1)
+	s.Contains(worktrees, worktree2)
+	s.Contains(worktrees, worktree3)
 }
 
-func TestWorkspace_GetWorktreeByPath(t *testing.T) {
+// TestWorkspace_GetWorktreeByPath tests worktree retrieval by path
+func (s *WorkspaceTestSuite) TestWorkspace_GetWorktreeByPath() {
 	workspace, err := NewWorkspace("/workspace")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	project, _ := NewProject("project1", "/repo1")
 	worktree, _ := NewWorktree("/worktree/path", "main")
-	require.NoError(t, project.AddWorktree(worktree))
-	require.NoError(t, workspace.AddProject(project))
+	s.Require().NoError(project.AddWorktree(worktree))
+	s.Require().NoError(workspace.AddProject(project))
 
 	// Find existing worktree
 	found, err := workspace.GetWorktreeByPath("/worktree/path")
-	require.NoError(t, err)
-	assert.Equal(t, worktree, found)
+	s.Require().NoError(err)
+	s.Equal(worktree, found)
 
 	// Try to find non-existent worktree
 	_, err = workspace.GetWorktreeByPath("/nonexistent/path")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "worktree not found")
+	s.Require().Error(err)
+	s.Contains(err.Error(), "worktree not found")
 }
 
-func TestWorkspace_EnhancedFeatures(t *testing.T) {
-	t.Run("should validate workspace path existence", func(t *testing.T) {
+// TestWorkspace_EnhancedFeatures tests enhanced workspace functionality with sub-tests
+func (s *WorkspaceTestSuite) TestWorkspace_EnhancedFeatures() {
+	s.Run("should validate workspace path existence", func() {
 		workspace, err := NewWorkspace("/non/existent/workspace")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// This should fail initially - we need to add path validation
 		isValid, err := workspace.ValidatePathExists()
-		assert.Error(t, err)
-		assert.False(t, isValid)
+		s.Error(err)
+		s.False(isValid)
 	})
 
-	t.Run("should provide workspace statistics", func(t *testing.T) {
+	s.Run("should provide workspace statistics", func() {
 		workspace, err := NewWorkspace("/workspace")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// Add projects with worktrees
 		project1, _ := NewProject("project1", "/repo1")
@@ -183,27 +256,27 @@ func TestWorkspace_EnhancedFeatures(t *testing.T) {
 		worktree2, _ := NewWorktree("/path2", "feature")
 		worktree3, _ := NewWorktree("/path3", "develop")
 
-		require.NoError(t, project1.AddWorktree(worktree1))
-		require.NoError(t, project1.AddWorktree(worktree2))
-		require.NoError(t, project2.AddWorktree(worktree3))
+		s.Require().NoError(project1.AddWorktree(worktree1))
+		s.Require().NoError(project1.AddWorktree(worktree2))
+		s.Require().NoError(project2.AddWorktree(worktree3))
 
-		require.NoError(t, workspace.AddProject(project1))
-		require.NoError(t, workspace.AddProject(project2))
+		s.Require().NoError(workspace.AddProject(project1))
+		s.Require().NoError(workspace.AddProject(project2))
 
 		// This should fail initially - we need to add statistics
 		stats := workspace.GetStatistics()
-		assert.NotNil(t, stats)
-		assert.Equal(t, 2, stats.ProjectCount)
-		assert.Equal(t, 3, stats.TotalWorktreeCount)
-		assert.Equal(t, 3, stats.UnknownWorktreeCount)
-		assert.Equal(t, 0, stats.CleanWorktreeCount)
-		assert.Equal(t, 0, stats.DirtyWorktreeCount)
-		assert.Equal(t, 3, len(stats.AllBranches))
+		s.NotNil(stats)
+		s.Equal(2, stats.ProjectCount)
+		s.Equal(3, stats.TotalWorktreeCount)
+		s.Equal(3, stats.UnknownWorktreeCount)
+		s.Equal(0, stats.CleanWorktreeCount)
+		s.Equal(0, stats.DirtyWorktreeCount)
+		s.Len(stats.AllBranches, 3)
 	})
 
-	t.Run("should support workspace configuration", func(t *testing.T) {
+	s.Run("should support workspace configuration", func() {
 		workspace, err := NewWorkspace("/workspace")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// This should fail initially - we need to add configuration support
 		workspace.SetConfig("scan-depth", 3)
@@ -211,47 +284,47 @@ func TestWorkspace_EnhancedFeatures(t *testing.T) {
 		workspace.SetConfig("auto-discover", true)
 
 		value, exists := workspace.GetConfig("scan-depth")
-		assert.True(t, exists)
-		assert.Equal(t, 3, value)
+		s.True(exists)
+		s.Equal(3, value)
 
 		value, exists = workspace.GetConfig("auto-discover")
-		assert.True(t, exists)
-		assert.Equal(t, true, value)
+		s.True(exists)
+		s.Equal(true, value)
 
 		patterns, exists := workspace.GetConfig("exclude-patterns")
-		assert.True(t, exists)
-		assert.Equal(t, []string{".git", "node_modules"}, patterns)
+		s.True(exists)
+		s.Equal([]string{".git", "node_modules"}, patterns)
 
 		_, exists = workspace.GetConfig("non-existent")
-		assert.False(t, exists)
+		s.False(exists)
 	})
 
-	t.Run("should provide workspace health check", func(t *testing.T) {
+	s.Run("should provide workspace health check", func() {
 		workspace, err := NewWorkspace("/workspace")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// This should fail initially - we need to add health check
 		health := workspace.GetHealth()
-		assert.NotNil(t, health)
-		assert.Equal(t, "unhealthy", health.Status)
-		assert.Contains(t, health.Issues, "workspace path not validated")
-		assert.Equal(t, 0, health.ProjectCount)
-		assert.Equal(t, 0, health.WorktreeCount)
+		s.NotNil(health)
+		s.Equal("unhealthy", health.Status)
+		s.Contains(health.Issues, "workspace path not validated")
+		s.Equal(0, health.ProjectCount)
+		s.Equal(0, health.WorktreeCount)
 	})
 
-	t.Run("should support project discovery", func(t *testing.T) {
+	s.Run("should support project discovery", func() {
 		workspace, err := NewWorkspace("/workspace")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// This should fail initially - we need to add project discovery
 		discovered, err := workspace.DiscoverProjects()
-		assert.NoError(t, err) // Should not fail for minimal implementation
-		assert.Empty(t, discovered)
+		s.NoError(err) // Should not fail for minimal implementation
+		s.Empty(discovered)
 	})
 
-	t.Run("should support workspace metadata", func(t *testing.T) {
+	s.Run("should support workspace metadata", func() {
 		workspace, err := NewWorkspace("/workspace")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// This should fail initially - we need to add metadata support
 		workspace.SetMetadata("created-at", "2023-01-01")
@@ -259,20 +332,20 @@ func TestWorkspace_EnhancedFeatures(t *testing.T) {
 		workspace.SetMetadata("version", "1.0.0")
 
 		value, exists := workspace.GetMetadata("created-at")
-		assert.True(t, exists)
-		assert.Equal(t, "2023-01-01", value)
+		s.True(exists)
+		s.Equal("2023-01-01", value)
 
 		value, exists = workspace.GetMetadata("version")
-		assert.True(t, exists)
-		assert.Equal(t, "1.0.0", value)
+		s.True(exists)
+		s.Equal("1.0.0", value)
 
 		_, exists = workspace.GetMetadata("non-existent")
-		assert.False(t, exists)
+		s.False(exists)
 	})
 
-	t.Run("should support worktree search and filtering", func(t *testing.T) {
+	s.Run("should support worktree search and filtering", func() {
 		workspace, err := NewWorkspace("/workspace")
-		require.NoError(t, err)
+		s.Require().NoError(err)
 
 		// Add projects with worktrees
 		project1, _ := NewProject("project1", "/repo1")
@@ -282,24 +355,29 @@ func TestWorkspace_EnhancedFeatures(t *testing.T) {
 		worktree2, _ := NewWorktree("/path2", "feature-1")
 		worktree3, _ := NewWorktree("/path3", "feature-2")
 
-		require.NoError(t, project1.AddWorktree(worktree1))
-		require.NoError(t, project1.AddWorktree(worktree2))
-		require.NoError(t, project2.AddWorktree(worktree3))
+		s.Require().NoError(project1.AddWorktree(worktree1))
+		s.Require().NoError(project1.AddWorktree(worktree2))
+		s.Require().NoError(project2.AddWorktree(worktree3))
 
-		require.NoError(t, workspace.AddProject(project1))
-		require.NoError(t, workspace.AddProject(project2))
+		s.Require().NoError(workspace.AddProject(project1))
+		s.Require().NoError(workspace.AddProject(project2))
 
 		// This should fail initially - we need to add search functionality
 		mainWorktrees := workspace.FindWorktreesByBranch("main")
-		assert.Len(t, mainWorktrees, 1)
+		s.Len(mainWorktrees, 1)
 
 		featureWorktrees := workspace.FindWorktreesByBranchPattern("feature-*")
-		assert.Len(t, featureWorktrees, 2)
+		s.Len(featureWorktrees, 2)
 
 		project1Worktrees := workspace.FindWorktreesByProject("project1")
-		assert.Len(t, project1Worktrees, 2)
+		s.Len(project1Worktrees, 2)
 
 		cleanWorktrees := workspace.FindWorktreesByStatus(StatusClean)
-		assert.Len(t, cleanWorktrees, 0) // None are clean yet
+		s.Empty(cleanWorktrees) // None are clean yet
 	})
+}
+
+// TestWorkspaceSuite runs the workspace test suite
+func TestWorkspaceSuite(t *testing.T) {
+	suite.Run(t, new(WorkspaceTestSuite))
 }

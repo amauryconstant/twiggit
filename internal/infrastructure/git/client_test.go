@@ -9,361 +9,571 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestGitClient_NewClient(t *testing.T) {
-	client := NewClient()
-	require.NotNil(t, client)
+// GitClientTestSuite provides hybrid suite setup for git client tests
+type GitClientTestSuite struct {
+	suite.Suite
+	Client  *Client
+	TempDir string
+	Cleanup func()
 }
 
-func TestGitClient_IsGitRepository(t *testing.T) {
-	// Create a temporary directory for testing
-	tempDir := t.TempDir()
-
-	// Create a non-git directory
-	nonGitDir := filepath.Join(tempDir, "non-git")
-	err := os.Mkdir(nonGitDir, 0755)
-	require.NoError(t, err)
-
-	client := NewClient()
-
-	t.Run("should return true for valid git repository", func(t *testing.T) {
-		// Create a git repository
-		gitDir := filepath.Join(tempDir, "git-repo")
-		_, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
-
-		isRepo, err := client.IsGitRepository(gitDir)
-		assert.NoError(t, err)
-		assert.True(t, isRepo)
-	})
-
-	t.Run("should return false for non-git directory", func(t *testing.T) {
-		isRepo, err := client.IsGitRepository(nonGitDir)
-		assert.NoError(t, err)
-		assert.False(t, isRepo)
-	})
-
-	t.Run("should return error for non-existent path", func(t *testing.T) {
-		nonExistentDir := filepath.Join(tempDir, "does-not-exist")
-		isRepo, err := client.IsGitRepository(nonExistentDir)
-		assert.Error(t, err)
-		assert.False(t, isRepo)
-	})
-
-	t.Run("should return error for empty path", func(t *testing.T) {
-		isRepo, err := client.IsGitRepository("")
-		assert.Error(t, err)
-		assert.False(t, isRepo)
-	})
+// SetupTest initializes infrastructure components for each test
+func (s *GitClientTestSuite) SetupTest() {
+	s.Client = NewClient()
+	s.TempDir = s.T().TempDir()
+	s.Cleanup = func() {
+		_ = os.RemoveAll(s.TempDir)
+	}
 }
 
-func TestGitClient_IsMainRepository(t *testing.T) {
-	tempDir := t.TempDir()
-	client := NewClient()
-
-	t.Run("should return true for main repository", func(t *testing.T) {
-		// Create a git repository
-		gitDir := filepath.Join(tempDir, "main-repo")
-		_, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
-
-		isMain, err := client.IsMainRepository(gitDir)
-		assert.NoError(t, err)
-		assert.True(t, isMain)
-	})
-
-	t.Run("should return false for worktree", func(t *testing.T) {
-		// Create main repository
-		mainDir := filepath.Join(tempDir, "main-for-worktree")
-		_, err := git.PlainInit(mainDir, false)
-		require.NoError(t, err)
-
-		// Create a worktree
-		worktreeDir := filepath.Join(tempDir, "test-worktree")
-		err = client.CreateWorktree(mainDir, "new-branch", worktreeDir)
-		require.NoError(t, err)
-
-		isMain, err := client.IsMainRepository(worktreeDir)
-		assert.NoError(t, err)
-		assert.False(t, isMain)
-	})
-
-	t.Run("should return false for non-git directory", func(t *testing.T) {
-		nonGitDir := filepath.Join(tempDir, "not-git")
-		err := os.MkdirAll(nonGitDir, 0755)
-		require.NoError(t, err)
-
-		isMain, err := client.IsMainRepository(nonGitDir)
-		assert.NoError(t, err)
-		assert.False(t, isMain)
-	})
-
-	t.Run("should return error for empty path", func(t *testing.T) {
-		isMain, err := client.IsMainRepository("")
-		assert.Error(t, err)
-		assert.False(t, isMain)
-	})
+// TearDownTest cleans up infrastructure test resources
+func (s *GitClientTestSuite) TearDownTest() {
+	if s.Cleanup != nil {
+		s.Cleanup()
+	}
 }
 
-func TestGitClient_ListWorktrees(t *testing.T) {
-	tempDir := t.TempDir()
+// TestGitClient_NewClient tests client creation
+func (s *GitClientTestSuite) TestGitClient_NewClient() {
 	client := NewClient()
-
-	t.Run("should return main repository for repository with no worktrees", func(t *testing.T) {
-		// Create a git repository
-		gitDir := filepath.Join(tempDir, "main-repo")
-		_, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
-
-		worktrees, err := client.ListWorktrees(gitDir)
-		assert.NoError(t, err)
-		assert.Len(t, worktrees, 1)
-		assert.Equal(t, gitDir, worktrees[0].Path)
-		assert.NotEmpty(t, worktrees[0].Branch)
-		assert.NotEmpty(t, worktrees[0].Commit)
-	})
-
-	t.Run("should return error for non-git directory", func(t *testing.T) {
-		nonGitDir := filepath.Join(tempDir, "non-git")
-		err := os.Mkdir(nonGitDir, 0755)
-		require.NoError(t, err)
-
-		worktrees, err := client.ListWorktrees(nonGitDir)
-		assert.Error(t, err)
-		assert.Nil(t, worktrees)
-	})
-
-	t.Run("should return error for empty repository path", func(t *testing.T) {
-		worktrees, err := client.ListWorktrees("")
-		assert.Error(t, err)
-		assert.Nil(t, worktrees)
-	})
+	s.Require().NotNil(client)
 }
 
-func TestGitClient_CreateWorktree(t *testing.T) {
-	tempDir := t.TempDir()
-	client := NewClient()
+// TestGitClient_IsGitRepository tests repository validation with table-driven approach
+func (s *GitClientTestSuite) TestGitClient_IsGitRepository() {
+	testCases := []struct {
+		name         string
+		setup        func() string
+		expectRepo   bool
+		expectError  bool
+		errorMessage string
+	}{
+		{
+			name: "should return true for valid git repository",
+			setup: func() string {
+				gitDir := filepath.Join(s.TempDir, "git-repo")
+				_, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+				return gitDir
+			},
+			expectRepo:  true,
+			expectError: false,
+		},
+		{
+			name: "should return false for non-git directory",
+			setup: func() string {
+				nonGitDir := filepath.Join(s.TempDir, "non-git")
+				err := os.Mkdir(nonGitDir, 0755)
+				s.Require().NoError(err)
+				return nonGitDir
+			},
+			expectRepo:  false,
+			expectError: false,
+		},
+		{
+			name: "should return error for non-existent path",
+			setup: func() string {
+				return filepath.Join(s.TempDir, "does-not-exist")
+			},
+			expectRepo:   false,
+			expectError:  true,
+			errorMessage: "does not exist",
+		},
+		{
+			name: "should return error for empty path",
+			setup: func() string {
+				return ""
+			},
+			expectRepo:   false,
+			expectError:  true,
+			errorMessage: "path cannot be empty",
+		},
+	}
 
-	t.Run("should create worktree from existing branch", func(t *testing.T) {
-		// Create a git repository with initial commit
-		gitDir := filepath.Join(tempDir, "main-repo-create")
-		repo, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			path := tt.setup()
+			isRepo, err := s.Client.IsGitRepository(path)
 
-		// Create initial commit
-		wt, err := repo.Worktree()
-		require.NoError(t, err)
+			if tt.expectError {
+				s.Require().Error(err)
+				if tt.errorMessage != "" {
+					s.Contains(err.Error(), tt.errorMessage)
+				}
+			} else {
+				s.Require().NoError(err)
+			}
 
-		// Create a test file
-		testFile := filepath.Join(gitDir, "test.txt")
-		err = os.WriteFile(testFile, []byte("test content"), 0644)
-		require.NoError(t, err)
-
-		_, err = wt.Add("test.txt")
-		require.NoError(t, err)
-
-		_, err = wt.Commit("Initial commit", &git.CommitOptions{
-			Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
+			s.Equal(tt.expectRepo, isRepo)
 		})
-		require.NoError(t, err)
-
-		// Get current branch name (could be master or main depending on git config)
-		head, err := repo.Head()
-		require.NoError(t, err)
-		branchName := head.Name().Short()
-
-		// Create a new branch for the worktree
-		branchRef := plumbing.ReferenceName("refs/heads/" + branchName + "-worktree")
-		err = wt.Checkout(&git.CheckoutOptions{
-			Branch: branchRef,
-			Create: true,
-		})
-		require.NoError(t, err)
-
-		// Switch back to main branch
-		mainRef := plumbing.ReferenceName("refs/heads/" + branchName)
-		err = wt.Checkout(&git.CheckoutOptions{
-			Branch: mainRef,
-		})
-		require.NoError(t, err)
-
-		// Create worktree from the new branch
-		worktreePath := filepath.Join(tempDir, "worktree-1")
-		err = client.CreateWorktree(gitDir, branchName+"-worktree", worktreePath)
-		assert.NoError(t, err)
-
-		// Verify worktree was created
-		assert.DirExists(t, worktreePath)
-	})
-
-	t.Run("should return error for empty repository path", func(t *testing.T) {
-		worktreePath := filepath.Join(tempDir, "worktree-1")
-		err := client.CreateWorktree("", "main", worktreePath)
-		assert.Error(t, err)
-	})
-
-	t.Run("should return error for empty branch name", func(t *testing.T) {
-		gitDir := filepath.Join(tempDir, "main-repo-empty-branch")
-		_, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
-
-		worktreePath := filepath.Join(tempDir, "worktree-empty-branch")
-		err = client.CreateWorktree(gitDir, "", worktreePath)
-		assert.Error(t, err)
-	})
-
-	t.Run("should return error for empty target path", func(t *testing.T) {
-		gitDir := filepath.Join(tempDir, "main-repo-empty-target")
-		_, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
-
-		err = client.CreateWorktree(gitDir, "main", "")
-		assert.Error(t, err)
-	})
-
-	t.Run("should return error for existing target path", func(t *testing.T) {
-		gitDir := filepath.Join(tempDir, "main-repo-existing-target")
-		_, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
-
-		worktreePath := filepath.Join(tempDir, "existing-dir")
-		err = os.Mkdir(worktreePath, 0755)
-		require.NoError(t, err)
-
-		err = client.CreateWorktree(gitDir, "main", worktreePath)
-		assert.Error(t, err)
-	})
+	}
 }
 
-func TestGitClient_GetWorktreeStatus(t *testing.T) {
-	tempDir := t.TempDir()
-	client := NewClient()
+// TestGitClient_IsMainRepository tests main repository detection with table-driven approach
+func (s *GitClientTestSuite) TestGitClient_IsMainRepository() {
+	testCases := []struct {
+		name         string
+		setup        func() (string, func())
+		expectMain   bool
+		expectError  bool
+		errorMessage string
+	}{
+		{
+			name: "should return true for main repository",
+			setup: func() (string, func()) {
+				gitDir := filepath.Join(s.TempDir, "main-repo")
+				_, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+				return gitDir, func() {}
+			},
+			expectMain:  true,
+			expectError: false,
+		},
+		{
+			name: "should return false for worktree",
+			setup: func() (string, func()) {
+				// Create main repository
+				mainDir := filepath.Join(s.TempDir, "main-for-worktree")
+				_, err := git.PlainInit(mainDir, false)
+				s.Require().NoError(err)
 
-	t.Run("should return status for clean worktree", func(t *testing.T) {
-		// Create a git repository
-		gitDir := filepath.Join(tempDir, "main-repo")
-		repo, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
+				// Create a worktree
+				worktreeDir := filepath.Join(s.TempDir, "test-worktree")
+				err = s.Client.CreateWorktree(mainDir, "new-branch", worktreeDir)
+				s.Require().NoError(err)
 
-		// Create initial commit
-		wt, err := repo.Worktree()
-		require.NoError(t, err)
+				return worktreeDir, func() {
+					_ = os.RemoveAll(worktreeDir)
+				}
+			},
+			expectMain:  false,
+			expectError: false,
+		},
+		{
+			name: "should return false for non-git directory",
+			setup: func() (string, func()) {
+				nonGitDir := filepath.Join(s.TempDir, "not-git")
+				err := os.MkdirAll(nonGitDir, 0755)
+				s.Require().NoError(err)
+				return nonGitDir, func() {
+					_ = os.RemoveAll(nonGitDir)
+				}
+			},
+			expectMain:  false,
+			expectError: false,
+		},
+		{
+			name: "should return error for empty path",
+			setup: func() (string, func()) {
+				return "", func() {}
+			},
+			expectMain:   false,
+			expectError:  true,
+			errorMessage: "path cannot be empty",
+		},
+	}
 
-		testFile := filepath.Join(gitDir, "test.txt")
-		err = os.WriteFile(testFile, []byte("test content"), 0644)
-		require.NoError(t, err)
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			path, cleanup := tt.setup()
+			defer cleanup()
 
-		_, err = wt.Add("test.txt")
-		require.NoError(t, err)
+			isMain, err := s.Client.IsMainRepository(path)
 
-		_, err = wt.Commit("Initial commit", &git.CommitOptions{
-			Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
+			if tt.expectError {
+				s.Require().Error(err)
+				if tt.errorMessage != "" {
+					s.Contains(err.Error(), tt.errorMessage)
+				}
+			} else {
+				s.Require().NoError(err)
+			}
+
+			s.Equal(tt.expectMain, isMain)
 		})
-		require.NoError(t, err)
-
-		status, err := client.GetWorktreeStatus(gitDir)
-		assert.NoError(t, err)
-		assert.NotNil(t, status)
-		assert.True(t, status.Clean)
-		assert.Equal(t, gitDir, status.Path)
-		assert.NotEmpty(t, status.Branch)
-		assert.NotEmpty(t, status.Commit)
-	})
-
-	t.Run("should return error for non-existent worktree path", func(t *testing.T) {
-		nonExistentPath := filepath.Join(tempDir, "does-not-exist")
-		status, err := client.GetWorktreeStatus(nonExistentPath)
-		assert.Error(t, err)
-		assert.Nil(t, status)
-	})
-
-	t.Run("should return error for empty worktree path", func(t *testing.T) {
-		status, err := client.GetWorktreeStatus("")
-		assert.Error(t, err)
-		assert.Nil(t, status)
-	})
+	}
 }
 
-func TestGitClient_RemoveWorktree(t *testing.T) {
-	tempDir := t.TempDir()
-	client := NewClient()
+// TestGitClient_ListWorktrees tests worktree listing with table-driven approach
+func (s *GitClientTestSuite) TestGitClient_ListWorktrees() {
+	testCases := []struct {
+		name         string
+		setup        func() (string, *Client)
+		expectError  bool
+		expectCount  int
+		errorMessage string
+	}{
+		{
+			name: "should return main repository for repository with no worktrees",
+			setup: func() (string, *Client) {
+				gitDir := filepath.Join(s.TempDir, "main-repo")
+				_, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+				return gitDir, s.Client
+			},
+			expectError: false,
+			expectCount: 1,
+		},
+		{
+			name: "should return error for non-git directory",
+			setup: func() (string, *Client) {
+				nonGitDir := filepath.Join(s.TempDir, "non-git")
+				err := os.Mkdir(nonGitDir, 0755)
+				s.Require().NoError(err)
+				return nonGitDir, s.Client
+			},
+			expectError: true,
+			expectCount: 0,
+		},
+		{
+			name: "should return error for empty repository path",
+			setup: func() (string, *Client) {
+				return "", s.Client
+			},
+			expectError: true,
+			expectCount: 0,
+		},
+	}
 
-	t.Run("should remove existing worktree", func(t *testing.T) {
-		// Create a git repository
-		gitDir := filepath.Join(tempDir, "main-repo-remove")
-		repo, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			path, client := tt.setup()
 
-		// Create initial commit
-		wt, err := repo.Worktree()
-		require.NoError(t, err)
+			worktrees, err := client.ListWorktrees(path)
 
-		testFile := filepath.Join(gitDir, "test.txt")
-		err = os.WriteFile(testFile, []byte("test content"), 0644)
-		require.NoError(t, err)
-
-		_, err = wt.Add("test.txt")
-		require.NoError(t, err)
-
-		_, err = wt.Commit("Initial commit", &git.CommitOptions{
-			Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
+			if tt.expectError {
+				s.Require().Error(err)
+				if tt.errorMessage != "" {
+					s.Contains(err.Error(), tt.errorMessage)
+				}
+				s.Nil(worktrees)
+			} else {
+				s.Require().NoError(err)
+				s.NotNil(worktrees)
+				s.Len(worktrees, tt.expectCount)
+				if tt.expectCount > 0 {
+					s.Equal(path, worktrees[0].Path)
+					s.NotEmpty(worktrees[0].Branch)
+					s.NotEmpty(worktrees[0].Commit)
+				}
+			}
 		})
-		require.NoError(t, err)
-
-		// Get current branch name
-		head, err := repo.Head()
-		require.NoError(t, err)
-		branchName := head.Name().Short()
-
-		// Create a new branch for the worktree
-		branchRef := plumbing.ReferenceName("refs/heads/" + branchName + "-remove")
-		err = wt.Checkout(&git.CheckoutOptions{
-			Branch: branchRef,
-			Create: true,
-		})
-		require.NoError(t, err)
-
-		// Switch back to main branch
-		mainRef := plumbing.ReferenceName("refs/heads/" + branchName)
-		err = wt.Checkout(&git.CheckoutOptions{
-			Branch: mainRef,
-		})
-		require.NoError(t, err)
-
-		// Create worktree from the new branch
-		worktreePath := filepath.Join(tempDir, "worktree-remove")
-		err = client.CreateWorktree(gitDir, branchName+"-remove", worktreePath)
-		require.NoError(t, err)
-
-		// Remove worktree
-		err = client.RemoveWorktree(gitDir, worktreePath, false)
-		assert.NoError(t, err)
-
-		// Verify worktree directory was removed (git worktree remove removes the directory by default)
-		assert.NoDirExists(t, worktreePath)
-	})
-
-	t.Run("should return error for empty repository path", func(t *testing.T) {
-		worktreePath := filepath.Join(tempDir, "worktree-1")
-		err := client.RemoveWorktree("", worktreePath, false)
-		assert.Error(t, err)
-	})
-
-	t.Run("should return error for empty worktree path", func(t *testing.T) {
-		gitDir := filepath.Join(tempDir, "main-repo-empty-worktree")
-		_, err := git.PlainInit(gitDir, false)
-		require.NoError(t, err)
-
-		err = client.RemoveWorktree(gitDir, "", false)
-		assert.Error(t, err)
-	})
+	}
 }
 
-func TestWorktreeInfo_Validation(t *testing.T) {
-	tests := []struct {
+// TestGitClient_CreateWorktree tests worktree creation with table-driven approach
+func (s *GitClientTestSuite) TestGitClient_CreateWorktree() {
+	testCases := []struct {
+		name         string
+		setup        func() (string, string, string)
+		expectError  bool
+		errorMessage string
+	}{
+		{
+			name: "should create worktree from existing branch",
+			setup: func() (string, string, string) {
+				// Create a git repository with initial commit
+				gitDir := filepath.Join(s.TempDir, "main-repo-create")
+				repo, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+
+				// Create initial commit
+				wt, err := repo.Worktree()
+				s.Require().NoError(err)
+
+				// Create a test file
+				testFile := filepath.Join(gitDir, "test.txt")
+				err = os.WriteFile(testFile, []byte("test content"), 0644)
+				s.Require().NoError(err)
+
+				_, err = wt.Add("test.txt")
+				s.Require().NoError(err)
+
+				_, err = wt.Commit("Initial commit", &git.CommitOptions{
+					Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
+				})
+				s.Require().NoError(err)
+
+				// Get current branch name (could be master or main depending on git config)
+				head, err := repo.Head()
+				s.Require().NoError(err)
+				branchName := head.Name().Short()
+
+				// Create a new branch for the worktree
+				branchRef := plumbing.ReferenceName("refs/heads/" + branchName + "-worktree")
+				err = wt.Checkout(&git.CheckoutOptions{
+					Branch: branchRef,
+					Create: true,
+				})
+				s.Require().NoError(err)
+
+				// Switch back to main branch
+				mainRef := plumbing.ReferenceName("refs/heads/" + branchName)
+				err = wt.Checkout(&git.CheckoutOptions{
+					Branch: mainRef,
+				})
+				s.Require().NoError(err)
+
+				// Create worktree from the new branch
+				worktreePath := filepath.Join(s.TempDir, "worktree-1")
+				return gitDir, branchName + "-worktree", worktreePath
+			},
+			expectError: false,
+		},
+		{
+			name: "should return error for empty repository path",
+			setup: func() (string, string, string) {
+				worktreePath := filepath.Join(s.TempDir, "worktree-1")
+				return "", "main", worktreePath
+			},
+			expectError: true,
+		},
+		{
+			name: "should return error for empty branch name",
+			setup: func() (string, string, string) {
+				gitDir := filepath.Join(s.TempDir, "main-repo-empty-branch")
+				_, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+
+				worktreePath := filepath.Join(s.TempDir, "worktree-empty-branch")
+				return gitDir, "", worktreePath
+			},
+			expectError: true,
+		},
+		{
+			name: "should return error for empty target path",
+			setup: func() (string, string, string) {
+				gitDir := filepath.Join(s.TempDir, "main-repo-empty-target")
+				_, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+
+				return gitDir, "main", ""
+			},
+			expectError: true,
+		},
+		{
+			name: "should return error for existing target path",
+			setup: func() (string, string, string) {
+				gitDir := filepath.Join(s.TempDir, "main-repo-existing-target")
+				_, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+
+				worktreePath := filepath.Join(s.TempDir, "existing-dir")
+				err = os.Mkdir(worktreePath, 0755)
+				s.Require().NoError(err)
+
+				return gitDir, "main", worktreePath
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			repoPath, branch, targetPath := tt.setup()
+
+			err := s.Client.CreateWorktree(repoPath, branch, targetPath)
+
+			if tt.expectError {
+				s.Require().Error(err)
+				if tt.errorMessage != "" {
+					s.Contains(err.Error(), tt.errorMessage)
+				}
+			} else {
+				s.Require().NoError(err)
+				// Verify worktree was created
+				s.DirExists(targetPath)
+			}
+		})
+	}
+}
+
+// TestGitClient_GetWorktreeStatus tests worktree status retrieval with table-driven approach
+func (s *GitClientTestSuite) TestGitClient_GetWorktreeStatus() {
+	testCases := []struct {
+		name         string
+		setup        func() string
+		expectError  bool
+		expectClean  bool
+		errorMessage string
+	}{
+		{
+			name: "should return status for clean worktree",
+			setup: func() string {
+				// Create a git repository
+				gitDir := filepath.Join(s.TempDir, "main-repo")
+				repo, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+
+				// Create initial commit
+				wt, err := repo.Worktree()
+				s.Require().NoError(err)
+
+				testFile := filepath.Join(gitDir, "test.txt")
+				err = os.WriteFile(testFile, []byte("test content"), 0644)
+				s.Require().NoError(err)
+
+				_, err = wt.Add("test.txt")
+				s.Require().NoError(err)
+
+				_, err = wt.Commit("Initial commit", &git.CommitOptions{
+					Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
+				})
+				s.Require().NoError(err)
+
+				return gitDir
+			},
+			expectError: false,
+			expectClean: true,
+		},
+		{
+			name: "should return error for non-existent worktree path",
+			setup: func() string {
+				return filepath.Join(s.TempDir, "does-not-exist")
+			},
+			expectError: true,
+		},
+		{
+			name: "should return error for empty worktree path",
+			setup: func() string {
+				return ""
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			path := tt.setup()
+
+			status, err := s.Client.GetWorktreeStatus(path)
+
+			if tt.expectError {
+				s.Require().Error(err)
+				if tt.errorMessage != "" {
+					s.Contains(err.Error(), tt.errorMessage)
+				}
+				s.Nil(status)
+			} else {
+				s.Require().NoError(err)
+				s.NotNil(status)
+				s.Equal(tt.expectClean, status.Clean)
+				s.Equal(path, status.Path)
+				s.NotEmpty(status.Branch)
+				s.NotEmpty(status.Commit)
+			}
+		})
+	}
+}
+
+// TestGitClient_RemoveWorktree tests worktree removal with table-driven approach
+func (s *GitClientTestSuite) TestGitClient_RemoveWorktree() {
+	testCases := []struct {
+		name         string
+		setup        func() (string, string)
+		expectError  bool
+		errorMessage string
+	}{
+		{
+			name: "should remove existing worktree",
+			setup: func() (string, string) {
+				// Create a git repository
+				gitDir := filepath.Join(s.TempDir, "main-repo-remove")
+				repo, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+
+				// Create initial commit
+				wt, err := repo.Worktree()
+				s.Require().NoError(err)
+
+				testFile := filepath.Join(gitDir, "test.txt")
+				err = os.WriteFile(testFile, []byte("test content"), 0644)
+				s.Require().NoError(err)
+
+				_, err = wt.Add("test.txt")
+				s.Require().NoError(err)
+
+				_, err = wt.Commit("Initial commit", &git.CommitOptions{
+					Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
+				})
+				s.Require().NoError(err)
+
+				// Get current branch name
+				head, err := repo.Head()
+				s.Require().NoError(err)
+				branchName := head.Name().Short()
+
+				// Create a new branch for the worktree
+				branchRef := plumbing.ReferenceName("refs/heads/" + branchName + "-remove")
+				err = wt.Checkout(&git.CheckoutOptions{
+					Branch: branchRef,
+					Create: true,
+				})
+				s.Require().NoError(err)
+
+				// Switch back to main branch
+				mainRef := plumbing.ReferenceName("refs/heads/" + branchName)
+				err = wt.Checkout(&git.CheckoutOptions{
+					Branch: mainRef,
+				})
+				s.Require().NoError(err)
+
+				// Create worktree from the new branch
+				worktreePath := filepath.Join(s.TempDir, "worktree-remove")
+				err = s.Client.CreateWorktree(gitDir, branchName+"-remove", worktreePath)
+				s.Require().NoError(err)
+
+				return gitDir, worktreePath
+			},
+			expectError: false,
+		},
+		{
+			name: "should return error for empty repository path",
+			setup: func() (string, string) {
+				worktreePath := filepath.Join(s.TempDir, "worktree-1")
+				return "", worktreePath
+			},
+			expectError: true,
+		},
+		{
+			name: "should return error for empty worktree path",
+			setup: func() (string, string) {
+				gitDir := filepath.Join(s.TempDir, "main-repo-empty-worktree")
+				_, err := git.PlainInit(gitDir, false)
+				s.Require().NoError(err)
+
+				return gitDir, ""
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			repoPath, worktreePath := tt.setup()
+
+			err := s.Client.RemoveWorktree(repoPath, worktreePath, false)
+
+			if tt.expectError {
+				s.Require().Error(err)
+				if tt.errorMessage != "" {
+					s.Contains(err.Error(), tt.errorMessage)
+				}
+			} else {
+				s.Require().NoError(err)
+				// Verify worktree directory was removed (git worktree remove removes the directory by default)
+				s.NoDirExists(worktreePath)
+			}
+		})
+	}
+}
+
+// TestWorktreeInfo_Validation tests worktree info validation with table-driven approach
+func (s *GitClientTestSuite) TestWorktreeInfo_Validation() {
+	testCases := []struct {
 		name        string
 		worktree    types.WorktreeInfo
 		expectError bool
@@ -401,16 +611,23 @@ func TestWorktreeInfo_Validation(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
 			err := tt.worktree.Validate()
 
 			if tt.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tt.errorMsg)
+				s.Require().Error(err)
+				if tt.errorMsg != "" {
+					s.Contains(err.Error(), tt.errorMsg)
+				}
 			} else {
-				require.NoError(t, err)
+				s.Require().NoError(err)
 			}
 		})
 	}
+}
+
+// TestGitClientSuite runs the git client test suite
+func TestGitClientSuite(t *testing.T) {
+	suite.Run(t, new(GitClientTestSuite))
 }
