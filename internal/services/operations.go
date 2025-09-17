@@ -2,6 +2,7 @@
 package services
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,7 +31,7 @@ func NewOperationsService(gitClient domain.GitClient, discovery *DiscoveryServic
 }
 
 // Create creates a new worktree from specified branch with comprehensive validation
-func (ops *OperationsService) Create(project, branch, targetPath string) error {
+func (ops *OperationsService) Create(ctx context.Context, project, branch, targetPath string) error {
 	// Validate inputs
 	if project == "" {
 		return domain.NewWorktreeError(
@@ -47,7 +48,7 @@ func (ops *OperationsService) Create(project, branch, targetPath string) error {
 	}
 
 	// Check if project is a valid git repository
-	isRepo, err := ops.gitClient.IsGitRepository(project)
+	isRepo, err := ops.gitClient.IsGitRepository(ctx, project)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrNotRepository,
@@ -66,10 +67,10 @@ func (ops *OperationsService) Create(project, branch, targetPath string) error {
 	}
 
 	// Check if branch exists (for logging purposes later)
-	branchExists := ops.gitClient.BranchExists(project, branch)
+	branchExists := ops.gitClient.BranchExists(ctx, project, branch)
 
 	// Create the worktree
-	err = ops.gitClient.CreateWorktree(project, branch, targetPath)
+	err = ops.gitClient.CreateWorktree(ctx, project, branch, targetPath)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrGitCommand,
@@ -98,7 +99,7 @@ func (ops *OperationsService) Create(project, branch, targetPath string) error {
 }
 
 // Remove removes a worktree with safety checks
-func (ops *OperationsService) Remove(worktreePath string, force bool) error {
+func (ops *OperationsService) Remove(ctx context.Context, worktreePath string, force bool) error {
 	// Basic validation
 	if worktreePath == "" {
 		return domain.NewWorktreeError(
@@ -110,13 +111,13 @@ func (ops *OperationsService) Remove(worktreePath string, force bool) error {
 
 	// Validate removal safety if not forced
 	if !force {
-		if err := ops.ValidateRemoval(worktreePath); err != nil {
+		if err := ops.ValidateRemoval(ctx, worktreePath); err != nil {
 			return err
 		}
 	}
 
 	// Get repository root to perform removal
-	repoRoot, err := ops.gitClient.GetRepositoryRoot(worktreePath)
+	repoRoot, err := ops.gitClient.GetRepositoryRoot(ctx, worktreePath)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrWorktreeNotFound,
@@ -127,7 +128,7 @@ func (ops *OperationsService) Remove(worktreePath string, force bool) error {
 	}
 
 	// Remove the worktree
-	err = ops.gitClient.RemoveWorktree(repoRoot, worktreePath, force)
+	err = ops.gitClient.RemoveWorktree(ctx, repoRoot, worktreePath, force)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrGitCommand,
@@ -141,7 +142,7 @@ func (ops *OperationsService) Remove(worktreePath string, force bool) error {
 }
 
 // GetCurrent returns information about current worktree (if any)
-func (ops *OperationsService) GetCurrent() (*domain.Worktree, error) {
+func (ops *OperationsService) GetCurrent(ctx context.Context) (*domain.Worktree, error) {
 	// Get current working directory
 	currentDir, err := ops.getCurrentWorkingDirectory()
 	if err != nil {
@@ -154,7 +155,7 @@ func (ops *OperationsService) GetCurrent() (*domain.Worktree, error) {
 	}
 
 	// Analyze current directory as a worktree
-	worktree, err := ops.discovery.AnalyzeWorktree(currentDir)
+	worktree, err := ops.discovery.AnalyzeWorktree(ctx, currentDir)
 	if err != nil {
 		return nil, domain.WrapError(
 			domain.ErrWorktreeNotFound,
@@ -168,7 +169,7 @@ func (ops *OperationsService) GetCurrent() (*domain.Worktree, error) {
 }
 
 // ValidateRemoval performs safety checks before worktree removal
-func (ops *OperationsService) ValidateRemoval(worktreePath string) error {
+func (ops *OperationsService) ValidateRemoval(ctx context.Context, worktreePath string) error {
 	// Check if trying to remove current directory
 	if ops.isCurrentDirectory(worktreePath) {
 		return domain.NewWorktreeError(
@@ -179,7 +180,7 @@ func (ops *OperationsService) ValidateRemoval(worktreePath string) error {
 	}
 
 	// Check if worktree exists and get status
-	_, err := ops.gitClient.GetWorktreeStatus(worktreePath)
+	_, err := ops.gitClient.GetWorktreeStatus(ctx, worktreePath)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrWorktreeNotFound,
@@ -190,7 +191,7 @@ func (ops *OperationsService) ValidateRemoval(worktreePath string) error {
 	}
 
 	// Check for uncommitted changes
-	hasChanges := ops.gitClient.HasUncommittedChanges(worktreePath)
+	hasChanges := ops.gitClient.HasUncommittedChanges(ctx, worktreePath)
 	if hasChanges {
 		return domain.NewWorktreeError(
 			domain.ErrUncommittedChanges,

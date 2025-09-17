@@ -2,6 +2,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -48,7 +49,7 @@ func (ds *DiscoveryService) SetConcurrency(workers int) {
 }
 
 // DiscoverWorktrees discovers all worktrees in a workspace directory using concurrent processing
-func (ds *DiscoveryService) DiscoverWorktrees(workspacePath string) ([]*domain.Worktree, error) {
+func (ds *DiscoveryService) DiscoverWorktrees(ctx context.Context, workspacePath string) ([]*domain.Worktree, error) {
 	if workspacePath == "" {
 		return nil, errors.New("workspace path cannot be empty")
 	}
@@ -59,7 +60,7 @@ func (ds *DiscoveryService) DiscoverWorktrees(workspacePath string) ([]*domain.W
 	}
 
 	// Find all potential worktree directories
-	paths, err := ds.findPotentialWorktreePaths(workspacePath)
+	paths, err := ds.findPotentialWorktreePaths(ctx, workspacePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to scan workspace: %w", err)
 	}
@@ -69,11 +70,11 @@ func (ds *DiscoveryService) DiscoverWorktrees(workspacePath string) ([]*domain.W
 	}
 
 	// Process paths concurrently
-	return ds.analyzePathsConcurrently(paths)
+	return ds.analyzePathsConcurrently(ctx, paths)
 }
 
 // AnalyzeWorktree analyzes a single worktree path and returns detailed information
-func (ds *DiscoveryService) AnalyzeWorktree(path string) (*domain.Worktree, error) {
+func (ds *DiscoveryService) AnalyzeWorktree(ctx context.Context, path string) (*domain.Worktree, error) {
 	if path == "" {
 		return nil, errors.New("worktree path cannot be empty")
 	}
@@ -84,7 +85,7 @@ func (ds *DiscoveryService) AnalyzeWorktree(path string) (*domain.Worktree, erro
 	}
 
 	// Get worktree status from git client
-	status, err := ds.gitClient.GetWorktreeStatus(path)
+	status, err := ds.gitClient.GetWorktreeStatus(ctx, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get worktree status for %s: %w", path, err)
 	}
@@ -102,7 +103,7 @@ func (ds *DiscoveryService) AnalyzeWorktree(path string) (*domain.Worktree, erro
 }
 
 // DiscoverProjects finds all Git repositories (projects) in the workspace directory
-func (ds *DiscoveryService) DiscoverProjects(workspacePath string) ([]*domain.Project, error) {
+func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, workspacePath string) ([]*domain.Project, error) {
 	if workspacePath == "" {
 		return nil, errors.New("workspace path cannot be empty")
 	}
@@ -128,7 +129,7 @@ func (ds *DiscoveryService) DiscoverProjects(workspacePath string) ([]*domain.Pr
 		projectPath := filepath.Join(workspacePath, entry.Name())
 
 		// Check if it's a main git repository (not a worktree)
-		isMainRepo, err := ds.gitClient.IsMainRepository(projectPath)
+		isMainRepo, err := ds.gitClient.IsMainRepository(ctx, projectPath)
 		if err != nil {
 			// Log error but continue with other directories
 			continue
@@ -145,7 +146,7 @@ func (ds *DiscoveryService) DiscoverProjects(workspacePath string) ([]*domain.Pr
 		}
 
 		// Get worktrees for this project
-		worktreeInfos, err := ds.gitClient.ListWorktrees(projectPath)
+		worktreeInfos, err := ds.gitClient.ListWorktrees(ctx, projectPath)
 		if err != nil {
 			continue
 		}
@@ -168,7 +169,7 @@ func (ds *DiscoveryService) DiscoverProjects(workspacePath string) ([]*domain.Pr
 }
 
 // findPotentialWorktreePaths scans the workspace for directories that might be worktrees
-func (ds *DiscoveryService) findPotentialWorktreePaths(workspacePath string) ([]string, error) {
+func (ds *DiscoveryService) findPotentialWorktreePaths(ctx context.Context, workspacePath string) ([]string, error) {
 	var paths []string
 
 	// First, find all project directories (git repositories)
@@ -185,14 +186,14 @@ func (ds *DiscoveryService) findPotentialWorktreePaths(workspacePath string) ([]
 		projectPath := filepath.Join(workspacePath, entry.Name())
 
 		// Check if it's a git repository
-		isRepo, err := ds.gitClient.IsGitRepository(projectPath)
+		isRepo, err := ds.gitClient.IsGitRepository(ctx, projectPath)
 		if err != nil {
 			continue // Skip on error
 		}
 
 		if isRepo {
 			// Get all worktrees for this project
-			worktreeInfos, err := ds.gitClient.ListWorktrees(projectPath)
+			worktreeInfos, err := ds.gitClient.ListWorktrees(ctx, projectPath)
 			if err != nil {
 				continue // Skip on error
 			}
@@ -208,7 +209,7 @@ func (ds *DiscoveryService) findPotentialWorktreePaths(workspacePath string) ([]
 }
 
 // analyzePathsConcurrently processes multiple paths concurrently using worker pools
-func (ds *DiscoveryService) analyzePathsConcurrently(paths []string) ([]*domain.Worktree, error) {
+func (ds *DiscoveryService) analyzePathsConcurrently(ctx context.Context, paths []string) ([]*domain.Worktree, error) {
 	pathsChan := make(chan string, len(paths))
 	resultsChan := make(chan *domain.Worktree, len(paths))
 	errorsChan := make(chan error, len(paths))
@@ -217,7 +218,7 @@ func (ds *DiscoveryService) analyzePathsConcurrently(paths []string) ([]*domain.
 	var wg sync.WaitGroup
 	for i := 0; i < ds.concurrency; i++ {
 		wg.Add(1)
-		go ds.workerAnalyze(pathsChan, resultsChan, errorsChan, &wg)
+		go ds.workerAnalyze(ctx, pathsChan, resultsChan, errorsChan, &wg)
 	}
 
 	// Send paths to workers
@@ -267,11 +268,11 @@ func (ds *DiscoveryService) analyzePathsConcurrently(paths []string) ([]*domain.
 }
 
 // workerAnalyze is a worker function for concurrent path analysis
-func (ds *DiscoveryService) workerAnalyze(paths <-chan string, results chan<- *domain.Worktree, errors chan<- error, wg *sync.WaitGroup) {
+func (ds *DiscoveryService) workerAnalyze(ctx context.Context, paths <-chan string, results chan<- *domain.Worktree, errors chan<- error, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	for path := range paths {
-		worktree, err := ds.AnalyzeWorktree(path)
+		worktree, err := ds.AnalyzeWorktree(ctx, path)
 		if err != nil {
 			errors <- err
 		} else {

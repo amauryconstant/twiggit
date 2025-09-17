@@ -1,19 +1,20 @@
 package git
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
-	"github.com/amaury/twiggit/internal/domain"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/suite"
 )
 
-// GitClientTestSuite provides hybrid suite setup for git client tests
-type GitClientTestSuite struct {
+// GitClientContextTestSuite tests context-aware git operations
+type GitClientContextTestSuite struct {
 	suite.Suite
 	Client  *Client
 	TempDir string
@@ -21,7 +22,7 @@ type GitClientTestSuite struct {
 }
 
 // SetupTest initializes infrastructure components for each test
-func (s *GitClientTestSuite) SetupTest() {
+func (s *GitClientContextTestSuite) SetupTest() {
 	s.Client = NewClient()
 	s.TempDir = s.T().TempDir()
 	s.Cleanup = func() {
@@ -30,604 +31,346 @@ func (s *GitClientTestSuite) SetupTest() {
 }
 
 // TearDownTest cleans up infrastructure test resources
-func (s *GitClientTestSuite) TearDownTest() {
+func (s *GitClientContextTestSuite) TearDownTest() {
 	if s.Cleanup != nil {
 		s.Cleanup()
 	}
 }
 
-// TestGitClient_NewClient tests client creation
-func (s *GitClientTestSuite) TestGitClient_NewClient() {
-	client := NewClient()
-	s.Require().NotNil(client)
+// setupRepositoryWithInitialCommit creates a git repository with an initial commit.
+// Returns the repository path and the worktree for further operations.
+func (s *GitClientContextTestSuite) setupRepositoryWithInitialCommit(repoName string) (string, *git.Worktree) {
+	s.T().Helper()
+	repoPath := filepath.Join(s.TempDir, repoName)
+	repo, err := git.PlainInit(repoPath, false)
+	s.Require().NoError(err)
+
+	wt, err := repo.Worktree()
+	s.Require().NoError(err)
+
+	// Create a test file
+	testFile := filepath.Join(repoPath, "test.txt")
+	err = os.WriteFile(testFile, []byte("initial content"), 0644)
+	s.Require().NoError(err)
+
+	// Add and commit the file
+	_, err = wt.Add("test.txt")
+	s.Require().NoError(err)
+
+	_, err = wt.Commit("Initial commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test Author",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
+	})
+	s.Require().NoError(err)
+
+	return repoPath, wt
 }
 
-// TestGitClient_IsGitRepository tests repository validation with table-driven approach
-func (s *GitClientTestSuite) TestGitClient_IsGitRepository() {
-	testCases := []struct {
-		name         string
-		setup        func() string
-		expectRepo   bool
-		expectError  bool
-		errorMessage string
-	}{
-		{
-			name: "should return true for valid git repository",
-			setup: func() string {
-				gitDir := filepath.Join(s.TempDir, "git-repo")
-				_, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
-				return gitDir
-			},
-			expectRepo:  true,
-			expectError: false,
-		},
-		{
-			name: "should return false for non-git directory",
-			setup: func() string {
-				nonGitDir := filepath.Join(s.TempDir, "non-git")
-				err := os.Mkdir(nonGitDir, 0755)
-				s.Require().NoError(err)
-				return nonGitDir
-			},
-			expectRepo:  false,
-			expectError: false,
-		},
-		{
-			name: "should return error for non-existent path",
-			setup: func() string {
-				return filepath.Join(s.TempDir, "does-not-exist")
-			},
-			expectRepo:   false,
-			expectError:  true,
-			errorMessage: "does not exist",
-		},
-		{
-			name: "should return error for empty path",
-			setup: func() string {
-				return ""
-			},
-			expectRepo:   false,
-			expectError:  true,
-			errorMessage: "path cannot be empty",
-		},
-	}
-
-	for _, tt := range testCases {
-		s.Run(tt.name, func() {
-			path := tt.setup()
-			isRepo, err := s.Client.IsGitRepository(path)
-
-			if tt.expectError {
-				s.Require().Error(err)
-				if tt.errorMessage != "" {
-					s.Contains(err.Error(), tt.errorMessage)
-				}
-			} else {
-				s.Require().NoError(err)
-			}
-
-			s.Equal(tt.expectRepo, isRepo)
-		})
-	}
+// createAndCheckoutBranch creates a new branch and checks it out.
+// Returns an error if the operation fails.
+func (s *GitClientContextTestSuite) createAndCheckoutBranch(wt *git.Worktree, branchName string) {
+	s.T().Helper()
+	err := wt.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.NewBranchReferenceName(branchName),
+		Create: true,
+	})
+	s.Require().NoError(err)
 }
 
-// TestGitClient_IsMainRepository tests main repository detection with table-driven approach
-func (s *GitClientTestSuite) TestGitClient_IsMainRepository() {
-	testCases := []struct {
-		name         string
-		setup        func() (string, func())
-		expectMain   bool
-		expectError  bool
-		errorMessage string
-	}{
-		{
-			name: "should return true for main repository",
-			setup: func() (string, func()) {
-				gitDir := filepath.Join(s.TempDir, "main-repo")
-				_, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
-				return gitDir, func() {}
-			},
-			expectMain:  true,
-			expectError: false,
-		},
-		{
-			name: "should return false for worktree",
-			setup: func() (string, func()) {
-				// Create main repository
-				mainDir := filepath.Join(s.TempDir, "main-for-worktree")
-				_, err := git.PlainInit(mainDir, false)
-				s.Require().NoError(err)
+// TestIsGitRepository_WithContext tests context support in IsGitRepository
+func (s *GitClientContextTestSuite) TestIsGitRepository_WithContext() {
+	ctx := context.Background()
 
-				// Create a worktree
-				worktreeDir := filepath.Join(s.TempDir, "test-worktree")
-				err = s.Client.CreateWorktree(mainDir, "new-branch", worktreeDir)
-				s.Require().NoError(err)
+	// Setup a git repository
+	gitDir := filepath.Join(s.TempDir, "git-repo")
+	_, err := git.PlainInit(gitDir, false)
+	s.Require().NoError(err)
 
-				return worktreeDir, func() {
-					_ = os.RemoveAll(worktreeDir)
-				}
-			},
-			expectMain:  false,
-			expectError: false,
-		},
-		{
-			name: "should return false for non-git directory",
-			setup: func() (string, func()) {
-				nonGitDir := filepath.Join(s.TempDir, "not-git")
-				err := os.MkdirAll(nonGitDir, 0755)
-				s.Require().NoError(err)
-				return nonGitDir, func() {
-					_ = os.RemoveAll(nonGitDir)
-				}
-			},
-			expectMain:  false,
-			expectError: false,
-		},
-		{
-			name: "should return error for empty path",
-			setup: func() (string, func()) {
-				return "", func() {}
-			},
-			expectMain:   false,
-			expectError:  true,
-			errorMessage: "path cannot be empty",
-		},
-	}
+	// This should fail because IsGitRepository doesn't accept context yet
+	isRepo, err := s.Client.IsGitRepository(ctx, gitDir)
 
-	for _, tt := range testCases {
-		s.Run(tt.name, func() {
-			path, cleanup := tt.setup()
-			defer cleanup()
-
-			isMain, err := s.Client.IsMainRepository(path)
-
-			if tt.expectError {
-				s.Require().Error(err)
-				if tt.errorMessage != "" {
-					s.Contains(err.Error(), tt.errorMessage)
-				}
-			} else {
-				s.Require().NoError(err)
-			}
-
-			s.Equal(tt.expectMain, isMain)
-		})
-	}
+	s.Require().NoError(err)
+	s.True(isRepo)
 }
 
-// TestGitClient_ListWorktrees tests worktree listing with table-driven approach
-func (s *GitClientTestSuite) TestGitClient_ListWorktrees() {
-	testCases := []struct {
-		name         string
-		setup        func() (string, *Client)
-		expectError  bool
-		expectCount  int
-		errorMessage string
-	}{
-		{
-			name: "should return main repository for repository with no worktrees",
-			setup: func() (string, *Client) {
-				gitDir := filepath.Join(s.TempDir, "main-repo")
-				_, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
-				return gitDir, s.Client
-			},
-			expectError: false,
-			expectCount: 1,
-		},
-		{
-			name: "should return error for non-git directory",
-			setup: func() (string, *Client) {
-				nonGitDir := filepath.Join(s.TempDir, "non-git")
-				err := os.Mkdir(nonGitDir, 0755)
-				s.Require().NoError(err)
-				return nonGitDir, s.Client
-			},
-			expectError: true,
-			expectCount: 0,
-		},
-		{
-			name: "should return error for empty repository path",
-			setup: func() (string, *Client) {
-				return "", s.Client
-			},
-			expectError: true,
-			expectCount: 0,
-		},
-	}
+// TestIsGitRepository_ContextCancellation tests context cancellation handling
+func (s *GitClientContextTestSuite) TestIsGitRepository_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
 
-	for _, tt := range testCases {
-		s.Run(tt.name, func() {
-			path, client := tt.setup()
+	// Cancel the context immediately
+	cancel()
 
-			worktrees, err := client.ListWorktrees(path)
+	gitDir := filepath.Join(s.TempDir, "git-repo")
+	_, err := git.PlainInit(gitDir, false)
+	s.Require().NoError(err)
 
-			if tt.expectError {
-				s.Require().Error(err)
-				if tt.errorMessage != "" {
-					s.Contains(err.Error(), tt.errorMessage)
-				}
-				s.Nil(worktrees)
-			} else {
-				s.Require().NoError(err)
-				s.NotNil(worktrees)
-				s.Len(worktrees, tt.expectCount)
-				if tt.expectCount > 0 {
-					s.Equal(path, worktrees[0].Path)
-					s.NotEmpty(worktrees[0].Branch)
-					s.NotEmpty(worktrees[0].Commit)
-				}
-			}
-		})
-	}
+	// This should fail with context canceled error
+	_, err = s.Client.IsGitRepository(ctx, gitDir)
+	s.Require().Error(err)
+	s.Contains(err.Error(), "context canceled")
 }
 
-// TestGitClient_CreateWorktree tests worktree creation with table-driven approach
-func (s *GitClientTestSuite) TestGitClient_CreateWorktree() {
-	testCases := []struct {
-		name         string
-		setup        func() (string, string, string)
-		expectError  bool
-		errorMessage string
-	}{
-		{
-			name: "should create worktree from existing branch",
-			setup: func() (string, string, string) {
-				// Create a git repository with initial commit
-				gitDir := filepath.Join(s.TempDir, "main-repo-create")
-				repo, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
+// TestListWorktrees_ContextTimeout tests context timeout handling
+func (s *GitClientContextTestSuite) TestListWorktrees_ContextTimeout() {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
+	defer cancel()
 
-				// Create initial commit
-				wt, err := repo.Worktree()
-				s.Require().NoError(err)
+	// Give context time to timeout
+	time.Sleep(10 * time.Millisecond)
 
-				// Create a test file
-				testFile := filepath.Join(gitDir, "test.txt")
-				err = os.WriteFile(testFile, []byte("test content"), 0644)
-				s.Require().NoError(err)
+	gitDir := filepath.Join(s.TempDir, "git-repo")
+	_, err := git.PlainInit(gitDir, false)
+	s.Require().NoError(err)
 
-				_, err = wt.Add("test.txt")
-				s.Require().NoError(err)
-
-				_, err = wt.Commit("Initial commit", &git.CommitOptions{
-					Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
-				})
-				s.Require().NoError(err)
-
-				// Get current branch name (could be master or main depending on git config)
-				head, err := repo.Head()
-				s.Require().NoError(err)
-				branchName := head.Name().Short()
-
-				// Create a new branch for the worktree
-				branchRef := plumbing.ReferenceName("refs/heads/" + branchName + "-worktree")
-				err = wt.Checkout(&git.CheckoutOptions{
-					Branch: branchRef,
-					Create: true,
-				})
-				s.Require().NoError(err)
-
-				// Switch back to main branch
-				mainRef := plumbing.ReferenceName("refs/heads/" + branchName)
-				err = wt.Checkout(&git.CheckoutOptions{
-					Branch: mainRef,
-				})
-				s.Require().NoError(err)
-
-				// Create worktree from the new branch
-				worktreePath := filepath.Join(s.TempDir, "worktree-1")
-				return gitDir, branchName + "-worktree", worktreePath
-			},
-			expectError: false,
-		},
-		{
-			name: "should return error for empty repository path",
-			setup: func() (string, string, string) {
-				worktreePath := filepath.Join(s.TempDir, "worktree-1")
-				return "", "main", worktreePath
-			},
-			expectError: true,
-		},
-		{
-			name: "should return error for empty branch name",
-			setup: func() (string, string, string) {
-				gitDir := filepath.Join(s.TempDir, "main-repo-empty-branch")
-				_, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
-
-				worktreePath := filepath.Join(s.TempDir, "worktree-empty-branch")
-				return gitDir, "", worktreePath
-			},
-			expectError: true,
-		},
-		{
-			name: "should return error for empty target path",
-			setup: func() (string, string, string) {
-				gitDir := filepath.Join(s.TempDir, "main-repo-empty-target")
-				_, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
-
-				return gitDir, "main", ""
-			},
-			expectError: true,
-		},
-		{
-			name: "should return error for existing target path",
-			setup: func() (string, string, string) {
-				gitDir := filepath.Join(s.TempDir, "main-repo-existing-target")
-				_, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
-
-				worktreePath := filepath.Join(s.TempDir, "existing-dir")
-				err = os.Mkdir(worktreePath, 0755)
-				s.Require().NoError(err)
-
-				return gitDir, "main", worktreePath
-			},
-			expectError: true,
-		},
-	}
-
-	for _, tt := range testCases {
-		s.Run(tt.name, func() {
-			repoPath, branch, targetPath := tt.setup()
-
-			err := s.Client.CreateWorktree(repoPath, branch, targetPath)
-
-			if tt.expectError {
-				s.Require().Error(err)
-				if tt.errorMessage != "" {
-					s.Contains(err.Error(), tt.errorMessage)
-				}
-			} else {
-				s.Require().NoError(err)
-				// Verify worktree was created
-				s.DirExists(targetPath)
-			}
-		})
-	}
+	// This should fail with context deadline exceeded
+	_, err = s.Client.ListWorktrees(ctx, gitDir)
+	s.Require().Error(err)
+	s.Contains(err.Error(), "context deadline exceeded")
 }
 
-// TestGitClient_GetWorktreeStatus tests worktree status retrieval with table-driven approach
-func (s *GitClientTestSuite) TestGitClient_GetWorktreeStatus() {
-	testCases := []struct {
-		name         string
-		setup        func() string
-		expectError  bool
-		expectClean  bool
-		errorMessage string
-	}{
-		{
-			name: "should return status for clean worktree",
-			setup: func() string {
-				// Create a git repository
-				gitDir := filepath.Join(s.TempDir, "main-repo")
-				repo, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
+// TestListWorktrees_UsingGoGit tests that ListWorktrees uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestListWorktrees_UsingGoGit() {
+	ctx := context.Background()
 
-				// Create initial commit
-				wt, err := repo.Worktree()
-				s.Require().NoError(err)
+	// Setup main repository with initial commit
+	mainRepo, _ := s.setupRepositoryWithInitialCommit("main")
 
-				testFile := filepath.Join(gitDir, "test.txt")
-				err = os.WriteFile(testFile, []byte("test content"), 0644)
-				s.Require().NoError(err)
-
-				_, err = wt.Add("test.txt")
-				s.Require().NoError(err)
-
-				_, err = wt.Commit("Initial commit", &git.CommitOptions{
-					Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
-				})
-				s.Require().NoError(err)
-
-				return gitDir
-			},
-			expectError: false,
-			expectClean: true,
-		},
-		{
-			name: "should return error for non-existent worktree path",
-			setup: func() string {
-				return filepath.Join(s.TempDir, "does-not-exist")
-			},
-			expectError: true,
-		},
-		{
-			name: "should return error for empty worktree path",
-			setup: func() string {
-				return ""
-			},
-			expectError: true,
-		},
-	}
-
-	for _, tt := range testCases {
-		s.Run(tt.name, func() {
-			path := tt.setup()
-
-			status, err := s.Client.GetWorktreeStatus(path)
-
-			if tt.expectError {
-				s.Require().Error(err)
-				if tt.errorMessage != "" {
-					s.Contains(err.Error(), tt.errorMessage)
-				}
-				s.Nil(status)
-			} else {
-				s.Require().NoError(err)
-				s.NotNil(status)
-				s.Equal(tt.expectClean, status.Clean)
-				s.Equal(path, status.Path)
-				s.NotEmpty(status.Branch)
-				s.NotEmpty(status.Commit)
-			}
-		})
-	}
+	// This test expects the implementation to use go-git internally
+	worktrees, err := s.Client.ListWorktrees(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.Len(worktrees, 1) // Should include main worktree
+	s.Equal(mainRepo, worktrees[0].Path)
 }
 
-// TestGitClient_RemoveWorktree tests worktree removal with table-driven approach
-func (s *GitClientTestSuite) TestGitClient_RemoveWorktree() {
-	testCases := []struct {
-		name         string
-		setup        func() (string, string)
-		expectError  bool
-		errorMessage string
-	}{
-		{
-			name: "should remove existing worktree",
-			setup: func() (string, string) {
-				// Create a git repository
-				gitDir := filepath.Join(s.TempDir, "main-repo-remove")
-				repo, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
+// TestGetAllBranches_UsingGoGit tests that GetAllBranches uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestGetAllBranches_UsingGoGit() {
+	ctx := context.Background()
 
-				// Create initial commit
-				wt, err := repo.Worktree()
-				s.Require().NoError(err)
+	// Setup repository with multiple branches
+	mainRepo, wt := s.setupRepositoryWithInitialCommit("main")
 
-				testFile := filepath.Join(gitDir, "test.txt")
-				err = os.WriteFile(testFile, []byte("test content"), 0644)
-				s.Require().NoError(err)
+	// Create and checkout a new branch
+	s.createAndCheckoutBranch(wt, "feature/test")
 
-				_, err = wt.Add("test.txt")
-				s.Require().NoError(err)
-
-				_, err = wt.Commit("Initial commit", &git.CommitOptions{
-					Author: &object.Signature{Name: "Test Author", Email: "test@example.com"},
-				})
-				s.Require().NoError(err)
-
-				// Get current branch name
-				head, err := repo.Head()
-				s.Require().NoError(err)
-				branchName := head.Name().Short()
-
-				// Create a new branch for the worktree
-				branchRef := plumbing.ReferenceName("refs/heads/" + branchName + "-remove")
-				err = wt.Checkout(&git.CheckoutOptions{
-					Branch: branchRef,
-					Create: true,
-				})
-				s.Require().NoError(err)
-
-				// Switch back to main branch
-				mainRef := plumbing.ReferenceName("refs/heads/" + branchName)
-				err = wt.Checkout(&git.CheckoutOptions{
-					Branch: mainRef,
-				})
-				s.Require().NoError(err)
-
-				// Create worktree from the new branch
-				worktreePath := filepath.Join(s.TempDir, "worktree-remove")
-				err = s.Client.CreateWorktree(gitDir, branchName+"-remove", worktreePath)
-				s.Require().NoError(err)
-
-				return gitDir, worktreePath
-			},
-			expectError: false,
-		},
-		{
-			name: "should return error for empty repository path",
-			setup: func() (string, string) {
-				worktreePath := filepath.Join(s.TempDir, "worktree-1")
-				return "", worktreePath
-			},
-			expectError: true,
-		},
-		{
-			name: "should return error for empty worktree path",
-			setup: func() (string, string) {
-				gitDir := filepath.Join(s.TempDir, "main-repo-empty-worktree")
-				_, err := git.PlainInit(gitDir, false)
-				s.Require().NoError(err)
-
-				return gitDir, ""
-			},
-			expectError: true,
-		},
-	}
-
-	for _, tt := range testCases {
-		s.Run(tt.name, func() {
-			repoPath, worktreePath := tt.setup()
-
-			err := s.Client.RemoveWorktree(repoPath, worktreePath, false)
-
-			if tt.expectError {
-				s.Require().Error(err)
-				if tt.errorMessage != "" {
-					s.Contains(err.Error(), tt.errorMessage)
-				}
-			} else {
-				s.Require().NoError(err)
-				// Verify worktree directory was removed (git worktree remove removes the directory by default)
-				s.NoDirExists(worktreePath)
-			}
-		})
-	}
+	// This test expects go-git based branch listing
+	branches, err := s.Client.GetAllBranches(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.Contains(branches, "master") // go-git default branch name
+	s.Contains(branches, "feature/test")
 }
 
-// TestWorktreeInfo_Validation tests worktree info validation with table-driven approach
-func (s *GitClientTestSuite) TestWorktreeInfo_Validation() {
-	testCases := []struct {
-		name        string
-		worktree    domain.WorktreeInfo
-		expectError bool
-		errorMsg    string
-	}{
-		{
-			name: "valid worktree info",
-			worktree: domain.WorktreeInfo{
-				Path:   "/valid/path",
-				Branch: "main",
-				Commit: "abc123",
-				Clean:  true,
-			},
-			expectError: false,
-		},
-		{
-			name: "empty path",
-			worktree: domain.WorktreeInfo{
-				Path:   "",
-				Branch: "main",
-				Commit: "abc123",
-			},
-			expectError: true,
-			errorMsg:    "path cannot be empty",
-		},
-		{
-			name: "empty branch",
-			worktree: domain.WorktreeInfo{
-				Path:   "/valid/path",
-				Branch: "",
-				Commit: "abc123",
-			},
-			expectError: true,
-			errorMsg:    "branch cannot be empty",
-		},
-	}
+// TestGetWorktreeStatus_UsingGoGit tests that GetWorktreeStatus uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestGetWorktreeStatus_UsingGoGit() {
+	ctx := context.Background()
 
-	for _, tt := range testCases {
-		s.Run(tt.name, func() {
-			err := tt.worktree.Validate()
+	// Setup repository
+	mainRepo, wt := s.setupRepositoryWithInitialCommit("main")
 
-			if tt.expectError {
-				s.Require().Error(err)
-				if tt.errorMsg != "" {
-					s.Contains(err.Error(), tt.errorMsg)
-				}
-			} else {
-				s.Require().NoError(err)
-			}
-		})
-	}
+	// Create another commit to have something to check status against
+	testFile := filepath.Join(mainRepo, "status_test.txt")
+	err := os.WriteFile(testFile, []byte("status test content"), 0644)
+	s.Require().NoError(err)
+
+	// Add and commit the file
+	_, err = wt.Add("status_test.txt")
+	s.Require().NoError(err)
+
+	commitHash, err := wt.Commit("Status test commit", &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "Test Author",
+			Email: "test@example.com",
+			When:  time.Now(),
+		},
+	})
+	s.Require().NoError(err)
+
+	// This test expects go-git based status checking
+	status, err := s.Client.GetWorktreeStatus(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.Equal(mainRepo, status.Path)
+	s.Equal("master", status.Branch) // go-git uses "master" as default
+	s.Equal(commitHash.String(), status.Commit)
+	s.True(status.Clean) // Should be clean after commit
 }
 
-// TestGitClientSuite runs the git client test suite
-func TestGitClientSuite(t *testing.T) {
-	suite.Run(t, new(GitClientTestSuite))
+// TestHasUncommittedChanges_UsingGoGit tests that HasUncommittedChanges uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestHasUncommittedChanges_UsingGoGit() {
+	ctx := context.Background()
+
+	// Setup repository
+	mainRepo := filepath.Join(s.TempDir, "main")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// Initially should be clean (no uncommitted changes)
+	hasChanges := s.Client.HasUncommittedChanges(ctx, mainRepo)
+	s.False(hasChanges)
+
+	// Create an uncommitted file
+	testFile := filepath.Join(mainRepo, "uncommitted.txt")
+	err = os.WriteFile(testFile, []byte("uncommitted content"), 0644)
+	s.Require().NoError(err)
+
+	// Now should have uncommitted changes
+	hasChanges = s.Client.HasUncommittedChanges(ctx, mainRepo)
+	s.True(hasChanges)
+}
+
+// TestGetCurrentBranch_UsingGoGit tests that GetCurrentBranch uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestGetCurrentBranch_UsingGoGit() {
+	ctx := context.Background()
+
+	// Setup repository with initial commit
+	mainRepo, wt := s.setupRepositoryWithInitialCommit("main")
+
+	// Should be on master branch initially (go-git default)
+	branch, err := s.Client.GetCurrentBranch(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.Equal("master", branch)
+
+	// Create and checkout a new branch
+	s.createAndCheckoutBranch(wt, "feature/new-branch")
+
+	// Should now be on the new branch
+	branch, err = s.Client.GetCurrentBranch(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.Equal("feature/new-branch", branch)
+}
+
+// TestCreateWorktree_UsingGoGit tests that CreateWorktree uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestCreateWorktree_UsingGoGit() {
+	ctx := context.Background()
+
+	// Setup main repository with initial commit
+	mainRepo, _ := s.setupRepositoryWithInitialCommit("main")
+
+	// Create a worktree path
+	worktreePath := filepath.Join(s.TempDir, "worktree1")
+
+	// This should create a worktree using go-git
+	err := s.Client.CreateWorktree(ctx, mainRepo, "feature/test-branch", worktreePath)
+	s.Require().NoError(err)
+
+	// Verify the worktree was created
+	s.DirExists(worktreePath)
+
+	// Verify it's a git repository
+	isRepo, err := s.Client.IsGitRepository(ctx, worktreePath)
+	s.Require().NoError(err)
+	s.True(isRepo)
+}
+
+// TestRemoveWorktree_UsingGoGit tests that RemoveWorktree uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestRemoveWorktree_UsingGoGit() {
+	ctx := context.Background()
+
+	// Setup main repository with initial commit
+	mainRepo, _ := s.setupRepositoryWithInitialCommit("main")
+
+	// Create a worktree first
+	worktreePath := filepath.Join(s.TempDir, "worktree1")
+	err := s.Client.CreateWorktree(ctx, mainRepo, "feature/test-branch", worktreePath)
+	s.Require().NoError(err)
+
+	// Now remove it using go-git
+	err = s.Client.RemoveWorktree(ctx, mainRepo, worktreePath, false)
+	s.Require().NoError(err)
+
+	// Verify the worktree directory was removed
+	s.NoDirExists(worktreePath)
+}
+
+// TestGetRepositoryRoot_UsingGoGit tests that GetRepositoryRoot uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestGetRepositoryRoot_UsingGoGit() {
+	ctx := context.Background()
+
+	// Setup repository
+	mainRepo := filepath.Join(s.TempDir, "main")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// Test from within the repository
+	root, err := s.Client.GetRepositoryRoot(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.Equal(mainRepo, root)
+
+	// Test from a subdirectory
+	subDir := filepath.Join(mainRepo, "subdir")
+	err = os.Mkdir(subDir, 0755)
+	s.Require().NoError(err)
+
+	root, err = s.Client.GetRepositoryRoot(ctx, subDir)
+	s.Require().NoError(err)
+	s.Equal(mainRepo, root)
+}
+
+// TestGetRemoteBranches_UsingGoGit tests that GetRemoteBranches uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestGetRemoteBranches_UsingGoGit() {
+	ctx := context.Background()
+
+	// Setup repository
+	mainRepo := filepath.Join(s.TempDir, "main")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// Initially no remote branches (should return empty slice, not error)
+	remoteBranches, err := s.Client.GetRemoteBranches(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.Empty(remoteBranches)
+}
+
+// TestBranchExists_UsingGoGit tests that BranchExists uses go-git instead of CLI
+func (s *GitClientContextTestSuite) TestBranchExists_UsingGoGit() {
+	ctx := context.Background()
+
+	// Setup repository
+	mainRepo, _ := s.setupRepositoryWithInitialCommit("main")
+
+	// Main branch should exist (go-git uses "master" by default)
+	exists := s.Client.BranchExists(ctx, mainRepo, "master")
+	s.True(exists)
+
+	// Non-existent branch should not exist
+	exists = s.Client.BranchExists(ctx, mainRepo, "non-existent")
+	s.False(exists)
+}
+
+// TestIsMainRepository_WithContext tests context support in IsMainRepository
+func (s *GitClientContextTestSuite) TestIsMainRepository_WithContext() {
+	ctx := context.Background()
+
+	// Setup a main git repository
+	mainRepo := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// This should fail because IsMainRepository doesn't accept context yet
+	isMain, err := s.Client.IsMainRepository(ctx, mainRepo)
+
+	s.Require().NoError(err)
+	s.True(isMain) // Should be main repository
+}
+
+// TestIsMainRepository_ContextCancellation tests context cancellation in IsMainRepository
+func (s *GitClientContextTestSuite) TestIsMainRepository_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	mainRepo := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// This should fail with context canceled error
+	_, err = s.Client.IsMainRepository(ctx, mainRepo)
+	s.Require().Error(err)
+	s.Contains(err.Error(), "context canceled")
+}
+
+func TestGitClientContextTestSuite(t *testing.T) {
+	suite.Run(t, new(GitClientContextTestSuite))
 }

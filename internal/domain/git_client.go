@@ -1,7 +1,10 @@
 // Package domain contains core business entities and interfaces for twiggit
 package domain
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 // WorktreeInfo represents information about a Git worktree
 type WorktreeInfo struct {
@@ -29,22 +32,22 @@ func (w *WorktreeInfo) Validate() error {
 // GitClient interface defines Git operations for worktree management
 type GitClient interface {
 	// Repository operations
-	IsGitRepository(path string) (bool, error)
-	IsMainRepository(path string) (bool, error)
-	GetRepositoryRoot(path string) (string, error)
+	IsGitRepository(ctx context.Context, path string) (bool, error)
+	IsMainRepository(ctx context.Context, path string) (bool, error)
+	GetRepositoryRoot(ctx context.Context, path string) (string, error)
 
 	// Worktree operations
-	ListWorktrees(repoPath string) ([]*WorktreeInfo, error)
-	CreateWorktree(repoPath, branch, targetPath string) error
-	RemoveWorktree(repoPath, worktreePath string, force bool) error
-	GetWorktreeStatus(worktreePath string) (*WorktreeInfo, error)
+	ListWorktrees(ctx context.Context, repoPath string) ([]*WorktreeInfo, error)
+	CreateWorktree(ctx context.Context, repoPath, branch, targetPath string) error
+	RemoveWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error
+	GetWorktreeStatus(ctx context.Context, worktreePath string) (*WorktreeInfo, error)
 
 	// Branch operations
-	GetCurrentBranch(repoPath string) (string, error)
-	GetAllBranches(repoPath string) ([]string, error)
-	GetRemoteBranches(repoPath string) ([]string, error)
-	BranchExists(repoPath, branch string) bool
+	GetCurrentBranch(ctx context.Context, repoPath string) (string, error)
+	GetAllBranches(ctx context.Context, repoPath string) ([]string, error)
+	GetRemoteBranches(ctx context.Context, repoPath string) ([]string, error)
+	BranchExists(ctx context.Context, repoPath, branch string) bool
 
 	// Status operations
-	HasUncommittedChanges(repoPath string) bool
+	HasUncommittedChanges(ctx context.Context, repoPath string) bool
 }
