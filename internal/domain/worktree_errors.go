@@ -1,6 +1,7 @@
-package types
+package domain
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -118,7 +119,8 @@ func WrapError(errType ErrorType, message string, path string, cause error) *Wor
 
 // IsErrorType checks if an error is of a specific WorktreeError type
 func IsErrorType(err error, errType ErrorType) bool {
-	if wtErr, ok := err.(*WorktreeError); ok {
+	wtErr := &WorktreeError{}
+	if errors.As(err, &wtErr) {
 		return wtErr.Type == errType
 	}
 	return false

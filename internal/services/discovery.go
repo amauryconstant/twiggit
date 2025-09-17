@@ -1,6 +1,8 @@
-package worktree
+// Package services contains business logic for twiggit operations
+package services
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -8,7 +10,6 @@ import (
 	"time"
 
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/pkg/types"
 )
 
 const (
@@ -19,7 +20,7 @@ const (
 
 // DiscoveryService handles the discovery and analysis of worktrees and projects
 type DiscoveryService struct {
-	gitClient   types.GitClient
+	gitClient   domain.GitClient
 	concurrency int
 	mu          sync.RWMutex
 	cache       map[string]*discoveryResult
@@ -31,7 +32,7 @@ type discoveryResult struct {
 }
 
 // NewDiscoveryService creates a new DiscoveryService instance
-func NewDiscoveryService(gitClient types.GitClient) *DiscoveryService {
+func NewDiscoveryService(gitClient domain.GitClient) *DiscoveryService {
 	return &DiscoveryService{
 		gitClient:   gitClient,
 		concurrency: defaultConcurrency,
@@ -49,7 +50,7 @@ func (ds *DiscoveryService) SetConcurrency(workers int) {
 // DiscoverWorktrees discovers all worktrees in a workspace directory using concurrent processing
 func (ds *DiscoveryService) DiscoverWorktrees(workspacePath string) ([]*domain.Worktree, error) {
 	if workspacePath == "" {
-		return nil, fmt.Errorf("workspace path cannot be empty")
+		return nil, errors.New("workspace path cannot be empty")
 	}
 
 	// Check if workspace path exists
@@ -74,7 +75,7 @@ func (ds *DiscoveryService) DiscoverWorktrees(workspacePath string) ([]*domain.W
 // AnalyzeWorktree analyzes a single worktree path and returns detailed information
 func (ds *DiscoveryService) AnalyzeWorktree(path string) (*domain.Worktree, error) {
 	if path == "" {
-		return nil, fmt.Errorf("worktree path cannot be empty")
+		return nil, errors.New("worktree path cannot be empty")
 	}
 
 	// Check cache first
@@ -94,7 +95,7 @@ func (ds *DiscoveryService) AnalyzeWorktree(path string) (*domain.Worktree, erro
 		return nil, fmt.Errorf("failed to convert worktree info: %w", err)
 	}
 
-	// Cache the result
+	// Cache result
 	ds.cacheResult(path, worktree)
 
 	return worktree, nil
@@ -103,7 +104,7 @@ func (ds *DiscoveryService) AnalyzeWorktree(path string) (*domain.Worktree, erro
 // DiscoverProjects finds all Git repositories (projects) in the workspace directory
 func (ds *DiscoveryService) DiscoverProjects(workspacePath string) ([]*domain.Project, error) {
 	if workspacePath == "" {
-		return nil, fmt.Errorf("workspace path cannot be empty")
+		return nil, errors.New("workspace path cannot be empty")
 	}
 
 	// Check if workspace path exists
@@ -117,6 +118,7 @@ func (ds *DiscoveryService) DiscoverProjects(workspacePath string) ([]*domain.Pr
 		return nil, fmt.Errorf("failed to read workspace directory: %w", err)
 	}
 
+	//nolint:prealloc // Number of valid projects is unpredictable due to filtering
 	var projects []*domain.Project
 	for _, entry := range entries {
 		if !entry.IsDir() {
@@ -258,7 +260,7 @@ func (ds *DiscoveryService) analyzePathsConcurrently(paths []string) ([]*domain.
 
 	// Return error if too many failures (more than half failed)
 	if len(errors) > 0 && len(errors) > len(paths)/2 {
-		return nil, fmt.Errorf("too many failures during discovery (%d/%d failed): %v", len(errors), len(paths), errors[0])
+		return nil, fmt.Errorf("too many failures during discovery (%d/%d failed): %w", len(errors), len(paths), errors[0])
 	}
 
 	return worktrees, nil
@@ -278,11 +280,11 @@ func (ds *DiscoveryService) workerAnalyze(paths <-chan string, results chan<- *d
 	}
 }
 
-// convertToWorktree converts a types.WorktreeInfo to domain.Worktree
-func (ds *DiscoveryService) convertToWorktree(info *types.WorktreeInfo) (*domain.Worktree, error) {
+// convertToWorktree converts a domain.WorktreeInfo to domain.Worktree
+func (ds *DiscoveryService) convertToWorktree(info *domain.WorktreeInfo) (*domain.Worktree, error) {
 	worktree, err := domain.NewWorktree(info.Path, info.Branch)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create worktree: %w", err)
 	}
 
 	// Set additional properties

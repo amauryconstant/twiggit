@@ -1,12 +1,12 @@
-package worktree
+package services
 
 import (
 	"errors"
 	"os"
 	"testing"
 
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
-	"github.com/amaury/twiggit/pkg/types"
 	"github.com/amaury/twiggit/test/mocks"
 	"github.com/stretchr/testify/suite"
 )
@@ -66,7 +66,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 		targetPath  string
 		setupMocks  func(*mocks.GitClientMock)
 		expectError bool
-		errorType   types.ErrorType
+		errorType   domain.ErrorType
 	}{
 		{
 			name:       "should create worktree from existing branch",
@@ -104,7 +104,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 				// Validation will fail before git operations
 			},
 			expectError: true,
-			errorType:   types.ErrInvalidBranchName,
+			errorType:   domain.ErrInvalidBranchName,
 		},
 		{
 			name:       "should return error for invalid target path",
@@ -115,7 +115,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 				// Validation will fail before git operations
 			},
 			expectError: true,
-			errorType:   types.ErrInvalidPath,
+			errorType:   domain.ErrInvalidPath,
 		},
 		{
 			name:       "should return error for non-repository project",
@@ -126,7 +126,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 				m.On("IsGitRepository", "not-a-repo").Return(false, nil)
 			},
 			expectError: true,
-			errorType:   types.ErrNotRepository,
+			errorType:   domain.ErrNotRepository,
 		},
 		{
 			name:       "should return error for empty project",
@@ -137,7 +137,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 				// No mocks needed for empty project
 			},
 			expectError: true,
-			errorType:   types.ErrValidation,
+			errorType:   domain.ErrValidation,
 		},
 	}
 
@@ -154,8 +154,8 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 
 			if tt.expectError {
 				s.Require().Error(err)
-				if tt.errorType != types.ErrUnknown {
-					s.True(types.IsErrorType(err, tt.errorType),
+				if tt.errorType != domain.ErrUnknown {
+					s.True(domain.IsErrorType(err, tt.errorType),
 						"Expected error type %v, got: %v", tt.errorType, err)
 				}
 			} else {
@@ -176,7 +176,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 		setupMocks   func(*mocks.GitClientMock, string)
 		setupCwd     func() (string, func())
 		expectError  bool
-		errorType    types.ErrorType
+		errorType    domain.ErrorType
 	}{
 		{
 			name:         "should remove clean worktree safely",
@@ -184,7 +184,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 			force:        false,
 			setupMocks: func(m *mocks.GitClientMock, path string) {
 				// Mock worktree status check
-				m.On("GetWorktreeStatus", path).Return(&types.WorktreeInfo{
+				m.On("GetWorktreeStatus", path).Return(&domain.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: true,
 				}, nil)
 				// Mock uncommitted changes check
@@ -202,14 +202,14 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 			worktreePath: "/tmp/dirty-worktree",
 			force:        false,
 			setupMocks: func(m *mocks.GitClientMock, path string) {
-				m.On("GetWorktreeStatus", path).Return(&types.WorktreeInfo{
+				m.On("GetWorktreeStatus", path).Return(&domain.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: false,
 				}, nil)
 				m.On("HasUncommittedChanges", path).Return(true)
 			},
 			setupCwd:    func() (string, func()) { return "/different/dir", func() {} },
 			expectError: true,
-			errorType:   types.ErrUncommittedChanges,
+			errorType:   domain.ErrUncommittedChanges,
 		},
 		{
 			name:         "should remove dirty worktree when forced",
@@ -228,12 +228,12 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 			worktreePath: "/tmp/non-existent",
 			force:        false,
 			setupMocks: func(m *mocks.GitClientMock, path string) {
-				m.On("GetWorktreeStatus", path).Return((*types.WorktreeInfo)(nil),
+				m.On("GetWorktreeStatus", path).Return((*domain.WorktreeInfo)(nil),
 					errors.New("worktree not found"))
 			},
 			setupCwd:    func() (string, func()) { return "/different/dir", func() {} },
 			expectError: true,
-			errorType:   types.ErrWorktreeNotFound,
+			errorType:   domain.ErrWorktreeNotFound,
 		},
 		{
 			name:         "should return error for empty path",
@@ -242,7 +242,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 			setupMocks:   func(m *mocks.GitClientMock, path string) {},
 			setupCwd:     func() (string, func()) { return "/different/dir", func() {} },
 			expectError:  true,
-			errorType:    types.ErrValidation,
+			errorType:    domain.ErrValidation,
 		},
 	}
 
@@ -266,8 +266,8 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 
 			if tt.expectError {
 				s.Require().Error(err)
-				if tt.errorType != types.ErrUnknown {
-					s.True(types.IsErrorType(err, tt.errorType),
+				if tt.errorType != domain.ErrUnknown {
+					s.True(domain.IsErrorType(err, tt.errorType),
 						"Expected error type %v, got: %v", tt.errorType, err)
 				}
 			} else {
@@ -304,7 +304,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 				}
 			},
 			setupMocks: func(m *mocks.GitClientMock, currentDir string) {
-				m.On("GetWorktreeStatus", currentDir).Return(&types.WorktreeInfo{
+				m.On("GetWorktreeStatus", currentDir).Return(&domain.WorktreeInfo{
 					Path: currentDir, Branch: "main", Clean: true,
 				}, nil)
 			},
@@ -327,7 +327,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 				}
 			},
 			setupMocks: func(m *mocks.GitClientMock, currentDir string) {
-				m.On("GetWorktreeStatus", currentDir).Return((*types.WorktreeInfo)(nil),
+				m.On("GetWorktreeStatus", currentDir).Return((*domain.WorktreeInfo)(nil),
 					errors.New("not a worktree"))
 			},
 			expectError: true,
@@ -370,7 +370,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 		setupCwd     func() (string, func())
 		setupMocks   func(*mocks.GitClientMock, string)
 		expectError  bool
-		errorType    types.ErrorType
+		errorType    domain.ErrorType
 	}{
 		{
 			name:         "should validate clean worktree for removal",
@@ -379,7 +379,7 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 				return "/different/directory", func() {}
 			},
 			setupMocks: func(m *mocks.GitClientMock, path string) {
-				m.On("GetWorktreeStatus", path).Return(&types.WorktreeInfo{
+				m.On("GetWorktreeStatus", path).Return(&domain.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: true,
 				}, nil)
 				m.On("HasUncommittedChanges", path).Return(false)
@@ -395,13 +395,13 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 				return "/different/directory", func() {}
 			},
 			setupMocks: func(m *mocks.GitClientMock, path string) {
-				m.On("GetWorktreeStatus", path).Return(&types.WorktreeInfo{
+				m.On("GetWorktreeStatus", path).Return(&domain.WorktreeInfo{
 					Path: path, Branch: "feature", Clean: false,
 				}, nil)
 				m.On("HasUncommittedChanges", path).Return(true)
 			},
 			expectError: true,
-			errorType:   types.ErrUncommittedChanges,
+			errorType:   domain.ErrUncommittedChanges,
 		},
 	}
 
@@ -431,8 +431,8 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 
 			if tt.expectError {
 				s.Require().Error(err)
-				if tt.errorType != types.ErrUnknown {
-					s.True(types.IsErrorType(err, tt.errorType),
+				if tt.errorType != domain.ErrUnknown {
+					s.True(domain.IsErrorType(err, tt.errorType),
 						"Expected error type %v, got: %v", tt.errorType, err)
 				}
 			} else {

@@ -1,6 +1,8 @@
+// Package domain contains core business entities and interfaces for twiggit
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -21,7 +23,7 @@ type Workspace struct {
 // NewWorkspace creates a new Workspace instance with validation
 func NewWorkspace(path string) (*Workspace, error) {
 	if path == "" {
-		return nil, fmt.Errorf("workspace path cannot be empty")
+		return nil, errors.New("workspace path cannot be empty")
 	}
 
 	return &Workspace{

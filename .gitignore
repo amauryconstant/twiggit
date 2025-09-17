@@ -8,7 +8,7 @@ bin/
 twiggit
 
 # Test coverage
-coverage.out
+coverage*.out
 coverage.html
 
 # Test binaries

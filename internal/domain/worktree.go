@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -51,10 +52,10 @@ type Worktree struct {
 // NewWorktree creates a new Worktree instance with validation
 func NewWorktree(path, branch string) (*Worktree, error) {
 	if path == "" {
-		return nil, fmt.Errorf("worktree path cannot be empty")
+		return nil, errors.New("worktree path cannot be empty")
 	}
 	if branch == "" {
-		return nil, fmt.Errorf("branch name cannot be empty")
+		return nil, errors.New("branch name cannot be empty")
 	}
 
 	return &Worktree{

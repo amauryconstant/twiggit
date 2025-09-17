@@ -393,7 +393,7 @@ func (s *ProjectTestSuite) TestProject_EnhancedFeatures() {
 			testFunc: func(project *Project) {
 				// This should fail initially - we need to add git repo validation
 				isValid, err := project.ValidateGitRepoExists()
-				s.Error(err)
+				s.Require().Error(err)
 				s.False(isValid)
 			},
 			expectError: false,

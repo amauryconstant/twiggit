@@ -1,4 +1,5 @@
-package helpers
+// Package mise provides integration with the mise tool for twiggit
+package mise
 
 import (
 	"fmt"

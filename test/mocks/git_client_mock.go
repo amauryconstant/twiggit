@@ -1,7 +1,8 @@
+// Package mocks contains test mocks for twiggit
 package mocks
 
 import (
-	"github.com/amaury/twiggit/pkg/types"
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -41,15 +42,15 @@ func (m *GitClientMock) RemoveWorktree(repoPath, worktreePath string, force bool
 }
 
 // ListWorktrees lists all worktrees in a repository
-func (m *GitClientMock) ListWorktrees(repoPath string) ([]*types.WorktreeInfo, error) {
+func (m *GitClientMock) ListWorktrees(repoPath string) ([]*domain.WorktreeInfo, error) {
 	args := m.Called(repoPath)
-	return args.Get(0).([]*types.WorktreeInfo), args.Error(1)
+	return args.Get(0).([]*domain.WorktreeInfo), args.Error(1)
 }
 
 // GetWorktreeStatus gets the status of a worktree
-func (m *GitClientMock) GetWorktreeStatus(worktreePath string) (*types.WorktreeInfo, error) {
+func (m *GitClientMock) GetWorktreeStatus(worktreePath string) (*domain.WorktreeInfo, error) {
 	args := m.Called(worktreePath)
-	return args.Get(0).(*types.WorktreeInfo), args.Error(1)
+	return args.Get(0).(*domain.WorktreeInfo), args.Error(1)
 }
 
 // HasUncommittedChanges checks if a worktree has uncommitted changes

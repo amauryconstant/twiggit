@@ -1,6 +1,8 @@
+// Package config handles configuration management for twiggit
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -79,11 +81,11 @@ func LoadConfig() (*Config, error) {
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
 	if c.Workspace == "" {
-		return fmt.Errorf("workspace path cannot be empty")
+		return errors.New("workspace path cannot be empty")
 	}
 
 	if c.Verbose && c.Quiet {
-		return fmt.Errorf("verbose and quiet cannot both be enabled")
+		return errors.New("verbose and quiet cannot both be enabled")
 	}
 
 	return nil

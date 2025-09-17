@@ -117,7 +117,7 @@ func (s *WorktreeTestSuite) TestEnhancedFeatures() {
 
 		// This should fail initially - we need to add Commit field
 		err = worktree.SetCommit("abc123def456")
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.Equal("abc123def456", worktree.GetCommit())
 	})
 
@@ -128,7 +128,7 @@ func (s *WorktreeTestSuite) TestEnhancedFeatures() {
 
 		// This should fail initially - we need to add path validation
 		isValid, err := worktree.ValidatePathExists()
-		s.Error(err)
+		s.Require().Error(err)
 		s.False(isValid)
 	})
 

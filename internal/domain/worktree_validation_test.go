@@ -1,4 +1,4 @@
-package types
+package domain
 
 import (
 	"os"
@@ -49,7 +49,7 @@ func (s *ValidationTestSuite) TestValidationResult_HasErrors() {
 
 func (s *ValidationTestSuite) TestValidationResult_FirstError() {
 	result := NewValidationResult()
-	s.NoError(result.FirstError())
+	s.Require().NoError(result.FirstError())
 
 	err1 := NewWorktreeError(ErrValidation, "first error", "")
 	err2 := NewWorktreeError(ErrValidation, "second error", "")

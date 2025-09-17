@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
-	"github.com/amaury/twiggit/internal/worktree"
-	"github.com/amaury/twiggit/pkg/types"
+	"github.com/amaury/twiggit/internal/services"
 	"github.com/amaury/twiggit/test/helpers"
 	"github.com/stretchr/testify/suite"
 )
@@ -58,10 +58,10 @@ func (r *IntegrationTestRepo) RepoDir() string {
 type WorktreeIntegrationTestSuite struct {
 	suite.Suite
 	testRepo          *IntegrationTestRepo
-	gitClient         types.GitClient
-	discoveryService  *worktree.DiscoveryService
+	gitClient         domain.GitClient
+	discoveryService  *services.DiscoveryService
 	config            *config.Config
-	operationsService *worktree.OperationsService
+	operationsService *services.OperationsService
 }
 
 func (s *WorktreeIntegrationTestSuite) SetupSuite() {
@@ -81,11 +81,11 @@ func (s *WorktreeIntegrationTestSuite) SetupSuite() {
 	// Initialize services
 	client := git.NewClient()
 	s.gitClient = client
-	s.discoveryService = worktree.NewDiscoveryService(s.gitClient)
+	s.discoveryService = services.NewDiscoveryService(s.gitClient)
 	s.config = &config.Config{
 		Workspace: s.testRepo.TempDir,
 	}
-	s.operationsService = worktree.NewOperationsService(s.gitClient, s.discoveryService, s.config)
+	s.operationsService = services.NewOperationsService(s.gitClient, s.discoveryService, s.config)
 }
 
 func (s *WorktreeIntegrationTestSuite) TearDownSuite() {
@@ -222,7 +222,7 @@ func (s *WorktreeIntegrationTestSuite) TestDiscoveryService() {
 	s.Require().NoError(err)
 
 	// Test discovery
-	discoveryService := worktree.NewDiscoveryService(gitClient)
+	discoveryService := services.NewDiscoveryService(gitClient)
 
 	s.Run("should discover all projects", func() {
 		projects, err := discoveryService.DiscoverProjects(workspaceDir)
@@ -259,11 +259,11 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 	defer testRepo.Cleanup()
 
 	gitClient := git.NewClient()
-	discoveryService := worktree.NewDiscoveryService(gitClient)
+	discoveryService := services.NewDiscoveryService(gitClient)
 	config := &config.Config{
 		Workspace: testRepo.TempDir,
 	}
-	operationsService := worktree.NewOperationsService(gitClient, discoveryService, config)
+	operationsService := services.NewOperationsService(gitClient, discoveryService, config)
 
 	s.Run("should handle non-existent repository", func() {
 		err := operationsService.Create("/non/existent/repo", "feature", "/tmp/test-worktree")
@@ -320,7 +320,7 @@ func (s *WorktreeIntegrationTestSuite) TestPerformance() {
 		}
 	}
 
-	discoveryService := worktree.NewDiscoveryService(gitClient)
+	discoveryService := services.NewDiscoveryService(gitClient)
 	discoveryService.SetConcurrency(4) // Test with concurrent processing
 
 	s.Run("should discover projects efficiently", func() {

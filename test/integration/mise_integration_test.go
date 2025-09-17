@@ -1,3 +1,6 @@
+//go:build integration
+// +build integration
+
 package integration
 
 import (
@@ -5,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/amaury/twiggit/test/helpers"
+	"github.com/amaury/twiggit/internal/infrastructure/mise"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -26,7 +29,7 @@ func TestMiseIntegrationSuite(t *testing.T) {
 }
 
 func (s *MiseIntegrationTestSuite) TestNewMiseIntegration() {
-	integration := helpers.NewMiseIntegration()
+	integration := mise.NewMiseIntegration()
 
 	s.NotNil(integration)
 	s.True(integration.IsAvailable()) // Should check availability instead of accessing execPath directly
@@ -34,7 +37,7 @@ func (s *MiseIntegrationTestSuite) TestNewMiseIntegration() {
 }
 
 func (s *MiseIntegrationTestSuite) TestIsAvailable() {
-	integration := helpers.NewMiseIntegration()
+	integration := mise.NewMiseIntegration()
 
 	// This test depends on system state, but we can test the method exists
 	available := integration.IsAvailable()
@@ -147,14 +150,14 @@ go = "1.21"
 			targetPath, cleanupTarget := tt.setupTarget()
 			defer cleanupTarget()
 
-			integration := helpers.NewMiseIntegration()
+			integration := mise.NewMiseIntegration()
 
 			err := integration.SetupWorktree(sourceRepo, targetPath)
 
 			if tt.expectError {
 				s.Error(err)
 			} else {
-				s.NoError(err)
+				s.Require().NoError(err)
 
 				// Check that expected files were copied
 				for _, expectedFile := range tt.expectFiles {
@@ -196,7 +199,7 @@ func (s *MiseIntegrationTestSuite) TestTrustDirectory() {
 			dirPath, cleanup := tt.setupDir()
 			defer cleanup()
 
-			integration := helpers.NewMiseIntegration()
+			integration := mise.NewMiseIntegration()
 
 			err := integration.TrustDirectory(dirPath)
 
@@ -204,7 +207,7 @@ func (s *MiseIntegrationTestSuite) TestTrustDirectory() {
 				s.Error(err)
 			} else {
 				// Should not error (may be no-op if mise not available)
-				s.NoError(err)
+				s.Require().NoError(err)
 			}
 		})
 	}
@@ -288,7 +291,7 @@ func (s *MiseIntegrationTestSuite) TestDetectConfigFiles() {
 			repoPath, cleanup := tt.setupRepo()
 			defer cleanup()
 
-			integration := helpers.NewMiseIntegration()
+			integration := mise.NewMiseIntegration()
 
 			configFiles := integration.DetectConfigFiles(repoPath)
 
@@ -327,23 +330,23 @@ go = "1.21"`)
 		s.Require().NoError(err)
 		defer func() { _ = os.RemoveAll(targetDir) }()
 
-		integration := helpers.NewMiseIntegration()
+		integration := mise.NewMiseIntegration()
 
 		// Copy files
 		configFiles := []string{".mise.local.toml", "mise/config.local.toml"}
 		err = integration.CopyConfigFiles(sourceDir, targetDir, configFiles)
 
-		s.NoError(err)
+		s.Require().NoError(err)
 
 		// Verify files were copied correctly
 		targetMiseFile := filepath.Join(targetDir, ".mise.local.toml")
 		copiedMiseContent, err := os.ReadFile(targetMiseFile)
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.Equal(miseContent, copiedMiseContent)
 
 		targetConfigFile := filepath.Join(targetDir, "mise", "config.local.toml")
 		copiedConfigContent, err := os.ReadFile(targetConfigFile)
-		s.NoError(err)
+		s.Require().NoError(err)
 		s.Equal(configContent, copiedConfigContent)
 	})
 }

@@ -1,3 +1,4 @@
+// Package fixtures contains test case data for twiggit
 package fixtures
 
 import (
