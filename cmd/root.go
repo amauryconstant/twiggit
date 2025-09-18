@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"github.com/amaury/twiggit/internal/version"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +19,7 @@ Features:
   - XDG-compliant configuration with environment variable support
   - Shell completion for multiple shells
   - Template-based workflows`,
-		Version: "0.1.0",
+		Version: version.Version(),
 	}
 
 	// Add persistent flags
