@@ -29,6 +29,7 @@ Thumbs.db
 
 # Mise
 .mise.local.toml
+.mise/
 
 # AI
 .ai
