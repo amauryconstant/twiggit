@@ -84,7 +84,7 @@ func runCreateCommand(_ *cobra.Command, args []string) error {
 	}
 
 	// Determine target path for worktree using project-aware logic
-	targetPath := determineWorktreePath(mainRepoPath, branchName, cfg.Workspace)
+	targetPath := determineWorktreePath(mainRepoPath, branchName, cfg.WorkspacesPath)
 
 	// Check if target path already exists
 	if _, err := os.Stat(targetPath); err == nil {

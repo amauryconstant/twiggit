@@ -53,7 +53,7 @@ func runSwitchCommand(_ *cobra.Command, args []string) error {
 	discoveryService := services.NewDiscoveryService(gitClient)
 
 	// Determine workspace path
-	workspacePath := cfg.Workspace
+	workspacePath := cfg.WorkspacesPath
 	if currentDir, err := os.Getwd(); err == nil {
 		if repoRoot, err := gitClient.GetRepositoryRoot(ctx, currentDir); err == nil {
 			// We're in a git repository, use its parent as workspace

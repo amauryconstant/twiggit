@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -549,6 +551,24 @@ func (c *Client) GetWorktreeStatus(ctx context.Context, worktreePath string) (*d
 		return nil, fmt.Errorf("worktree is not a git repository: %s", worktreePath)
 	}
 
+	// Try using go-git first, fall back to git command line if it fails
+	return c.getWorktreeStatusWithFallback(ctx, worktreePath)
+}
+
+// getWorktreeStatusWithFallback tries go-git first, then falls back to git command line
+func (c *Client) getWorktreeStatusWithFallback(ctx context.Context, worktreePath string) (*domain.WorktreeInfo, error) {
+	// Try go-git first
+	info, err := c.getWorktreeStatusGoGit(ctx, worktreePath)
+	if err == nil {
+		return info, nil
+	}
+
+	// Fall back to git command line
+	return c.getWorktreeStatusGitCLI(ctx, worktreePath)
+}
+
+// getWorktreeStatusGoGit gets worktree status using go-git library
+func (c *Client) getWorktreeStatusGoGit(_ context.Context, worktreePath string) (*domain.WorktreeInfo, error) {
 	// Open the repository
 	repo, err := git.PlainOpen(worktreePath)
 	if err != nil {
@@ -592,6 +612,88 @@ func (c *Client) GetWorktreeStatus(ctx context.Context, worktreePath string) (*d
 		Clean:      status.IsClean(),
 		CommitTime: commitTime,
 	}, nil
+}
+
+// getWorktreeStatusGitCLI gets worktree status using git command line
+func (c *Client) getWorktreeStatusGitCLI(ctx context.Context, worktreePath string) (*domain.WorktreeInfo, error) {
+	// Use git command line to get status
+	output, err := c.runGitCommand(ctx, worktreePath, "status", "--porcelain")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get git status: %w", err)
+	}
+
+	// Use git command line to get current branch
+	branchOutput, err := c.runGitCommand(ctx, worktreePath, "branch", "--show-current")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get current branch: %w", err)
+	}
+	branch := strings.TrimSpace(branchOutput)
+
+	// Use git command line to get current commit
+	commitOutput, err := c.runGitCommand(ctx, worktreePath, "rev-parse", "HEAD")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get HEAD commit: %w", err)
+	}
+	commit := strings.TrimSpace(commitOutput)
+
+	// Use git command line to get commit timestamp
+	timeOutput, err := c.runGitCommand(ctx, worktreePath, "log", "-1", "--format=%ct")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get commit time: %w", err)
+	}
+
+	var commitTime time.Time
+	if timestampStr := strings.TrimSpace(timeOutput); timestampStr != "" {
+		if timestamp, err := strconv.ParseInt(timestampStr, 10, 64); err == nil {
+			commitTime = time.Unix(timestamp, 0)
+		} else {
+			// Fallback to current time
+			commitTime = time.Now()
+		}
+	} else {
+		commitTime = time.Now()
+	}
+
+	// Check if working directory is clean
+	// git status --porcelain outputs nothing when clean, file changes when dirty
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	clean := true
+	for _, line := range lines {
+		if line != "" {
+			clean = false
+			break
+		}
+	}
+
+	return &domain.WorktreeInfo{
+		Path:       worktreePath,
+		Branch:     branch,
+		Commit:     commit,
+		Clean:      clean,
+		CommitTime: commitTime,
+	}, nil
+}
+
+// runGitCommand runs a git command in the specified directory
+func (c *Client) runGitCommand(ctx context.Context, dir, command string, args ...string) (string, error) {
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// Build the command
+	cmd := exec.CommandContext(ctx, "git", append([]string{command}, args...)...)
+	cmd.Dir = dir
+
+	// Run the command and capture output
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("git command failed: %w, output: %s", err, string(output))
+	}
+
+	return string(output), nil
 }
 
 // GetRepositoryRoot finds and returns the root directory of the git repository
@@ -840,24 +942,67 @@ func (c *Client) HasUncommittedChanges(ctx context.Context, repoPath string) boo
 		return false
 	}
 
+	// Try go-git first, fall back to git command line
+	return c.hasUncommittedChangesWithFallback(ctx, repoPath)
+}
+
+// hasUncommittedChangesWithFallback tries git command line first, then falls back to go-git
+func (c *Client) hasUncommittedChangesWithFallback(ctx context.Context, repoPath string) bool {
+	// Try git command line first (more reliable for worktrees)
+	result, err := c.hasUncommittedChangesGitCLI(ctx, repoPath)
+	if err == nil {
+		return result
+	}
+
+	// Fall back to go-git
+	result, err = c.hasUncommittedChangesGoGit(ctx, repoPath)
+	if err == nil {
+		return result
+	}
+
+	// If both fail, assume there are changes to be safe
+	return true
+}
+
+// hasUncommittedChangesGoGit checks for uncommitted changes using go-git
+func (c *Client) hasUncommittedChangesGoGit(_ context.Context, repoPath string) (bool, error) {
 	// Open the repository
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
-		return false
+		return false, fmt.Errorf("failed to open repository: %w", err)
 	}
 
 	// Get the worktree
 	wt, err := repo.Worktree()
 	if err != nil {
-		return false
+		return false, fmt.Errorf("failed to get worktree: %w", err)
 	}
 
 	// Get status
 	status, err := wt.Status()
 	if err != nil {
-		return false
+		return false, fmt.Errorf("failed to get status: %w", err)
 	}
 
 	// Check if status is clean
-	return !status.IsClean()
+	return !status.IsClean(), nil
+}
+
+// hasUncommittedChangesGitCLI checks for uncommitted changes using git command line
+func (c *Client) hasUncommittedChangesGitCLI(ctx context.Context, repoPath string) (bool, error) {
+	// Use git command line to get status
+	output, err := c.runGitCommand(ctx, repoPath, "status", "--porcelain")
+	if err != nil {
+		return false, err
+	}
+
+	// git status --porcelain outputs nothing when clean, file changes when dirty
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	for _, line := range lines {
+		if line != "" {
+			return true, nil // Has uncommitted changes
+		}
+	}
+
+	return false, nil // No uncommitted changes
 }
