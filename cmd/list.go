@@ -73,7 +73,7 @@ func runListCommand(cmd *cobra.Command, _ []string) error {
 	discoveryService := services.NewDiscoveryService(gitClient)
 
 	// Determine workspace path and scope
-	workspacePath := cfg.Workspace
+	workspacePath := cfg.WorkspacesPath
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
