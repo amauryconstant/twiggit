@@ -26,7 +26,8 @@ default:
 test:
   stage: test
   before_script:
-    - apt-get update && apt-get install -y --no-install-recommends git mise
+    - apt-get update && apt-get install -y --no-install-recommends git curl
+    - curl https://mise.run | MISE_INSTALL_PATH=/usr/local/bin/mise sh
     - export PATH="$(go env GOPATH)/bin:$PATH"
     - go install github.com/boumenot/gocover-cobertura@v1.4.0
     - go mod download
