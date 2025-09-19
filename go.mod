@@ -1,6 +1,6 @@
 module github.com/amaury/twiggit
 
-// Version: 0.1.11
+// Version: 0.1.12
 go 1.25.1
 
 require (

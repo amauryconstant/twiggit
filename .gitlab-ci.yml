@@ -132,6 +132,6 @@ mirror-to-github:
   script:
     - git remote add github "https://${GITHUB_ACCESS_TOKEN}@github.com/${GITHUB_REPO_URL}.git"
     - git fetch github
-    - git push github $CI_COMMIT_BRANCH --tags
+    - git push github HEAD:$CI_COMMIT_BRANCH --force-with-lease --tags
   rules:
     - if: '$CI_COMMIT_BRANCH == "main"'
