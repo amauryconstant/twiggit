@@ -31,7 +31,6 @@ Features:
 	// Add subcommands
 	rootCmd.AddCommand(NewCreateCmd())
 	rootCmd.AddCommand(NewSwitchCmd())
-	rootCmd.AddCommand(NewStatusCmd())
 	rootCmd.AddCommand(NewCleanupCmd())
 	rootCmd.AddCommand(NewListCmd())
 
