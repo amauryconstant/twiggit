@@ -49,7 +49,7 @@ Examples:
 }
 
 // runListCommand implements the list command functionality
-func runListCommand(cmd *cobra.Command, args []string) error {
+func runListCommand(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
 	// Load configuration
@@ -130,11 +130,19 @@ func outputTable(worktrees []*domain.Worktree, workspacePath string) error {
 
 	// Create tabwriter for aligned output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		if err := w.Flush(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to flush output: %v\n", err)
+		}
+	}()
 
 	// Print header
-	fmt.Fprintln(w, "Path\tBranch\tStatus\tLast Updated")
-	fmt.Fprintln(w, "----\t------\t------\t------------")
+	if _, err := fmt.Fprintln(w, "Path\tBranch\tStatus\tLast Updated"); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
+	}
+	if _, err := fmt.Fprintln(w, "----\t------\t------\t------------"); err != nil {
+		return fmt.Errorf("failed to write separator: %w", err)
+	}
 
 	// Print worktree rows
 	for _, wt := range worktrees {
@@ -142,9 +150,7 @@ func outputTable(worktrees []*domain.Worktree, workspacePath string) error {
 		relPath := wt.Path
 		if strings.HasPrefix(wt.Path, workspacePath) {
 			relPath = strings.TrimPrefix(wt.Path, workspacePath)
-			if strings.HasPrefix(relPath, "/") {
-				relPath = relPath[1:]
-			}
+			relPath = strings.TrimPrefix(relPath, "/")
 		}
 
 		// Format last updated time
@@ -159,7 +165,9 @@ func outputTable(worktrees []*domain.Worktree, workspacePath string) error {
 			status = "clean"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", relPath, wt.Branch, status, timeAgo)
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", relPath, wt.Branch, status, timeAgo); err != nil {
+			return fmt.Errorf("failed to write worktree row: %w", err)
+		}
 	}
 
 	return nil
@@ -174,13 +182,13 @@ func outputSimple(worktrees []*domain.Worktree) error {
 }
 
 // outputJSON displays worktrees in JSON format
-func outputJSON(worktrees []*domain.Worktree) error {
+func outputJSON(_ []*domain.Worktree) error {
 	fmt.Println("JSON output not yet implemented")
 	return nil
 }
 
 // outputYAML displays worktrees in YAML format
-func outputYAML(worktrees []*domain.Worktree) error {
+func outputYAML(_ []*domain.Worktree) error {
 	fmt.Println("YAML output not yet implemented")
 	return nil
 }

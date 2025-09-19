@@ -54,7 +54,7 @@ Examples:
 }
 
 // runCleanupCommand implements the cleanup command functionality
-func runCleanupCommand(cmd *cobra.Command, args []string) error {
+func runCleanupCommand(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
 	// Load configuration
@@ -96,8 +96,10 @@ func runCleanupCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// Filter worktrees based on criteria
-	var candidates []*domain.Worktree
 	cutoffTime := time.Now().Add(-olderThan)
+
+	// Pre-allocate slice with reasonable capacity
+	candidates := make([]*domain.Worktree, 0, len(worktrees)/2) // Estimate half will be candidates
 
 	for _, wt := range worktrees {
 		// Skip if worktree is too recent (if older-than is specified)
@@ -137,9 +139,7 @@ func runCleanupCommand(cmd *cobra.Command, args []string) error {
 		relPath := wt.Path
 		if strings.HasPrefix(wt.Path, workspacePath) {
 			relPath = strings.TrimPrefix(wt.Path, workspacePath)
-			if strings.HasPrefix(relPath, "/") {
-				relPath = relPath[1:]
-			}
+			relPath = strings.TrimPrefix(relPath, "/")
 		}
 
 		fmt.Printf("%d. %s\n", i+1, relPath)

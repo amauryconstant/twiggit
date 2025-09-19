@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/amaury/twiggit/internal/domain"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
 	"github.com/spf13/cobra"
@@ -139,41 +138,6 @@ func runCreateCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
-}
-
-// findMainRepository finds the main git repository in the workspace
-func findMainRepository(ctx context.Context, gitClient domain.GitClient, workspacePath string) (string, error) {
-	// Check if workspace path exists
-	if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
-		return "", fmt.Errorf("workspace path does not exist: %s", workspacePath)
-	}
-
-	// Read workspace directory
-	entries, err := os.ReadDir(workspacePath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read workspace directory: %w", err)
-	}
-
-	// Look for git repositories
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		candidatePath := filepath.Join(workspacePath, entry.Name())
-
-		// Check if it's a main repository (not a worktree)
-		isMainRepo, err := gitClient.IsMainRepository(ctx, candidatePath)
-		if err != nil {
-			continue // Skip on error
-		}
-
-		if isMainRepo {
-			return candidatePath, nil
-		}
-	}
-
-	return "", fmt.Errorf("no main git repository found in workspace: %s", workspacePath)
 }
 
 // createWorktreeNative creates a worktree using the native git command
