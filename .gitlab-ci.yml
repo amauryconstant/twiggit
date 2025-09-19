@@ -1,6 +1,4 @@
 stages:
-  - build-base
-  - setup
   - build-docker-image
   - test
   - tag
@@ -13,65 +11,19 @@ workflow:
     - when: never
 
 # ------------------------
-# Global cache for mise + Go modules
+# Global Go module cache
 # ------------------------
 .default_cache: &default_cache
   cache:
     key:
       files:
-        - .mise.toml
         - go.sum
     paths:
-      - .local/share/mise
-      - .cache/mise
       - go/pkg/mod
       - go/bin
 
 # ------------------------
-# Build base image (Alpine + pinned mise)
-# ------------------------
-build-base-image:
-  stage: build-base
-  image: docker:28.4
-  services:
-    - docker:28.4-dind
-  variables:
-    DOCKER_HOST: tcp://docker:2376
-    DOCKER_DRIVER: overlay2
-    DOCKER_BUILDKIT: 1
-    BASE_IMAGE_TAG: $CI_REGISTRY_IMAGE/base:$CI_COMMIT_SHA
-  script:
-    - echo "🐳 Building base image (Alpine + mise)..."
-    - docker buildx build \
-        --cache-from=type=registry,ref=$CI_REGISTRY_IMAGE/base:cache \
-        --cache-to=type=registry,ref=$CI_REGISTRY_IMAGE/base:cache,mode=max \
-        --tag $BASE_IMAGE_TAG \
-        --tag $CI_REGISTRY_IMAGE/base:latest \
-        -f Dockerfile \
-        --push .
-    - echo "✅ Base image built and pushed"
-  rules:
-    - changes:
-        - Dockerfile
-
-# ------------------------
-# Setup tools (mise install)
-# ------------------------
-setup-tools:
-  stage: setup
-  image: $CI_REGISTRY_IMAGE/base:latest
-  <<: *default_cache
-  variables:
-    MISE_TRUSTED_CONFIG_PATHS: $CI_PROJECT_DIR
-  script:
-    - echo "🔧 Installing tools via mise..."
-    - mise trust
-    - mise install
-  rules:
-    - when: always
-
-# ------------------------
-# Build CI Docker image
+# Build CI Docker image (Alpine + mise + Go + tools)
 # ------------------------
 build-docker-image:
   stage: build-docker-image
@@ -91,21 +43,16 @@ build-docker-image:
   before_script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
   script:
-    - echo "🐳 Building CI Docker image..."
-    - |
-      # Extract CLI version from go.mod
-      CLI_VERSION=$(grep "// Version:" go.mod | awk '{print $3}')
-      echo "CLI version: $CLI_VERSION"
+    - echo "🐳 Building Twiggit CI Docker image..."
     - docker buildx build \
         --build-arg BUILDKIT_INLINE_CACHE=1 \
         --cache-from=type=registry,ref=$CACHE_IMAGE \
         --cache-to=type=registry,ref=$CACHE_IMAGE,mode=max \
         --tag $CI_REGISTRY_IMAGE/twiggit-ci:$IMAGE_TAG \
         --tag $CI_REGISTRY_IMAGE/twiggit-ci:latest \
-        --tag $CI_REGISTRY_IMAGE/twiggit-ci:v$CLI_VERSION \
         --push \
         .
-    - echo "✅ CI Docker image built and pushed with version tag v$CLI_VERSION"
+    - echo "✅ CI Docker image built and pushed"
   after_script:
     - docker system prune -f
     - docker volume prune -f
@@ -121,7 +68,7 @@ build-docker-image:
 test:
   stage: test
   image: $CI_REGISTRY_IMAGE/twiggit-ci:$CI_COMMIT_SHA
-  needs: [setup-tools, build-docker-image]
+  needs: [build-docker-image]
   <<: *default_cache
   before_script:
     - eval "$(mise activate bash)"
@@ -129,7 +76,7 @@ test:
     - go mod download
     - go mod verify
   script:
-    - echo "🧪 Running tests..."
+    - echo "🧪 Running tests via mise..."
     - mise run test
     - mise run lint:check
   coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
@@ -143,17 +90,15 @@ test:
       - coverage.xml
 
 # ------------------------
-# Version tag & release
+# Version tag & GitLab release
 # ------------------------
 create-version-tag:
   stage: tag
   image: $CI_REGISTRY_IMAGE/twiggit-ci:$CI_COMMIT_SHA
-  needs: [setup-tools, test, build-docker-image]
+  needs: [build-docker-image, test]
   <<: *default_cache
   script:
     - eval "$(mise activate bash)"
-    - mise run ci:update-deps
-    - echo "🏷️ Creating Git tag & GitLab release..."
     - |
       CURRENT_VERSION=$(cat VERSION)
       TAG="v$CURRENT_VERSION"
@@ -165,7 +110,6 @@ create-version-tag:
         git tag -a "$TAG" -m "Release $TAG"
         git push origin "$TAG"
       fi
-      # Create GitLab release
       curl --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" \
            --header "Content-Type: application/json" \
            --data "{
@@ -188,7 +132,7 @@ create-version-tag:
 mirror-to-github:
   stage: mirror
   image: $CI_REGISTRY_IMAGE/twiggit-ci:$CI_COMMIT_SHA
-  needs: [setup-tools, build-docker-image]
+  needs: [build-docker-image, create-version-tag]
   <<: *default_cache
   script:
     - eval "$(mise activate bash)"
