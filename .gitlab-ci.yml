@@ -1,0 +1,135 @@
+stages:
+  - test
+  - tag
+  - mirror
+
+workflow:
+  rules:
+    # Run MR pipelines when a merge request exists
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    # Run branch pipelines only for main
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    # Prevent all other pipelines
+    - when: never
+
+default:
+  image: golang:1.25-alpine
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}
+    paths:
+      - /go/pkg/mod
+      - /root/.cache/go-build
+
+# ------------------------
+# Tests & Lint
+# ------------------------
+test:
+  stage: test
+  before_script:
+    - export PATH="$(go env GOPATH)/bin:$PATH"
+    - go install github.com/boumenot/gocover-cobertura@v1.4.0
+    - go mod download
+    - go mod verify
+  script:
+    - echo "🧪 Running unit tests with coverage..."
+    - go test -short -coverprofile=coverage.out ./...
+    - echo "🔍 Running integration tests..."
+    - go test -tags=integration ./test/integration/...
+    - echo "🏃 Running race condition tests..."
+    - CGO_ENABLED=1 go test -race ./...
+    - echo "📊 Converting coverage to HTML and XML..."
+    - go tool cover -html=coverage.out -o coverage.html
+    - gocover-cobertura < coverage.out > coverage.xml
+  coverage: '/total:\s+\(statements\)\s+(\d+\.\d+)%/'
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.html
+      - coverage.xml
+
+# ------------------------
+# Version Tag Creation & Release
+# ------------------------
+create-version-tag:
+  stage: tag
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git curl
+    - git config --global user.email "$GITLAB_USER_EMAIL"
+    - git config --global user.name "$GITLAB_USER_NAME"
+    - git remote set-url origin "https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/amoconst/twiggit"
+  script:
+    - |
+      echo "🏷️  Determining version..."
+      if [ -f VERSION ]; then
+        CURRENT_VERSION=$(cat VERSION)
+      else
+        CURRENT_VERSION=$(grep "// Version:" go.mod | awk '{print $3}')
+      fi
+      export TAG="v$CURRENT_VERSION"
+      echo "Current version: $CURRENT_VERSION"
+      echo "Creating tag: $TAG"
+    - git fetch --tags --prune
+    - |
+      if git tag -l "$TAG" | grep -q "$TAG"; then
+        echo "✅ Tag $TAG already exists, skipping creation"
+      else
+        echo "🏷️  Creating new tag $TAG..."
+        git tag -a "$TAG" -m "Release $TAG"
+        git push origin "$TAG"
+        echo "✅ Tag $TAG created and pushed successfully"
+      fi
+    # Create GitLab Release
+    - |
+      echo "📦 Creating GitLab Release..."
+      curl --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" \
+           --header "Content-Type: application/json" \
+           --data "{
+             \"name\": \"Release $CURRENT_VERSION\",
+             \"tag_name\": \"$CURRENT_VERSION\",
+             \"description\": \"Automated release for version $CURRENT_VERSION\",
+             \"assets\": {
+               \"links\": [
+                 {\"name\": \"Coverage Report (HTML)\", \"url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/coverage.html\"},
+                 {\"name\": \"Coverage Report (XML)\", \"url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/coverage.xml\"}
+               ]
+             }
+           }" \
+           --request POST "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases" || \
+           echo "⚠️ Release may already exist, skipping."
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+  dependencies:
+    - test
+  artifacts:
+    paths:
+      - coverage.html
+      - coverage.xml
+    expire_in: 1 week
+
+# ------------------------
+# Mirror to GitHub
+# ------------------------
+mirror-to-github:
+  stage: mirror
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache git
+    - |
+      if [ -z "$GITHUB_ACCESS_TOKEN" ]; then
+        echo "ERROR: GITHUB_ACCESS_TOKEN is not set"
+        exit 1
+      fi
+      if [ -z "$GITHUB_REPO_URL" ]; then
+        echo "ERROR: GITHUB_REPO_URL is not set (format: username/repository)"
+        exit 1
+      fi
+  script:
+    - git remote add github "https://${GITHUB_ACCESS_TOKEN}@github.com/${GITHUB_REPO_URL}.git"
+    - git fetch github
+    - git push github $CI_COMMIT_BRANCH --tags
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
