@@ -18,37 +18,41 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// NewListCmd creates the list command
+// NewListCmd creates the unified list command
 func NewListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all available worktrees",
-		Long: `List all Git worktrees in the current project or workspace.
+		Long: `List Git worktrees with intelligent auto-detection.
 
-Shows detailed information about each worktree including:
+When inside a Git repository, shows worktrees for that project only.
+When outside a Git repository, shows worktrees for all projects.
+Use --all to override and show all projects regardless of location.
+
+Shows information about:
 - Path and branch name
 - Status (clean/dirty)
 - Last commit information
-- Creation date
+- Last activity time
+- Summary statistics
 
 Examples:
-  twiggit list
-  twiggit list --all-projects
-  twiggit list --format=json`,
+  twiggit list              # Auto-detect scope based on current location
+  twiggit list --all        # Show all projects' worktrees
+  twiggit list --sort=date  # Sort by last updated time`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runListCommand(cmd, args)
 		},
 	}
 
-	// Add flags specific to list
-	cmd.Flags().Bool("all-projects", false, "List worktrees from all projects in workspace")
-	cmd.Flags().String("format", "table", "Output format (table, json, yaml, simple)")
+	// Add flags
+	cmd.Flags().BoolP("all", "a", false, "Show worktrees from all projects")
 	cmd.Flags().String("sort", "name", "Sort order (name, date, branch, status)")
 
 	return cmd
 }
 
-// runListCommand implements the list command functionality
+// runListCommand implements the unified list command functionality
 func runListCommand(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
@@ -59,8 +63,7 @@ func runListCommand(cmd *cobra.Command, _ []string) error {
 	}
 
 	// Get flags
-	allProjects, _ := cmd.Flags().GetBool("all-projects")
-	format, _ := cmd.Flags().GetString("format")
+	allFlag, _ := cmd.Flags().GetBool("all")
 	sortBy, _ := cmd.Flags().GetString("sort")
 
 	// Create git client
@@ -69,17 +72,23 @@ func runListCommand(cmd *cobra.Command, _ []string) error {
 	// Create discovery service
 	discoveryService := services.NewDiscoveryService(gitClient)
 
-	// Determine workspace path
+	// Determine workspace path and scope
 	workspacePath := cfg.Workspace
-	if !allProjects {
-		// If not listing all projects, try to detect current project
-		if currentDir, err := os.Getwd(); err == nil {
-			if repoRoot, err := gitClient.GetRepositoryRoot(ctx, currentDir); err == nil {
-				// We're in a git repository, use its parent as workspace
-				workspacePath = filepath.Dir(repoRoot)
-			}
-		}
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
 	}
+
+	// Auto-detect if we're in a git repository
+	repoRoot, err := gitClient.GetRepositoryRoot(ctx, currentDir)
+	inGitRepo := err == nil
+
+	// Determine scope based on location and --all flag
+	if !allFlag && inGitRepo {
+		// Inside git repo without --all: show current project only
+		workspacePath = filepath.Dir(repoRoot)
+	}
+	// Otherwise: show all projects (either --all flag or not in git repo)
 
 	// Discover worktrees
 	worktrees, err := discoveryService.DiscoverWorktrees(ctx, workspacePath)
@@ -87,20 +96,20 @@ func runListCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to discover worktrees: %w", err)
 	}
 
+	if len(worktrees) == 0 {
+		if inGitRepo && !allFlag {
+			fmt.Printf("No worktrees found in current project\n")
+		} else {
+			fmt.Printf("No worktrees found in %s\n", workspacePath)
+		}
+		return nil
+	}
+
 	// Sort worktrees
 	sortWorktrees(worktrees, sortBy)
 
-	// Format output
-	switch format {
-	case "json":
-		return outputJSON(worktrees)
-	case "yaml":
-		return outputYAML(worktrees)
-	case "simple":
-		return outputSimple(worktrees)
-	default:
-		return outputTable(worktrees, workspacePath)
-	}
+	// Output table with all information
+	return outputTable(worktrees, workspacePath)
 }
 
 // sortWorktrees sorts worktrees based on the specified criteria
@@ -119,14 +128,10 @@ func sortWorktrees(worktrees []*domain.Worktree, sortBy string) {
 	})
 }
 
-// outputTable displays worktrees in a table format
+// outputTable displays worktrees in a comprehensive table format
 func outputTable(worktrees []*domain.Worktree, workspacePath string) error {
-	if len(worktrees) == 0 {
-		fmt.Printf("No worktrees found in %s\n", workspacePath)
-		return nil
-	}
-
 	fmt.Printf("Worktrees in %s:\n", workspacePath)
+	fmt.Println()
 
 	// Create tabwriter for aligned output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
@@ -137,10 +142,10 @@ func outputTable(worktrees []*domain.Worktree, workspacePath string) error {
 	}()
 
 	// Print header
-	if _, err := fmt.Fprintln(w, "Path\tBranch\tStatus\tLast Updated"); err != nil {
+	if _, err := fmt.Fprintln(w, "Path\tBranch\tStatus\tLast Commit\tLast Updated"); err != nil {
 		return fmt.Errorf("failed to write header: %w", err)
 	}
-	if _, err := fmt.Fprintln(w, "----\t------\t------\t------------"); err != nil {
+	if _, err := fmt.Fprintln(w, "----\t------\t------\t-----------\t------------"); err != nil {
 		return fmt.Errorf("failed to write separator: %w", err)
 	}
 
@@ -153,10 +158,19 @@ func outputTable(worktrees []*domain.Worktree, workspacePath string) error {
 			relPath = strings.TrimPrefix(relPath, "/")
 		}
 
+		// Format last commit (truncate hash for display)
+		lastCommit := wt.Commit
+		if len(lastCommit) > 7 {
+			lastCommit = lastCommit[:7]
+		}
+		if lastCommit == "" {
+			lastCommit = "unknown"
+		}
+
 		// Format last updated time
 		timeAgo := formatTimeAgo(wt.LastUpdated)
 
-		// Format status with color indicators
+		// Format status
 		status := wt.Status.String()
 		switch wt.Status {
 		case domain.StatusDirty:
@@ -165,31 +179,25 @@ func outputTable(worktrees []*domain.Worktree, workspacePath string) error {
 			status = "clean"
 		}
 
-		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", relPath, wt.Branch, status, timeAgo); err != nil {
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", relPath, wt.Branch, status, lastCommit, timeAgo); err != nil {
 			return fmt.Errorf("failed to write worktree row: %w", err)
 		}
 	}
 
-	return nil
-}
-
-// outputSimple displays worktrees in a simple format
-func outputSimple(worktrees []*domain.Worktree) error {
+	// Add summary section
+	fmt.Println()
+	var cleanCount, dirtyCount int
 	for _, wt := range worktrees {
-		fmt.Printf("%s (%s) - %s\n", wt.Path, wt.Branch, wt.Status.String())
+		switch wt.Status {
+		case domain.StatusClean:
+			cleanCount++
+		case domain.StatusDirty:
+			dirtyCount++
+		}
 	}
-	return nil
-}
 
-// outputJSON displays worktrees in JSON format
-func outputJSON(_ []*domain.Worktree) error {
-	fmt.Println("JSON output not yet implemented")
-	return nil
-}
+	fmt.Printf("Summary: %d total, %d clean, %d dirty\n", len(worktrees), cleanCount, dirtyCount)
 
-// outputYAML displays worktrees in YAML format
-func outputYAML(_ []*domain.Worktree) error {
-	fmt.Println("YAML output not yet implemented")
 	return nil
 }
 
