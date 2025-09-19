@@ -9,30 +9,28 @@ import (
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "twiggit",
-		Short: "Modern Git worktree management",
-		Long: `twiggit is a modern, fast, and intuitive Git worktree management tool
-that replaces complex bash scripts with a maintainable Go application.
+		Short: "Simple Git worktree and project management",
+		Long: `twiggit is a fast and intuitive tool for managing Git worktrees and projects.
 
-Features:
-  - Interactive worktree creation and management
-  - Rich terminal UI with colors and progress indicators
-  - XDG-compliant configuration with environment variable support
-  - Shell completion for multiple shells
-  - Template-based workflows`,
+It provides simple commands to switch between projects and worktrees,
+create new worktrees, list existing ones, and clean up when done.
+
+Perfect for developers who work with multiple branches across different projects.`,
 		Version: version.Version(),
+		CompletionOptions: cobra.CompletionOptions{
+			DisableDefaultCmd: true,
+		},
 	}
 
 	// Add persistent flags
-	rootCmd.PersistentFlags().String("workspace", "", "Override workspace directory")
-	rootCmd.PersistentFlags().String("project", "", "Override project name")
 	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose logging")
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
 
-	// Add subcommands
-	rootCmd.AddCommand(NewCreateCmd())
+	// Add subcommands (ordered by usage frequency)
 	rootCmd.AddCommand(NewSwitchCmd())
-	rootCmd.AddCommand(NewDeleteCmd())
 	rootCmd.AddCommand(NewListCmd())
+	rootCmd.AddCommand(NewCreateCmd())
+	rootCmd.AddCommand(NewDeleteCmd())
 
 	return rootCmd
 }
