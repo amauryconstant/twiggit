@@ -2,13 +2,26 @@
 
 ## Build/Test Commands
 
-- `mise run test:ci` - Run CI test suite (unit + integration + race)
-- `mise run test:coverage` - Show coverage report in JSON format
-- `mise run test:coverage:core` - Show coverage for core business logic (domain, services)
-- `mise run test:coverage:infrastructure` - Show coverage for infrastructure layer (config, git)
+### Testing Commands
+- `mise run test` - Run all tests (unit + integration + E2E + race)
+- `mise run test:unit` - Run unit tests only
+- `mise run test:integration` - Run integration tests only
+- `mise run test:e2e` - Run CLI end-to-end tests
+- `mise run test:race` - Run tests with race condition detection
+- `mise run test:single` - Run single test (usage: `mise run test:single TestName ./pkg/module`)
+
+### Build Commands
+- `mise run build:cli` - Build the CLI binary
+- `mise run build:e2e` - Build CLI binary for E2E tests
+- `mise run build:clean` - Clean build artifacts
+
+### Quality Commands
 - `mise run lint:check` - Run linting and formatting checks
 - `mise run lint:fix` - Auto-fix linting issues
-- `mise run build:cli` - Build the CLI binary
+
+### Development Commands
+- `mise run dev:run` - Test CLI structure
+- `mise run dev:tidy` - Clean up go.mod and go.sum
 
 ## Development Principles
 
@@ -25,6 +38,7 @@
 - Use tests as safety net for refactoring, not as bureaucracy
 - Focus on integration tests that verify user workflows
 - Unit tests for complex algorithms, not simple getters/setters
+- E2E tests for CLI commands to ensure user-facing functionality works correctly
 
 ### Domain-Driven Design (DDD) - Simplified
 
@@ -51,7 +65,13 @@
 ### Imports & Dependencies
 
 - Group imports: standard library, third-party, local packages
-- Use essential dependencies: Cobra for CLI, go-git for Git operations, testify for testing
+- Current essential dependencies:
+  - **Cobra** (`github.com/spf13/cobra`): CLI framework for command parsing and help
+  - **go-git** (`github.com/go-git/go-git/v5`): Native Git operations without system git dependency
+  - **Carapace** (`github.com/carapace-sh/carapace`): Shell completion integration
+  - **Koanf** (`github.com/knadh/koanf/v2`): Configuration management with YAML and env support
+  - **Testify** (`github.com/stretchr/testify`): Testing assertions and mock generation
+  - **Ginkgo/Gomega** (`github.com/onsi/ginkgo/v2`, `github.com/onsi/gomega`): E2E testing framework for CLI interaction testing
 - Keep go.mod tidy and versioned appropriately
 - **Avoid adding dependencies unless they solve a real user problem**
 
@@ -76,8 +96,27 @@
 
 ### Testing Patterns
 
-- Unit tests: good coverage with mocked dependencies, test behavior not implementation
-- Integration tests: Real git repositories in temporary directories
+#### Unit Tests
+- Good coverage with mocked dependencies, test behavior not implementation
 - Use testify for assertions and mock generation
+- Focus on business logic and algorithms
 - Tests should be fast, isolated, and repeatable
+
+#### Integration Tests
+- Real git repositories in temporary directories
+- Test component interactions and workflows
+- Use build tags to separate from unit tests
+- Skip in short mode with `testing.Short()` check
+
+#### E2E Tests
+- Test CLI commands from user perspective using Ginkgo/Gomega
+- Build actual binary and execute commands
+- Use gexec for process management and output capture
+- Test complete user workflows and error scenarios
+- Use build tags to separate from other test types
+
+#### General Principles
 - Use test doubles (mocks, stubs) to isolate units under test
+- Table-driven tests for multiple scenarios with same logic
+- Descriptive test names that explain the scenario
+- Always cleanup resources with `defer` patterns
