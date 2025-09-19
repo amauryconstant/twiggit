@@ -4,6 +4,7 @@ package domain
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 // WorktreeInfo represents information about a Git worktree
@@ -16,6 +17,8 @@ type WorktreeInfo struct {
 	Commit string
 	// Clean indicates if the worktree has no uncommitted changes
 	Clean bool
+	// CommitTime is the timestamp when the commit was created
+	CommitTime time.Time
 }
 
 // Validate checks if the WorktreeInfo is valid
@@ -33,6 +36,7 @@ func (w *WorktreeInfo) Validate() error {
 type GitClient interface {
 	// Repository operations
 	IsGitRepository(ctx context.Context, path string) (bool, error)
+	IsBareRepository(ctx context.Context, path string) (bool, error)
 	IsMainRepository(ctx context.Context, path string) (bool, error)
 	GetRepositoryRoot(ctx context.Context, path string) (string, error)
 

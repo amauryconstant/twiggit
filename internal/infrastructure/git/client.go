@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/amaury/twiggit/internal/domain"
 	"github.com/go-git/go-git/v5"
@@ -49,6 +50,38 @@ func (c *Client) IsGitRepository(ctx context.Context, path string) (bool, error)
 	_, err := git.PlainOpen(path)
 	if err == nil {
 		return true, nil
+	}
+
+	return false, nil
+}
+
+// IsBareRepository checks if the given path is a bare Git repository
+func (c *Client) IsBareRepository(ctx context.Context, path string) (bool, error) {
+	if path == "" {
+		return false, errors.New("path cannot be empty")
+	}
+
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return false, fmt.Errorf("context cancelled: %w", ctx.Err())
+	default:
+	}
+
+	// Open the repository
+	repo, err := git.PlainOpen(path)
+	if err != nil {
+		return false, fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	// Try to get the worktree - if it fails, it's likely a bare repository
+	_, err = repo.Worktree()
+	if err != nil {
+		// Check if the error indicates it's a bare repository
+		if strings.Contains(err.Error(), "bare repository") {
+			return true, nil
+		}
+		return false, fmt.Errorf("failed to get worktree: %w", err)
 	}
 
 	return false, nil
@@ -293,11 +326,18 @@ func (c *Client) getMainWorktreeInfo(ctx context.Context, repo *git.Repository, 
 		branch = strings.TrimPrefix(head.Name().String(), "refs/heads/")
 	}
 
+	// Get commit timestamp
+	commitTime := time.Now()
+	if commitObj, err := repo.CommitObject(head.Hash()); err == nil {
+		commitTime = commitObj.Author.When
+	}
+
 	return &domain.WorktreeInfo{
-		Path:   repoPath,
-		Branch: branch,
-		Commit: head.Hash().String(),
-		Clean:  status.IsClean(),
+		Path:       repoPath,
+		Branch:     branch,
+		Commit:     head.Hash().String(),
+		Clean:      status.IsClean(),
+		CommitTime: commitTime,
 	}, nil
 }
 
@@ -539,11 +579,18 @@ func (c *Client) GetWorktreeStatus(ctx context.Context, worktreePath string) (*d
 		branch = strings.TrimPrefix(head.Name().String(), "refs/heads/")
 	}
 
+	// Get commit timestamp
+	commitTime := time.Now()
+	if commitObj, err := repo.CommitObject(head.Hash()); err == nil {
+		commitTime = commitObj.Author.When
+	}
+
 	return &domain.WorktreeInfo{
-		Path:   worktreePath,
-		Branch: branch,
-		Commit: head.Hash().String(),
-		Clean:  status.IsClean(),
+		Path:       worktreePath,
+		Branch:     branch,
+		Commit:     head.Hash().String(),
+		Clean:      status.IsClean(),
+		CommitTime: commitTime,
 	}, nil
 }
 

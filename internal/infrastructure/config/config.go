@@ -16,7 +16,11 @@ import (
 
 // Config represents the application configuration
 type Config struct {
-	// Workspace is the root directory containing all projects
+	// ProjectsPath is the directory containing git project repositories
+	ProjectsPath string `koanf:"projects_path"`
+	// WorkspacesPath is the directory containing worktree checkouts
+	WorkspacesPath string `koanf:"workspaces_path"`
+	// Workspace is the legacy field for backward compatibility (maps to WorkspacesPath)
 	Workspace string `koanf:"workspace"`
 	// Project is the currently active project name
 	Project string `koanf:"project"`
@@ -34,10 +38,12 @@ func NewConfig() *Config {
 	}
 
 	return &Config{
-		Workspace: filepath.Join(home, "Workspaces"),
-		Project:   "",
-		Verbose:   false,
-		Quiet:     false,
+		ProjectsPath:   filepath.Join(home, "Projects"),
+		WorkspacesPath: filepath.Join(home, "Workspaces"),
+		Workspace:      filepath.Join(home, "Workspaces"), // Legacy field
+		Project:        "",
+		Verbose:        false,
+		Quiet:          false,
 	}
 }
 
@@ -80,8 +86,15 @@ func LoadConfig() (*Config, error) {
 
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
-	if c.Workspace == "" {
-		return errors.New("workspace path cannot be empty")
+	// Normalize config for backward compatibility
+	c.normalize()
+
+	if c.WorkspacesPath == "" {
+		return errors.New("workspaces path cannot be empty")
+	}
+
+	if c.ProjectsPath == "" {
+		return errors.New("projects path cannot be empty")
 	}
 
 	if c.Verbose && c.Quiet {
@@ -89,6 +102,34 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// normalize handles backward compatibility by mapping legacy fields to new ones
+func (c *Config) normalize() {
+	// If only the legacy Workspace field is set, use it for WorkspacesPath
+	// and set ProjectsPath to a sibling directory
+	if c.Workspace != "" && c.WorkspacesPath == "" {
+		c.WorkspacesPath = c.Workspace
+		// Set ProjectsPath to parent/Projects if Workspace is parent/Workspaces
+		parent := filepath.Dir(c.Workspace)
+		if filepath.Base(c.Workspace) == "Workspaces" {
+			c.ProjectsPath = filepath.Join(parent, "Projects")
+		} else {
+			// Fallback: create Projects directory alongside Workspace
+			c.ProjectsPath = filepath.Join(parent, "Projects")
+		}
+	}
+
+	// Ensure WorkspacesPath is set (fallback to legacy Workspace)
+	if c.WorkspacesPath == "" {
+		c.WorkspacesPath = c.Workspace
+	}
+
+	// Ensure ProjectsPath is set (fallback to sibling of WorkspacesPath)
+	if c.ProjectsPath == "" {
+		parent := filepath.Dir(c.WorkspacesPath)
+		c.ProjectsPath = filepath.Join(parent, "Projects")
+	}
 }
 
 // getConfigPaths returns the list of possible configuration file paths

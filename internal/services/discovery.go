@@ -17,6 +17,7 @@ const (
 	defaultConcurrency = 4
 	maxConcurrency     = 16
 	cacheExpiryTime    = 5 * time.Minute
+	failureThreshold   = 0.5 // 50% failure rate threshold
 )
 
 // DiscoveryService handles the discovery and analysis of worktrees and projects
@@ -48,21 +49,47 @@ func (ds *DiscoveryService) SetConcurrency(workers int) {
 	}
 }
 
-// DiscoverWorktrees discovers all worktrees in a workspace directory using concurrent processing
-func (ds *DiscoveryService) DiscoverWorktrees(ctx context.Context, workspacePath string) ([]*domain.Worktree, error) {
-	if workspacePath == "" {
-		return nil, errors.New("workspace path cannot be empty")
+// validatePath validates that a path is not empty and exists
+func (ds *DiscoveryService) validatePath(path, pathType string) error {
+	if path == "" {
+		return fmt.Errorf("%s path cannot be empty", pathType)
 	}
 
-	// Check if workspace path exists
-	if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("workspace path does not exist: %s", workspacePath)
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return fmt.Errorf("%s path does not exist: %s", pathType, path)
 	}
 
-	// Find all potential worktree directories
-	paths, err := ds.findPotentialWorktreePaths(ctx, workspacePath)
+	return nil
+}
+
+// isGitRepositorySafe safely checks if a path is a git repository, returning false on errors
+func (ds *DiscoveryService) isGitRepositorySafe(ctx context.Context, path string) bool {
+	isRepo, err := ds.gitClient.IsGitRepository(ctx, path)
+	return err == nil && isRepo
+}
+
+// isMainRepositorySafe safely checks if a path is a main repository, returning false on errors
+func (ds *DiscoveryService) isMainRepositorySafe(ctx context.Context, path string) bool {
+	isMainRepo, err := ds.gitClient.IsMainRepository(ctx, path)
+	return err == nil && isMainRepo
+}
+
+// isBareRepositorySafe safely checks if a path is a bare repository, returning false on errors
+func (ds *DiscoveryService) isBareRepositorySafe(ctx context.Context, path string) bool {
+	isBare, err := ds.gitClient.IsBareRepository(ctx, path)
+	return err == nil && isBare
+}
+
+// DiscoverWorktrees discovers all worktrees in a workspaces directory using concurrent processing
+func (ds *DiscoveryService) DiscoverWorktrees(ctx context.Context, workspacesPath string) ([]*domain.Worktree, error) {
+	if err := ds.validatePath(workspacesPath, "workspaces"); err != nil {
+		return nil, err
+	}
+
+	// Find all potential worktree directories in the workspaces directory
+	paths, err := ds.findWorktreePathsInWorkspaces(ctx, workspacesPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to scan workspace: %w", err)
+		return nil, fmt.Errorf("failed to scan workspaces: %w", err)
 	}
 
 	if len(paths) == 0 {
@@ -102,21 +129,16 @@ func (ds *DiscoveryService) AnalyzeWorktree(ctx context.Context, path string) (*
 	return worktree, nil
 }
 
-// DiscoverProjects finds all Git repositories (projects) in the workspace directory
-func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, workspacePath string) ([]*domain.Project, error) {
-	if workspacePath == "" {
-		return nil, errors.New("workspace path cannot be empty")
+// DiscoverProjects finds all Git repositories (projects) in the projects directory
+func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath string) ([]*domain.Project, error) {
+	if err := ds.validatePath(projectsPath, "projects"); err != nil {
+		return nil, err
 	}
 
-	// Check if workspace path exists
-	if _, err := os.Stat(workspacePath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("workspace path does not exist: %s", workspacePath)
-	}
-
-	// Find all directories in workspace
-	entries, err := os.ReadDir(workspacePath)
+	// Find all directories in projects directory
+	entries, err := os.ReadDir(projectsPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read workspace directory: %w", err)
+		return nil, fmt.Errorf("failed to read projects directory: %w", err)
 	}
 
 	//nolint:prealloc // Number of valid projects is unpredictable due to filtering
@@ -126,40 +148,17 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, workspacePath 
 			continue
 		}
 
-		projectPath := filepath.Join(workspacePath, entry.Name())
+		projectPath := filepath.Join(projectsPath, entry.Name())
 
 		// Check if it's a main git repository (not a worktree)
-		isMainRepo, err := ds.gitClient.IsMainRepository(ctx, projectPath)
-		if err != nil {
-			// Log error but continue with other directories
+		if !ds.isMainRepositorySafe(ctx, projectPath) {
 			continue
 		}
 
-		if !isMainRepo {
-			continue
-		}
-
-		// Create project and discover its worktrees
+		// Create project (without worktrees for now - they're in the workspaces directory)
 		project, err := domain.NewProject(entry.Name(), projectPath)
 		if err != nil {
 			continue
-		}
-
-		// Get worktrees for this project
-		worktreeInfos, err := ds.gitClient.ListWorktrees(ctx, projectPath)
-		if err != nil {
-			continue
-		}
-
-		// Convert and add worktrees to project
-		for _, wtInfo := range worktreeInfos {
-			worktree, err := ds.convertToWorktree(wtInfo)
-			if err != nil {
-				continue
-			}
-			if err := project.AddWorktree(worktree); err != nil {
-				continue
-			}
 		}
 
 		projects = append(projects, project)
@@ -168,14 +167,14 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, workspacePath 
 	return projects, nil
 }
 
-// findPotentialWorktreePaths scans the workspace for directories that might be worktrees
-func (ds *DiscoveryService) findPotentialWorktreePaths(ctx context.Context, workspacePath string) ([]string, error) {
+// findWorktreePathsInWorkspaces scans the workspaces directory for directories that might be worktrees
+func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, workspacesPath string) ([]string, error) {
 	var paths []string
 
-	// First, find all project directories (git repositories)
-	entries, err := os.ReadDir(workspacePath)
+	// Read the workspaces directory to find project subdirectories
+	entries, err := os.ReadDir(workspacesPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read workspace directory: %w", err)
+		return nil, fmt.Errorf("failed to read workspaces directory: %w", err)
 	}
 
 	for _, entry := range entries {
@@ -183,24 +182,29 @@ func (ds *DiscoveryService) findPotentialWorktreePaths(ctx context.Context, work
 			continue
 		}
 
-		projectPath := filepath.Join(workspacePath, entry.Name())
+		projectDir := filepath.Join(workspacesPath, entry.Name())
 
-		// Check if it's a git repository
-		isRepo, err := ds.gitClient.IsGitRepository(ctx, projectPath)
+		// First, check if the project directory itself is a git repository (main worktree)
+		if ds.isGitRepositorySafe(ctx, projectDir) && !ds.isBareRepositorySafe(ctx, projectDir) {
+			paths = append(paths, projectDir)
+		}
+
+		// Then, look for worktree directories within each project directory
+		worktreeEntries, err := os.ReadDir(projectDir)
 		if err != nil {
 			continue // Skip on error
 		}
 
-		if isRepo {
-			// Get all worktrees for this project
-			worktreeInfos, err := ds.gitClient.ListWorktrees(ctx, projectPath)
-			if err != nil {
-				continue // Skip on error
+		for _, worktreeEntry := range worktreeEntries {
+			if !worktreeEntry.IsDir() {
+				continue
 			}
 
-			// Add all worktree paths
-			for _, wtInfo := range worktreeInfos {
-				paths = append(paths, wtInfo.Path)
+			worktreePath := filepath.Join(projectDir, worktreeEntry.Name())
+
+			// Check if it's a git repository (worktree)
+			if ds.isGitRepositorySafe(ctx, worktreePath) && !ds.isBareRepositorySafe(ctx, worktreePath) {
+				paths = append(paths, worktreePath)
 			}
 		}
 	}
@@ -234,7 +238,32 @@ func (ds *DiscoveryService) analyzePathsConcurrently(ctx context.Context, paths 
 		close(errorsChan)
 	}()
 
-	// Collect results
+	worktrees, errors := ds.collectResults(resultsChan, errorsChan, len(paths))
+
+	// Return error if too many failures
+	if len(errors) > 0 && float64(len(errors))/float64(len(paths)) > failureThreshold {
+		return nil, fmt.Errorf("too many failures during discovery (%d/%d failed): %w", len(errors), len(paths), errors[0])
+	}
+
+	return worktrees, nil
+}
+
+// workerAnalyze is a worker function for concurrent path analysis
+func (ds *DiscoveryService) workerAnalyze(ctx context.Context, paths <-chan string, results chan<- *domain.Worktree, errors chan<- error, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for path := range paths {
+		worktree, err := ds.AnalyzeWorktree(ctx, path)
+		if err != nil {
+			errors <- err
+		} else {
+			results <- worktree
+		}
+	}
+}
+
+// collectResults collects results and errors from channels until both are closed
+func (ds *DiscoveryService) collectResults(resultsChan <-chan *domain.Worktree, errorsChan <-chan error, _ int) ([]*domain.Worktree, []error) {
 	var worktrees []*domain.Worktree
 	var errors []error
 
@@ -259,26 +288,7 @@ func (ds *DiscoveryService) analyzePathsConcurrently(ctx context.Context, paths 
 		}
 	}
 
-	// Return error if too many failures (more than half failed)
-	if len(errors) > 0 && len(errors) > len(paths)/2 {
-		return nil, fmt.Errorf("too many failures during discovery (%d/%d failed): %w", len(errors), len(paths), errors[0])
-	}
-
-	return worktrees, nil
-}
-
-// workerAnalyze is a worker function for concurrent path analysis
-func (ds *DiscoveryService) workerAnalyze(ctx context.Context, paths <-chan string, results chan<- *domain.Worktree, errors chan<- error, wg *sync.WaitGroup) {
-	defer wg.Done()
-
-	for path := range paths {
-		worktree, err := ds.AnalyzeWorktree(ctx, path)
-		if err != nil {
-			errors <- err
-		} else {
-			results <- worktree
-		}
-	}
+	return worktrees, errors
 }
 
 // convertToWorktree converts a domain.WorktreeInfo to domain.Worktree
@@ -293,15 +303,15 @@ func (ds *DiscoveryService) convertToWorktree(info *domain.WorktreeInfo) (*domai
 		return nil, fmt.Errorf("failed to set commit: %w", err)
 	}
 
+	// Set status without using UpdateStatus to avoid overriding LastUpdated
 	if info.Clean {
-		if err := worktree.UpdateStatus(domain.StatusClean); err != nil {
-			return nil, fmt.Errorf("failed to update status: %w", err)
-		}
+		worktree.Status = domain.StatusClean
 	} else {
-		if err := worktree.UpdateStatus(domain.StatusDirty); err != nil {
-			return nil, fmt.Errorf("failed to update status: %w", err)
-		}
+		worktree.Status = domain.StatusDirty
 	}
+
+	// Set the LastUpdated to the commit timestamp instead of current time
+	worktree.LastUpdated = info.CommitTime
 
 	return worktree, nil
 }
