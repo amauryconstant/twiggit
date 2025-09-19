@@ -2,31 +2,29 @@
 package cmd
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/amaury/twiggit/internal/infrastructure/config"
-	"github.com/amaury/twiggit/internal/infrastructure/git"
-	"github.com/amaury/twiggit/internal/services"
 	"github.com/spf13/cobra"
 )
 
 // NewSwitchCmd creates the switch command
 func NewSwitchCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "switch [worktree-path]",
-		Short: "Switch to an existing worktree",
-		Long: `Switch to an existing Git worktree.
+		Use:   "switch <project|project/branch>",
+		Short: "Switch to a project or worktree",
+		Long: `Switch to a project repository or worktree.
 
-If no path is provided, an interactive selection will be presented.
-This command changes your shell working directory to the selected worktree.
+Switches to the main project repository or a specific worktree branch.
+Supports context-aware switching when called from within a project.
 
 Examples:
-  twiggit switch /path/to/worktree
-  twiggit switch  # Interactive mode`,
+  twiggit switch myproject              # Switch to ~/Projects/myproject
+  twiggit switch myproject/feature-branch # Switch to ~/Workspaces/myproject/feature-branch
+  twiggit switch feature-branch         # When in project context, switches to worktree`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSwitchCommand(cmd, args)
@@ -38,85 +36,133 @@ Examples:
 
 // runSwitchCommand implements the switch command functionality
 func runSwitchCommand(_ *cobra.Command, args []string) error {
-	ctx := context.Background()
+	if len(args) == 0 {
+		// Try to use current context for intelligent switching
+		project, err := detectCurrentContext()
+		if err != nil {
+			return errors.New("specify a target: <project> or <project/branch>")
+		}
 
-	// Load configuration
-	cfg, err := config.LoadConfig()
+		if project != "" {
+			fmt.Printf("Current project: %s\n", project)
+			fmt.Printf("Available targets:\n")
+			fmt.Printf("  twiggit switch %s          # main repository\n", project)
+			fmt.Printf("  twiggit switch %s/<branch> # worktree\n", project)
+			return nil
+		}
+
+		return errors.New("specify a target: <project> or <project/branch>")
+	}
+
+	target := args[0]
+
+	// Handle relative branch names when in project context
+	if !strings.Contains(target, "/") {
+		project, err := detectCurrentContext()
+		if err == nil && project != "" && target != project {
+			// User said "switch feature-branch" while in project context
+			// But only if target is not the same as project name
+			return switchToWorktree(fmt.Sprintf("%s/%s", project, target))
+		}
+	}
+
+	// Original logic
+	if strings.Contains(target, "/") {
+		return switchToWorktree(target)
+	}
+
+	return switchToProject(target)
+}
+
+// switchToProject switches to a main project repository
+func switchToProject(project string) error {
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
+		return fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	// Create git client
-	gitClient := git.NewClient()
+	targetPath := filepath.Join(homeDir, "Projects", project)
 
-	// Create discovery service
-	discoveryService := services.NewDiscoveryService(gitClient)
-
-	// Determine workspace path
-	workspacePath := cfg.WorkspacesPath
-	if currentDir, err := os.Getwd(); err == nil {
-		if repoRoot, err := gitClient.GetRepositoryRoot(ctx, currentDir); err == nil {
-			// We're in a git repository, use its parent as workspace
-			workspacePath = filepath.Dir(repoRoot)
-		}
+	if err := validatePathExists(targetPath); err != nil {
+		return err
 	}
 
-	// Discover worktrees
-	worktrees, err := discoveryService.DiscoverWorktrees(ctx, workspacePath)
+	return changeDirectory(targetPath)
+}
+
+// switchToWorktree switches to a specific worktree
+func switchToWorktree(target string) error {
+	parts := strings.Split(target, "/")
+	if len(parts) != 2 {
+		return errors.New("invalid worktree format: use <project>/<branch>")
+	}
+
+	project, branch := parts[0], parts[1]
+
+	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return fmt.Errorf("failed to discover worktrees: %w", err)
+		return fmt.Errorf("failed to get home directory: %w", err)
 	}
 
-	if len(worktrees) == 0 {
-		fmt.Printf("No worktrees found in %s\n", workspacePath)
-		return nil
+	targetPath := filepath.Join(homeDir, "Workspaces", project, branch)
+
+	if err := validatePathExists(targetPath); err != nil {
+		return err
 	}
 
-	// Get current directory to highlight current worktree
-	currentDir, _ := os.Getwd()
+	return changeDirectory(targetPath)
+}
 
-	// If a specific path was provided, try to find and switch to it
-	if len(args) > 0 {
-		targetPath := args[0]
-		for _, wt := range worktrees {
-			if strings.HasSuffix(wt.Path, targetPath) || wt.Path == targetPath {
-				fmt.Printf("Switch to worktree: cd %s\n", wt.Path)
-				fmt.Printf("Branch: %s\n", wt.Branch)
-				fmt.Printf("Status: %s\n", wt.Status)
-				return nil
-			}
+// detectCurrentContext detects the current project context from the working directory
+func detectCurrentContext() (project string, err error) {
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Check if we're in a worktree: ~/Workspaces/project/branch/
+	workspacesDir := filepath.Join(homeDir, "Workspaces")
+	if strings.HasPrefix(currentDir, workspacesDir) {
+		relPath := strings.TrimPrefix(currentDir, workspacesDir)
+		parts := strings.Split(strings.TrimPrefix(relPath, string(filepath.Separator)), string(filepath.Separator))
+		if len(parts) >= 2 && parts[0] != "" {
+			return parts[0], nil
 		}
-		return fmt.Errorf("worktree not found: %s", targetPath)
 	}
 
-	// Interactive mode: list all worktrees with navigation hints
-	fmt.Printf("Available worktrees in %s:\n", workspacePath)
-	fmt.Println()
-
-	for i, wt := range worktrees {
-		// Make path relative to workspace for cleaner display
-		relPath := wt.Path
-		if strings.HasPrefix(wt.Path, workspacePath) {
-			relPath = strings.TrimPrefix(wt.Path, workspacePath)
-			relPath = strings.TrimPrefix(relPath, "/")
+	// Check if we're in a project: ~/Projects/project/
+	projectsDir := filepath.Join(homeDir, "Projects")
+	if strings.HasPrefix(currentDir, projectsDir) {
+		relPath := strings.TrimPrefix(currentDir, projectsDir)
+		parts := strings.Split(strings.TrimPrefix(relPath, string(filepath.Separator)), string(filepath.Separator))
+		if len(parts) >= 1 && parts[0] != "" {
+			return parts[0], nil
 		}
-
-		// Check if this is the current worktree
-		isCurrent := strings.HasPrefix(currentDir, wt.Path)
-		currentMarker := ""
-		if isCurrent {
-			currentMarker = " (current)"
-		}
-
-		fmt.Printf("%d. %s%s\n", i+1, relPath, currentMarker)
-		fmt.Printf("   Branch: %s\n", wt.Branch)
-		fmt.Printf("   Status: %s\n", wt.Status)
-		fmt.Printf("   Switch: cd %s\n", wt.Path)
-		fmt.Println()
 	}
 
-	fmt.Println("Use: twiggit switch <worktree-path> to switch directly")
-	fmt.Println("Or: cd <path> to navigate to a worktree")
+	return "", nil
+}
 
+// validatePathExists validates that a path exists and returns appropriate errors
+func validatePathExists(path string) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		if strings.Contains(path, "Workspaces") {
+			return fmt.Errorf("worktree not found: %s", path)
+		}
+		return fmt.Errorf("project not found: %s", path)
+	}
+	return nil
+}
+
+// changeDirectory changes the current working directory
+func changeDirectory(path string) error {
+	// For now, print the cd command since Go can't change the parent shell's directory
+	// Users can use: eval "$(twiggit switch target)"
+	fmt.Printf("cd %s\n", path)
 	return nil
 }

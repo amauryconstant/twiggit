@@ -20,7 +20,7 @@ func TestMain_HelpCommand(t *testing.T) {
 		rootCmd := getRootCommand()
 		require.NotNil(t, rootCmd)
 		assert.Equal(t, "twiggit", rootCmd.Use)
-		assert.Contains(t, rootCmd.Short, "Git worktree management")
+		assert.Contains(t, rootCmd.Short, "Git worktree and project management")
 	})
 }
 
@@ -46,15 +46,16 @@ func TestMain_GlobalFlags(t *testing.T) {
 	require.NotNil(t, rootCmd)
 
 	// Check that global flags exist
-	workspaceFlag := rootCmd.PersistentFlags().Lookup("workspace")
-	assert.NotNil(t, workspaceFlag, "Missing --workspace flag")
-
-	projectFlag := rootCmd.PersistentFlags().Lookup("project")
-	assert.NotNil(t, projectFlag, "Missing --project flag")
-
 	verboseFlag := rootCmd.PersistentFlags().Lookup("verbose")
 	assert.NotNil(t, verboseFlag, "Missing --verbose flag")
 
 	quietFlag := rootCmd.PersistentFlags().Lookup("quiet")
 	assert.NotNil(t, quietFlag, "Missing --quiet flag")
+
+	// Check that removed flags no longer exist
+	workspaceFlag := rootCmd.PersistentFlags().Lookup("workspace")
+	assert.Nil(t, workspaceFlag, "--workspace flag should have been removed")
+
+	projectFlag := rootCmd.PersistentFlags().Lookup("project")
+	assert.Nil(t, projectFlag, "--project flag should have been removed")
 }

@@ -32,7 +32,7 @@ func NewDeleteCmd() *cobra.Command {
 		Use:   "delete",
 		Short: "Delete Git worktrees",
 		Long: `Delete Git worktrees from workspace directory.
-		
+
 This command intelligently detects worktrees based on your current location
 and will NEVER delete main repositories in ~/Projects/.
 
