@@ -26,6 +26,7 @@ default:
 test:
   stage: test
   before_script:
+    - apk add --no-cache git bash
     - export PATH="$(go env GOPATH)/bin:$PATH"
     - go install github.com/boumenot/gocover-cobertura@v1.4.0
     - go mod download
