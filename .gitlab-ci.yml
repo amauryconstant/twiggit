@@ -44,14 +44,15 @@ build-docker-image:
     - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
   script:
     - echo "🐳 Building Twiggit CI Docker image..."
-    - docker buildx build \
-        --build-arg BUILDKIT_INLINE_CACHE=1 \
-        --cache-from=type=registry,ref=$CACHE_IMAGE \
-        --cache-to=type=registry,ref=$CACHE_IMAGE,mode=max \
-        --tag $CI_REGISTRY_IMAGE/twiggit-ci:$IMAGE_TAG \
-        --tag $CI_REGISTRY_IMAGE/twiggit-ci:latest \
-        --push \
-        .
+    - >
+      docker buildx build
+      --build-arg BUILDKIT_INLINE_CACHE=1
+      --cache-from=type=registry,ref=$CACHE_IMAGE
+      --cache-to=type=registry,ref=$CACHE_IMAGE,mode=max
+      --tag $CI_REGISTRY_IMAGE/twiggit-ci:$IMAGE_TAG
+      --tag $CI_REGISTRY_IMAGE/twiggit-ci:latest
+      --push
+      .
     - echo "✅ CI Docker image built and pushed"
   after_script:
     - docker system prune -f
