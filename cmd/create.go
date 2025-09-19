@@ -22,11 +22,10 @@ func NewCreateCmd() *cobra.Command {
 		Long: `Create a new Git worktree for the specified branch.
 
 If no branch name is provided, an interactive selection will be presented.
-The worktree will be created in the configured workspace directory.
+The worktree will be created in the configured workspace directory under the project name.
 
 Examples:
   twiggit create feature/new-auth
-  twiggit create --from=main hotfix/critical-bug
   twiggit create  # Interactive mode`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -34,16 +33,11 @@ Examples:
 		},
 	}
 
-	// Add flags specific to create
-	cmd.Flags().String("from", "", "Create worktree from specific branch or commit")
-	cmd.Flags().String("template", "", "Use project template for worktree setup")
-	cmd.Flags().Bool("open", false, "Open worktree in default IDE after creation")
-
 	return cmd
 }
 
 // runCreateCommand implements the create command functionality
-func runCreateCommand(cmd *cobra.Command, args []string) error {
+func runCreateCommand(_ *cobra.Command, args []string) error {
 	ctx := context.Background()
 
 	// Load configuration
@@ -51,16 +45,6 @@ func runCreateCommand(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
-
-	// Override workspace if specified as flag
-	if workspaceFlag, err := cmd.Flags().GetString("workspace"); err == nil && workspaceFlag != "" {
-		cfg.Workspace = workspaceFlag
-	}
-
-	// Get flags
-	fromBranch, _ := cmd.Flags().GetString("from")
-	template, _ := cmd.Flags().GetString("template")
-	openInIDE, _ := cmd.Flags().GetBool("open")
 
 	// Determine branch name
 	var branchName string
@@ -89,18 +73,18 @@ func runCreateCommand(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to find repository root from current directory: %w", err)
 	}
 
-	// Validate source branch exists
-	sourceBranch := fromBranch
-	if sourceBranch == "" {
-		sourceBranch = branchName
+	// Check if branch exists, create it if it doesn't
+	if !gitClient.BranchExists(ctx, mainRepoPath, branchName) {
+		fmt.Printf("Branch '%s' does not exist, creating it...\n", branchName)
+		err := createBranchNative(mainRepoPath, branchName)
+		if err != nil {
+			return fmt.Errorf("failed to create branch '%s': %w", branchName, err)
+		}
+		fmt.Printf("✅ Branch '%s' created successfully\n", branchName)
 	}
 
-	if !gitClient.BranchExists(ctx, mainRepoPath, sourceBranch) {
-		return fmt.Errorf("branch '%s' does not exist in repository", sourceBranch)
-	}
-
-	// Determine target path for worktree
-	targetPath := filepath.Join(cfg.Workspace, branchName)
+	// Determine target path for worktree using project-aware logic
+	targetPath := determineWorktreePath(mainRepoPath, branchName, cfg.Workspace)
 
 	// Check if target path already exists
 	if _, err := os.Stat(targetPath); err == nil {
@@ -112,7 +96,7 @@ func runCreateCommand(cmd *cobra.Command, args []string) error {
 
 	// For now, use native git command for worktree creation
 	// TODO: Fix go-git implementation or use exec.Command for git operations
-	err = createWorktreeNative(mainRepoPath, sourceBranch, targetPath)
+	err = createWorktreeNative(mainRepoPath, branchName, targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
@@ -122,20 +106,6 @@ func runCreateCommand(cmd *cobra.Command, args []string) error {
 	fmt.Printf("   Branch: %s\n", branchName)
 	fmt.Printf("   Path:   %s\n", targetPath)
 	fmt.Printf("   Navigate: cd %s\n", targetPath)
-
-	// Apply template if specified
-	if template != "" {
-		fmt.Printf("📋 Applying template '%s'...\n", template)
-		// Template application would go here
-		fmt.Printf("   Template application not yet implemented\n")
-	}
-
-	// Open in IDE if requested
-	if openInIDE {
-		fmt.Printf("🔧 Opening in default IDE...\n")
-		// IDE opening would go here
-		fmt.Printf("   IDE opening not yet implemented\n")
-	}
 
 	return nil
 }
@@ -150,6 +120,32 @@ func createWorktreeNative(repoPath, branch, targetPath string) error {
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git worktree add failed: %w\nOutput: %s", err, string(output))
+	}
+
+	return nil
+}
+
+// extractProjectNameFromPath extracts the project name from the repository path
+func extractProjectNameFromPath(repoPath string) string {
+	// Get the base name of the repository directory
+	return filepath.Base(repoPath)
+}
+
+// determineWorktreePath determines the correct worktree path based on repository location
+func determineWorktreePath(repoPath, branchName, workspacesDir string) string {
+	projectName := extractProjectNameFromPath(repoPath)
+	return filepath.Join(workspacesDir, projectName, branchName)
+}
+
+// createBranchNative creates a new branch using the native git command without switching to it
+func createBranchNative(repoPath, branchName string) error {
+	// Create the new branch from the current branch without switching to it
+	cmd := exec.Command("git", "branch", branchName)
+	cmd.Dir = repoPath
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git branch failed: %w\nOutput: %s", err, string(output))
 	}
 
 	return nil
