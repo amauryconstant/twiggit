@@ -37,7 +37,7 @@ Examples:
 }
 
 // runSwitchCommand implements the switch command functionality
-func runSwitchCommand(cmd *cobra.Command, args []string) error {
+func runSwitchCommand(_ *cobra.Command, args []string) error {
 	ctx := context.Background()
 
 	// Load configuration
@@ -98,9 +98,7 @@ func runSwitchCommand(cmd *cobra.Command, args []string) error {
 		relPath := wt.Path
 		if strings.HasPrefix(wt.Path, workspacePath) {
 			relPath = strings.TrimPrefix(wt.Path, workspacePath)
-			if strings.HasPrefix(relPath, "/") {
-				relPath = relPath[1:]
-			}
+			relPath = strings.TrimPrefix(relPath, "/")
 		}
 
 		// Check if this is the current worktree

@@ -49,7 +49,7 @@ Examples:
 }
 
 // runStatusCommand implements the status command functionality
-func runStatusCommand(cmd *cobra.Command, args []string) error {
+func runStatusCommand(cmd *cobra.Command, _ []string) error {
 	ctx := context.Background()
 
 	// Load configuration
@@ -130,11 +130,19 @@ func outputStatusTable(worktrees []*domain.Worktree, workspacePath string) error
 
 	// Create tabwriter for aligned output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	defer w.Flush()
+	defer func() {
+		if err := w.Flush(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to flush output: %v\n", err)
+		}
+	}()
 
 	// Print header
-	fmt.Fprintln(w, "Path\tBranch\tStatus\tLast Commit\tLast Updated")
-	fmt.Fprintln(w, "----\t------\t------\t-----------\t------------")
+	if _, err := fmt.Fprintln(w, "Path\tBranch\tStatus\tLast Commit\tLast Updated"); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
+	}
+	if _, err := fmt.Fprintln(w, "----\t------\t------\t-----------\t------------"); err != nil {
+		return fmt.Errorf("failed to write separator: %w", err)
+	}
 
 	// Print worktree rows
 	for _, wt := range worktrees {
@@ -142,9 +150,7 @@ func outputStatusTable(worktrees []*domain.Worktree, workspacePath string) error
 		relPath := wt.Path
 		if strings.HasPrefix(wt.Path, workspacePath) {
 			relPath = strings.TrimPrefix(wt.Path, workspacePath)
-			if strings.HasPrefix(relPath, "/") {
-				relPath = relPath[1:]
-			}
+			relPath = strings.TrimPrefix(relPath, "/")
 		}
 
 		// Format last commit (truncate hash for display)
@@ -168,7 +174,9 @@ func outputStatusTable(worktrees []*domain.Worktree, workspacePath string) error
 			status = "clean"
 		}
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", relPath, wt.Branch, status, lastCommit, timeAgo)
+		if _, err := fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", relPath, wt.Branch, status, lastCommit, timeAgo); err != nil {
+			return fmt.Errorf("failed to write worktree row: %w", err)
+		}
 	}
 
 	// Add summary section
@@ -189,13 +197,13 @@ func outputStatusTable(worktrees []*domain.Worktree, workspacePath string) error
 }
 
 // outputStatusJSON displays worktree status in JSON format
-func outputStatusJSON(worktrees []*domain.Worktree) error {
+func outputStatusJSON(_ []*domain.Worktree) error {
 	fmt.Println("JSON output not yet implemented")
 	return nil
 }
 
 // outputStatusYAML displays worktree status in YAML format
-func outputStatusYAML(worktrees []*domain.Worktree) error {
+func outputStatusYAML(_ []*domain.Worktree) error {
 	fmt.Println("YAML output not yet implemented")
 	return nil
 }

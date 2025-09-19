@@ -1,3 +1,4 @@
+// Package version provides version information for the twiggit CLI
 package version
 
 import (
