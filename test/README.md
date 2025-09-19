@@ -14,10 +14,19 @@ The testing infrastructure has been streamlined to reduce complexity and improve
 
 ```
 test/
+├── e2e/                # End-to-end CLI tests
+│   ├── create_test.go       # Create command E2E tests
+│   ├── delete_test.go       # Delete command E2E tests
+│   ├── e2e_suite_test.go    # E2E test suite setup
+│   ├── global_cli_test.go   # Global CLI behavior tests
+│   ├── help_test.go         # Help command tests
+│   ├── list_test.go         # List command tests
+│   └── switch_test.go       # Switch command tests
 ├── fixtures/           # Test data and test cases
 │   ├── domain_cases.go      # Domain layer test cases
 │   └── infrastructure_cases.go # Infrastructure layer test cases
 ├── helpers/            # Test utilities and helpers
+│   ├── cli.go              # CLI testing utilities for E2E tests
 │   ├── git.go              # Git repository testing utilities
 │   ├── mise.go             # Mise integration testing utilities
 │   ├── temp.go             # Temporary directory management
@@ -52,6 +61,12 @@ The helpers package provides essential testing utilities:
 - `TempDir()`: Creates temporary directories with automatic cleanup
 - `TempFile()`: Creates temporary files with automatic cleanup
 
+#### CLI Utilities (`cli.go`)
+- `TwiggitCLI`: CLI wrapper for end-to-end testing
+- `NewTwiggitCLI()`: Creates new CLI test wrapper
+- `Run()`: Executes CLI commands with gexec session
+- `RunWithDir()`: Executes CLI commands in specific directory
+
 #### Assertion Helpers (`assertion_helpers.go`)
 - `AssertDirExists()`: Directory existence assertions
 - `AssertFileExists()`: File existence assertions
@@ -64,9 +79,21 @@ The fixtures package contains test data and test cases:
 - `domain_cases.go`: Test cases for domain layer validation
 - `infrastructure_cases.go`: Test cases for infrastructure layer components
 
+### E2E Tests (`test/e2e/`)
+
+End-to-end tests verify CLI functionality from user perspective:
+
+- `create_test.go`: Create command E2E tests
+- `delete_test.go`: Delete command E2E tests
+- `e2e_suite_test.go`: E2E test suite setup and configuration
+- `global_cli_test.go`: Global CLI behavior tests
+- `help_test.go`: Help command tests
+- `list_test.go`: List command tests
+- `switch_test.go`: Switch command tests
+
 ### Integration Tests (`test/integration/`)
 
-Integration tests verify end-to-end functionality:
+Integration tests verify component interactions:
 
 - `mise_integration_test.go`: Mise integration tests
 - `worktree_integration_test.go`: Worktree lifecycle integration tests
@@ -138,6 +165,26 @@ func TestGitOperation(t *testing.T) {
 }
 ```
 
+### E2E Testing
+
+```go
+func TestCreateCommand(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping E2E test")
+    }
+
+    // Create CLI wrapper
+    cli := helpers.NewTwiggitCLI()
+    
+    // Run CLI command
+    session := cli.Run("create", "feature-branch")
+    defer session.Terminate()
+    
+    // Verify results
+    Expect(session.ExitCode()).To(Equal(0))
+    Expect(session.Out.Contents()).To(ContainSubstring("Created worktree"))
+}
+
 ### Integration Testing
 
 ```go
@@ -192,6 +239,11 @@ The old `internal/testutil` structure has been replaced with this simplified app
 go test ./...
 ```
 
+### E2E Tests
+```bash
+go test -tags=e2e ./test/e2e/...
+```
+
 ### Integration Tests
 ```bash
 go test -tags=integration ./test/integration/...
@@ -208,6 +260,15 @@ go tool cover -html=coverage.out
 go test ./internal/domain/...
 go test ./internal/infrastructure/...
 go test ./internal/services/...
+```
+
+### Using Mise Tasks
+```bash
+mise run test          # Run all tests (unit + integration + E2E + race)
+mise run test:unit     # Run unit tests only
+mise run test:integration # Run integration tests only
+mise run test:e2e      # Run E2E tests only
+mise run test:race     # Run tests with race detection
 ```
 
 ## Best Practices
