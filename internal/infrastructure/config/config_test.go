@@ -165,7 +165,7 @@ func (s *ConfigTestSuite) TestConfig_Validate() {
 				Project:   "valid-project",
 			},
 			expectError: true,
-			errorMsg:    "workspace path cannot be empty",
+			errorMsg:    "workspaces path cannot be empty",
 		},
 		{
 			name: "verbose and quiet both true",

@@ -70,30 +70,43 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
 				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "project1", "worktree1"), 0755))
 				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "project1", "worktree2"), 0755))
 
-				// Mock git repository detection
-				m.On("IsGitRepository", mock.Anything, filepath.Join(workspacePath, "project1")).Return(true, nil)
-				m.On("ListWorktrees", mock.Anything, filepath.Join(workspacePath, "project1")).Return([]*domain.WorktreeInfo{
-					{Path: filepath.Join(workspacePath, "project1", "worktree1"), Branch: "main", Commit: "abc123", Clean: true},
-					{Path: filepath.Join(workspacePath, "project1", "worktree2"), Branch: "feature", Commit: "def456", Clean: false},
-				}, nil)
+				// Mock git repository detection for project directory (main repository) and worktree paths
+				m.On("IsGitRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1")).Return(true, nil)
+				m.On("IsGitRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1", "worktree1")).Return(true, nil)
+				m.On("IsGitRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1", "worktree2")).Return(true, nil)
+
+				// Mock bare repository detection (return false for all - these are not bare repos)
+				m.On("IsBareRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1")).Return(false, nil)
+				m.On("IsBareRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1", "worktree1")).Return(false, nil)
+				m.On("IsBareRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1", "worktree2")).Return(false, nil)
 
 				// Mock worktree status calls for analysis
-				m.On("GetWorktreeStatus", mock.Anything, filepath.Join(workspacePath, "project1", "worktree1")).Return(
+				m.On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1")).Return(
 					&domain.WorktreeInfo{
-						Path:   filepath.Join(workspacePath, "project1", "worktree1"),
-						Branch: "main",
-						Commit: "abc123",
-						Clean:  true,
+						Path:       filepath.Join(workspacePath, "project1"),
+						Branch:     "main",
+						Commit:     "main123",
+						Clean:      true,
+						CommitTime: time.Now(),
 					}, nil)
-				m.On("GetWorktreeStatus", mock.Anything, filepath.Join(workspacePath, "project1", "worktree2")).Return(
+				m.On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1", "worktree1")).Return(
 					&domain.WorktreeInfo{
-						Path:   filepath.Join(workspacePath, "project1", "worktree2"),
-						Branch: "feature",
-						Commit: "def456",
-						Clean:  false,
+						Path:       filepath.Join(workspacePath, "project1", "worktree1"),
+						Branch:     "main",
+						Commit:     "abc123",
+						Clean:      true,
+						CommitTime: time.Now(),
+					}, nil)
+				m.On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1", "worktree2")).Return(
+					&domain.WorktreeInfo{
+						Path:       filepath.Join(workspacePath, "project1", "worktree2"),
+						Branch:     "feature",
+						Commit:     "def456",
+						Clean:      false,
+						CommitTime: time.Now(),
 					}, nil)
 			},
-			expectedCount: 2,
+			expectedCount: 3,
 			expectError:   false,
 		},
 		{
@@ -155,12 +168,13 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_AnalyzeWorktree() {
 			name: "should return detailed worktree information",
 			path: "/tmp/test-worktree",
 			setupMocks: func(m *mocks.GitClientMock) {
-				m.On("GetWorktreeStatus", mock.Anything, "/tmp/test-worktree").Return(
+				m.On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), "/tmp/test-worktree").Return(
 					&domain.WorktreeInfo{
-						Path:   "/tmp/test-worktree",
-						Branch: "feature-branch",
-						Commit: "abc123456",
-						Clean:  true,
+						Path:       "/tmp/test-worktree",
+						Branch:     "feature-branch",
+						Commit:     "abc123456",
+						Clean:      true,
+						CommitTime: time.Now(),
 					}, nil)
 			},
 			expectError: false,
@@ -169,7 +183,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_AnalyzeWorktree() {
 			name: "should handle invalid worktree paths",
 			path: "/invalid/path",
 			setupMocks: func(m *mocks.GitClientMock) {
-				m.On("GetWorktreeStatus", mock.Anything, "/invalid/path").Return(
+				m.On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), "/invalid/path").Return(
 					(*domain.WorktreeInfo)(nil),
 					errors.New("mock error"))
 			},
@@ -230,17 +244,9 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "not-a-project"), 0755))
 
 				// Mock main repository detection
-				m.On("IsMainRepository", mock.Anything, filepath.Join(workspacePath, "project1")).Return(true, nil)
-				m.On("IsMainRepository", mock.Anything, filepath.Join(workspacePath, "project2")).Return(true, nil)
-				m.On("IsMainRepository", mock.Anything, filepath.Join(workspacePath, "not-a-project")).Return(false, nil)
-
-				// Mock worktree listing for projects
-				m.On("ListWorktrees", mock.Anything, filepath.Join(workspacePath, "project1")).Return([]*domain.WorktreeInfo{
-					{Path: filepath.Join(workspacePath, "project1"), Branch: "main", Commit: "abc123", Clean: true},
-				}, nil)
-				m.On("ListWorktrees", mock.Anything, filepath.Join(workspacePath, "project2")).Return([]*domain.WorktreeInfo{
-					{Path: filepath.Join(workspacePath, "project2"), Branch: "main", Commit: "def456", Clean: true},
-				}, nil)
+				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project1")).Return(true, nil)
+				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "project2")).Return(true, nil)
+				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "not-a-project")).Return(false, nil)
 			},
 			expectedCount: 2,
 			expectError:   false,
@@ -250,7 +256,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 			workspacePath: "/tmp/no-repos",
 			setupMocks: func(m *mocks.GitClientMock, workspacePath string) {
 				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "regular-dir"), 0755))
-				m.On("IsMainRepository", mock.Anything, filepath.Join(workspacePath, "regular-dir")).Return(false, nil)
+				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "regular-dir")).Return(false, nil)
 			},
 			expectedCount: 0,
 			expectError:   false,
@@ -304,10 +310,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_Performance() {
 			s.Require().NoError(os.MkdirAll(projectPath, 0755))
 
 			// Mock each as main repository
-			mockGit.On("IsMainRepository", mock.Anything, projectPath).Return(true, nil)
-			mockGit.On("ListWorktrees", mock.Anything, projectPath).Return([]*domain.WorktreeInfo{
-				{Path: projectPath, Branch: "main", Commit: "abc123", Clean: true},
-			}, nil)
+			mockGit.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), projectPath).Return(true, nil)
 		}
 
 		// Test with timing

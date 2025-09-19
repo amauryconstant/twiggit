@@ -25,6 +25,12 @@ func (m *GitClientMock) IsMainRepository(ctx context.Context, path string) (bool
 	return args.Bool(0), args.Error(1)
 }
 
+// IsBareRepository checks if a path is a bare git repository
+func (m *GitClientMock) IsBareRepository(ctx context.Context, path string) (bool, error) {
+	args := m.Called(ctx, path)
+	return args.Bool(0), args.Error(1)
+}
+
 // BranchExists checks if a branch exists in the repository
 func (m *GitClientMock) BranchExists(ctx context.Context, repoPath, branch string) bool {
 	args := m.Called(ctx, repoPath, branch)
