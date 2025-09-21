@@ -61,10 +61,10 @@ var _ = Describe("Delete Command", func() {
 		Expect(output).To(ContainSubstring("twiggit delete --force"))
 	})
 
-	It("accepts no arguments", func() {
+	It("rejects extra arguments", func() {
 		session := cli.Run("delete", "extra-arg")
-		Eventually(session).Should(gexec.Exit(0))
-		Expect(string(session.Out.Contents())).To(ContainSubstring("No worktrees found to delete"))
+		Eventually(session).Should(gexec.Exit(1))
+		Expect(string(session.Err.Contents())).To(ContainSubstring("unknown command"))
 	})
 
 	It("supports all flags", func() {

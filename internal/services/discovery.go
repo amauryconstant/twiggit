@@ -82,6 +82,11 @@ func (ds *DiscoveryService) isBareRepositorySafe(ctx context.Context, path strin
 
 // DiscoverWorktrees discovers all worktrees in a workspaces directory using concurrent processing
 func (ds *DiscoveryService) DiscoverWorktrees(ctx context.Context, workspacesPath string) ([]*domain.Worktree, error) {
+	// Check if workspaces path exists, return empty list if it doesn't
+	if _, err := os.Stat(workspacesPath); os.IsNotExist(err) {
+		return []*domain.Worktree{}, nil
+	}
+
 	if err := ds.validatePath(workspacesPath, "workspaces"); err != nil {
 		return nil, err
 	}
@@ -131,6 +136,11 @@ func (ds *DiscoveryService) AnalyzeWorktree(ctx context.Context, path string) (*
 
 // DiscoverProjects finds all Git repositories (projects) in the projects directory
 func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath string) ([]*domain.Project, error) {
+	// Check if projects path exists, return empty list if it doesn't
+	if _, err := os.Stat(projectsPath); os.IsNotExist(err) {
+		return []*domain.Project{}, nil
+	}
+
 	if err := ds.validatePath(projectsPath, "projects"); err != nil {
 		return nil, err
 	}
