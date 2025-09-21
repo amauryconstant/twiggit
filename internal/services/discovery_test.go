@@ -119,11 +119,11 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
 			expectError:   false,
 		},
 		{
-			name:          "should return error for non-existent workspace",
+			name:          "should return empty list for non-existent workspace",
 			workspacePath: "/tmp/non-existent",
 			setupMocks:    func(m *mocks.GitClientMock, workspacePath string) {},
 			expectedCount: 0,
-			expectError:   true,
+			expectError:   false,
 		},
 	}
 
@@ -258,6 +258,13 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 				s.Require().NoError(os.MkdirAll(filepath.Join(workspacePath, "regular-dir"), 0755))
 				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), filepath.Join(workspacePath, "regular-dir")).Return(false, nil)
 			},
+			expectedCount: 0,
+			expectError:   false,
+		},
+		{
+			name:          "should return empty list for non-existent workspace",
+			workspacePath: "/tmp/non-existent-projects",
+			setupMocks:    func(m *mocks.GitClientMock, workspacePath string) {},
 			expectedCount: 0,
 			expectError:   false,
 		},

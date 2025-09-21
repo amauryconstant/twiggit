@@ -8,8 +8,7 @@ bin/
 twiggit
 
 # Test coverage
-coverage*.out
-coverage.html
+coverage*
 
 # Test binaries
 *.test
@@ -26,10 +25,6 @@ coverage.html
 # OS
 .DS_Store
 Thumbs.db
-
-# Mise
-.mise.local.toml
-.mise/
 
 # AI
 .ai

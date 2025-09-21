@@ -1,0 +1,59 @@
+[tools]
+go = "1.25.1"
+golangci-lint = "latest"
+
+[env]
+CGO_ENABLED = "0"
+
+[tasks."test"]
+description = "Run all tests"
+depends = ["test:unit", "test:integration", "test:e2e", "test:race"]
+
+[tasks."test:unit"]
+description = "Run unit tests only"
+run = "go test -short ./..."
+
+[tasks."test:integration"]
+description = "Run integration tests only"
+run = "go test -tags=integration ./test/integration/..."
+
+[tasks."test:race"]
+description = "Run tests with race condition detection"
+run = "CGO_ENABLED=1 go test -race ./..."
+
+[tasks."test:e2e"]
+description = "Run CLI end-to-end tests (quiet)"
+depends = ["build:e2e"]
+run = "ginkgo --tags=e2e ./test/e2e/..."
+
+[tasks."build:e2e"]
+description = "Build CLI binary for E2E tests"
+run = "go build -tags=e2e -o bin/twiggit main.go"
+
+[tasks."test:single"]
+description = "Run single test - usage: mise run test:single TestName ./pkg/module"
+run = "go test -run $1 $2"
+
+[tasks."lint:check"]
+description = "Run linting and formatting checks"
+run = "golangci-lint run"
+
+[tasks."lint:fix"]
+description = "Auto-fix linting issues"
+run = "golangci-lint run --fix"
+
+[tasks."build:cli"]
+description = "Build the CLI binary"
+run = "go build -o bin/twiggit main.go"
+
+[tasks."build:clean"]
+description = "Clean build artifacts"
+run = "rm -rf bin/ coverage*.out coverage.html"
+
+[tasks."dev:run"]
+description = "Test CLI structure"
+run = "go run main.go --help"
+
+[tasks."dev:tidy"]
+description = "Clean up go.mod and go.sum"
+run = "go mod tidy"
