@@ -185,30 +185,6 @@ create-version-tag:
         git push origin "$TAG"
         echo "✅ Tag $TAG created and pushed successfully"
       fi
-    # Create GitLab Release
-    - |
-      echo "📦 Creating GitLab Release..."
-      RESPONSE=$(curl -s -o response.json -w "%{http_code}" \
-        --header "PRIVATE-TOKEN: $CI_JOB_TOKEN" \
-        --header "Content-Type: application/json" \
-        --data "{
-          \"name\": \"Release $TAG\",
-          \"tag_name\": \"$TAG\",
-          \"description\": \"Automated release for version $TAG\",
-          \"assets\": {
-            \"links\": [
-              {\"name\": \"Coverage Report (HTML)\", \"url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/coverage.html\"},
-              {\"name\": \"Coverage Report (XML)\", \"url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID/artifacts/file/coverage.xml\"}
-            ]
-          }
-        }" \
-        --request POST "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases")
-
-      if [ "$RESPONSE" -ne 201 ] && [ "$RESPONSE" -ne 409 ]; then
-        echo "❌ Release API failed (HTTP $RESPONSE)"
-        cat response.json
-        exit 1
-      fi
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
   artifacts:
