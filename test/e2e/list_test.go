@@ -38,10 +38,10 @@ var _ = Describe("List Command", func() {
 		Expect(output).To(ContainSubstring("Sort order"))
 	})
 
-	It("accepts no arguments", func() {
+	It("rejects extra arguments", func() {
 		session := cli.Run("list", "extra-arg")
-		Eventually(session, "10s").Should(gexec.Exit(0))
-		Expect(string(session.Out.Contents())).To(ContainSubstring("Worktrees in"))
+		Eventually(session).Should(gexec.Exit(1))
+		Expect(string(session.Err.Contents())).To(ContainSubstring("unknown command"))
 	})
 
 	It("supports --all flag", func() {

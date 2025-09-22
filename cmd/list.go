@@ -12,14 +12,13 @@ import (
 	"time"
 
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/internal/infrastructure/config"
-	"github.com/amaury/twiggit/internal/infrastructure/git"
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/services"
 	"github.com/spf13/cobra"
 )
 
 // NewListCmd creates the unified list command
-func NewListCmd() *cobra.Command {
+func NewListCmd(deps *infrastructure.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all available worktrees",
@@ -40,8 +39,9 @@ Examples:
   twiggit list              # Auto-detect scope based on current location
   twiggit list --all        # Show all projects' worktrees
   twiggit list --sort=date  # Sort by last updated time`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListCommand(cmd, args)
+			return runListCommand(cmd, args, deps)
 		},
 	}
 
@@ -53,34 +53,25 @@ Examples:
 }
 
 // runListCommand implements the unified list command functionality
-func runListCommand(cmd *cobra.Command, _ []string) error {
+func runListCommand(cmd *cobra.Command, _ []string, deps *infrastructure.Deps) error {
 	ctx := context.Background()
-
-	// Load configuration
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
-	}
 
 	// Get flags
 	allFlag, _ := cmd.Flags().GetBool("all")
 	sortBy, _ := cmd.Flags().GetString("sort")
 
-	// Create git client
-	gitClient := git.NewClient()
-
 	// Create discovery service
-	discoveryService := services.NewDiscoveryService(gitClient)
+	discoveryService := services.NewDiscoveryService(deps)
 
 	// Determine workspace path and scope
-	workspacePath := cfg.WorkspacesPath
+	workspacePath := deps.Config.WorkspacesPath
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
 	// Auto-detect if we're in a git repository
-	repoRoot, err := gitClient.GetRepositoryRoot(ctx, currentDir)
+	repoRoot, err := deps.GitClient.GetRepositoryRoot(ctx, currentDir)
 	inGitRepo := err == nil
 
 	// Determine scope based on location and --all flag

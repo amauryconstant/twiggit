@@ -1,9 +1,7 @@
 [tools]
 go = "1.25.1"
 golangci-lint = "latest"
-
-[env]
-CGO_ENABLED = "0"
+ginkgo="latest"
 
 [tasks."test"]
 description = "Run all tests"
@@ -19,7 +17,7 @@ run = "go test -tags=integration ./test/integration/..."
 
 [tasks."test:race"]
 description = "Run tests with race condition detection"
-run = "CGO_ENABLED=1 go test -race ./..."
+run = "go test -race ./..."
 
 [tasks."test:e2e"]
 description = "Run CLI end-to-end tests (quiet)"

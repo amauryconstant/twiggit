@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
 	"github.com/amaury/twiggit/internal/services"
@@ -64,6 +65,7 @@ type WorktreeIntegrationTestSuite struct {
 	discoveryService  *services.DiscoveryService
 	config            *config.Config
 	operationsService *services.OperationsService
+	deps              *infrastructure.Deps
 }
 
 func (s *WorktreeIntegrationTestSuite) SetupSuite() {
@@ -83,11 +85,19 @@ func (s *WorktreeIntegrationTestSuite) SetupSuite() {
 	// Initialize services
 	client := git.NewClient()
 	s.gitClient = client
-	s.discoveryService = services.NewDiscoveryService(s.gitClient)
 	s.config = &config.Config{
 		Workspace: s.testRepo.TempDir,
 	}
-	s.operationsService = services.NewOperationsService(s.gitClient, s.discoveryService, s.config)
+
+	// Create deps container
+	s.deps = &infrastructure.Deps{
+		GitClient:  s.gitClient,
+		Config:     s.config,
+		FileSystem: os.DirFS(s.testRepo.TempDir),
+	}
+
+	s.discoveryService = services.NewDiscoveryService(s.deps)
+	s.operationsService = services.NewOperationsService(s.deps, s.discoveryService)
 }
 
 func (s *WorktreeIntegrationTestSuite) TearDownSuite() {
@@ -238,10 +248,16 @@ func (s *WorktreeIntegrationTestSuite) TestDiscoveryService() {
 	s.Require().NoError(err)
 
 	// Test discovery
-	discoveryService := services.NewDiscoveryService(gitClient)
+	deps := &infrastructure.Deps{
+		GitClient:  gitClient,
+		Config:     &config.Config{Workspace: workspaceDir},
+		FileSystem: os.DirFS(workspaceDir),
+	}
+	discoveryService := services.NewDiscoveryService(deps)
 
 	s.Run("should discover all projects", func() {
-		projects, err := discoveryService.DiscoverProjects(context.Background(), workspaceDir)
+		// FileSystem is rooted at workspaceDir, so use "." to scan current directory
+		projects, err := discoveryService.DiscoverProjects(context.Background(), ".")
 		s.Assert().NoError(err)
 
 		// Debug: print what we found
@@ -260,7 +276,8 @@ func (s *WorktreeIntegrationTestSuite) TestDiscoveryService() {
 	})
 
 	s.Run("should discover all worktrees", func() {
-		worktrees, err := discoveryService.DiscoverWorktrees(context.Background(), workspaceDir)
+		// FileSystem is rooted at workspaceDir, so use "." to scan current directory
+		worktrees, err := discoveryService.DiscoverWorktrees(context.Background(), ".")
 		s.Assert().NoError(err)
 		s.Assert().GreaterOrEqual(len(worktrees), 3, "Should discover at least 3 worktrees (feature1, feature2, develop)")
 
@@ -280,11 +297,16 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 	defer testRepo.Cleanup()
 
 	gitClient := git.NewClient()
-	discoveryService := services.NewDiscoveryService(gitClient)
 	config := &config.Config{
 		Workspace: testRepo.TempDir,
 	}
-	operationsService := services.NewOperationsService(gitClient, discoveryService, config)
+	deps := &infrastructure.Deps{
+		GitClient:  gitClient,
+		Config:     config,
+		FileSystem: os.DirFS(testRepo.TempDir),
+	}
+	discoveryService := services.NewDiscoveryService(deps)
+	operationsService := services.NewOperationsService(deps, discoveryService)
 
 	s.Run("should handle non-existent repository", func() {
 		err := operationsService.Create(context.Background(), "/non/existent/repo", "feature", "/tmp/test-worktree")
@@ -341,11 +363,17 @@ func (s *WorktreeIntegrationTestSuite) TestPerformance() {
 		}
 	}
 
-	discoveryService := services.NewDiscoveryService(gitClient)
+	deps := &infrastructure.Deps{
+		GitClient:  gitClient,
+		Config:     &config.Config{Workspace: workspaceDir},
+		FileSystem: os.DirFS(workspaceDir),
+	}
+	discoveryService := services.NewDiscoveryService(deps)
 	discoveryService.SetConcurrency(4) // Test with concurrent processing
 
 	s.Run("should discover projects efficiently", func() {
-		projects, err := discoveryService.DiscoverProjects(context.Background(), workspaceDir)
+		// FileSystem is rooted at workspaceDir, so use "." to scan current directory
+		projects, err := discoveryService.DiscoverProjects(context.Background(), ".")
 		s.Assert().NoError(err)
 		s.Assert().Len(projects, projectCount, "Should discover all projects")
 
@@ -361,7 +389,8 @@ func (s *WorktreeIntegrationTestSuite) TestPerformance() {
 	})
 
 	s.Run("should discover all worktrees efficiently", func() {
-		worktrees, err := discoveryService.DiscoverWorktrees(context.Background(), workspaceDir)
+		// FileSystem is rooted at workspaceDir, so use "." to scan current directory
+		worktrees, err := discoveryService.DiscoverWorktrees(context.Background(), ".")
 		s.Assert().NoError(err)
 
 		expectedCount := projectCount * (worktreesPerProject + 1) // +1 for main repo

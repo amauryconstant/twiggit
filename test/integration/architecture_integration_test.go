@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
 	"github.com/amaury/twiggit/internal/services"
@@ -29,6 +30,7 @@ type ArchitectureIntegrationTestSuite struct {
 	gitClient        domain.GitClient
 	discoveryService *services.DiscoveryService
 	config           *config.Config
+	deps             *infrastructure.Deps
 }
 
 func TestArchitectureIntegrationSuite(t *testing.T) {
@@ -58,7 +60,6 @@ func (s *ArchitectureIntegrationTestSuite) SetupSuite() {
 
 	// Initialize services
 	s.gitClient = git.NewClient()
-	s.discoveryService = services.NewDiscoveryService(s.gitClient)
 
 	// Create config with both paths
 	s.config = &config.Config{
@@ -66,6 +67,15 @@ func (s *ArchitectureIntegrationTestSuite) SetupSuite() {
 		WorkspacesPath: s.workspacesDir,
 		Workspace:      s.workspacesDir, // Legacy field for backward compatibility
 	}
+
+	// Create deps container
+	s.deps = &infrastructure.Deps{
+		GitClient:  s.gitClient,
+		Config:     s.config,
+		FileSystem: os.DirFS(s.tempDir),
+	}
+
+	s.discoveryService = services.NewDiscoveryService(s.deps)
 }
 
 func (s *ArchitectureIntegrationTestSuite) TearDownSuite() {
@@ -98,7 +108,9 @@ func (s *ArchitectureIntegrationTestSuite) TestCorrectArchitecture_ProjectsInPro
 	_ = s.createProject("project2")
 
 	// Verify projects are found in Projects directory
-	projects, err := s.discoveryService.DiscoverProjects(context.Background(), s.projectsDir)
+	// Convert absolute path to relative path for FileSystem
+	relativeProjectsPath := "Projects"
+	projects, err := s.discoveryService.DiscoverProjects(context.Background(), relativeProjectsPath)
 	s.Require().NoError(err)
 
 	// Should find both projects
@@ -130,7 +142,9 @@ func (s *ArchitectureIntegrationTestSuite) TestCorrectArchitecture_WorktreesInWo
 	s.createWorktree(project1, "feature2", worktree2Path)
 
 	// Discover worktrees in Workspaces directory
-	worktrees, err := s.discoveryService.DiscoverWorktrees(context.Background(), s.workspacesDir)
+	// Convert absolute path to relative path for FileSystem
+	relativeWorkspacesPath := "Workspaces"
+	worktrees, err := s.discoveryService.DiscoverWorktrees(context.Background(), relativeWorkspacesPath)
 	s.Require().NoError(err)
 
 	// Should find both worktrees
@@ -166,12 +180,14 @@ func (s *ArchitectureIntegrationTestSuite) TestCorrectArchitecture_CrossReferenc
 	s.createWorktree(project2, "develop", worktree2Path)
 
 	// Discover projects
-	projects, err := s.discoveryService.DiscoverProjects(context.Background(), s.projectsDir)
+	relativeProjectsPath := "Projects"
+	projects, err := s.discoveryService.DiscoverProjects(context.Background(), relativeProjectsPath)
 	s.Require().NoError(err)
 	s.Assert().Len(projects, 2, "Should discover 2 projects")
 
 	// Discover worktrees
-	worktrees, err := s.discoveryService.DiscoverWorktrees(context.Background(), s.workspacesDir)
+	relativeWorkspacesPath := "Workspaces"
+	worktrees, err := s.discoveryService.DiscoverWorktrees(context.Background(), relativeWorkspacesPath)
 	s.Require().NoError(err)
 	s.Assert().GreaterOrEqual(len(worktrees), 2, "Should discover at least 2 worktrees")
 
@@ -218,7 +234,8 @@ func (s *ArchitectureIntegrationTestSuite) TestCorrectArchitecture_CommitTimesta
 	s.createWorktreeFromCommit(project1, headHash, worktreePath)
 
 	// Discover worktrees
-	worktrees, err := s.discoveryService.DiscoverWorktrees(context.Background(), s.workspacesDir)
+	relativeWorkspacesPath := "Workspaces"
+	worktrees, err := s.discoveryService.DiscoverWorktrees(context.Background(), relativeWorkspacesPath)
 	s.Require().NoError(err)
 
 	// Find our worktree
@@ -271,7 +288,8 @@ func (s *ArchitectureIntegrationTestSuite) TestCorrectArchitecture_ListCommandSh
 	s.createWorktree(project1, "feature1", worktreePath)
 
 	// Test discovery from Workspaces directory (what the CLI command should do)
-	worktrees, err := s.discoveryService.DiscoverWorktrees(context.Background(), s.workspacesDir)
+	relativeWorkspacesPath := "Workspaces"
+	worktrees, err := s.discoveryService.DiscoverWorktrees(context.Background(), relativeWorkspacesPath)
 	s.Require().NoError(err)
 
 	// Should find the worktree but NOT the project directory
