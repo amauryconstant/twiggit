@@ -4,7 +4,6 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"strings"
 )
 
 // Types
@@ -179,7 +178,7 @@ func (p *Project) GetWorktreeStatistics() *WorktreeStatistics {
 }
 
 // GetHealth returns health status of the project
-func (p *Project) GetHealth() *ProjectHealth {
+func (p *Project) GetHealth(pathValidator PathValidator) *ProjectHealth {
 	health := &ProjectHealth{
 		Status:        "unknown",
 		Issues:        make([]string, 0),
@@ -192,7 +191,7 @@ func (p *Project) GetHealth() *ProjectHealth {
 	}
 
 	// Additional validation - check if git repo path looks valid
-	if p.GitRepo != "" && !isValidGitRepoPath(p.GitRepo) {
+	if p.GitRepo != "" && !pathValidator.IsValidGitRepoPath(p.GitRepo) {
 		health.Issues = append(health.Issues, "git repository not validated")
 	}
 
@@ -207,36 +206,6 @@ func (p *Project) GetHealth() *ProjectHealth {
 }
 
 // Pure Functions
-
-// isValidGitRepoPath checks if the git repo path format is valid (pure business logic)
-func isValidGitRepoPath(path string) bool {
-	if path == "" {
-		return false
-	}
-
-	// Basic path format validation
-	if len(path) > MaxPathLength {
-		return false
-	}
-
-	// Check if it looks like an absolute path (starts with /)
-	if !strings.HasPrefix(path, "/") {
-		return false
-	}
-
-	// Check for invalid characters
-	if strings.Contains(path, "..") || strings.Contains(path, "//") {
-		return false
-	}
-
-	// For testing purposes, consider test and repo paths as invalid
-	// In a real implementation, this would be more sophisticated
-	if strings.Contains(path, "/test/") || strings.Contains(path, "/repo/") {
-		return false
-	}
-
-	return true
-}
 
 // CanAddWorktree checks if a worktree can be added to project (pure business logic)
 func (p *Project) CanAddWorktree(worktree *Worktree) error {
