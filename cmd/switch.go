@@ -2,17 +2,20 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/amaury/twiggit/internal/infrastructure"
+	"github.com/amaury/twiggit/internal/services"
 	"github.com/spf13/cobra"
 )
 
 // NewSwitchCmd creates the switch command
-func NewSwitchCmd() *cobra.Command {
+func NewSwitchCmd(deps *infrastructure.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "switch <project|project/branch>",
 		Short: "Switch to a project or worktree",
@@ -27,7 +30,7 @@ Examples:
   twiggit switch feature-branch         # When in project context, switches to worktree`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSwitchCommand(cmd, args)
+			return runSwitchCommand(cmd, args, deps)
 		},
 	}
 
@@ -35,10 +38,12 @@ Examples:
 }
 
 // runSwitchCommand implements the switch command functionality
-func runSwitchCommand(_ *cobra.Command, args []string) error {
+func runSwitchCommand(_ *cobra.Command, args []string, deps *infrastructure.Deps) error {
+	ctx := context.Background()
+
 	if len(args) == 0 {
 		// Try to use current context for intelligent switching
-		project, err := detectCurrentContext()
+		project, err := detectCurrentContext(ctx, deps)
 		if err != nil {
 			return errors.New("specify a target: <project> or <project/branch>")
 		}
@@ -58,40 +63,49 @@ func runSwitchCommand(_ *cobra.Command, args []string) error {
 
 	// Handle relative branch names when in project context
 	if !strings.Contains(target, "/") {
-		project, err := detectCurrentContext()
+		project, err := detectCurrentContext(ctx, deps)
 		if err == nil && project != "" && target != project {
 			// User said "switch feature-branch" while in project context
 			// But only if target is not the same as project name
-			return switchToWorktree(fmt.Sprintf("%s/%s", project, target))
+			return switchToWorktree(ctx, deps, fmt.Sprintf("%s/%s", project, target))
 		}
 	}
 
 	// Original logic
 	if strings.Contains(target, "/") {
-		return switchToWorktree(target)
+		return switchToWorktree(ctx, deps, target)
 	}
 
-	return switchToProject(target)
+	return switchToProject(ctx, deps, target)
 }
 
 // switchToProject switches to a main project repository
-func switchToProject(project string) error {
-	homeDir, err := os.UserHomeDir()
+func switchToProject(ctx context.Context, deps *infrastructure.Deps, project string) error {
+	// Use discovery service to find projects
+	discoveryService := services.NewDiscoveryService(deps)
+	projects, err := discoveryService.DiscoverProjects(ctx, deps.Config.ProjectsPath)
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return fmt.Errorf("failed to discover projects: %w", err)
 	}
 
-	targetPath := filepath.Join(homeDir, "Projects", project)
+	// Find the target project
+	var targetPath string
+	for _, p := range projects {
+		if p.Name == project {
+			targetPath = p.GitRepo
+			break
+		}
+	}
 
-	if err := validatePathExists(targetPath); err != nil {
-		return err
+	if targetPath == "" {
+		return fmt.Errorf("project not found: %s", project)
 	}
 
 	return changeDirectory(targetPath)
 }
 
 // switchToWorktree switches to a specific worktree
-func switchToWorktree(target string) error {
+func switchToWorktree(ctx context.Context, deps *infrastructure.Deps, target string) error {
 	parts := strings.Split(target, "/")
 	if len(parts) != 2 {
 		return errors.New("invalid worktree format: use <project>/<branch>")
@@ -99,64 +113,46 @@ func switchToWorktree(target string) error {
 
 	project, branch := parts[0], parts[1]
 
-	homeDir, err := os.UserHomeDir()
+	// Use discovery service to find worktrees
+	discoveryService := services.NewDiscoveryService(deps)
+	worktrees, err := discoveryService.DiscoverWorktrees(ctx, deps.Config.WorkspacesPath)
 	if err != nil {
-		return fmt.Errorf("failed to get home directory: %w", err)
+		return fmt.Errorf("failed to discover worktrees: %w", err)
 	}
 
-	targetPath := filepath.Join(homeDir, "Workspaces", project, branch)
+	// Find the target worktree
+	var targetPath string
+	for _, wt := range worktrees {
+		// Check if worktree matches project and branch
+		if strings.Contains(wt.Path, project) && wt.Branch == branch {
+			targetPath = wt.Path
+			break
+		}
+	}
 
-	if err := validatePathExists(targetPath); err != nil {
-		return err
+	if targetPath == "" {
+		return fmt.Errorf("worktree not found: %s/%s", project, branch)
 	}
 
 	return changeDirectory(targetPath)
 }
 
 // detectCurrentContext detects the current project context from the working directory
-func detectCurrentContext() (project string, err error) {
+func detectCurrentContext(ctx context.Context, deps *infrastructure.Deps) (project string, err error) {
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	homeDir, err := os.UserHomeDir()
+	// Check if we're in a git repository
+	repoRoot, err := deps.GitClient.GetRepositoryRoot(ctx, currentDir)
 	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
+		return "", nil // Not in git repo, no context
 	}
 
-	// Check if we're in a worktree: ~/Workspaces/project/branch/
-	workspacesDir := filepath.Join(homeDir, "Workspaces")
-	if strings.HasPrefix(currentDir, workspacesDir) {
-		relPath := strings.TrimPrefix(currentDir, workspacesDir)
-		parts := strings.Split(strings.TrimPrefix(relPath, string(filepath.Separator)), string(filepath.Separator))
-		if len(parts) >= 2 && parts[0] != "" {
-			return parts[0], nil
-		}
-	}
-
-	// Check if we're in a project: ~/Projects/project/
-	projectsDir := filepath.Join(homeDir, "Projects")
-	if strings.HasPrefix(currentDir, projectsDir) {
-		relPath := strings.TrimPrefix(currentDir, projectsDir)
-		parts := strings.Split(strings.TrimPrefix(relPath, string(filepath.Separator)), string(filepath.Separator))
-		if len(parts) >= 1 && parts[0] != "" {
-			return parts[0], nil
-		}
-	}
-
-	return "", nil
-}
-
-// validatePathExists validates that a path exists and returns appropriate errors
-func validatePathExists(path string) error {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		if strings.Contains(path, "Workspaces") {
-			return fmt.Errorf("worktree not found: %s", path)
-		}
-		return fmt.Errorf("project not found: %s", path)
-	}
-	return nil
+	// Extract project name from repository root
+	projectName := filepath.Base(repoRoot)
+	return projectName, nil
 }
 
 // changeDirectory changes the current working directory

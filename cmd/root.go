@@ -1,12 +1,13 @@
 package cmd
 
 import (
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/version"
 	"github.com/spf13/cobra"
 )
 
 // NewRootCmd creates the root command for twiggit
-func NewRootCmd() *cobra.Command {
+func NewRootCmd(deps *infrastructure.Deps) *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "twiggit",
 		Short: "Simple Git worktree and project management",
@@ -27,10 +28,10 @@ Perfect for developers who work with multiple branches across different projects
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
 
 	// Add subcommands (ordered by usage frequency)
-	rootCmd.AddCommand(NewSwitchCmd())
-	rootCmd.AddCommand(NewListCmd())
-	rootCmd.AddCommand(NewCreateCmd())
-	rootCmd.AddCommand(NewDeleteCmd())
+	rootCmd.AddCommand(NewSwitchCmd(deps))
+	rootCmd.AddCommand(NewListCmd(deps))
+	rootCmd.AddCommand(NewCreateCmd(deps))
+	rootCmd.AddCommand(NewDeleteCmd(deps))
 
 	return rootCmd
 }

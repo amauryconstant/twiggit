@@ -32,15 +32,15 @@
 - **Incremental delivery**: Each commit should add visible user value
 - **Simple solutions for simple problems**: Avoid over-engineering for personal tools
 
-### Test-Driven Development (TDD) - Applied Pragmatically
+### Test-Driven Development (TDD)
 
-- Write tests BEFORE implementation for critical business logic
+- Write tests BEFORE implementation
 - Use tests as safety net for refactoring, not as bureaucracy
 - Focus on integration tests that verify user workflows
 - Unit tests for complex algorithms, not simple getters/setters
 - E2E tests for CLI commands to ensure user-facing functionality works correctly
 
-### Domain-Driven Design (DDD) - Simplified
+### Simplified Domain-Driven Design 
 
 - Use clear domain models that reflect real worktree concepts
 - Separate business logic from infrastructure where it makes sense

@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/test/mocks"
 	"github.com/stretchr/testify/mock"
@@ -19,6 +20,7 @@ type BaseWorktreeTestSuite struct {
 	MockGit *mocks.GitClientMock
 	Service *OperationsService
 	Config  *config.Config
+	Deps    *infrastructure.Deps
 }
 
 // SetupTest initializes worktree service and mocks for each test
@@ -26,8 +28,15 @@ func (s *BaseWorktreeTestSuite) SetupTest() {
 	s.MockGit = &mocks.GitClientMock{}
 	s.Config = &config.Config{Workspace: s.T().TempDir()}
 
-	discovery := NewDiscoveryService(s.MockGit)
-	s.Service = NewOperationsService(s.MockGit, discovery, s.Config)
+	// Create test deps with mock git client
+	s.Deps = &infrastructure.Deps{
+		GitClient:  s.MockGit,
+		Config:     s.Config,
+		FileSystem: os.DirFS("/tmp"),
+	}
+
+	discovery := NewDiscoveryService(s.Deps)
+	s.Service = NewOperationsService(s.Deps, discovery)
 }
 
 // TearDownTest validates mock expectations and cleans up
@@ -46,17 +55,17 @@ type WorktreeOperationsTestSuite struct {
 // SetupTest initializes worktree service and mocks for each test
 func (s *WorktreeOperationsTestSuite) SetupTest() {
 	s.BaseWorktreeTestSuite.SetupTest()
-	s.DiscoveryService = NewDiscoveryService(s.MockGit)
+	s.DiscoveryService = NewDiscoveryService(s.Deps)
 	// Recreate service with the correct discovery service
-	s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
+	s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
 }
 
 // TestOperationsService_NewOperationsService tests service creation
 func (s *WorktreeOperationsTestSuite) TestOperationsService_NewOperationsService() {
 	s.Require().NotNil(s.Service)
-	s.Equal(s.MockGit, s.Service.gitClient)
+	s.Equal(s.MockGit, s.Service.deps.GitClient)
 	s.Equal(s.DiscoveryService, s.Service.discovery)
-	s.Equal(s.Config, s.Service.config)
+	s.Equal(s.Deps, s.Service.deps)
 }
 
 // TestOperationsService_Create tests worktree creation with table-driven approach
@@ -147,8 +156,9 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 		s.Run(tt.name, func() {
 			// Reset mock for each test case
 			s.MockGit = &mocks.GitClientMock{}
-			s.DiscoveryService = NewDiscoveryService(s.MockGit)
-			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
+			s.Deps.GitClient = s.MockGit
+			s.DiscoveryService = NewDiscoveryService(s.Deps)
+			s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
 
 			tt.setupMocks(s.MockGit)
 
@@ -260,8 +270,9 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 
 			// Reset mock for each test case
 			s.MockGit = &mocks.GitClientMock{}
-			s.DiscoveryService = NewDiscoveryService(s.MockGit)
-			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
+			s.Deps.GitClient = s.MockGit
+			s.DiscoveryService = NewDiscoveryService(s.Deps)
+			s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
 
 			tt.setupMocks(s.MockGit, tt.worktreePath)
 
@@ -308,7 +319,10 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 				}
 			},
 			setupMocks: func(m *mocks.GitClientMock, currentDir string) {
-				m.On("GetWorktreeStatus", mock.Anything, currentDir).Return(&domain.WorktreeInfo{
+				m.On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
+					// The path should be the currentDir since it's already absolute
+					return path == currentDir
+				})).Return(&domain.WorktreeInfo{
 					Path: currentDir, Branch: "main", Clean: true,
 				}, nil)
 			},
@@ -331,7 +345,10 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 				}
 			},
 			setupMocks: func(m *mocks.GitClientMock, currentDir string) {
-				m.On("GetWorktreeStatus", mock.Anything, currentDir).Return((*domain.WorktreeInfo)(nil),
+				m.On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
+					// The path should be the currentDir since it's already absolute
+					return path == currentDir
+				})).Return((*domain.WorktreeInfo)(nil),
 					errors.New("not a worktree"))
 			},
 			expectError: true,
@@ -345,8 +362,9 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 
 			// Reset mock for each test case
 			s.MockGit = &mocks.GitClientMock{}
-			s.DiscoveryService = NewDiscoveryService(s.MockGit)
-			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
+			s.Deps.GitClient = s.MockGit
+			s.DiscoveryService = NewDiscoveryService(s.Deps)
+			s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
 
 			tt.setupMocks(s.MockGit, currentDir)
 
@@ -427,8 +445,9 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 
 			// Reset mock for each test case
 			s.MockGit = &mocks.GitClientMock{}
-			s.DiscoveryService = NewDiscoveryService(s.MockGit)
-			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, s.Config)
+			s.Deps.GitClient = s.MockGit
+			s.DiscoveryService = NewDiscoveryService(s.Deps)
+			s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
 
 			tt.setupMocks(s.MockGit, tt.worktreePath)
 

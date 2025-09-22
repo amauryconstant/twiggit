@@ -6,16 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
-	"github.com/amaury/twiggit/internal/infrastructure/config"
-	"github.com/amaury/twiggit/internal/infrastructure/git"
+	"github.com/amaury/twiggit/internal/infrastructure"
+	"github.com/amaury/twiggit/internal/services"
 	"github.com/spf13/cobra"
 )
 
 // NewCreateCmd creates the create command
-func NewCreateCmd() *cobra.Command {
+func NewCreateCmd(deps *infrastructure.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [branch-name]",
 		Short: "Create a new Git worktree",
@@ -29,7 +28,7 @@ Examples:
   twiggit create  # Interactive mode`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreateCommand(cmd, args)
+			return runCreateCommand(cmd, args, deps)
 		},
 	}
 
@@ -37,14 +36,8 @@ Examples:
 }
 
 // runCreateCommand implements the create command functionality
-func runCreateCommand(_ *cobra.Command, args []string) error {
+func runCreateCommand(_ *cobra.Command, args []string, deps *infrastructure.Deps) error {
 	ctx := context.Background()
-
-	// Load configuration
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
-	}
 
 	// Determine branch name
 	var branchName string
@@ -59,68 +52,45 @@ func runCreateCommand(_ *cobra.Command, args []string) error {
 		return errors.New("branch name is required")
 	}
 
-	// Create git client
-	gitClient := git.NewClient()
-
 	// Try to find repository root from current directory first
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	mainRepoPath, err := gitClient.GetRepositoryRoot(ctx, currentDir)
+	mainRepoPath, err := deps.GitClient.GetRepositoryRoot(ctx, currentDir)
 	if err != nil {
 		return fmt.Errorf("failed to find repository root from current directory: %w", err)
 	}
 
-	// Check if branch exists, create it if it doesn't
-	if !gitClient.BranchExists(ctx, mainRepoPath, branchName) {
-		fmt.Printf("Branch '%s' does not exist, creating it...\n", branchName)
-		err := createBranchNative(mainRepoPath, branchName)
-		if err != nil {
-			return fmt.Errorf("failed to create branch '%s': %w", branchName, err)
-		}
-		fmt.Printf("✅ Branch '%s' created successfully\n", branchName)
-	}
+	// Create operations service
+	operationsService := services.NewOperationsService(deps, services.NewDiscoveryService(deps))
 
 	// Determine target path for worktree using project-aware logic
-	targetPath := determineWorktreePath(mainRepoPath, branchName, cfg.WorkspacesPath)
+	targetPath := determineWorktreePath(mainRepoPath, branchName, deps.Config.WorkspacesPath)
 
-	// Check if target path already exists
-	if _, err := os.Stat(targetPath); err == nil {
-		return fmt.Errorf("target path already exists: %s", targetPath)
+	// Check if branch exists for logging purposes
+	branchExists := deps.GitClient.BranchExists(ctx, mainRepoPath, branchName)
+	if !branchExists {
+		fmt.Printf("Branch '%s' does not exist, it will be created...\n", branchName)
 	}
 
-	// Create the worktree
+	// Create the worktree using service layer
 	fmt.Printf("Creating worktree for branch '%s' at %s...\n", branchName, targetPath)
-
-	// For now, use native git command for worktree creation
-	// TODO: Fix go-git implementation or use exec.Command for git operations
-	err = createWorktreeNative(mainRepoPath, branchName, targetPath)
+	err = operationsService.Create(ctx, mainRepoPath, branchName, targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
 
 	// Success message
 	fmt.Printf("✅ Worktree created successfully!\n")
-	fmt.Printf("   Branch: %s\n", branchName)
+	if !branchExists {
+		fmt.Printf("   Branch: %s (newly created)\n", branchName)
+	} else {
+		fmt.Printf("   Branch: %s\n", branchName)
+	}
 	fmt.Printf("   Path:   %s\n", targetPath)
 	fmt.Printf("   Navigate: cd %s\n", targetPath)
-
-	return nil
-}
-
-// createWorktreeNative creates a worktree using the native git command
-func createWorktreeNative(repoPath, branch, targetPath string) error {
-	// For now, use os/exec to run git worktree add command
-	// This is a temporary solution until the go-git implementation is fixed
-	cmd := exec.Command("git", "worktree", "add", targetPath, branch)
-	cmd.Dir = repoPath
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git worktree add failed: %w\nOutput: %s", err, string(output))
-	}
 
 	return nil
 }
@@ -135,18 +105,4 @@ func extractProjectNameFromPath(repoPath string) string {
 func determineWorktreePath(repoPath, branchName, workspacesDir string) string {
 	projectName := extractProjectNameFromPath(repoPath)
 	return filepath.Join(workspacesDir, projectName, branchName)
-}
-
-// createBranchNative creates a new branch using the native git command without switching to it
-func createBranchNative(repoPath, branchName string) error {
-	// Create the new branch from the current branch without switching to it
-	cmd := exec.Command("git", "branch", branchName)
-	cmd.Dir = repoPath
-
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git branch failed: %w\nOutput: %s", err, string(output))
-	}
-
-	return nil
 }

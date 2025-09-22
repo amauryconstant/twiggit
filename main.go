@@ -5,6 +5,8 @@ import (
 	"os"
 
 	"github.com/amaury/twiggit/cmd"
+	"github.com/amaury/twiggit/internal/infrastructure"
+	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 )
@@ -20,5 +22,15 @@ func main() {
 }
 
 func getRootCommand() *cobra.Command {
-	return cmd.NewRootCmd()
+	// Load configuration
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Failed to load configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create dependency container
+	deps := infrastructure.NewDeps(cfg)
+
+	return cmd.NewRootCmd(deps)
 }

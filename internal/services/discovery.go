@@ -5,12 +5,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 const (
@@ -22,7 +23,7 @@ const (
 
 // DiscoveryService handles the discovery and analysis of worktrees and projects
 type DiscoveryService struct {
-	gitClient   domain.GitClient
+	deps        *infrastructure.Deps
 	concurrency int
 	mu          sync.RWMutex
 	cache       map[string]*discoveryResult
@@ -34,9 +35,9 @@ type discoveryResult struct {
 }
 
 // NewDiscoveryService creates a new DiscoveryService instance
-func NewDiscoveryService(gitClient domain.GitClient) *DiscoveryService {
+func NewDiscoveryService(deps *infrastructure.Deps) *DiscoveryService {
 	return &DiscoveryService{
-		gitClient:   gitClient,
+		deps:        deps,
 		concurrency: defaultConcurrency,
 		cache:       make(map[string]*discoveryResult),
 	}
@@ -55,7 +56,7 @@ func (ds *DiscoveryService) validatePath(path, pathType string) error {
 		return fmt.Errorf("%s path cannot be empty", pathType)
 	}
 
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := ds.deps.Stat(path); err != nil {
 		return fmt.Errorf("%s path does not exist: %s", pathType, path)
 	}
 
@@ -64,26 +65,26 @@ func (ds *DiscoveryService) validatePath(path, pathType string) error {
 
 // isGitRepositorySafe safely checks if a path is a git repository, returning false on errors
 func (ds *DiscoveryService) isGitRepositorySafe(ctx context.Context, path string) bool {
-	isRepo, err := ds.gitClient.IsGitRepository(ctx, path)
+	isRepo, err := ds.deps.GitClient.IsGitRepository(ctx, path)
 	return err == nil && isRepo
 }
 
 // isMainRepositorySafe safely checks if a path is a main repository, returning false on errors
 func (ds *DiscoveryService) isMainRepositorySafe(ctx context.Context, path string) bool {
-	isMainRepo, err := ds.gitClient.IsMainRepository(ctx, path)
+	isMainRepo, err := ds.deps.GitClient.IsMainRepository(ctx, path)
 	return err == nil && isMainRepo
 }
 
 // isBareRepositorySafe safely checks if a path is a bare repository, returning false on errors
 func (ds *DiscoveryService) isBareRepositorySafe(ctx context.Context, path string) bool {
-	isBare, err := ds.gitClient.IsBareRepository(ctx, path)
+	isBare, err := ds.deps.GitClient.IsBareRepository(ctx, path)
 	return err == nil && isBare
 }
 
 // DiscoverWorktrees discovers all worktrees in a workspaces directory using concurrent processing
 func (ds *DiscoveryService) DiscoverWorktrees(ctx context.Context, workspacesPath string) ([]*domain.Worktree, error) {
 	// Check if workspaces path exists, return empty list if it doesn't
-	if _, err := os.Stat(workspacesPath); os.IsNotExist(err) {
+	if _, err := ds.deps.Stat(workspacesPath); err != nil {
 		return []*domain.Worktree{}, nil
 	}
 
@@ -116,8 +117,11 @@ func (ds *DiscoveryService) AnalyzeWorktree(ctx context.Context, path string) (*
 		return cached, nil
 	}
 
+	// Convert relative path to absolute path for Git client
+	absolutePath := ds.convertToAbsolutePath(path)
+
 	// Get worktree status from git client
-	status, err := ds.gitClient.GetWorktreeStatus(ctx, path)
+	status, err := ds.deps.GitClient.GetWorktreeStatus(ctx, absolutePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get worktree status for %s: %w", path, err)
 	}
@@ -137,7 +141,7 @@ func (ds *DiscoveryService) AnalyzeWorktree(ctx context.Context, path string) (*
 // DiscoverProjects finds all Git repositories (projects) in the projects directory
 func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath string) ([]*domain.Project, error) {
 	// Check if projects path exists, return empty list if it doesn't
-	if _, err := os.Stat(projectsPath); os.IsNotExist(err) {
+	if _, err := ds.deps.Stat(projectsPath); err != nil {
 		return []*domain.Project{}, nil
 	}
 
@@ -146,7 +150,7 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath s
 	}
 
 	// Find all directories in projects directory
-	entries, err := os.ReadDir(projectsPath)
+	entries, err := ds.deps.ReadDir(projectsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read projects directory: %w", err)
 	}
@@ -160,13 +164,16 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath s
 
 		projectPath := filepath.Join(projectsPath, entry.Name())
 
+		// Convert relative path to absolute path for Git client
+		absoluteProjectPath := ds.convertToAbsolutePath(projectPath)
+
 		// Check if it's a main git repository (not a worktree)
-		if !ds.isMainRepositorySafe(ctx, projectPath) {
+		if !ds.isMainRepositorySafe(ctx, absoluteProjectPath) {
 			continue
 		}
 
-		// Create project (without worktrees for now - they're in the workspaces directory)
-		project, err := domain.NewProject(entry.Name(), projectPath)
+		// Create project with absolute path
+		project, err := domain.NewProject(entry.Name(), absoluteProjectPath)
 		if err != nil {
 			continue
 		}
@@ -182,7 +189,7 @@ func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, w
 	var paths []string
 
 	// Read the workspaces directory to find project subdirectories
-	entries, err := os.ReadDir(workspacesPath)
+	entries, err := ds.deps.ReadDir(workspacesPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read workspaces directory: %w", err)
 	}
@@ -195,12 +202,13 @@ func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, w
 		projectDir := filepath.Join(workspacesPath, entry.Name())
 
 		// First, check if the project directory itself is a git repository (main worktree)
-		if ds.isGitRepositorySafe(ctx, projectDir) && !ds.isBareRepositorySafe(ctx, projectDir) {
-			paths = append(paths, projectDir)
+		absoluteProjectDir := ds.convertToAbsolutePath(projectDir)
+		if ds.isGitRepositorySafe(ctx, absoluteProjectDir) && !ds.isBareRepositorySafe(ctx, absoluteProjectDir) {
+			paths = append(paths, projectDir) // Keep relative path for consistency
 		}
 
 		// Then, look for worktree directories within each project directory
-		worktreeEntries, err := os.ReadDir(projectDir)
+		worktreeEntries, err := ds.deps.ReadDir(projectDir)
 		if err != nil {
 			continue // Skip on error
 		}
@@ -213,8 +221,9 @@ func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, w
 			worktreePath := filepath.Join(projectDir, worktreeEntry.Name())
 
 			// Check if it's a git repository (worktree)
-			if ds.isGitRepositorySafe(ctx, worktreePath) && !ds.isBareRepositorySafe(ctx, worktreePath) {
-				paths = append(paths, worktreePath)
+			absoluteWorktreePath := ds.convertToAbsolutePath(worktreePath)
+			if ds.isGitRepositorySafe(ctx, absoluteWorktreePath) && !ds.isBareRepositorySafe(ctx, absoluteWorktreePath) {
+				paths = append(paths, worktreePath) // Keep relative path for consistency
 			}
 		}
 	}
@@ -360,4 +369,53 @@ func (ds *DiscoveryService) ClearCache() {
 	ds.mu.Lock()
 	defer ds.mu.Unlock()
 	ds.cache = make(map[string]*discoveryResult)
+}
+
+// convertToAbsolutePath converts a relative FileSystem path to an absolute path for Git client
+func (ds *DiscoveryService) convertToAbsolutePath(relativePath string) string {
+	// If the path is already absolute, return it as-is
+	if filepath.IsAbs(relativePath) {
+		return relativePath
+	}
+
+	// If the path is ".", use the Workspace path (legacy support)
+	if relativePath == "." {
+		if ds.deps.Config.Workspace != "" {
+			return ds.deps.Config.Workspace
+		}
+		// Fallback to ProjectsPath if Workspace is not set
+		if ds.deps.Config.ProjectsPath != "" {
+			return ds.deps.Config.ProjectsPath
+		}
+		return relativePath
+	}
+
+	// If the path starts with "Projects", use the configured ProjectsPath
+	if strings.HasPrefix(relativePath, "Projects") {
+		// Remove "Projects" prefix and join with ProjectsPath
+		rest := strings.TrimPrefix(relativePath, "Projects")
+		if rest == "" {
+			return ds.deps.Config.ProjectsPath
+		}
+		return filepath.Join(ds.deps.Config.ProjectsPath, rest)
+	}
+
+	// If the path starts with "Workspaces", use the configured WorkspacesPath
+	if strings.HasPrefix(relativePath, "Workspaces") {
+		// Remove "Workspaces" prefix and join with WorkspacesPath
+		rest := strings.TrimPrefix(relativePath, "Workspaces")
+		if rest == "" {
+			return ds.deps.Config.WorkspacesPath
+		}
+		return filepath.Join(ds.deps.Config.WorkspacesPath, rest)
+	}
+
+	// For other cases (like relative paths within the workspace),
+	// join with the Workspace path
+	if ds.deps.Config.Workspace != "" {
+		return filepath.Join(ds.deps.Config.Workspace, relativePath)
+	}
+
+	// Fallback: assume it's already absolute or handle as needed
+	return relativePath
 }

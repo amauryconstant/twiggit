@@ -12,8 +12,7 @@ import (
 	"strings"
 
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/internal/infrastructure/config"
-	"github.com/amaury/twiggit/internal/infrastructure/git"
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/services"
 	"github.com/spf13/cobra"
 )
@@ -27,7 +26,7 @@ type DeleteScope struct {
 }
 
 // NewDeleteCmd creates the delete command
-func NewDeleteCmd() *cobra.Command {
+func NewDeleteCmd(deps *infrastructure.Deps) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete Git worktrees",
@@ -48,7 +47,7 @@ Examples:
   twiggit delete --force      # Skip confirmation and safety checks`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runDeleteCommand(cmd, args)
+			return runDeleteCommand(cmd, args, deps)
 		},
 	}
 
@@ -61,14 +60,8 @@ Examples:
 }
 
 // runDeleteCommand implements the delete command functionality
-func runDeleteCommand(cmd *cobra.Command, _ []string) error {
+func runDeleteCommand(cmd *cobra.Command, _ []string, deps *infrastructure.Deps) error {
 	ctx := context.Background()
-
-	// Load configuration
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load configuration: %w", err)
-	}
 
 	// Get flags
 	dryRun, _ := cmd.Flags().GetBool("dry-run")
@@ -76,12 +69,11 @@ func runDeleteCommand(cmd *cobra.Command, _ []string) error {
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
 	// Create services
-	gitClient := git.NewClient()
-	discoveryService := services.NewDiscoveryService(gitClient)
-	operationsService := services.NewOperationsService(gitClient, discoveryService, cfg)
+	discoveryService := services.NewDiscoveryService(deps)
+	operationsService := services.NewOperationsService(deps, discoveryService)
 
 	// Determine scope based on current location (same logic as list command)
-	workspacePath, scope, err := determineDeleteScope(ctx, gitClient, cfg)
+	workspacePath, scope, err := determineDeleteScope(ctx, deps.GitClient, deps)
 	if err != nil {
 		return fmt.Errorf("failed to determine scope: %w", err)
 	}
@@ -112,7 +104,7 @@ func runDeleteCommand(cmd *cobra.Command, _ []string) error {
 }
 
 // determineDeleteScope determines the deletion scope based on current location
-func determineDeleteScope(ctx context.Context, gitClient domain.GitClient, cfg *config.Config) (string, DeleteScope, error) {
+func determineDeleteScope(ctx context.Context, gitClient domain.GitClient, cfg *infrastructure.Deps) (string, DeleteScope, error) {
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return "", DeleteScope{}, fmt.Errorf("failed to get current directory: %w", err)
@@ -122,7 +114,7 @@ func determineDeleteScope(ctx context.Context, gitClient domain.GitClient, cfg *
 	repoRoot, err := gitClient.GetRepositoryRoot(ctx, currentDir)
 	if err != nil {
 		// Not in git repo - scope is all projects
-		return cfg.WorkspacesPath, DeleteScope{AllProjects: true}, nil
+		return cfg.Config.WorkspacesPath, DeleteScope{AllProjects: true}, nil
 	}
 
 	// We're in a git repository - use configured workspaces path
@@ -130,13 +122,13 @@ func determineDeleteScope(ctx context.Context, gitClient domain.GitClient, cfg *
 	projectName := filepath.Base(repoRoot)
 
 	// Check if current directory is within the workspaces path
-	if strings.HasPrefix(currentDir, cfg.WorkspacesPath) {
+	if strings.HasPrefix(currentDir, cfg.Config.WorkspacesPath) {
 		// We're in a worktree - scope is current project
-		return cfg.WorkspacesPath, DeleteScope{Project: projectName}, nil
+		return cfg.Config.WorkspacesPath, DeleteScope{Project: projectName}, nil
 	}
 
 	// We're in a main repository or other location - scope is all projects
-	return cfg.WorkspacesPath, DeleteScope{AllProjects: true}, nil
+	return cfg.Config.WorkspacesPath, DeleteScope{AllProjects: true}, nil
 }
 
 // filterWorktreesForDeletion applies safety rules and scope filtering
