@@ -62,11 +62,13 @@ func (r *IntegrationTestRepo) RepoDir() string {
 
 type WorktreeIntegrationTestSuite struct {
 	suite.Suite
-	testRepo          *IntegrationTestRepo
-	gitClient         domain.GitClient
-	discoveryService  *services.DiscoveryService
-	config            *config.Config
-	operationsService *services.OperationsService
+	testRepo                 *IntegrationTestRepo
+	gitClient                domain.GitClient
+	discoveryService         *services.DiscoveryService
+	config                   *config.Config
+	worktreeCreator          *services.WorktreeCreator
+	worktreeRemover          *services.WorktreeRemover
+	currentDirectoryDetector *services.CurrentDirectoryDetector
 }
 
 func (s *WorktreeIntegrationTestSuite) SetupSuite() {
@@ -98,7 +100,9 @@ func (s *WorktreeIntegrationTestSuite) SetupSuite() {
 	infraService := infrastructure.NewInfrastructureService(s.gitClient, fileSystem, pathValidator)
 	validationService := services.NewValidationService(infraService)
 	miseService := mise.NewMiseIntegration()
-	s.operationsService = services.NewOperationsService(s.gitClient, s.discoveryService, validationService, miseService)
+	s.worktreeCreator = services.NewWorktreeCreator(s.gitClient, validationService, miseService)
+	s.worktreeRemover = services.NewWorktreeRemover(s.gitClient)
+	s.currentDirectoryDetector = services.NewCurrentDirectoryDetector(s.gitClient)
 }
 
 func (s *WorktreeIntegrationTestSuite) TearDownSuite() {
@@ -122,7 +126,7 @@ func (s *WorktreeIntegrationTestSuite) TestFullWorktreeLifecycle() {
 		exists := s.gitClient.BranchExists(context.Background(), s.testRepo.RepoDir(), "feature-1")
 		s.Assert().True(exists, "feature-1 branch should exist before creating worktree")
 
-		err := s.operationsService.Create(context.Background(), s.testRepo.RepoDir(), "feature-1", worktreePath)
+		err := s.worktreeCreator.Create(context.Background(), s.testRepo.RepoDir(), "feature-1", worktreePath)
 		s.Assert().NoError(err)
 
 		// Verify worktree was created
@@ -148,7 +152,7 @@ func (s *WorktreeIntegrationTestSuite) TestFullWorktreeLifecycle() {
 	s.Run("should create worktree for new branch", func() {
 		worktreePath := filepath.Join(filepath.Dir(s.testRepo.RepoDir()), "new-feature-worktree-"+uniqueSuffix)
 
-		err := s.operationsService.Create(context.Background(), s.testRepo.RepoDir(), "new-feature", worktreePath)
+		err := s.worktreeCreator.Create(context.Background(), s.testRepo.RepoDir(), "new-feature", worktreePath)
 		s.Assert().NoError(err)
 
 		// Verify worktree was created
@@ -194,7 +198,7 @@ func (s *WorktreeIntegrationTestSuite) TestFullWorktreeLifecycle() {
 		s.Assert().NoError(err)
 
 		// Remove the worktree (use force since mise config was copied)
-		err = s.operationsService.Remove(context.Background(), worktreePath, true)
+		err = s.worktreeRemover.Remove(context.Background(), worktreePath, true)
 		s.Assert().NoError(err)
 
 		// Verify it was removed
@@ -301,20 +305,21 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 	}
 	fileSystem := os.DirFS("/") // Use real filesystem for integration tests
 	pathValidator := validation.NewPathValidator()
-	discoveryService := services.NewDiscoveryService(gitClient, config, fileSystem, pathValidator)
+	_ = services.NewDiscoveryService(gitClient, config, fileSystem, pathValidator)
 	infraService := infrastructure.NewInfrastructureService(gitClient, fileSystem, pathValidator)
 	validationService := services.NewValidationService(infraService)
 	miseService := mise.NewMiseIntegration()
-	operationsService := services.NewOperationsService(gitClient, discoveryService, validationService, miseService)
+	worktreeCreator := services.NewWorktreeCreator(gitClient, validationService, miseService)
+	worktreeRemover := services.NewWorktreeRemover(gitClient)
 
 	s.Run("should handle non-existent repository", func() {
-		err := operationsService.Create(context.Background(), "/non/existent/repo", "feature", "/tmp/test-worktree")
+		err := worktreeCreator.Create(context.Background(), "/non/existent/repo", "feature", "/tmp/test-worktree")
 		s.Assert().Error(err)
 		s.Assert().Contains(err.Error(), "not a git repository")
 	})
 
 	s.Run("should handle invalid target path", func() {
-		err := operationsService.Create(context.Background(), testRepo.RepoDir(), "feature", "relative/path")
+		err := worktreeCreator.Create(context.Background(), testRepo.RepoDir(), "feature", "relative/path")
 		s.Assert().Error(err)
 		s.Assert().Contains(err.Error(), "path must be absolute")
 	})
@@ -324,12 +329,12 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 		err := os.MkdirAll(existingPath, 0755)
 		s.Require().NoError(err)
 
-		err = operationsService.Create(context.Background(), testRepo.RepoDir(), "feature", existingPath)
+		err = worktreeCreator.Create(context.Background(), testRepo.RepoDir(), "feature", existingPath)
 		s.Assert().Error(err)
 	})
 
 	s.Run("should handle removal of non-existent worktree", func() {
-		err := operationsService.Remove(context.Background(), "/non/existent/worktree", false)
+		err := worktreeRemover.Remove(context.Background(), "/non/existent/worktree", false)
 		s.Assert().Error(err)
 	})
 }

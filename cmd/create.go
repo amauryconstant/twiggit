@@ -63,7 +63,7 @@ func runCreateCommand(_ *cobra.Command, args []string, container *di.Container) 
 	}
 
 	// Get services from container
-	operationsService := container.OperationsService()
+	worktreeCreator := container.WorktreeCreator()
 
 	// Determine target path for worktree using project-aware logic
 	targetPath := determineWorktreePath(mainRepoPath, branchName, container.Config().WorkspacesPath)
@@ -76,7 +76,7 @@ func runCreateCommand(_ *cobra.Command, args []string, container *di.Container) 
 
 	// Create the worktree using service layer
 	fmt.Printf("Creating worktree for branch '%s' at %s...\n", branchName, targetPath)
-	err = operationsService.Create(ctx, mainRepoPath, branchName, targetPath)
+	err = worktreeCreator.Create(ctx, mainRepoPath, branchName, targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}

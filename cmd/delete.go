@@ -214,14 +214,14 @@ func performDeletion(ctx context.Context, container *di.Container, candidates []
 
 	var failed []string
 	var success int
-	ops := container.OperationsService()
+	worktreeRemover := container.WorktreeRemover()
 
 	for _, wt := range candidates {
 		if verbose {
 			fmt.Printf("Deleting worktree: %s\n", wt.Path)
 		}
 
-		err := ops.Remove(ctx, wt.Path, force)
+		err := worktreeRemover.Remove(ctx, wt.Path, force)
 		if err != nil {
 			if verbose {
 				fmt.Printf("Failed to delete %s: %v\n", wt.Path, err)
