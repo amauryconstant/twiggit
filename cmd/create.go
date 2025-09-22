@@ -8,13 +8,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/amaury/twiggit/internal/infrastructure"
-	"github.com/amaury/twiggit/internal/services"
+	"github.com/amaury/twiggit/internal/di"
 	"github.com/spf13/cobra"
 )
 
 // NewCreateCmd creates the create command
-func NewCreateCmd(deps *infrastructure.Deps) *cobra.Command {
+func NewCreateCmd(container *di.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "create [branch-name]",
 		Short: "Create a new Git worktree",
@@ -28,7 +27,7 @@ Examples:
   twiggit create  # Interactive mode`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreateCommand(cmd, args, deps)
+			return runCreateCommand(cmd, args, container)
 		},
 	}
 
@@ -36,7 +35,7 @@ Examples:
 }
 
 // runCreateCommand implements the create command functionality
-func runCreateCommand(_ *cobra.Command, args []string, deps *infrastructure.Deps) error {
+func runCreateCommand(_ *cobra.Command, args []string, container *di.Container) error {
 	ctx := context.Background()
 
 	// Determine branch name
@@ -58,19 +57,19 @@ func runCreateCommand(_ *cobra.Command, args []string, deps *infrastructure.Deps
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
-	mainRepoPath, err := deps.GitClient.GetRepositoryRoot(ctx, currentDir)
+	mainRepoPath, err := container.GitClient().GetRepositoryRoot(ctx, currentDir)
 	if err != nil {
 		return fmt.Errorf("failed to find repository root from current directory: %w", err)
 	}
 
-	// Create operations service
-	operationsService := services.NewOperationsService(deps, services.NewDiscoveryService(deps))
+	// Get services from container
+	operationsService := container.OperationsService()
 
 	// Determine target path for worktree using project-aware logic
-	targetPath := determineWorktreePath(mainRepoPath, branchName, deps.Config.WorkspacesPath)
+	targetPath := determineWorktreePath(mainRepoPath, branchName, container.Config().WorkspacesPath)
 
 	// Check if branch exists for logging purposes
-	branchExists := deps.GitClient.BranchExists(ctx, mainRepoPath, branchName)
+	branchExists := container.GitClient().BranchExists(ctx, mainRepoPath, branchName)
 	if !branchExists {
 		fmt.Printf("Branch '%s' does not exist, it will be created...\n", branchName)
 	}

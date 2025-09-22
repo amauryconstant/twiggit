@@ -3,13 +3,15 @@ package services
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
+	"github.com/amaury/twiggit/internal/infrastructure/mise"
+	"github.com/amaury/twiggit/internal/infrastructure/validation"
 	"github.com/amaury/twiggit/test/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -22,7 +24,7 @@ type BaseWorktreeTestSuite struct {
 	MockInfrastructure *mocks.InfrastructureServiceMock
 	Service            *OperationsService
 	Config             *config.Config
-	Deps               *infrastructure.Deps
+	FileSystem         fs.FS
 }
 
 // SetupTest initializes worktree service and mocks for each test
@@ -31,21 +33,16 @@ func (s *BaseWorktreeTestSuite) SetupTest() {
 	s.MockInfrastructure = &mocks.InfrastructureServiceMock{}
 	tempDir := s.T().TempDir()
 	s.Config = &config.Config{Workspace: tempDir}
+	s.FileSystem = os.DirFS(tempDir)
 
-	// Create test deps with mock git client
-	s.Deps = &infrastructure.Deps{
-		GitClient:  s.MockGit,
-		Config:     s.Config,
-		FileSystem: os.DirFS(tempDir),
-	}
-
-	discovery := NewDiscoveryService(s.Deps)
+	pathValidator := validation.NewPathValidator()
+	discovery := NewDiscoveryService(s.MockGit, s.Config, s.FileSystem, pathValidator)
 
 	// Create validation service with mock infrastructure
 	validationService := NewValidationService(s.MockInfrastructure)
 
 	s.Service = &OperationsService{
-		deps:       s.Deps,
+		gitClient:  s.MockGit,
 		discovery:  discovery,
 		mise:       nil, // Not needed for tests
 		validation: validationService,
@@ -68,17 +65,19 @@ type WorktreeOperationsTestSuite struct {
 // SetupTest initializes worktree service and mocks for each test
 func (s *WorktreeOperationsTestSuite) SetupTest() {
 	s.BaseWorktreeTestSuite.SetupTest()
-	s.DiscoveryService = NewDiscoveryService(s.Deps)
-	// Recreate service with the correct discovery service
-	s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
+	pathValidator := validation.NewPathValidator()
+	s.DiscoveryService = NewDiscoveryService(s.MockGit, s.Config, s.FileSystem, pathValidator)
+	validationService := NewValidationService(s.MockInfrastructure)
+	miseService := mise.NewMiseIntegration()
+	// Recreate service with the correct dependencies
+	s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, validationService, miseService)
 }
 
 // TestOperationsService_NewOperationsService tests service creation
 func (s *WorktreeOperationsTestSuite) TestOperationsService_NewOperationsService() {
 	s.Require().NotNil(s.Service)
-	s.Equal(s.MockGit, s.Service.deps.GitClient)
+	s.Equal(s.MockGit, s.Service.gitClient)
 	s.Equal(s.DiscoveryService, s.Service.discovery)
-	s.Equal(s.Deps, s.Service.deps)
 }
 
 // TestOperationsService_Create tests worktree creation with table-driven approach
@@ -170,12 +169,12 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create() {
 			// Reset mocks for each test case
 			s.MockGit = &mocks.GitClientMock{}
 			s.MockInfrastructure = &mocks.InfrastructureServiceMock{}
-			s.Deps.GitClient = s.MockGit
 
-			discovery := NewDiscoveryService(s.Deps)
+			pathValidator := validation.NewPathValidator()
+			discovery := NewDiscoveryService(s.MockGit, s.Config, s.FileSystem, pathValidator)
 			validationService := NewValidationService(s.MockInfrastructure)
 			s.Service = &OperationsService{
-				deps:       s.Deps,
+				gitClient:  s.MockGit,
 				discovery:  discovery,
 				mise:       nil, // Not needed for tests
 				validation: validationService,
@@ -303,9 +302,11 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Remove() {
 
 			// Reset mock for each test case
 			s.MockGit = &mocks.GitClientMock{}
-			s.Deps.GitClient = s.MockGit
-			s.DiscoveryService = NewDiscoveryService(s.Deps)
-			s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
+			pathValidator := validation.NewPathValidator()
+			s.DiscoveryService = NewDiscoveryService(s.MockGit, s.Config, s.FileSystem, pathValidator)
+			validationService := NewValidationService(s.MockInfrastructure)
+			miseService := mise.NewMiseIntegration()
+			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, validationService, miseService)
 
 			tt.setupMocks(s.MockGit, tt.worktreePath)
 
@@ -395,9 +396,11 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_GetCurrent() {
 
 			// Reset mock for each test case
 			s.MockGit = &mocks.GitClientMock{}
-			s.Deps.GitClient = s.MockGit
-			s.DiscoveryService = NewDiscoveryService(s.Deps)
-			s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
+			pathValidator := validation.NewPathValidator()
+			s.DiscoveryService = NewDiscoveryService(s.MockGit, s.Config, s.FileSystem, pathValidator)
+			validationService := NewValidationService(s.MockInfrastructure)
+			miseService := mise.NewMiseIntegration()
+			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, validationService, miseService)
 
 			tt.setupMocks(s.MockGit, currentDir)
 
@@ -478,9 +481,11 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_ValidateRemoval() {
 
 			// Reset mock for each test case
 			s.MockGit = &mocks.GitClientMock{}
-			s.Deps.GitClient = s.MockGit
-			s.DiscoveryService = NewDiscoveryService(s.Deps)
-			s.Service = NewOperationsService(s.Deps, s.DiscoveryService)
+			pathValidator := validation.NewPathValidator()
+			s.DiscoveryService = NewDiscoveryService(s.MockGit, s.Config, s.FileSystem, pathValidator)
+			validationService := NewValidationService(s.MockInfrastructure)
+			miseService := mise.NewMiseIntegration()
+			s.Service = NewOperationsService(s.MockGit, s.DiscoveryService, validationService, miseService)
 
 			tt.setupMocks(s.MockGit, tt.worktreePath)
 
@@ -579,12 +584,12 @@ func (s *WorktreeOperationsTestSuite) TestOperationsService_Create_WithPureDomai
 			// Reset mocks for each test case
 			s.MockGit = &mocks.GitClientMock{}
 			s.MockInfrastructure = &mocks.InfrastructureServiceMock{}
-			s.Deps.GitClient = s.MockGit
 
-			discovery := NewDiscoveryService(s.Deps)
+			pathValidator := validation.NewPathValidator()
+			discovery := NewDiscoveryService(s.MockGit, s.Config, s.FileSystem, pathValidator)
 			validationService := NewValidationService(s.MockInfrastructure)
 			s.Service = &OperationsService{
-				deps:       s.Deps,
+				gitClient:  s.MockGit,
 				discovery:  discovery,
 				mise:       nil, // Not needed for tests
 				validation: validationService,

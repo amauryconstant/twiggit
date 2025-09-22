@@ -1,7 +1,9 @@
+// Package infrastructure contains external dependencies and implementations
 package infrastructure
 
 import (
 	"context"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -11,15 +13,17 @@ import (
 // InfrastructureServiceImpl implements the InfrastructureService interface
 // It provides filesystem and git repository operations for domain entities
 type InfrastructureServiceImpl struct {
-	deps          *Deps
+	gitClient     domain.GitClient
+	fileSystem    fs.FS
 	pathValidator domain.PathValidator
 }
 
 // NewInfrastructureService creates a new InfrastructureService instance
-func NewInfrastructureService(deps *Deps) *InfrastructureServiceImpl {
+func NewInfrastructureService(gitClient domain.GitClient, fileSystem fs.FS, pathValidator domain.PathValidator) *InfrastructureServiceImpl {
 	return &InfrastructureServiceImpl{
-		deps:          deps,
-		pathValidator: deps.PathValidator,
+		gitClient:     gitClient,
+		fileSystem:    fileSystem,
+		pathValidator: pathValidator,
 	}
 }
 
@@ -30,7 +34,7 @@ func (s *InfrastructureServiceImpl) PathExists(path string) bool {
 	if len(path) > 0 && path[0] == '/' {
 		relPath = path[1:]
 	}
-	_, err := s.deps.Stat(relPath)
+	_, err := fs.Stat(s.fileSystem, relPath)
 	return err == nil
 }
 
@@ -50,7 +54,7 @@ func (s *InfrastructureServiceImpl) PathWritable(path string) bool {
 		relParentDir = parentDir[1:]
 	}
 
-	parentInfo, err := s.deps.Stat(relParentDir)
+	parentInfo, err := fs.Stat(s.fileSystem, relParentDir)
 	if err != nil {
 		return false
 	}
@@ -80,7 +84,7 @@ func (s *InfrastructureServiceImpl) IsGitRepository(path string) bool {
 		return false
 	}
 
-	isRepo, err := s.deps.GitClient.IsGitRepository(context.TODO(), path)
+	isRepo, err := s.gitClient.IsGitRepository(context.TODO(), path)
 	if err != nil {
 		return false
 	}

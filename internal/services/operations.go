@@ -8,26 +8,29 @@ import (
 	"path/filepath"
 
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/mise"
 )
 
 // OperationsService handles worktree creation, removal, and management operations
 type OperationsService struct {
-	deps       *infrastructure.Deps
+	gitClient  domain.GitClient
 	discovery  *DiscoveryService
 	mise       *mise.MiseIntegration
 	validation *ValidationService
 }
 
 // NewOperationsService creates a new OperationsService instance
-func NewOperationsService(deps *infrastructure.Deps, discovery *DiscoveryService) *OperationsService {
-	infraService := infrastructure.NewInfrastructureService(deps)
+func NewOperationsService(
+	gitClient domain.GitClient,
+	discovery *DiscoveryService,
+	validation *ValidationService,
+	mise *mise.MiseIntegration,
+) *OperationsService {
 	return &OperationsService{
-		deps:       deps,
+		gitClient:  gitClient,
 		discovery:  discovery,
-		mise:       mise.NewMiseIntegration(),
-		validation: NewValidationService(infraService),
+		validation: validation,
+		mise:       mise,
 	}
 }
 
@@ -49,7 +52,7 @@ func (ops *OperationsService) Create(ctx context.Context, project, branch, targe
 	}
 
 	// Check if project is a valid git repository
-	isRepo, err := ops.deps.GitClient.IsGitRepository(ctx, project)
+	isRepo, err := ops.gitClient.IsGitRepository(ctx, project)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrNotRepository,
@@ -68,10 +71,10 @@ func (ops *OperationsService) Create(ctx context.Context, project, branch, targe
 	}
 
 	// Check if branch exists (for logging purposes later)
-	branchExists := ops.deps.GitClient.BranchExists(ctx, project, branch)
+	branchExists := ops.gitClient.BranchExists(ctx, project, branch)
 
 	// Create the worktree
-	err = ops.deps.GitClient.CreateWorktree(ctx, project, branch, targetPath)
+	err = ops.gitClient.CreateWorktree(ctx, project, branch, targetPath)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrGitCommand,
@@ -118,7 +121,7 @@ func (ops *OperationsService) Remove(ctx context.Context, worktreePath string, f
 	}
 
 	// Get repository root to perform removal
-	repoRoot, err := ops.deps.GitClient.GetRepositoryRoot(ctx, worktreePath)
+	repoRoot, err := ops.gitClient.GetRepositoryRoot(ctx, worktreePath)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrWorktreeNotFound,
@@ -129,7 +132,7 @@ func (ops *OperationsService) Remove(ctx context.Context, worktreePath string, f
 	}
 
 	// Remove the worktree
-	err = ops.deps.GitClient.RemoveWorktree(ctx, repoRoot, worktreePath, force)
+	err = ops.gitClient.RemoveWorktree(ctx, repoRoot, worktreePath, force)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrGitCommand,
@@ -181,7 +184,7 @@ func (ops *OperationsService) ValidateRemoval(ctx context.Context, worktreePath 
 	}
 
 	// Check if worktree exists and get status
-	_, err := ops.deps.GitClient.GetWorktreeStatus(ctx, worktreePath)
+	_, err := ops.gitClient.GetWorktreeStatus(ctx, worktreePath)
 	if err != nil {
 		return domain.WrapError(
 			domain.ErrWorktreeNotFound,
@@ -192,7 +195,7 @@ func (ops *OperationsService) ValidateRemoval(ctx context.Context, worktreePath 
 	}
 
 	// Check for uncommitted changes
-	hasChanges := ops.deps.GitClient.HasUncommittedChanges(ctx, worktreePath)
+	hasChanges := ops.gitClient.HasUncommittedChanges(ctx, worktreePath)
 	if hasChanges {
 		return domain.NewWorktreeError(
 			domain.ErrUncommittedChanges,

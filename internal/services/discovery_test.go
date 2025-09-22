@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
+	"github.com/amaury/twiggit/internal/infrastructure/validation"
 	"github.com/amaury/twiggit/test/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
@@ -24,21 +24,18 @@ type DiscoveryServiceTestSuite struct {
 	Service   *DiscoveryService
 	TempDir   string
 	Cleanup   func()
-	Deps      *infrastructure.Deps
+	Config    *config.Config
 }
 
 // SetupTest initializes infrastructure components for each test
 func (s *DiscoveryServiceTestSuite) SetupTest() {
 	s.GitClient = &mocks.GitClientMock{}
 
-	// Create test deps with mock git client
-	s.Deps = &infrastructure.Deps{
-		GitClient:  s.GitClient,
-		Config:     &config.Config{Workspace: s.T().TempDir()},
-		FileSystem: os.DirFS("/tmp"),
-	}
+	// Create test config with mock git client
+	s.Config = &config.Config{Workspace: s.T().TempDir()}
+	testFileSystem := os.DirFS("/tmp")
 
-	s.Service = NewDiscoveryService(s.Deps)
+	s.Service = NewDiscoveryService(s.GitClient, s.Config, testFileSystem, nil)
 	s.TempDir = s.T().TempDir()
 	s.Cleanup = func() {
 		_ = os.RemoveAll(s.TempDir)
@@ -56,16 +53,13 @@ func (s *DiscoveryServiceTestSuite) TearDownTest() {
 func (s *DiscoveryServiceTestSuite) TestDiscoveryService_NewDiscoveryService() {
 	gitClient := &mocks.GitClientMock{}
 
-	deps := &infrastructure.Deps{
-		GitClient:  gitClient,
-		Config:     &config.Config{Workspace: s.T().TempDir()},
-		FileSystem: os.DirFS("/tmp"),
-	}
+	testConfig := &config.Config{Workspace: s.T().TempDir()}
+	testFileSystem := os.DirFS("/tmp")
 
-	service := NewDiscoveryService(deps)
+	service := NewDiscoveryService(gitClient, testConfig, testFileSystem, nil)
 
 	s.NotNil(service)
-	s.Equal(gitClient, service.deps.GitClient)
+	s.Equal(gitClient, service.gitClient)
 	s.Equal(defaultConcurrency, service.concurrency)
 }
 
@@ -168,12 +162,10 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
 		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
-			deps := &infrastructure.Deps{
-				GitClient:  mockGit,
-				Config:     &config.Config{Workspace: s.T().TempDir()},
-				FileSystem: os.DirFS("/tmp"),
-			}
-			service := NewDiscoveryService(deps)
+			testConfig := &config.Config{Workspace: s.T().TempDir()}
+			testFileSystem := os.DirFS("/tmp")
+			pathValidator := validation.NewPathValidator()
+			service := NewDiscoveryService(mockGit, testConfig, testFileSystem, pathValidator)
 
 			// Cleanup
 			defer func() { _ = os.RemoveAll(filepath.Join("/tmp", tt.workspacePath)) }()
@@ -251,12 +243,10 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_AnalyzeWorktree() {
 		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
-			deps := &infrastructure.Deps{
-				GitClient:  mockGit,
-				Config:     &config.Config{Workspace: s.T().TempDir()},
-				FileSystem: os.DirFS("/tmp"),
-			}
-			service := NewDiscoveryService(deps)
+			testConfig := &config.Config{Workspace: s.T().TempDir()}
+			testFileSystem := os.DirFS("/tmp")
+			pathValidator := validation.NewPathValidator()
+			service := NewDiscoveryService(mockGit, testConfig, testFileSystem, pathValidator)
 			tt.setupMocks(mockGit)
 
 			// Test
@@ -337,12 +327,10 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
-			deps := &infrastructure.Deps{
-				GitClient:  mockGit,
-				Config:     &config.Config{Workspace: s.T().TempDir()},
-				FileSystem: os.DirFS("/tmp"),
-			}
-			service := NewDiscoveryService(deps)
+			testConfig := &config.Config{Workspace: s.T().TempDir()}
+			testFileSystem := os.DirFS("/tmp")
+			pathValidator := validation.NewPathValidator()
+			service := NewDiscoveryService(mockGit, testConfig, testFileSystem, pathValidator)
 
 			// Cleanup
 			defer func() { _ = os.RemoveAll(filepath.Join("/tmp", tt.workspacePath)) }()
@@ -372,12 +360,10 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_Performance() {
 	s.Run("should handle concurrent discovery efficiently", func() {
 		// Setup
 		mockGit := &mocks.GitClientMock{}
-		deps := &infrastructure.Deps{
-			GitClient:  mockGit,
-			Config:     &config.Config{Workspace: s.T().TempDir()},
-			FileSystem: os.DirFS("/tmp"),
-		}
-		service := NewDiscoveryService(deps)
+		testConfig := &config.Config{Workspace: s.T().TempDir()}
+		testFileSystem := os.DirFS("/tmp")
+		pathValidator := validation.NewPathValidator()
+		service := NewDiscoveryService(mockGit, testConfig, testFileSystem, pathValidator)
 		service.SetConcurrency(4) // Test with 4 workers
 
 		workspacePath := "perf-test"
@@ -504,15 +490,13 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects_WithPu
 			// Setup infrastructure service mock
 			infraMock := &mocks.InfrastructureServiceMock{}
 
-			// Setup test deps with infrastructure service
-			s.Deps = &infrastructure.Deps{
-				GitClient:  s.GitClient,
-				Config:     &config.Config{Workspace: s.T().TempDir()},
-				FileSystem: os.DirFS("/tmp"),
-			}
+			// Setup test dependencies with infrastructure service
+			testConfig := &config.Config{Workspace: s.T().TempDir()}
+			testFileSystem := os.DirFS("/tmp")
+			pathValidator := validation.NewPathValidator()
 
 			// Create service with infrastructure integration
-			s.Service = NewDiscoveryServiceWithInfra(s.Deps, infraMock)
+			s.Service = NewDiscoveryServiceWithInfra(s.GitClient, testConfig, testFileSystem, pathValidator, infraMock)
 
 			// Setup mocks
 			tt.setupMocks(s.GitClient, infraMock, tt.projectsPath)
@@ -554,7 +538,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_AnalyzeWorktree_WithPur
 	// Setup: Mock git client to return worktree status with specific commit time
 	expectedCommitTime := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
 
-	s.Deps.GitClient.(*mocks.GitClientMock).On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
+	s.GitClient.On("GetWorktreeStatus", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
 		return filepath.IsAbs(path) && filepath.Base(path) == "test-worktree"
 	})).Return(
 		&domain.WorktreeInfo{
@@ -589,7 +573,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_AnalyzeWorktree_WithPur
 
 	// 4. Verify no I/O operations are called in domain entity creation
 	// (This is verified by the fact that we only mocked GetWorktreeStatus once)
-	s.Deps.GitClient.(*mocks.GitClientMock).AssertExpectations(s.T())
+	s.GitClient.AssertExpectations(s.T())
 }
 
 // TestDiscoveryService_ConvertToWorktree_WithPureDomain tests conversion to pure domain entities
@@ -631,7 +615,10 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_ConvertToWorktree_WithP
 
 	for _, tt := range testCases {
 		s.Run(tt.name, func() {
-			s.Service = NewDiscoveryService(s.Deps)
+			testConfig := &config.Config{Workspace: s.T().TempDir()}
+			testFileSystem := os.DirFS("/tmp")
+			pathValidator := validation.NewPathValidator()
+			s.Service = NewDiscoveryService(s.GitClient, testConfig, testFileSystem, pathValidator)
 
 			worktree, err := s.Service.convertToWorktree(tt.worktreeInfo)
 
