@@ -9,22 +9,25 @@ import (
 	"github.com/amaury/twiggit/internal/domain"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
+	"github.com/amaury/twiggit/internal/infrastructure/validation"
 )
 
 // Deps contains all essential dependencies for the application
 // It provides a centralized dependency injection container
 type Deps struct {
-	GitClient  domain.GitClient
-	Config     *config.Config
-	FileSystem fs.FS
+	GitClient     domain.GitClient
+	Config        *config.Config
+	FileSystem    fs.FS
+	PathValidator domain.PathValidator
 }
 
 // NewDeps creates a new Deps container with initialized dependencies
 func NewDeps(cfg *config.Config) *Deps {
 	return &Deps{
-		GitClient:  git.NewClient(),
-		Config:     cfg,
-		FileSystem: os.DirFS("/"),
+		GitClient:     git.NewClient(),
+		Config:        cfg,
+		FileSystem:    os.DirFS("/"),
+		PathValidator: validation.NewPathValidator(),
 	}
 }
 

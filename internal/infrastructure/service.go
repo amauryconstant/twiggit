@@ -4,18 +4,22 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+
+	"github.com/amaury/twiggit/internal/domain"
 )
 
 // InfrastructureServiceImpl implements the InfrastructureService interface
 // It provides filesystem and git repository operations for domain entities
 type InfrastructureServiceImpl struct {
-	deps *Deps
+	deps          *Deps
+	pathValidator domain.PathValidator
 }
 
 // NewInfrastructureService creates a new InfrastructureService instance
 func NewInfrastructureService(deps *Deps) *InfrastructureServiceImpl {
 	return &InfrastructureServiceImpl{
-		deps: deps,
+		deps:          deps,
+		pathValidator: deps.PathValidator,
 	}
 }
 
@@ -71,6 +75,11 @@ func (s *InfrastructureServiceImpl) PathWritable(path string) bool {
 
 // IsGitRepository checks if a path is a valid git repository
 func (s *InfrastructureServiceImpl) IsGitRepository(path string) bool {
+	// First validate path format
+	if !s.pathValidator.IsValidGitRepoPath(path) {
+		return false
+	}
+
 	isRepo, err := s.deps.GitClient.IsGitRepository(context.TODO(), path)
 	if err != nil {
 		return false

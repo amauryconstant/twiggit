@@ -6,6 +6,28 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+// MockPathValidator is a mock implementation of PathValidator for testing
+type MockPathValidator struct {
+	IsValidGitRepoPathFunc   func(path string) bool
+	IsValidWorkspacePathFunc func(path string) bool
+}
+
+// IsValidGitRepoPath mocks the IsValidGitRepoPath method
+func (m *MockPathValidator) IsValidGitRepoPath(path string) bool {
+	if m.IsValidGitRepoPathFunc != nil {
+		return m.IsValidGitRepoPathFunc(path)
+	}
+	return false
+}
+
+// IsValidWorkspacePath mocks the IsValidWorkspacePath method
+func (m *MockPathValidator) IsValidWorkspacePath(path string) bool {
+	if m.IsValidWorkspacePathFunc != nil {
+		return m.IsValidWorkspacePathFunc(path)
+	}
+	return false
+}
+
 // ProjectTestSuite provides hybrid suite setup for project tests
 type ProjectTestSuite struct {
 	suite.Suite
@@ -469,8 +491,14 @@ func (s *ProjectTestSuite) TestProject_EnhancedFeatures() {
 				return project
 			},
 			testFunc: func(project *Project) {
-				// This should fail initially - we need to add health check
-				health := project.GetHealth()
+				// Create mock path validator that returns false for /repo/path
+				mockPathValidator := &MockPathValidator{
+					IsValidGitRepoPathFunc: func(path string) bool {
+						return path == "/valid/repo"
+					},
+				}
+
+				health := project.GetHealth(mockPathValidator)
 				s.NotNil(health)
 				s.Equal("unhealthy", health.Status)
 				s.Contains(health.Issues, "git repository not validated")

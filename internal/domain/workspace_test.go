@@ -366,7 +366,12 @@ func (s *WorkspaceTestSuite) TestWorkspace_EnhancedFeatures() {
 		s.Require().NoError(err)
 
 		// This should fail initially - we need to add health check
-		health := workspace.GetHealth()
+		mockPathValidator := &MockPathValidator{
+			IsValidWorkspacePathFunc: func(path string) bool {
+				return false // Simulate invalid path for testing
+			},
+		}
+		health := workspace.GetHealth(mockPathValidator)
 		s.NotNil(health)
 		s.Equal("unhealthy", health.Status)
 		s.Contains(health.Issues, "workspace path not validated")

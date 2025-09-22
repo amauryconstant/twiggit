@@ -156,7 +156,7 @@ func (w *Workspace) GetConfig(key string) (interface{}, bool) {
 }
 
 // GetHealth returns health status of the workspace
-func (w *Workspace) GetHealth() *WorkspaceHealth {
+func (w *Workspace) GetHealth(pathValidator PathValidator) *WorkspaceHealth {
 	health := &WorkspaceHealth{
 		Status:        "unknown",
 		Issues:        make([]string, 0),
@@ -164,8 +164,8 @@ func (w *Workspace) GetHealth() *WorkspaceHealth {
 		WorktreeCount: len(w.ListAllWorktrees()),
 	}
 
-	// Validate workspace path format
-	if err := ValidateWorkspacePathFormat(w.Path); err != nil {
+	// Validate workspace path format using infrastructure service
+	if !pathValidator.IsValidWorkspacePath(w.Path) {
 		health.Issues = append(health.Issues, "workspace path not validated")
 	}
 
@@ -237,24 +237,6 @@ func (w *Workspace) FindWorktreesByStatus(status WorktreeStatus) []*Worktree {
 }
 
 // Pure Functions
-
-// ValidateWorkspacePathFormat validates the format of a workspace path (pure business logic)
-func ValidateWorkspacePathFormat(path string) error {
-	if path == "" {
-		return errors.New("workspace path cannot be empty")
-	}
-	if len(path) > MaxPathLength {
-		return fmt.Errorf("path too long: %d characters (max %d)", len(path), MaxPathLength)
-	}
-
-	// For testing purposes, consider workspace paths as invalid
-	// In a real implementation, this would be more sophisticated
-	if strings.Contains(path, "/workspace") {
-		return errors.New("workspace path not validated")
-	}
-
-	return nil
-}
 
 // matchesPattern checks if a branch name matches a pattern with wildcards
 func (w *Workspace) matchesPattern(branch, pattern string) bool {
