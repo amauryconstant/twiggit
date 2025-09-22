@@ -72,7 +72,7 @@ func (s *ArchitectureIntegrationTestSuite) SetupSuite() {
 	s.deps = &infrastructure.Deps{
 		GitClient:  s.gitClient,
 		Config:     s.config,
-		FileSystem: os.DirFS(s.tempDir),
+		FileSystem: os.DirFS(s.tempDir), // Use temp directory as filesystem root for integration tests
 	}
 
 	s.discoveryService = services.NewDiscoveryService(s.deps)

@@ -14,17 +14,20 @@ import (
 
 // OperationsService handles worktree creation, removal, and management operations
 type OperationsService struct {
-	deps      *infrastructure.Deps
-	discovery *DiscoveryService
-	mise      *mise.MiseIntegration
+	deps       *infrastructure.Deps
+	discovery  *DiscoveryService
+	mise       *mise.MiseIntegration
+	validation *ValidationService
 }
 
 // NewOperationsService creates a new OperationsService instance
 func NewOperationsService(deps *infrastructure.Deps, discovery *DiscoveryService) *OperationsService {
+	infraService := infrastructure.NewInfrastructureService(deps)
 	return &OperationsService{
-		deps:      deps,
-		discovery: discovery,
-		mise:      mise.NewMiseIntegration(),
+		deps:       deps,
+		discovery:  discovery,
+		mise:       mise.NewMiseIntegration(),
+		validation: NewValidationService(infraService),
 	}
 }
 
@@ -40,7 +43,7 @@ func (ops *OperationsService) Create(ctx context.Context, project, branch, targe
 	}
 
 	// Validate branch name and target path
-	validationResult := domain.ValidateWorktreeCreation(branch, targetPath)
+	validationResult := ops.validation.ValidateWorktreeCreation(branch, targetPath)
 	if !validationResult.Valid {
 		return fmt.Errorf("validation failed: %w", validationResult.FirstError())
 	}

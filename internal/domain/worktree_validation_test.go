@@ -1,8 +1,6 @@
 package domain
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -144,47 +142,34 @@ func (s *ValidationTestSuite) TestValidatePath() {
 }
 
 func (s *ValidationTestSuite) TestValidatePathWritable() {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "twiggit-test-*")
-	s.Require().NoError(err)
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
+	// Test only pure business logic (path format validation)
+	// Filesystem operations are now handled by the service layer
 	tests := []struct {
 		name        string
-		setupPath   func() string
+		path        string
 		expectValid bool
 		errorType   ErrorType
 	}{
 		{
-			name: "valid writable path",
-			setupPath: func() string {
-				return filepath.Join(tempDir, "new-path")
-			},
+			name:        "valid path format",
+			path:        "/valid/path",
 			expectValid: true,
 		},
 		{
-			name: "path already exists",
-			setupPath: func() string {
-				existingPath := filepath.Join(tempDir, "existing")
-				s.Require().NoError(os.MkdirAll(existingPath, 0755))
-				return existingPath
-			},
+			name:        "empty path",
+			path:        "",
 			expectValid: false,
-			errorType:   ErrPathNotWritable,
+			errorType:   ErrInvalidPath,
 		},
 		{
-			name: "parent directory doesn't exist",
-			setupPath: func() string {
-				return filepath.Join(tempDir, "non-existent", "path")
-			},
+			name:        "relative path",
+			path:        "relative/path",
 			expectValid: false,
-			errorType:   ErrPathNotWritable,
+			errorType:   ErrInvalidPath,
 		},
 		{
-			name: "invalid path format",
-			setupPath: func() string {
-				return "relative/path"
-			},
+			name:        "path with null character",
+			path:        "/valid\x00/path",
 			expectValid: false,
 			errorType:   ErrInvalidPath,
 		},
@@ -192,8 +177,7 @@ func (s *ValidationTestSuite) TestValidatePathWritable() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			path := tt.setupPath()
-			result := ValidatePathWritable(path)
+			result := ValidatePathWritable(tt.path)
 
 			s.Equal(tt.expectValid, result.Valid, "Validation result should match expected")
 
@@ -206,11 +190,8 @@ func (s *ValidationTestSuite) TestValidatePathWritable() {
 }
 
 func (s *ValidationTestSuite) TestValidateWorktreeCreation() {
-	// Create a temporary directory for testing
-	tempDir, err := os.MkdirTemp("", "twiggit-test-*")
-	s.Require().NoError(err)
-	defer func() { _ = os.RemoveAll(tempDir) }()
-
+	// Test only pure business logic (format validation)
+	// Filesystem operations are now handled by the service layer
 	tests := []struct {
 		name        string
 		branchName  string
@@ -220,13 +201,13 @@ func (s *ValidationTestSuite) TestValidateWorktreeCreation() {
 		{
 			name:        "valid branch and path",
 			branchName:  "feature-branch",
-			targetPath:  filepath.Join(tempDir, "new-worktree"),
+			targetPath:  "/valid/path",
 			expectValid: true,
 		},
 		{
 			name:        "invalid branch name",
 			branchName:  "invalid branch name",
-			targetPath:  filepath.Join(tempDir, "valid-path"),
+			targetPath:  "/valid/path",
 			expectValid: false,
 		},
 		{

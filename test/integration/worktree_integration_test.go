@@ -93,7 +93,7 @@ func (s *WorktreeIntegrationTestSuite) SetupSuite() {
 	s.deps = &infrastructure.Deps{
 		GitClient:  s.gitClient,
 		Config:     s.config,
-		FileSystem: os.DirFS(s.testRepo.TempDir),
+		FileSystem: os.DirFS("/"), // Use real filesystem for integration tests
 	}
 
 	s.discoveryService = services.NewDiscoveryService(s.deps)
@@ -303,7 +303,7 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 	deps := &infrastructure.Deps{
 		GitClient:  gitClient,
 		Config:     config,
-		FileSystem: os.DirFS(testRepo.TempDir),
+		FileSystem: os.DirFS("/"), // Use real filesystem for integration tests
 	}
 	discoveryService := services.NewDiscoveryService(deps)
 	operationsService := services.NewOperationsService(deps, discoveryService)

@@ -24,6 +24,7 @@ const (
 // DiscoveryService handles the discovery and analysis of worktrees and projects
 type DiscoveryService struct {
 	deps        *infrastructure.Deps
+	infra       infrastructure.InfrastructureService
 	concurrency int
 	mu          sync.RWMutex
 	cache       map[string]*discoveryResult
@@ -36,8 +37,14 @@ type discoveryResult struct {
 
 // NewDiscoveryService creates a new DiscoveryService instance
 func NewDiscoveryService(deps *infrastructure.Deps) *DiscoveryService {
+	return NewDiscoveryServiceWithInfra(deps, infrastructure.NewInfrastructureService(deps))
+}
+
+// NewDiscoveryServiceWithInfra creates a new DiscoveryService instance with custom InfrastructureService
+func NewDiscoveryServiceWithInfra(deps *infrastructure.Deps, infra infrastructure.InfrastructureService) *DiscoveryService {
 	return &DiscoveryService{
 		deps:        deps,
+		infra:       infra,
 		concurrency: defaultConcurrency,
 		cache:       make(map[string]*discoveryResult),
 	}
@@ -56,7 +63,7 @@ func (ds *DiscoveryService) validatePath(path, pathType string) error {
 		return fmt.Errorf("%s path cannot be empty", pathType)
 	}
 
-	if _, err := ds.deps.Stat(path); err != nil {
+	if !ds.infra.PathExists(path) {
 		return fmt.Errorf("%s path does not exist: %s", pathType, path)
 	}
 
@@ -84,7 +91,7 @@ func (ds *DiscoveryService) isBareRepositorySafe(ctx context.Context, path strin
 // DiscoverWorktrees discovers all worktrees in a workspaces directory using concurrent processing
 func (ds *DiscoveryService) DiscoverWorktrees(ctx context.Context, workspacesPath string) ([]*domain.Worktree, error) {
 	// Check if workspaces path exists, return empty list if it doesn't
-	if _, err := ds.deps.Stat(workspacesPath); err != nil {
+	if !ds.infra.PathExists(workspacesPath) {
 		return []*domain.Worktree{}, nil
 	}
 
@@ -141,7 +148,7 @@ func (ds *DiscoveryService) AnalyzeWorktree(ctx context.Context, path string) (*
 // DiscoverProjects finds all Git repositories (projects) in the projects directory
 func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath string) ([]*domain.Project, error) {
 	// Check if projects path exists, return empty list if it doesn't
-	if _, err := ds.deps.Stat(projectsPath); err != nil {
+	if !ds.infra.PathExists(projectsPath) {
 		return []*domain.Project{}, nil
 	}
 
