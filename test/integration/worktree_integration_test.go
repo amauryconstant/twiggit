@@ -15,6 +15,8 @@ import (
 	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
+	"github.com/amaury/twiggit/internal/infrastructure/mise"
+	"github.com/amaury/twiggit/internal/infrastructure/validation"
 	"github.com/amaury/twiggit/internal/services"
 	"github.com/amaury/twiggit/test/helpers"
 	"github.com/stretchr/testify/suite"
@@ -65,7 +67,6 @@ type WorktreeIntegrationTestSuite struct {
 	discoveryService  *services.DiscoveryService
 	config            *config.Config
 	operationsService *services.OperationsService
-	deps              *infrastructure.Deps
 }
 
 func (s *WorktreeIntegrationTestSuite) SetupSuite() {
@@ -89,15 +90,15 @@ func (s *WorktreeIntegrationTestSuite) SetupSuite() {
 		Workspace: s.testRepo.TempDir,
 	}
 
-	// Create deps container
-	s.deps = &infrastructure.Deps{
-		GitClient:  s.gitClient,
-		Config:     s.config,
-		FileSystem: os.DirFS("/"), // Use real filesystem for integration tests
-	}
+	// Create path validator and filesystem
+	pathValidator := validation.NewPathValidator()
+	fileSystem := os.DirFS("/") // Use real filesystem for integration tests
 
-	s.discoveryService = services.NewDiscoveryService(s.deps)
-	s.operationsService = services.NewOperationsService(s.deps, s.discoveryService)
+	s.discoveryService = services.NewDiscoveryService(s.gitClient, s.config, fileSystem, pathValidator)
+	infraService := infrastructure.NewInfrastructureService(s.gitClient, fileSystem, pathValidator)
+	validationService := services.NewValidationService(infraService)
+	miseService := mise.NewMiseIntegration()
+	s.operationsService = services.NewOperationsService(s.gitClient, s.discoveryService, validationService, miseService)
 }
 
 func (s *WorktreeIntegrationTestSuite) TearDownSuite() {
@@ -248,12 +249,10 @@ func (s *WorktreeIntegrationTestSuite) TestDiscoveryService() {
 	s.Require().NoError(err)
 
 	// Test discovery
-	deps := &infrastructure.Deps{
-		GitClient:  gitClient,
-		Config:     &config.Config{Workspace: workspaceDir},
-		FileSystem: os.DirFS(workspaceDir),
-	}
-	discoveryService := services.NewDiscoveryService(deps)
+	config := &config.Config{Workspace: workspaceDir}
+	fileSystem := os.DirFS(workspaceDir)
+	pathValidator := validation.NewPathValidator()
+	discoveryService := services.NewDiscoveryService(gitClient, config, fileSystem, pathValidator)
 
 	s.Run("should discover all projects", func() {
 		// FileSystem is rooted at workspaceDir, so use "." to scan current directory
@@ -300,13 +299,13 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 	config := &config.Config{
 		Workspace: testRepo.TempDir,
 	}
-	deps := &infrastructure.Deps{
-		GitClient:  gitClient,
-		Config:     config,
-		FileSystem: os.DirFS("/"), // Use real filesystem for integration tests
-	}
-	discoveryService := services.NewDiscoveryService(deps)
-	operationsService := services.NewOperationsService(deps, discoveryService)
+	fileSystem := os.DirFS("/") // Use real filesystem for integration tests
+	pathValidator := validation.NewPathValidator()
+	discoveryService := services.NewDiscoveryService(gitClient, config, fileSystem, pathValidator)
+	infraService := infrastructure.NewInfrastructureService(gitClient, fileSystem, pathValidator)
+	validationService := services.NewValidationService(infraService)
+	miseService := mise.NewMiseIntegration()
+	operationsService := services.NewOperationsService(gitClient, discoveryService, validationService, miseService)
 
 	s.Run("should handle non-existent repository", func() {
 		err := operationsService.Create(context.Background(), "/non/existent/repo", "feature", "/tmp/test-worktree")
@@ -363,12 +362,10 @@ func (s *WorktreeIntegrationTestSuite) TestPerformance() {
 		}
 	}
 
-	deps := &infrastructure.Deps{
-		GitClient:  gitClient,
-		Config:     &config.Config{Workspace: workspaceDir},
-		FileSystem: os.DirFS(workspaceDir),
-	}
-	discoveryService := services.NewDiscoveryService(deps)
+	config := &config.Config{Workspace: workspaceDir}
+	fileSystem := os.DirFS(workspaceDir)
+	pathValidator := validation.NewPathValidator()
+	discoveryService := services.NewDiscoveryService(gitClient, config, fileSystem, pathValidator)
 	discoveryService.SetConcurrency(4) // Test with concurrent processing
 
 	s.Run("should discover projects efficiently", func() {

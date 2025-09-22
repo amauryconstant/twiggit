@@ -11,9 +11,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/amaury/twiggit/internal/di"
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/internal/infrastructure"
-	"github.com/amaury/twiggit/internal/services"
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +25,7 @@ type DeleteScope struct {
 }
 
 // NewDeleteCmd creates the delete command
-func NewDeleteCmd(deps *infrastructure.Deps) *cobra.Command {
+func NewDeleteCmd(container *di.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete Git worktrees",
@@ -47,7 +46,7 @@ Examples:
   twiggit delete --force      # Skip confirmation and safety checks`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runDeleteCommand(cmd, args, deps)
+			return runDeleteCommand(cmd, args, container)
 		},
 	}
 
@@ -60,7 +59,7 @@ Examples:
 }
 
 // runDeleteCommand implements the delete command functionality
-func runDeleteCommand(cmd *cobra.Command, _ []string, deps *infrastructure.Deps) error {
+func runDeleteCommand(cmd *cobra.Command, _ []string, container *di.Container) error {
 	ctx := context.Background()
 
 	// Get flags
@@ -68,12 +67,11 @@ func runDeleteCommand(cmd *cobra.Command, _ []string, deps *infrastructure.Deps)
 	force, _ := cmd.Flags().GetBool("force")
 	verbose, _ := cmd.Flags().GetBool("verbose")
 
-	// Create services
-	discoveryService := services.NewDiscoveryService(deps)
-	operationsService := services.NewOperationsService(deps, discoveryService)
+	// Get services from container
+	discoveryService := container.DiscoveryService()
 
 	// Determine scope based on current location (same logic as list command)
-	workspacePath, scope, err := determineDeleteScope(ctx, deps.GitClient, deps)
+	workspacePath, scope, err := determineDeleteScope(ctx, container)
 	if err != nil {
 		return fmt.Errorf("failed to determine scope: %w", err)
 	}
@@ -100,21 +98,21 @@ func runDeleteCommand(cmd *cobra.Command, _ []string, deps *infrastructure.Deps)
 	}
 
 	// Perform deletion
-	return performDeletion(ctx, operationsService, candidates, dryRun, force, verbose)
+	return performDeletion(ctx, container, candidates, dryRun, force, verbose)
 }
 
 // determineDeleteScope determines the deletion scope based on current location
-func determineDeleteScope(ctx context.Context, gitClient domain.GitClient, cfg *infrastructure.Deps) (string, DeleteScope, error) {
+func determineDeleteScope(ctx context.Context, container *di.Container) (string, DeleteScope, error) {
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return "", DeleteScope{}, fmt.Errorf("failed to get current directory: %w", err)
 	}
 
 	// Check if we're in a git repository
-	repoRoot, err := gitClient.GetRepositoryRoot(ctx, currentDir)
+	repoRoot, err := container.GitClient().GetRepositoryRoot(ctx, currentDir)
 	if err != nil {
 		// Not in git repo - scope is all projects
-		return cfg.Config.WorkspacesPath, DeleteScope{AllProjects: true}, nil
+		return container.Config().WorkspacesPath, DeleteScope{AllProjects: true}, nil
 	}
 
 	// We're in a git repository - use configured workspaces path
@@ -122,13 +120,13 @@ func determineDeleteScope(ctx context.Context, gitClient domain.GitClient, cfg *
 	projectName := filepath.Base(repoRoot)
 
 	// Check if current directory is within the workspaces path
-	if strings.HasPrefix(currentDir, cfg.Config.WorkspacesPath) {
+	if strings.HasPrefix(currentDir, container.Config().WorkspacesPath) {
 		// We're in a worktree - scope is current project
-		return cfg.Config.WorkspacesPath, DeleteScope{Project: projectName}, nil
+		return container.Config().WorkspacesPath, DeleteScope{Project: projectName}, nil
 	}
 
 	// We're in a main repository or other location - scope is all projects
-	return cfg.Config.WorkspacesPath, DeleteScope{AllProjects: true}, nil
+	return container.Config().WorkspacesPath, DeleteScope{AllProjects: true}, nil
 }
 
 // filterWorktreesForDeletion applies safety rules and scope filtering
@@ -208,7 +206,7 @@ func showDeletionConfirmation(candidates []*domain.Worktree, workspacePath strin
 }
 
 // performDeletion executes the worktree deletion
-func performDeletion(ctx context.Context, ops *services.OperationsService, candidates []*domain.Worktree, dryRun, force, verbose bool) error {
+func performDeletion(ctx context.Context, container *di.Container, candidates []*domain.Worktree, dryRun, force, verbose bool) error {
 	if dryRun {
 		fmt.Println("DRY RUN: No worktrees would be deleted")
 		return nil
@@ -216,6 +214,7 @@ func performDeletion(ctx context.Context, ops *services.OperationsService, candi
 
 	var failed []string
 	var success int
+	ops := container.OperationsService()
 
 	for _, wt := range candidates {
 		if verbose {

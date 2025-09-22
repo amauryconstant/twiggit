@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/amaury/twiggit/internal/domain"
 	"github.com/amaury/twiggit/internal/infrastructure"
+	"github.com/amaury/twiggit/internal/infrastructure/config"
 )
 
 const (
@@ -23,7 +25,9 @@ const (
 
 // DiscoveryService handles the discovery and analysis of worktrees and projects
 type DiscoveryService struct {
-	deps        *infrastructure.Deps
+	gitClient   domain.GitClient
+	config      *config.Config
+	fileSystem  fs.FS
 	infra       infrastructure.InfrastructureService
 	concurrency int
 	mu          sync.RWMutex
@@ -36,14 +40,16 @@ type discoveryResult struct {
 }
 
 // NewDiscoveryService creates a new DiscoveryService instance
-func NewDiscoveryService(deps *infrastructure.Deps) *DiscoveryService {
-	return NewDiscoveryServiceWithInfra(deps, infrastructure.NewInfrastructureService(deps))
+func NewDiscoveryService(gitClient domain.GitClient, config *config.Config, fileSystem fs.FS, pathValidator domain.PathValidator) *DiscoveryService {
+	return NewDiscoveryServiceWithInfra(gitClient, config, fileSystem, pathValidator, infrastructure.NewInfrastructureService(gitClient, fileSystem, pathValidator))
 }
 
 // NewDiscoveryServiceWithInfra creates a new DiscoveryService instance with custom InfrastructureService
-func NewDiscoveryServiceWithInfra(deps *infrastructure.Deps, infra infrastructure.InfrastructureService) *DiscoveryService {
+func NewDiscoveryServiceWithInfra(gitClient domain.GitClient, config *config.Config, fileSystem fs.FS, _ domain.PathValidator, infra infrastructure.InfrastructureService) *DiscoveryService {
 	return &DiscoveryService{
-		deps:        deps,
+		gitClient:   gitClient,
+		config:      config,
+		fileSystem:  fileSystem,
 		infra:       infra,
 		concurrency: defaultConcurrency,
 		cache:       make(map[string]*discoveryResult),
@@ -72,19 +78,19 @@ func (ds *DiscoveryService) validatePath(path, pathType string) error {
 
 // isGitRepositorySafe safely checks if a path is a git repository, returning false on errors
 func (ds *DiscoveryService) isGitRepositorySafe(ctx context.Context, path string) bool {
-	isRepo, err := ds.deps.GitClient.IsGitRepository(ctx, path)
+	isRepo, err := ds.gitClient.IsGitRepository(ctx, path)
 	return err == nil && isRepo
 }
 
 // isMainRepositorySafe safely checks if a path is a main repository, returning false on errors
 func (ds *DiscoveryService) isMainRepositorySafe(ctx context.Context, path string) bool {
-	isMainRepo, err := ds.deps.GitClient.IsMainRepository(ctx, path)
+	isMainRepo, err := ds.gitClient.IsMainRepository(ctx, path)
 	return err == nil && isMainRepo
 }
 
 // isBareRepositorySafe safely checks if a path is a bare repository, returning false on errors
 func (ds *DiscoveryService) isBareRepositorySafe(ctx context.Context, path string) bool {
-	isBare, err := ds.deps.GitClient.IsBareRepository(ctx, path)
+	isBare, err := ds.gitClient.IsBareRepository(ctx, path)
 	return err == nil && isBare
 }
 
@@ -128,7 +134,7 @@ func (ds *DiscoveryService) AnalyzeWorktree(ctx context.Context, path string) (*
 	absolutePath := ds.convertToAbsolutePath(path)
 
 	// Get worktree status from git client
-	status, err := ds.deps.GitClient.GetWorktreeStatus(ctx, absolutePath)
+	status, err := ds.gitClient.GetWorktreeStatus(ctx, absolutePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get worktree status for %s: %w", path, err)
 	}
@@ -157,7 +163,7 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath s
 	}
 
 	// Find all directories in projects directory
-	entries, err := ds.deps.ReadDir(projectsPath)
+	entries, err := fs.ReadDir(ds.fileSystem, projectsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read projects directory: %w", err)
 	}
@@ -196,7 +202,7 @@ func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, w
 	var paths []string
 
 	// Read the workspaces directory to find project subdirectories
-	entries, err := ds.deps.ReadDir(workspacesPath)
+	entries, err := fs.ReadDir(ds.fileSystem, workspacesPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read workspaces directory: %w", err)
 	}
@@ -215,7 +221,7 @@ func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, w
 		}
 
 		// Then, look for worktree directories within each project directory
-		worktreeEntries, err := ds.deps.ReadDir(projectDir)
+		worktreeEntries, err := fs.ReadDir(ds.fileSystem, projectDir)
 		if err != nil {
 			continue // Skip on error
 		}
@@ -387,12 +393,12 @@ func (ds *DiscoveryService) convertToAbsolutePath(relativePath string) string {
 
 	// If the path is ".", use the Workspace path (legacy support)
 	if relativePath == "." {
-		if ds.deps.Config.Workspace != "" {
-			return ds.deps.Config.Workspace
+		if ds.config.Workspace != "" {
+			return ds.config.Workspace
 		}
 		// Fallback to ProjectsPath if Workspace is not set
-		if ds.deps.Config.ProjectsPath != "" {
-			return ds.deps.Config.ProjectsPath
+		if ds.config.ProjectsPath != "" {
+			return ds.config.ProjectsPath
 		}
 		return relativePath
 	}
@@ -402,9 +408,9 @@ func (ds *DiscoveryService) convertToAbsolutePath(relativePath string) string {
 		// Remove "Projects" prefix and join with ProjectsPath
 		rest := strings.TrimPrefix(relativePath, "Projects")
 		if rest == "" {
-			return ds.deps.Config.ProjectsPath
+			return ds.config.ProjectsPath
 		}
-		return filepath.Join(ds.deps.Config.ProjectsPath, rest)
+		return filepath.Join(ds.config.ProjectsPath, rest)
 	}
 
 	// If the path starts with "Workspaces", use the configured WorkspacesPath
@@ -412,15 +418,15 @@ func (ds *DiscoveryService) convertToAbsolutePath(relativePath string) string {
 		// Remove "Workspaces" prefix and join with WorkspacesPath
 		rest := strings.TrimPrefix(relativePath, "Workspaces")
 		if rest == "" {
-			return ds.deps.Config.WorkspacesPath
+			return ds.config.WorkspacesPath
 		}
-		return filepath.Join(ds.deps.Config.WorkspacesPath, rest)
+		return filepath.Join(ds.config.WorkspacesPath, rest)
 	}
 
 	// For other cases (like relative paths within the workspace),
 	// join with the Workspace path
-	if ds.deps.Config.Workspace != "" {
-		return filepath.Join(ds.deps.Config.Workspace, relativePath)
+	if ds.config.Workspace != "" {
+		return filepath.Join(ds.config.Workspace, relativePath)
 	}
 
 	// Fallback: assume it's already absolute or handle as needed

@@ -9,13 +9,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/amaury/twiggit/internal/infrastructure"
-	"github.com/amaury/twiggit/internal/services"
+	"github.com/amaury/twiggit/internal/di"
 	"github.com/spf13/cobra"
 )
 
 // NewSwitchCmd creates the switch command
-func NewSwitchCmd(deps *infrastructure.Deps) *cobra.Command {
+func NewSwitchCmd(container *di.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "switch <project|project/branch>",
 		Short: "Switch to a project or worktree",
@@ -30,7 +29,7 @@ Examples:
   twiggit switch feature-branch         # When in project context, switches to worktree`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runSwitchCommand(cmd, args, deps)
+			return runSwitchCommand(cmd, args, container)
 		},
 	}
 
@@ -38,12 +37,12 @@ Examples:
 }
 
 // runSwitchCommand implements the switch command functionality
-func runSwitchCommand(_ *cobra.Command, args []string, deps *infrastructure.Deps) error {
+func runSwitchCommand(_ *cobra.Command, args []string, container *di.Container) error {
 	ctx := context.Background()
 
 	if len(args) == 0 {
 		// Try to use current context for intelligent switching
-		project, err := detectCurrentContext(ctx, deps)
+		project, err := detectCurrentContext(ctx, container)
 		if err != nil {
 			return errors.New("specify a target: <project> or <project/branch>")
 		}
@@ -63,27 +62,27 @@ func runSwitchCommand(_ *cobra.Command, args []string, deps *infrastructure.Deps
 
 	// Handle relative branch names when in project context
 	if !strings.Contains(target, "/") {
-		project, err := detectCurrentContext(ctx, deps)
+		project, err := detectCurrentContext(ctx, container)
 		if err == nil && project != "" && target != project {
 			// User said "switch feature-branch" while in project context
 			// But only if target is not the same as project name
-			return switchToWorktree(ctx, deps, fmt.Sprintf("%s/%s", project, target))
+			return switchToWorktree(ctx, container, fmt.Sprintf("%s/%s", project, target))
 		}
 	}
 
 	// Original logic
 	if strings.Contains(target, "/") {
-		return switchToWorktree(ctx, deps, target)
+		return switchToWorktree(ctx, container, target)
 	}
 
-	return switchToProject(ctx, deps, target)
+	return switchToProject(ctx, container, target)
 }
 
 // switchToProject switches to a main project repository
-func switchToProject(ctx context.Context, deps *infrastructure.Deps, project string) error {
-	// Use discovery service to find projects
-	discoveryService := services.NewDiscoveryService(deps)
-	projects, err := discoveryService.DiscoverProjects(ctx, deps.Config.ProjectsPath)
+func switchToProject(ctx context.Context, container *di.Container, project string) error {
+	// Get services from container
+	discoveryService := container.DiscoveryService()
+	projects, err := discoveryService.DiscoverProjects(ctx, container.Config().ProjectsPath)
 	if err != nil {
 		return fmt.Errorf("failed to discover projects: %w", err)
 	}
@@ -105,7 +104,7 @@ func switchToProject(ctx context.Context, deps *infrastructure.Deps, project str
 }
 
 // switchToWorktree switches to a specific worktree
-func switchToWorktree(ctx context.Context, deps *infrastructure.Deps, target string) error {
+func switchToWorktree(ctx context.Context, container *di.Container, target string) error {
 	parts := strings.Split(target, "/")
 	if len(parts) != 2 {
 		return errors.New("invalid worktree format: use <project>/<branch>")
@@ -113,9 +112,9 @@ func switchToWorktree(ctx context.Context, deps *infrastructure.Deps, target str
 
 	project, branch := parts[0], parts[1]
 
-	// Use discovery service to find worktrees
-	discoveryService := services.NewDiscoveryService(deps)
-	worktrees, err := discoveryService.DiscoverWorktrees(ctx, deps.Config.WorkspacesPath)
+	// Get services from container
+	discoveryService := container.DiscoveryService()
+	worktrees, err := discoveryService.DiscoverWorktrees(ctx, container.Config().WorkspacesPath)
 	if err != nil {
 		return fmt.Errorf("failed to discover worktrees: %w", err)
 	}
@@ -138,14 +137,14 @@ func switchToWorktree(ctx context.Context, deps *infrastructure.Deps, target str
 }
 
 // detectCurrentContext detects the current project context from the working directory
-func detectCurrentContext(ctx context.Context, deps *infrastructure.Deps) (project string, err error) {
+func detectCurrentContext(ctx context.Context, container *di.Container) (project string, err error) {
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current directory: %w", err)
 	}
 
 	// Check if we're in a git repository
-	repoRoot, err := deps.GitClient.GetRepositoryRoot(ctx, currentDir)
+	repoRoot, err := container.GitClient().GetRepositoryRoot(ctx, currentDir)
 	if err != nil {
 		return "", nil // Not in git repo, no context
 	}

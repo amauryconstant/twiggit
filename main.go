@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/amaury/twiggit/cmd"
-	"github.com/amaury/twiggit/internal/infrastructure"
+	"github.com/amaury/twiggit/internal/di"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
@@ -30,7 +30,7 @@ func getRootCommand() *cobra.Command {
 	}
 
 	// Create dependency container
-	deps := infrastructure.NewDeps(cfg)
+	container := di.NewContainer(cfg)
 
-	return cmd.NewRootCmd(deps)
+	return cmd.NewRootCmd(container)
 }

@@ -1,3 +1,4 @@
+// Package infrastructure contains external dependencies and implementations
 package infrastructure
 
 // InfrastructureService provides external dependencies for domain operations

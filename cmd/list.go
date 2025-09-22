@@ -11,14 +11,13 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/amaury/twiggit/internal/di"
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/internal/infrastructure"
-	"github.com/amaury/twiggit/internal/services"
 	"github.com/spf13/cobra"
 )
 
 // NewListCmd creates the unified list command
-func NewListCmd(deps *infrastructure.Deps) *cobra.Command {
+func NewListCmd(container *di.Container) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List all available worktrees",
@@ -41,7 +40,7 @@ Examples:
   twiggit list --sort=date  # Sort by last updated time`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runListCommand(cmd, args, deps)
+			return runListCommand(cmd, args, container)
 		},
 	}
 
@@ -53,25 +52,25 @@ Examples:
 }
 
 // runListCommand implements the unified list command functionality
-func runListCommand(cmd *cobra.Command, _ []string, deps *infrastructure.Deps) error {
+func runListCommand(cmd *cobra.Command, _ []string, container *di.Container) error {
 	ctx := context.Background()
 
 	// Get flags
 	allFlag, _ := cmd.Flags().GetBool("all")
 	sortBy, _ := cmd.Flags().GetString("sort")
 
-	// Create discovery service
-	discoveryService := services.NewDiscoveryService(deps)
+	// Get services from container
+	discoveryService := container.DiscoveryService()
 
 	// Determine workspace path and scope
-	workspacePath := deps.Config.WorkspacesPath
+	workspacePath := container.Config().WorkspacesPath
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
 	}
 
 	// Auto-detect if we're in a git repository
-	repoRoot, err := deps.GitClient.GetRepositoryRoot(ctx, currentDir)
+	repoRoot, err := container.GitClient().GetRepositoryRoot(ctx, currentDir)
 	inGitRepo := err == nil
 
 	// Determine scope based on location and --all flag
