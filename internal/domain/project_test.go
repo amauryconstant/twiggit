@@ -348,7 +348,57 @@ func (s *ProjectTestSuite) TestProject_ListBranches() {
 	}
 }
 
-// TestProject_EnhancedFeatures tests enhanced project features with table-driven approach
+func (s *ProjectTestSuite) TestProject_CanAddWorktree_Pure() {
+	// Arrange - deterministic, no I/O
+	project := &Project{
+		Name:      "test-project",
+		GitRepo:   "/path/to/repo",
+		Worktrees: []*Worktree{},
+	}
+
+	existingWorktree := &Worktree{Path: "/existing/path", Branch: "main"}
+	project.Worktrees = append(project.Worktrees, existingWorktree)
+
+	newWorktree := &Worktree{Path: "/new/path", Branch: "feature"}
+	duplicateWorktree := &Worktree{Path: "/existing/path", Branch: "feature"}
+
+	// Act & Assert - pure business logic
+	s.Require().NoError(project.CanAddWorktree(newWorktree))
+	s.Require().Error(project.CanAddWorktree(duplicateWorktree))
+}
+
+func (s *ProjectTestSuite) TestProject_HasWorktreeOnBranch_Pure() {
+	project := &Project{
+		Name: "test-project",
+		Worktrees: []*Worktree{
+			{Branch: "main", Path: "/main/path"},
+			{Branch: "feature", Path: "/feature/path"},
+		},
+	}
+
+	s.True(project.HasWorktreeOnBranch("main"))
+	s.True(project.HasWorktreeOnBranch("feature"))
+	s.False(project.HasWorktreeOnBranch("nonexistent"))
+}
+
+func (s *ProjectTestSuite) TestProject_AddWorktree_Pure() {
+	project := &Project{
+		Name:      "test-project",
+		GitRepo:   "/path/to/repo",
+		Worktrees: []*Worktree{},
+	}
+
+	worktree := &Worktree{Path: "/new/path", Branch: "feature"}
+
+	// Act
+	err := project.AddWorktree(worktree)
+
+	// Assert
+	s.Require().NoError(err)
+	s.Len(project.Worktrees, 1)
+	s.Equal(worktree, project.Worktrees[0])
+}
+
 func (s *ProjectTestSuite) TestProject_EnhancedFeatures() {
 	testCases := []struct {
 		name         string
@@ -380,21 +430,6 @@ func (s *ProjectTestSuite) TestProject_EnhancedFeatures() {
 
 				_, exists = project.GetMetadata("non-existent")
 				s.False(exists)
-			},
-			expectError: false,
-		},
-		{
-			name: "should validate git repository existence",
-			setupProject: func() *Project {
-				project, err := NewProject("test-project", "/non/existent/repo")
-				s.Require().NoError(err)
-				return project
-			},
-			testFunc: func(project *Project) {
-				// This should fail initially - we need to add git repo validation
-				isValid, err := project.ValidateGitRepoExists()
-				s.Require().Error(err)
-				s.False(isValid)
 			},
 			expectError: false,
 		},

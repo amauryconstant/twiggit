@@ -3,9 +3,16 @@ package domain
 import (
 	"errors"
 	"fmt"
-	"os"
 	"time"
 )
+
+// Constants
+const (
+	// MaxPathLength is the maximum allowed length for worktree paths
+	MaxPathLength = 255
+)
+
+// Types
 
 // WorktreeStatus represents the current state of a worktree
 type WorktreeStatus int
@@ -19,18 +26,10 @@ const (
 	StatusDirty
 )
 
-// String returns a human-readable representation of the status
-func (s WorktreeStatus) String() string {
-	switch s {
-	case StatusUnknown:
-		return "unknown"
-	case StatusClean:
-		return "clean"
-	case StatusDirty:
-		return "dirty"
-	default:
-		return "invalid"
-	}
+// WorktreeHealth represents the health status of a worktree
+type WorktreeHealth struct {
+	Status string
+	Issues []string
 }
 
 // Worktree represents a Git worktree entity
@@ -49,10 +48,17 @@ type Worktree struct {
 	Metadata map[string]string
 }
 
+// Constructors
+
 // NewWorktree creates a new Worktree instance with validation
 func NewWorktree(path, branch string) (*Worktree, error) {
-	if path == "" {
-		return nil, errors.New("worktree path cannot be empty")
+	return NewWorktreeAt(path, branch, time.Now())
+}
+
+// NewWorktreeAt creates a new Worktree instance with deterministic timestamp
+func NewWorktreeAt(path, branch string, timestamp time.Time) (*Worktree, error) {
+	if err := ValidatePathFormat(path); err != nil {
+		return nil, err
 	}
 	if branch == "" {
 		return nil, errors.New("branch name cannot be empty")
@@ -63,16 +69,28 @@ func NewWorktree(path, branch string) (*Worktree, error) {
 		Branch:      branch,
 		Commit:      "",
 		Status:      StatusUnknown,
-		LastUpdated: time.Now(),
+		LastUpdated: timestamp,
 		Metadata:    make(map[string]string),
 	}, nil
 }
 
+// Methods
+
+// String returns a human-readable representation of the worktree
+func (w *Worktree) String() string {
+	return fmt.Sprintf("Worktree{path=%s, branch=%s, status=%s}", w.Path, w.Branch, w.Status)
+}
+
 // UpdateStatus updates the worktree status and refresh timestamp
 func (w *Worktree) UpdateStatus(status WorktreeStatus) error {
-	w.Status = status
-	w.LastUpdated = time.Now()
+	w.UpdateStatusAt(status, time.Now())
 	return nil
+}
+
+// UpdateStatusAt updates the worktree status with deterministic timestamp
+func (w *Worktree) UpdateStatusAt(status WorktreeStatus, timestamp time.Time) {
+	w.Status = status
+	w.LastUpdated = timestamp
 }
 
 // IsClean returns true if the worktree has no uncommitted changes
@@ -80,9 +98,14 @@ func (w *Worktree) IsClean() bool {
 	return w.Status == StatusClean
 }
 
-// String returns a human-readable representation of the worktree
-func (w *Worktree) String() string {
-	return fmt.Sprintf("Worktree{path=%s, branch=%s, status=%s}", w.Path, w.Branch, w.Status)
+// IsStatusStale checks if the worktree status is stale (older than 5 minutes)
+func (w *Worktree) IsStatusStale() bool {
+	return time.Since(w.LastUpdated) > 5*time.Minute
+}
+
+// IsStatusStaleWithThreshold checks if the worktree status is stale with custom threshold
+func (w *Worktree) IsStatusStaleWithThreshold(threshold time.Duration) bool {
+	return time.Since(w.LastUpdated) > threshold
 }
 
 // SetCommit sets the commit hash for the worktree
@@ -96,22 +119,15 @@ func (w *Worktree) GetCommit() string {
 	return w.Commit
 }
 
-// ValidatePathExists checks if the worktree path exists on the filesystem
-func (w *Worktree) ValidatePathExists() (bool, error) {
-	if _, err := os.Stat(w.Path); os.IsNotExist(err) {
-		return false, fmt.Errorf("worktree path does not exist: %s", w.Path)
-	}
-	return true, nil
+// SetMetadata sets a metadata key-value pair
+func (w *Worktree) SetMetadata(key, value string) {
+	w.Metadata[key] = value
 }
 
-// IsStatusStale checks if the worktree status is stale (older than 5 minutes)
-func (w *Worktree) IsStatusStale() bool {
-	return time.Since(w.LastUpdated) > 5*time.Minute
-}
-
-// IsStatusStaleWithThreshold checks if the worktree status is stale with custom threshold
-func (w *Worktree) IsStatusStaleWithThreshold(threshold time.Duration) bool {
-	return time.Since(w.LastUpdated) > threshold
+// GetMetadata retrieves a metadata value by key
+func (w *Worktree) GetMetadata(key string) (string, bool) {
+	value, exists := w.Metadata[key]
+	return value, exists
 }
 
 // Equals checks if two worktrees are equal (all fields match)
@@ -133,23 +149,6 @@ func (w *Worktree) SameLocationAs(other *Worktree) bool {
 	return w.Path == other.Path
 }
 
-// SetMetadata sets a metadata key-value pair
-func (w *Worktree) SetMetadata(key, value string) {
-	w.Metadata[key] = value
-}
-
-// GetMetadata retrieves a metadata value by key
-func (w *Worktree) GetMetadata(key string) (string, bool) {
-	value, exists := w.Metadata[key]
-	return value, exists
-}
-
-// WorktreeHealth represents the health status of a worktree
-type WorktreeHealth struct {
-	Status string
-	Issues []string
-}
-
 // GetHealth returns the health status of the worktree
 func (w *Worktree) GetHealth() *WorktreeHealth {
 	health := &WorktreeHealth{
@@ -157,9 +156,14 @@ func (w *Worktree) GetHealth() *WorktreeHealth {
 		Issues: make([]string, 0),
 	}
 
-	// Check if path exists
-	if exists, err := w.ValidatePathExists(); err != nil || !exists {
+	// Basic validation - path format check
+	if err := ValidatePathFormat(w.Path); err != nil {
 		health.Issues = append(health.Issues, "path not validated")
+	}
+
+	// Validate branch name
+	if w.Branch == "" {
+		health.Issues = append(health.Issues, "branch name is empty")
 	}
 
 	// Determine overall status
@@ -170,4 +174,34 @@ func (w *Worktree) GetHealth() *WorktreeHealth {
 	}
 
 	return health
+}
+
+// Pure Functions
+
+// ValidatePathFormat validates the format of a worktree path (pure business logic)
+func ValidatePathFormat(path string) error {
+	if path == "" {
+		return errors.New("worktree path cannot be empty")
+	}
+	if len(path) > MaxPathLength {
+		return fmt.Errorf("path too long: %d characters (max %d)", len(path), MaxPathLength)
+	}
+
+	// Basic path format validation - in a real implementation this would be more sophisticated
+	// For now, we accept most paths as long as they're not empty and not too long
+	return nil
+}
+
+// String returns a human-readable representation of status
+func (s WorktreeStatus) String() string {
+	switch s {
+	case StatusUnknown:
+		return "unknown"
+	case StatusClean:
+		return "clean"
+	case StatusDirty:
+		return "dirty"
+	default:
+		return "invalid"
+	}
 }

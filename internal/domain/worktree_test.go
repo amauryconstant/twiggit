@@ -110,26 +110,65 @@ func (s *WorktreeTestSuite) TestString() {
 	s.Contains(result, "unknown")
 }
 
+func (s *WorktreeTestSuite) TestValidatePathFormat_Pure() {
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{"valid path", "/valid/path", false},
+		{"empty path", "", true},
+		{"too long path", "a" + string(make([]byte, 299)), true}, // 300 chars
+		{"relative path", "relative/path", false},
+		{"home path", "/home/user/project", false},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			err := ValidatePathFormat(tt.path)
+			if tt.wantErr {
+				s.Require().Error(err)
+			} else {
+				s.Require().NoError(err)
+			}
+		})
+	}
+}
+
+func (s *WorktreeTestSuite) TestNewWorktreeAt_Deterministic() {
+	timestamp := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+
+	worktree, err := NewWorktreeAt("/valid/path", "main", timestamp)
+
+	s.Require().NoError(err)
+	s.Equal("/valid/path", worktree.Path)
+	s.Equal("main", worktree.Branch)
+	s.Equal(timestamp, worktree.LastUpdated)
+	s.Equal(StatusUnknown, worktree.Status)
+}
+
+func (s *WorktreeTestSuite) TestUpdateStatusAt_Deterministic() {
+	timestamp := time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC)
+	worktree, err := NewWorktreeAt("/valid/path", "main", timestamp)
+	s.Require().NoError(err)
+
+	newTimestamp := time.Date(2023, 1, 1, 13, 0, 0, 0, time.UTC)
+
+	worktree.UpdateStatusAt(StatusClean, newTimestamp)
+
+	s.Equal(StatusClean, worktree.Status)
+	s.Equal(newTimestamp, worktree.LastUpdated)
+}
+
 func (s *WorktreeTestSuite) TestEnhancedFeatures() {
 	s.Run("should support commit hash tracking", func() {
-		worktree, err := NewWorktree("/test/path", "main")
+		worktree, err := NewWorktree("/valid/path", "main")
 		s.Require().NoError(err)
 
 		// This should fail initially - we need to add Commit field
 		err = worktree.SetCommit("abc123def456")
 		s.Require().NoError(err)
 		s.Equal("abc123def456", worktree.GetCommit())
-	})
-
-	s.Run("should validate path existence", func() {
-		// Test with non-existent path
-		worktree, err := NewWorktree("/non/existent/path", "main")
-		s.Require().NoError(err)
-
-		// This should fail initially - we need to add path validation
-		isValid, err := worktree.ValidatePathExists()
-		s.Require().Error(err)
-		s.False(isValid)
 	})
 
 	s.Run("should support status aging", func() {
@@ -190,10 +229,10 @@ func (s *WorktreeTestSuite) TestEnhancedFeatures() {
 		worktree, err := NewWorktree("/test/path", "main")
 		s.Require().NoError(err)
 
-		// This should fail initially - we need to add health check
+		// With pure domain validation, the path should be valid
 		health := worktree.GetHealth()
 		s.NotNil(health)
-		s.Equal("unhealthy", health.Status)
-		s.Contains(health.Issues, "path not validated")
+		s.Equal("healthy", health.Status)
+		s.Empty(health.Issues)
 	})
 }

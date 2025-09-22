@@ -232,16 +232,78 @@ func (s *WorkspaceTestSuite) TestWorkspace_GetWorktreeByPath() {
 	s.Contains(err.Error(), "worktree not found")
 }
 
-// TestWorkspace_EnhancedFeatures tests enhanced workspace functionality with sub-tests
+func (s *WorkspaceTestSuite) TestWorkspace_GetStatistics_Pure() {
+	workspace := &Workspace{
+		Path: "/workspace",
+		Projects: []*Project{
+			{
+				Name:    "project1",
+				GitRepo: "/repo1",
+				Worktrees: []*Worktree{
+					{Path: "/path1", Branch: "main"},
+					{Path: "/path2", Branch: "feature"},
+				},
+			},
+			{
+				Name:    "project2",
+				GitRepo: "/repo2",
+				Worktrees: []*Worktree{
+					{Path: "/path3", Branch: "develop"},
+				},
+			},
+		},
+	}
+
+	stats := workspace.GetStatistics()
+	s.NotNil(stats)
+	s.Equal(2, stats.ProjectCount)
+	s.Equal(3, stats.TotalWorktreeCount)
+}
+
+func (s *WorkspaceTestSuite) TestWorkspace_GetProject_Pure() {
+	workspace := &Workspace{
+		Path: "/workspace",
+		Projects: []*Project{
+			{Name: "project1", GitRepo: "/repo1"},
+			{Name: "project2", GitRepo: "/repo2"},
+		},
+	}
+
+	// Test existing project
+	project, err := workspace.GetProject("project1")
+	s.Require().NoError(err)
+	s.Equal("project1", project.Name)
+
+	// Test non-existent project
+	_, err = workspace.GetProject("nonexistent")
+	s.Require().Error(err)
+	s.Contains(err.Error(), "project not found")
+}
+
 func (s *WorkspaceTestSuite) TestWorkspace_EnhancedFeatures() {
-	s.Run("should validate workspace path existence", func() {
-		workspace, err := NewWorkspace("/non/existent/workspace")
+	s.Run("should support workspace configuration", func() {
+		workspace, err := NewWorkspace("/workspace")
 		s.Require().NoError(err)
 
-		// This should fail initially - we need to add path validation
-		isValid, err := workspace.ValidatePathExists()
-		s.Require().Error(err)
-		s.False(isValid)
+		// This should fail initially - we need to add configuration support
+		workspace.SetConfig("scan-depth", 3)
+		workspace.SetConfig("exclude-patterns", []string{".git", "node_modules"})
+		workspace.SetConfig("auto-discover", true)
+
+		value, exists := workspace.GetConfig("scan-depth")
+		s.True(exists)
+		s.Equal(3, value)
+
+		value, exists = workspace.GetConfig("auto-discover")
+		s.True(exists)
+		s.Equal(true, value)
+
+		patterns, exists := workspace.GetConfig("exclude-patterns")
+		s.True(exists)
+		s.Equal([]string{".git", "node_modules"}, patterns)
+
+		_, exists = workspace.GetConfig("non-existent")
+		s.False(exists)
 	})
 
 	s.Run("should provide workspace statistics", func() {

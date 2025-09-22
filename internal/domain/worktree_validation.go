@@ -2,7 +2,6 @@ package domain
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -199,7 +198,9 @@ func ValidatePath(path string) *ValidationResult {
 	return result
 }
 
-// ValidatePathWritable checks if a path is writable (parent directory must exist and be writable)
+// ValidatePathWritable checks if a path is writable (pure business logic only)
+// Note: This function only validates the path format, not actual filesystem access
+// For full validation including filesystem checks, use services.ValidationService.ValidatePathWritable
 func ValidatePathWritable(path string) *ValidationResult {
 	result := NewValidationResult()
 
@@ -211,68 +212,15 @@ func ValidatePathWritable(path string) *ValidationResult {
 		return result
 	}
 
-	// Check if path already exists
-	if _, err := os.Stat(path); err == nil {
-		result.AddError(NewWorktreeError(
-			ErrPathNotWritable,
-			"path already exists",
-			path,
-		).WithSuggestion("Choose a different path that doesn't already exist"))
-		return result
-	}
-
-	// Check if parent directory exists and is writable
-	parentDir := filepath.Dir(path)
-	parentInfo, err := os.Stat(parentDir)
-	if os.IsNotExist(err) {
-		result.AddError(NewWorktreeError(
-			ErrPathNotWritable,
-			"parent directory does not exist",
-			path,
-		).WithSuggestion("Create the parent directory: " + parentDir))
-		return result
-	}
-
-	if err != nil {
-		result.AddError(WrapError(
-			ErrPathNotWritable,
-			"cannot access parent directory",
-			path,
-			err,
-		).WithSuggestion("Ensure the parent directory is accessible"))
-		return result
-	}
-
-	if !parentInfo.IsDir() {
-		result.AddError(NewWorktreeError(
-			ErrPathNotWritable,
-			"parent path is not a directory",
-			path,
-		).WithSuggestion("Ensure the parent path is a directory"))
-		return result
-	}
-
-	// Test writability by attempting to create a temporary file
-	tempFile := filepath.Join(parentDir, ".twiggit-write-test")
-	file, err := os.Create(tempFile)
-	if err != nil {
-		result.AddError(WrapError(
-			ErrPathNotWritable,
-			"parent directory is not writable",
-			path,
-			err,
-		).WithSuggestion("Ensure you have write permissions to the parent directory"))
-		return result
-	}
-
-	// Clean up the temporary file
-	_ = file.Close()
-	_ = os.Remove(tempFile)
+	// Pure business logic validation only
+	// Actual filesystem checks are handled by the service layer
 
 	return result
 }
 
 // ValidateWorktreeCreation performs comprehensive validation for worktree creation
+// Note: This function only validates the format, not actual filesystem access
+// For full validation including filesystem checks, use services.ValidationService.ValidateWorktreeCreation
 func ValidateWorktreeCreation(branchName, targetPath string) *ValidationResult {
 	result := NewValidationResult()
 
@@ -281,7 +229,7 @@ func ValidateWorktreeCreation(branchName, targetPath string) *ValidationResult {
 	result.Errors = append(result.Errors, branchResult.Errors...)
 	result.Warnings = append(result.Warnings, branchResult.Warnings...)
 
-	// Validate target path
+	// Validate target path format only
 	pathResult := ValidatePathWritable(targetPath)
 	result.Errors = append(result.Errors, pathResult.Errors...)
 	result.Warnings = append(result.Warnings, pathResult.Warnings...)
