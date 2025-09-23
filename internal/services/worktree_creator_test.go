@@ -129,7 +129,7 @@ func TestWorktreeCreator_Create(t *testing.T) {
 
 		// Verify
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "validation failed")
+		assert.Contains(t, err.Error(), "parent directory does not exist")
 
 		mockGitClient.AssertNotCalled(t, "IsGitRepository")
 	})

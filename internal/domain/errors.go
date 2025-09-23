@@ -5,8 +5,10 @@ import (
 	"fmt"
 )
 
-// DomainErrorType represents different categories of domain errors
-// This unified type replaces ProjectErrorType, ErrorType, and WorkspaceErrorType
+// DomainErrorType represents different categories of domain errors.
+// This unified type provides consistent error handling across all domain operations
+// including projects, worktrees, and workspaces. Each error type corresponds to
+// a specific category of failure that can occur during system operations.
 type DomainErrorType int
 
 const (
@@ -121,19 +123,23 @@ func (et DomainErrorType) String() string {
 	}
 }
 
-// DomainError represents a comprehensive error with context for all domain operations
-// This unified type replaces ProjectError, WorktreeError, and WorkspaceError
+// DomainError represents a comprehensive error with context for all domain operations.
+// This unified type replaces ProjectError, WorktreeError, and WorkspaceError.
+// It provides rich context including error type, message, path, cause, suggestions,
+// and entity type for better error handling and user experience.
 type DomainError struct {
 	Type        DomainErrorType
 	Message     string
 	Path        string
 	Cause       error
 	Suggestions []string
-	Code        string
 	EntityType  string // "project", "worktree", "workspace" for context
 }
 
-// Error implements the error interface
+// Error implements the error interface.
+// Returns a formatted error message that includes the error type, message,
+// and path if available. This provides consistent error string representation
+// across all domain operations.
 func (e *DomainError) Error() string {
 	if e.Path != "" {
 		return fmt.Sprintf("%s: %s (path: %s)", e.Type, e.Message, e.Path)
@@ -141,30 +147,33 @@ func (e *DomainError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Type, e.Message)
 }
 
-// Unwrap returns the underlying cause error
+// Unwrap returns the underlying cause error.
+// This enables error wrapping and allows callers to inspect the root cause
+// using errors.Is() and errors.As() functions from the standard library.
 func (e *DomainError) Unwrap() error {
 	return e.Cause
 }
 
-// WithSuggestion adds a suggestion to help resolve the error
+// WithSuggestion adds a suggestion to help resolve the error.
+// Suggestions are displayed to users in formatted error messages to provide
+// actionable guidance for resolving the error. Multiple suggestions can be added.
 func (e *DomainError) WithSuggestion(suggestion string) *DomainError {
 	e.Suggestions = append(e.Suggestions, suggestion)
 	return e
 }
 
-// WithCode adds an error code for programmatic handling
-func (e *DomainError) WithCode(code string) *DomainError {
-	e.Code = code
-	return e
-}
-
-// WithEntityType adds entity type context for better error categorization
+// WithEntityType adds entity type context for better error categorization.
+// Entity type helps categorize errors by domain concept ("project", "worktree", "workspace")
+// and enables more targeted error handling and user messaging.
 func (e *DomainError) WithEntityType(entityType string) *DomainError {
 	e.EntityType = entityType
 	return e
 }
 
-// IsDomainErrorType checks if an error is of a specific DomainError type
+// IsDomainErrorType checks if an error is of a specific DomainError type.
+// This function enables type-safe error checking and is useful for error handling
+// logic that needs to respond differently based on error categories.
+// Returns true if the error matches the specified type, false otherwise.
 func IsDomainErrorType(err error, errType DomainErrorType) bool {
 	domainErr := &DomainError{}
 	if errors.As(err, &domainErr) {
@@ -175,97 +184,88 @@ func IsDomainErrorType(err error, errType DomainErrorType) bool {
 
 // Domain-specific constructors that preserve ubiquitous language
 
-// NewProjectError creates a new DomainError with project context
-func NewProjectError(errType DomainErrorType, message string, path string) *DomainError {
+// NewProjectError creates a new DomainError with project context.
+// Use this function for all project-related errors to ensure consistent
+// error handling and user experience. Automatically sets entity type to "project".
+// Accepts an optional cause error for wrapping underlying errors.
+//
+// Example:
+//
+//	err := NewProjectError(ErrProjectNotFound, "project not found", path)
+//	    .WithSuggestion("Check if project exists in projects directory")
+//
+//	// With underlying cause:
+//	err := NewProjectError(ErrProjectValidation, "validation failed", path, underlyingErr)
+//	    .WithSuggestion("Check project configuration")
+func NewProjectError(errType DomainErrorType, message string, path string, cause ...error) *DomainError {
+	var err error
+	if len(cause) > 0 {
+		err = cause[0]
+	}
+
 	return &DomainError{
 		Type:        errType,
 		Message:     message,
 		Path:        path,
+		Cause:       err,
 		Suggestions: make([]string, 0),
 		EntityType:  "project",
 	}
 }
 
-// NewWorktreeError creates a new DomainError with worktree context
-func NewWorktreeError(errType DomainErrorType, message string, path string) *DomainError {
+// NewWorktreeError creates a new DomainError with worktree context.
+// Use this function for all worktree-related errors to ensure consistent
+// error handling and user experience. Automatically sets entity type to "worktree".
+// Accepts an optional cause error for wrapping underlying errors.
+//
+// Example:
+//
+//	err := NewWorktreeError(ErrWorktreeExists, "worktree already exists", path)
+//	    .WithSuggestion("Use 'twiggit switch' to navigate to existing worktree")
+//
+//	// With underlying cause:
+//	err := NewWorktreeError(ErrGitCommand, "git command failed", path, gitErr)
+//	    .WithSuggestion("Check git installation and repository state")
+func NewWorktreeError(errType DomainErrorType, message string, path string, cause ...error) *DomainError {
+	var err error
+	if len(cause) > 0 {
+		err = cause[0]
+	}
+
 	return &DomainError{
 		Type:        errType,
 		Message:     message,
 		Path:        path,
+		Cause:       err,
 		Suggestions: make([]string, 0),
 		EntityType:  "worktree",
 	}
 }
 
-// NewWorkspaceError creates a new DomainError with workspace context
-func NewWorkspaceError(errType DomainErrorType, message string) *DomainError {
+// NewWorkspaceError creates a new DomainError with workspace context.
+// Use this function for all workspace-related errors to ensure consistent
+// error handling and user experience. Automatically sets entity type to "workspace".
+// Accepts an optional cause error for wrapping underlying errors.
+//
+// Example:
+//
+//	err := NewWorkspaceError(ErrWorkspaceDiscoveryFailed, "discovery failed")
+//	    .WithSuggestion("Check workspace configuration and permissions")
+//
+//	// With underlying cause:
+//	err := NewWorkspaceError(ErrWorkspaceDiscoveryFailed, "discovery failed", underlyingErr)
+//	    .WithSuggestion("Check workspace directory permissions")
+func NewWorkspaceError(errType DomainErrorType, message string, cause ...error) *DomainError {
+	var err error
+	if len(cause) > 0 {
+		err = cause[0]
+	}
+
 	return &DomainError{
 		Type:        errType,
 		Message:     message,
+		Cause:       err,
 		Suggestions: make([]string, 0),
 		EntityType:  "workspace",
 	}
-}
-
-// Wrapping functions that preserve entity context
-
-// WrapProjectError wraps an existing error with project context
-func WrapProjectError(errType DomainErrorType, message string, path string, cause error) *DomainError {
-	return &DomainError{
-		Type:        errType,
-		Message:     message,
-		Path:        path,
-		Cause:       cause,
-		Suggestions: make([]string, 0),
-		EntityType:  "project",
-	}
-}
-
-// WrapWorktreeError wraps an existing error with worktree context
-func WrapWorktreeError(errType DomainErrorType, message string, path string, cause error) *DomainError {
-	return &DomainError{
-		Type:        errType,
-		Message:     message,
-		Path:        path,
-		Cause:       cause,
-		Suggestions: make([]string, 0),
-		EntityType:  "worktree",
-	}
-}
-
-// WrapWorkspaceError wraps an existing error with workspace context
-func WrapWorkspaceError(errType DomainErrorType, message string, cause error) *DomainError {
-	return &DomainError{
-		Type:        errType,
-		Message:     message,
-		Cause:       cause,
-		Suggestions: make([]string, 0),
-		EntityType:  "workspace",
-	}
-}
-
-// Legacy compatibility functions - these will be deprecated later
-
-// IsProjectErrorType checks if an error is of a specific project error type
-// This function maintains backward compatibility during migration
-func IsProjectErrorType(err error, errType DomainErrorType) bool {
-	return IsDomainErrorType(err, errType)
-}
-
-// IsWorktreeErrorType checks if an error is of a specific worktree error type
-// This function maintains backward compatibility during migration
-func IsWorktreeErrorType(err error, errType DomainErrorType) bool {
-	return IsDomainErrorType(err, errType)
-}
-
-// IsWorkspaceErrorType checks if an error is of a specific workspace error type
-// This function maintains backward compatibility during migration
-func IsWorkspaceErrorType(err error, errType DomainErrorType) bool {
-	return IsDomainErrorType(err, errType)
-}
-
-// WrapError is a legacy function for worktree error wrapping
-// This function maintains backward compatibility during migration
-func WrapError(errType DomainErrorType, message string, path string, cause error) *DomainError {
-	return WrapWorktreeError(errType, message, path, cause)
 }

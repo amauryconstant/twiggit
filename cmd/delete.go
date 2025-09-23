@@ -44,7 +44,6 @@ Examples:
   twiggit delete              # Delete worktrees in current scope
   twiggit delete --dry-run    # Preview what would be deleted
   twiggit delete --force      # Skip confirmation and safety checks`,
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runDeleteCommand(cmd, args, container)
 		},

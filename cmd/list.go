@@ -38,7 +38,6 @@ Examples:
   twiggit list              # Auto-detect scope based on current location
   twiggit list --all        # Show all projects' worktrees
   twiggit list --sort=date  # Sort by last updated time`,
-		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runListCommand(cmd, args, container)
 		},

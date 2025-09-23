@@ -3,13 +3,13 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/amaury/twiggit/internal/di"
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +27,6 @@ Examples:
   twiggit switch myproject              # Switch to ~/Projects/myproject
   twiggit switch myproject/feature-branch # Switch to ~/Workspaces/myproject/feature-branch
   twiggit switch feature-branch         # When in project context, switches to worktree`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runSwitchCommand(cmd, args, container)
 		},
@@ -44,7 +43,11 @@ func runSwitchCommand(_ *cobra.Command, args []string, container *di.Container) 
 		// Try to use current context for intelligent switching
 		project, err := detectCurrentContext(ctx, container)
 		if err != nil {
-			return errors.New("specify a target: <project> or <project/branch>")
+			return domain.NewWorktreeError(
+				domain.ErrValidation,
+				"no target specified",
+				"",
+			).WithSuggestion("Provide a target in the format 'project' or 'project/branch'")
 		}
 
 		if project != "" {
@@ -55,7 +58,11 @@ func runSwitchCommand(_ *cobra.Command, args []string, container *di.Container) 
 			return nil
 		}
 
-		return errors.New("specify a target: <project> or <project/branch>")
+		return domain.NewWorktreeError(
+			domain.ErrValidation,
+			"no target specified",
+			"",
+		).WithSuggestion("Provide a target in the format 'project' or 'project/branch'")
 	}
 
 	target := args[0]
@@ -84,7 +91,12 @@ func switchToProject(ctx context.Context, container *di.Container, project strin
 	discoveryService := container.DiscoveryService()
 	projects, err := discoveryService.DiscoverProjects(ctx, container.Config().ProjectsPath)
 	if err != nil {
-		return fmt.Errorf("failed to discover projects: %w", err)
+		return domain.NewWorkspaceError(
+			domain.ErrWorkspaceDiscoveryFailed,
+			"failed to discover projects",
+			err,
+		).WithSuggestion("Check projects directory configuration").
+			WithSuggestion("Verify projects directory exists and is readable")
 	}
 
 	// Find the target project
@@ -97,7 +109,12 @@ func switchToProject(ctx context.Context, container *di.Container, project strin
 	}
 
 	if targetPath == "" {
-		return fmt.Errorf("project not found: %s", project)
+		return domain.NewWorkspaceError(
+			domain.ErrWorkspaceProjectNotFound,
+			fmt.Sprintf("project '%s' not found", project),
+		).WithSuggestion("Check project name spelling").
+			WithSuggestion("Verify project exists in projects directory").
+			WithSuggestion("Use 'twiggit list' to see available projects")
 	}
 
 	return changeDirectory(targetPath)
@@ -107,7 +124,11 @@ func switchToProject(ctx context.Context, container *di.Container, project strin
 func switchToWorktree(ctx context.Context, container *di.Container, target string) error {
 	parts := strings.Split(target, "/")
 	if len(parts) != 2 {
-		return errors.New("invalid worktree format: use <project>/<branch>")
+		return domain.NewWorktreeError(
+			domain.ErrValidation,
+			"invalid worktree format",
+			"",
+		).WithSuggestion("Use the format 'project/branch' to specify a worktree")
 	}
 
 	project, branch := parts[0], parts[1]
@@ -116,7 +137,12 @@ func switchToWorktree(ctx context.Context, container *di.Container, target strin
 	discoveryService := container.DiscoveryService()
 	worktrees, err := discoveryService.DiscoverWorktrees(ctx, container.Config().WorkspacesPath)
 	if err != nil {
-		return fmt.Errorf("failed to discover worktrees: %w", err)
+		return domain.NewWorkspaceError(
+			domain.ErrWorkspaceDiscoveryFailed,
+			"failed to discover worktrees",
+			err,
+		).WithSuggestion("Check workspaces directory configuration").
+			WithSuggestion("Verify workspaces directory exists and is readable")
 	}
 
 	// Find the target worktree
@@ -130,7 +156,12 @@ func switchToWorktree(ctx context.Context, container *di.Container, target strin
 	}
 
 	if targetPath == "" {
-		return fmt.Errorf("worktree not found: %s/%s", project, branch)
+		return domain.NewWorkspaceError(
+			domain.ErrWorkspaceWorktreeNotFound,
+			fmt.Sprintf("worktree '%s' not found", target),
+		).WithSuggestion("Check worktree name spelling").
+			WithSuggestion("Verify worktree exists for this project").
+			WithSuggestion("Use 'twiggit list' to see available worktrees")
 	}
 
 	return changeDirectory(targetPath)
@@ -140,7 +171,12 @@ func switchToWorktree(ctx context.Context, container *di.Container, target strin
 func detectCurrentContext(ctx context.Context, container *di.Container) (project string, err error) {
 	currentDir, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("failed to get current directory: %w", err)
+		return "", domain.NewWorktreeError(
+			domain.ErrInvalidPath,
+			"failed to get current directory",
+			"",
+			err,
+		).WithSuggestion("Check current directory permissions")
 	}
 
 	// Check if we're in a git repository

@@ -41,13 +41,16 @@ var _ = Describe("Switch Command", func() {
 	It("accepts at most one argument", func() {
 		session := cli.Run("switch", "project1", "project2")
 		Eventually(session).Should(gexec.Exit(1))
-		Expect(string(session.Err.Contents())).To(ContainSubstring("accepts at most 1 arg(s), received 2"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("accepts at most 1 arg(s), received 2"))
 	})
 
 	It("shows context help when no arguments provided", func() {
 		session := cli.RunWithDir("/tmp", "switch")
 		Eventually(session).Should(gexec.Exit(1))
-		Expect(string(session.Err.Contents())).To(ContainSubstring("specify a target"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("no target specified"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("Provide a target in the format"))
 	})
 
 	It("handles project switching format", func() {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -58,12 +59,9 @@ func (ds *DiscoveryService) SetConcurrency(workers int) {
 
 // pathExists checks if a path exists on the filesystem
 func (ds *DiscoveryService) pathExists(path string) bool {
-	// Convert absolute path to relative path for fs.FS interface
-	relPath := path
-	if len(path) > 0 && path[0] == '/' {
-		relPath = path[1:]
-	}
-	_, err := fs.Stat(ds.fileSystem, relPath)
+	// Convert to absolute path first to ensure we check the correct location
+	absolutePath := ds.convertToAbsolutePath(path)
+	_, err := os.Stat(absolutePath)
 	return err == nil
 }
 
@@ -167,7 +165,8 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath s
 	}
 
 	// Find all directories in projects directory
-	entries, err := fs.ReadDir(ds.fileSystem, projectsPath)
+	absoluteProjectsPath := ds.convertToAbsolutePath(projectsPath)
+	entries, err := os.ReadDir(absoluteProjectsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read projects directory: %w", err)
 	}
@@ -201,12 +200,74 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath s
 	return projects, nil
 }
 
+// DiscoverProjectsWithFallback discovers projects with fallback mechanisms
+// This method provides enhanced error recovery when primary discovery fails
+func (ds *DiscoveryService) DiscoverProjectsWithFallback(ctx context.Context, projectsPath string) ([]*domain.Project, error) {
+	projects, err := ds.DiscoverProjects(ctx, projectsPath)
+	if err != nil {
+		// Try fallback detection method
+		projects, fallbackErr := ds.fallbackProjectDiscovery(ctx, projectsPath)
+		if fallbackErr != nil {
+			return nil, domain.NewWorkspaceError(
+				domain.ErrWorkspaceDiscoveryFailed,
+				"failed to discover projects with fallback",
+				err,
+			).WithSuggestion("Check if projects directory exists and is accessible")
+		}
+		return projects, nil
+	}
+	return projects, nil
+}
+
+// fallbackProjectDiscovery provides alternative project discovery when primary method fails
+func (ds *DiscoveryService) fallbackProjectDiscovery(ctx context.Context, projectsPath string) ([]*domain.Project, error) {
+	// Check if path exists at all
+	if !ds.pathExists(projectsPath) {
+		return []*domain.Project{}, nil
+	}
+
+	// Try to read directory with basic error handling
+	absolutePath := ds.convertToAbsolutePath(projectsPath)
+	entries, err := os.ReadDir(absolutePath)
+	if err != nil {
+		return nil, fmt.Errorf("fallback discovery failed: %w", err)
+	}
+
+	//nolint:prealloc // Number of valid projects is unpredictable
+	var projects []*domain.Project
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		projectPath := filepath.Join(projectsPath, entry.Name())
+		absoluteProjectPath := ds.convertToAbsolutePath(projectPath)
+
+		// Simple git repository check without complex validation
+		isRepo, err := ds.gitClient.IsGitRepository(ctx, absoluteProjectPath)
+		if err != nil || !isRepo {
+			continue
+		}
+
+		// Create project with basic validation
+		project, err := domain.NewProject(entry.Name(), absoluteProjectPath)
+		if err != nil {
+			continue
+		}
+
+		projects = append(projects, project)
+	}
+
+	return projects, nil
+}
+
 // findWorktreePathsInWorkspaces scans the workspaces directory for directories that might be worktrees
 func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, workspacesPath string) ([]string, error) {
 	var paths []string
 
 	// Read the workspaces directory to find project subdirectories
-	entries, err := fs.ReadDir(ds.fileSystem, workspacesPath)
+	absoluteWorkspacesPath := ds.convertToAbsolutePath(workspacesPath)
+	entries, err := os.ReadDir(absoluteWorkspacesPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read workspaces directory: %w", err)
 	}
@@ -225,7 +286,7 @@ func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, w
 		}
 
 		// Then, look for worktree directories within each project directory
-		worktreeEntries, err := fs.ReadDir(ds.fileSystem, projectDir)
+		worktreeEntries, err := os.ReadDir(absoluteProjectDir)
 		if err != nil {
 			continue // Skip on error
 		}

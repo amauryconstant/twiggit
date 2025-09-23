@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
@@ -110,7 +111,7 @@ func (s *GitClientContextTestSuite) TestIsGitRepository_ContextCancellation() {
 	// This should fail with context canceled error
 	_, err = s.Client.IsGitRepository(ctx, gitDir)
 	s.Require().Error(err)
-	s.Contains(err.Error(), "context canceled")
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
 }
 
 // TestListWorktrees_ContextTimeout tests context timeout handling
@@ -128,7 +129,7 @@ func (s *GitClientContextTestSuite) TestListWorktrees_ContextTimeout() {
 	// This should fail with context deadline exceeded
 	_, err = s.Client.ListWorktrees(ctx, gitDir)
 	s.Require().Error(err)
-	s.Contains(err.Error(), "context deadline exceeded")
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
 }
 
 // TestListWorktrees_UsingGoGit tests that ListWorktrees uses go-git instead of CLI
@@ -368,7 +369,7 @@ func (s *GitClientContextTestSuite) TestIsMainRepository_ContextCancellation() {
 	// This should fail with context canceled error
 	_, err = s.Client.IsMainRepository(ctx, mainRepo)
 	s.Require().Error(err)
-	s.Contains(err.Error(), "context canceled")
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
 }
 
 func TestGitClientContextTestSuite(t *testing.T) {
