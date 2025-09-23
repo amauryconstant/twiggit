@@ -132,7 +132,7 @@ func (s *WorkspaceTestSuite) TestWorkspace_AddProject() {
 
 	err = workspace.AddProject(duplicateProject)
 	s.Require().Error(err)
-	s.Contains(err.Error(), "project already exists")
+	s.Equal("project 'test-project' already exists in workspace", err.Error())
 	s.Len(workspace.Projects, 1) // Should not be added
 }
 
@@ -155,7 +155,7 @@ func (s *WorkspaceTestSuite) TestWorkspace_RemoveProject() {
 	// Try to remove non-existent project
 	err = workspace.RemoveProject("nonexistent-project")
 	s.Require().Error(err)
-	s.Contains(err.Error(), "project not found")
+	s.Equal("project 'nonexistent-project' not found in workspace", err.Error())
 }
 
 // TestWorkspace_GetProject tests project retrieval from workspace
@@ -177,7 +177,7 @@ func (s *WorkspaceTestSuite) TestWorkspace_GetProject() {
 	// Get non-existent project
 	_, err = workspace.GetProject("nonexistent-project")
 	s.Require().Error(err)
-	s.Contains(err.Error(), "project not found")
+	s.Equal("project 'nonexistent-project' not found in workspace", err.Error())
 }
 
 // TestWorkspace_ListAllWorktrees tests listing all worktrees in workspace
@@ -277,7 +277,7 @@ func (s *WorkspaceTestSuite) TestWorkspace_GetProject_Pure() {
 	// Test non-existent project
 	_, err = workspace.GetProject("nonexistent")
 	s.Require().Error(err)
-	s.Contains(err.Error(), "project not found")
+	s.Equal("project 'nonexistent' not found in workspace", err.Error())
 }
 
 func (s *WorkspaceTestSuite) TestWorkspace_EnhancedFeatures() {
@@ -374,7 +374,7 @@ func (s *WorkspaceTestSuite) TestWorkspace_EnhancedFeatures() {
 		health := workspace.GetHealth(mockPathValidator)
 		s.NotNil(health)
 		s.Equal("unhealthy", health.Status)
-		s.Contains(health.Issues, "workspace path not validated")
+		s.Equal("workspace path '/workspace' is not valid", health.Issues[0])
 		s.Equal(0, health.ProjectCount)
 		s.Equal(0, health.WorktreeCount)
 	})
