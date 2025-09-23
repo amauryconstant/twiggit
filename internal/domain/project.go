@@ -3,7 +3,6 @@ package domain
 
 import (
 	"errors"
-	"fmt"
 )
 
 // Types
@@ -64,11 +63,9 @@ func NewProject(name, gitRepo string) (*Project, error) {
 
 // AddWorktree adds a new worktree to the project
 func (p *Project) AddWorktree(worktree *Worktree) error {
-	// Check for duplicate path
-	for _, existing := range p.Worktrees {
-		if existing.Path == worktree.Path {
-			return fmt.Errorf("worktree already exists at path: %s", worktree.Path)
-		}
+	// Use the pure business logic function to check for duplicates
+	if err := p.CanAddWorktree(worktree); err != nil {
+		return err
 	}
 
 	p.Worktrees = append(p.Worktrees, worktree)
@@ -85,7 +82,7 @@ func (p *Project) RemoveWorktree(path string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("worktree not found at path: %s", path)
+	return NewWorktreeError(ErrWorktreeNotFound, "worktree not found at path", path)
 }
 
 // GetWorktree retrieves a worktree by path
@@ -95,7 +92,7 @@ func (p *Project) GetWorktree(path string) (*Worktree, error) {
 			return worktree, nil
 		}
 	}
-	return nil, fmt.Errorf("worktree not found at path: %s", path)
+	return nil, NewWorktreeError(ErrWorktreeNotFound, "worktree not found at path", path)
 }
 
 // ListBranches returns a unique list of all branches in the project's worktrees
@@ -185,15 +182,16 @@ func (p *Project) GetHealth(pathValidator PathValidator) *ProjectHealth {
 		WorktreeCount: len(p.Worktrees),
 	}
 
-	// Basic validation - check if git repo path is not empty
-	if p.GitRepo == "" {
-		health.Issues = append(health.Issues, "git repository not validated")
+	// Use new validation system
+	validationResult := ValidateProjectHealth(p, pathValidator)
+
+	// Convert validation errors to health issues
+	for _, err := range validationResult.Errors {
+		health.Issues = append(health.Issues, err.Message)
 	}
 
-	// Additional validation - check if git repo path looks valid
-	if p.GitRepo != "" && !pathValidator.IsValidGitRepoPath(p.GitRepo) {
-		health.Issues = append(health.Issues, "git repository not validated")
-	}
+	// Add warnings as issues too (for health monitoring)
+	health.Issues = append(health.Issues, validationResult.Warnings...)
 
 	// Determine overall status
 	if len(health.Issues) == 0 {
@@ -211,7 +209,7 @@ func (p *Project) GetHealth(pathValidator PathValidator) *ProjectHealth {
 func (p *Project) CanAddWorktree(worktree *Worktree) error {
 	for _, existing := range p.Worktrees {
 		if existing.Path == worktree.Path {
-			return fmt.Errorf("worktree already exists at path: %s", worktree.Path)
+			return NewWorktreeError(ErrWorktreeExists, "worktree already exists at path", worktree.Path)
 		}
 	}
 	return nil

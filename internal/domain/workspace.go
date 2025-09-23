@@ -2,8 +2,6 @@
 package domain
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 )
 
@@ -45,8 +43,10 @@ type Workspace struct {
 
 // NewWorkspace creates a new Workspace instance with validation
 func NewWorkspace(path string) (*Workspace, error) {
-	if path == "" {
-		return nil, errors.New("workspace path cannot be empty")
+	// Validate workspace path using the new validation system
+	validationResult := ValidateWorkspaceCreation(path)
+	if !validationResult.IsValid() {
+		return nil, validationResult.ToError()
 	}
 
 	return &Workspace{
@@ -61,11 +61,10 @@ func NewWorkspace(path string) (*Workspace, error) {
 
 // AddProject adds a new project to the workspace
 func (w *Workspace) AddProject(project *Project) error {
-	// Check for duplicate name
-	for _, existing := range w.Projects {
-		if existing.Name == project.Name {
-			return fmt.Errorf("project already exists: %s", project.Name)
-		}
+	// Validate project name using the new validation system
+	validationResult := ValidateWorkspaceProjectName(project.Name, w)
+	if !validationResult.IsValid() {
+		return validationResult.ToError()
 	}
 
 	w.Projects = append(w.Projects, project)
@@ -74,6 +73,12 @@ func (w *Workspace) AddProject(project *Project) error {
 
 // RemoveProject removes a project by name
 func (w *Workspace) RemoveProject(name string) error {
+	// Validate that project exists using the new validation system
+	validationResult := ValidateWorkspaceProjectExists(name, w)
+	if !validationResult.IsValid() {
+		return validationResult.ToError()
+	}
+
 	for i, project := range w.Projects {
 		if project.Name == name {
 			// Remove element by swapping with last and truncating
@@ -82,17 +87,27 @@ func (w *Workspace) RemoveProject(name string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("project not found: %s", name)
+
+	// This should not happen since we validated above
+	return nil
 }
 
 // GetProject retrieves a project by name
 func (w *Workspace) GetProject(name string) (*Project, error) {
+	// Validate that project exists using the new validation system
+	validationResult := ValidateWorkspaceProjectExists(name, w)
+	if !validationResult.IsValid() {
+		return nil, validationResult.ToError()
+	}
+
 	for _, project := range w.Projects {
 		if project.Name == name {
 			return project, nil
 		}
 	}
-	return nil, fmt.Errorf("project not found: %s", name)
+
+	// This should not happen since we validated above
+	return nil, nil
 }
 
 // ListAllWorktrees returns all worktrees from all projects in the workspace
@@ -113,7 +128,7 @@ func (w *Workspace) GetWorktreeByPath(path string) (*Worktree, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("worktree not found at path: %s", path)
+	return nil, NewWorkspaceError(WorkspaceErrorWorktreeNotFound, "worktree not found at path: "+path)
 }
 
 // GetStatistics returns statistics about the workspace
@@ -164,9 +179,12 @@ func (w *Workspace) GetHealth(pathValidator PathValidator) *WorkspaceHealth {
 		WorktreeCount: len(w.ListAllWorktrees()),
 	}
 
-	// Validate workspace path format using infrastructure service
-	if !pathValidator.IsValidWorkspacePath(w.Path) {
-		health.Issues = append(health.Issues, "workspace path not validated")
+	// Validate workspace health using the new validation system
+	validationResult := ValidateWorkspaceHealth(w, pathValidator)
+	if !validationResult.IsValid() {
+		for _, err := range validationResult.Errors {
+			health.Issues = append(health.Issues, err.Message)
+		}
 	}
 
 	// Determine overall status
