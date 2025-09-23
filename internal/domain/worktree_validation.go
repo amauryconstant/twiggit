@@ -8,104 +8,40 @@ import (
 	"unicode/utf8"
 )
 
-const (
-	// MaxBranchNameLength is the maximum allowed length for branch names
-	MaxBranchNameLength = 250
-	// MinBranchNameLength is the minimum allowed length for branch names
-	MinBranchNameLength = 1
-)
-
 var (
 	// validBranchNameRegex matches valid git branch names
 	// Based on git-check-ref-format rules
 	validBranchNameRegex = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._/-]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$`)
-
-	// invalidBranchChars contains characters not allowed in branch names
-	invalidBranchChars = []string{" ", "\t", "\n", "\r", "~", "^", ":", "?", "*", "[", "\\", "..", "//"}
-
-	// maxPathLength is the maximum allowed filesystem path length
-	maxPathLength = 4096
 )
 
-// ValidationResult represents the result of a validation operation
-type ValidationResult struct {
-	Valid    bool
-	Errors   []*WorktreeError
-	Warnings []string
-}
-
-// AddError adds an error to the validation result
-func (vr *ValidationResult) AddError(err *WorktreeError) {
-	vr.Valid = false
-	vr.Errors = append(vr.Errors, err)
-}
-
-// AddWarning adds a warning to the validation result
-func (vr *ValidationResult) AddWarning(warning string) {
-	vr.Warnings = append(vr.Warnings, warning)
-}
-
-// HasErrors returns true if there are validation errors
-func (vr *ValidationResult) HasErrors() bool {
-	return len(vr.Errors) > 0
-}
-
-// FirstError returns the first validation error, or nil if none
-func (vr *ValidationResult) FirstError() error {
-	if len(vr.Errors) > 0 {
-		return vr.Errors[0]
-	}
-	return nil
-}
-
-// NewValidationResult creates a new ValidationResult
-func NewValidationResult() *ValidationResult {
-	return &ValidationResult{
-		Valid:    true,
-		Errors:   make([]*WorktreeError, 0),
-		Warnings: make([]string, 0),
-	}
-}
+// WorktreeValidationResult is a legacy type alias for backward compatibility during migration
+// Use unified ValidationResult from errors.go
+type WorktreeValidationResult = ValidationResult
 
 // ValidateBranchName validates a Git branch name according to git naming rules
 func ValidateBranchName(branchName string) *ValidationResult {
-	result := NewValidationResult()
-
-	if branchName == "" {
-		result.AddError(NewWorktreeError(
-			ErrInvalidBranchName,
-			"branch name cannot be empty",
-			"",
-		).WithSuggestion("Provide a valid branch name"))
+	// Validate not empty
+	result := ValidateNotEmpty(branchName, "branch name", ErrInvalidBranchName, func(errorType DomainErrorType, message, context string) *DomainError {
+		return NewWorktreeError(errorType, message, context).WithSuggestion("Provide a valid branch name")
+	})
+	if result.HasErrors() {
 		return result
 	}
 
-	// Check length
-	if len(branchName) < MinBranchNameLength {
-		result.AddError(NewWorktreeError(
-			ErrInvalidBranchName,
-			fmt.Sprintf("branch name too short (minimum %d characters)", MinBranchNameLength),
-			"",
-		).WithSuggestion("Use a longer branch name"))
+	// Validate length
+	lengthResult := ValidateStringLength(branchName, "branch name", MinBranchNameLength, MaxBranchNameLength, ErrInvalidBranchName, func(errorType DomainErrorType, message, context string) *DomainError {
+		return NewWorktreeError(errorType, message, context).WithSuggestion("Use a branch name with appropriate length")
+	})
+	if lengthResult.HasErrors() {
+		return lengthResult
 	}
 
-	if len(branchName) > MaxBranchNameLength {
-		result.AddError(NewWorktreeError(
-			ErrInvalidBranchName,
-			fmt.Sprintf("branch name too long (maximum %d characters)", MaxBranchNameLength),
-			"",
-		).WithSuggestion("Use a shorter branch name"))
-	}
-
-	// Check for invalid characters
-	for _, invalidChar := range invalidBranchChars {
-		if strings.Contains(branchName, invalidChar) {
-			result.AddError(NewWorktreeError(
-				ErrInvalidBranchName,
-				fmt.Sprintf("branch name contains invalid character: '%s'", invalidChar),
-				"",
-			).WithSuggestion("Remove invalid characters from branch name"))
-		}
+	// Validate characters
+	charResult := ValidateCharacters(branchName, "branch name", InvalidBranchChars, ErrInvalidBranchName, func(errorType DomainErrorType, message, context string) *DomainError {
+		return NewWorktreeError(errorType, message, context).WithSuggestion("Remove invalid characters from branch name")
+	})
+	if charResult.HasErrors() {
+		return charResult
 	}
 
 	// Check for reserved names
@@ -148,14 +84,11 @@ func ValidateBranchName(branchName string) *ValidationResult {
 
 // ValidatePath validates a filesystem path for worktree operations
 func ValidatePath(path string) *ValidationResult {
-	result := NewValidationResult()
-
-	if path == "" {
-		result.AddError(NewWorktreeError(
-			ErrInvalidPath,
-			"path cannot be empty",
-			"",
-		).WithSuggestion("Provide a valid filesystem path"))
+	// Validate not empty
+	result := ValidateNotEmpty(path, "path", ErrInvalidPath, func(errorType DomainErrorType, message, context string) *DomainError {
+		return NewWorktreeError(errorType, message, context).WithSuggestion("Provide a valid filesystem path")
+	})
+	if result.HasErrors() {
 		return result
 	}
 
@@ -169,10 +102,10 @@ func ValidatePath(path string) *ValidationResult {
 	}
 
 	// Check path length (filesystem dependent, but 4096 is a safe limit)
-	if len(path) > maxPathLength {
+	if len(path) > MaxPathLength {
 		result.AddError(NewWorktreeError(
 			ErrInvalidPath,
-			fmt.Sprintf("path too long (maximum %d characters)", maxPathLength),
+			fmt.Sprintf("path too long (maximum %d characters)", MaxPathLength),
 			path,
 		).WithSuggestion("Use a shorter path"))
 	}
@@ -202,40 +135,24 @@ func ValidatePath(path string) *ValidationResult {
 // Note: This function only validates the path format, not actual filesystem access
 // For full validation including filesystem checks, use services.ValidationService.ValidatePathWritable
 func ValidatePathWritable(path string) *ValidationResult {
-	result := NewValidationResult()
-
 	// First validate the path format
 	pathResult := ValidatePath(path)
 	if !pathResult.Valid {
-		result.Errors = append(result.Errors, pathResult.Errors...)
-		result.Valid = false
-		return result
+		return pathResult
 	}
 
 	// Pure business logic validation only
 	// Actual filesystem checks are handled by the service layer
 
-	return result
+	return NewValidationResult()
 }
 
 // ValidateWorktreeCreation performs comprehensive validation for worktree creation
 // Note: This function only validates the format, not actual filesystem access
 // For full validation including filesystem checks, use services.ValidationService.ValidateWorktreeCreation
 func ValidateWorktreeCreation(branchName, targetPath string) *ValidationResult {
-	result := NewValidationResult()
-
-	// Validate branch name
-	branchResult := ValidateBranchName(branchName)
-	result.Errors = append(result.Errors, branchResult.Errors...)
-	result.Warnings = append(result.Warnings, branchResult.Warnings...)
-
-	// Validate target path format only
-	pathResult := ValidatePathWritable(targetPath)
-	result.Errors = append(result.Errors, pathResult.Errors...)
-	result.Warnings = append(result.Warnings, pathResult.Warnings...)
-
-	// Set overall validity
-	result.Valid = len(result.Errors) == 0
-
-	return result
+	return MergeValidationResults(
+		ValidateBranchName(branchName),
+		ValidatePathWritable(targetPath),
+	)
 }

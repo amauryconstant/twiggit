@@ -1,108 +1,36 @@
 package domain
 
-import (
-	"strings"
-)
-
-// WorkspaceValidationResult represents the result of workspace validation
-type WorkspaceValidationResult struct {
-	Errors []WorkspaceError
-}
-
-// IsValid returns true if the validation result contains no errors
-func (vr *WorkspaceValidationResult) IsValid() bool {
-	return len(vr.Errors) == 0
-}
-
-// GetErrorCount returns the number of validation errors
-func (vr *WorkspaceValidationResult) GetErrorCount() int {
-	return len(vr.Errors)
-}
-
-// GetErrorsByType returns all errors of the specified type
-func (vr *WorkspaceValidationResult) GetErrorsByType(errorType WorkspaceErrorType) []WorkspaceError {
-	result := make([]WorkspaceError, 0)
-	for i := range vr.Errors {
-		if IsWorkspaceErrorType(&vr.Errors[i], errorType) {
-			result = append(result, vr.Errors[i])
-		}
-	}
-	return result
-}
-
-// GetFirstError returns the first error in the validation result, or nil if there are no errors
-func (vr *WorkspaceValidationResult) GetFirstError() *WorkspaceError {
-	if len(vr.Errors) == 0 {
-		return nil
-	}
-	return &vr.Errors[0]
-}
-
-// AddError adds a validation error to the result
-func (vr *WorkspaceValidationResult) AddError(err WorkspaceError) {
-	vr.Errors = append(vr.Errors, err)
-}
-
-// Merge merges another validation result into this one, returning a new result
-func (vr *WorkspaceValidationResult) Merge(other WorkspaceValidationResult) WorkspaceValidationResult {
-	merged := NewWorkspaceValidationResult()
-	merged.Errors = append(vr.Errors, other.Errors...)
-	return merged
-}
-
-// ToError returns the first validation error as an error interface, or nil if there are no errors
-func (vr *WorkspaceValidationResult) ToError() error {
-	if len(vr.Errors) == 0 {
-		return nil
-	}
-	return &vr.Errors[0]
-}
-
-// NewWorkspaceValidationResult creates a new workspace validation result with optional initial errors
-func NewWorkspaceValidationResult(errors ...WorkspaceError) WorkspaceValidationResult {
-	if len(errors) == 0 {
-		return WorkspaceValidationResult{
-			Errors: make([]WorkspaceError, 0),
-		}
-	}
-	return WorkspaceValidationResult{
-		Errors: errors,
-	}
-}
+// WorkspaceValidationResult is a legacy type alias for backward compatibility during migration
+// Use unified ValidationResult from errors.go
+type WorkspaceValidationResult = ValidationResult
 
 // ValidateWorkspacePath validates a workspace path
-func ValidateWorkspacePath(path string) WorkspaceValidationResult {
-	result := NewWorkspaceValidationResult()
-
-	if strings.TrimSpace(path) == "" {
-		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorInvalidPath,
-			Message: "workspace path cannot be empty",
-		})
-	}
-
-	return result
+func ValidateWorkspacePath(path string) *ValidationResult {
+	return ValidateNotEmpty(path, "workspace path", ErrWorkspaceInvalidPath, func(errorType DomainErrorType, message, _ string) *DomainError {
+		return NewWorkspaceError(errorType, message)
+	})
 }
 
 // ValidateWorkspaceProjectName validates a project name for addition to a workspace
-func ValidateWorkspaceProjectName(projectName string, workspace *Workspace) WorkspaceValidationResult {
-	result := NewWorkspaceValidationResult()
+func ValidateWorkspaceProjectName(projectName string, workspace *Workspace) *ValidationResult {
+	// Validate project name is not empty
+	result := ValidateNotEmpty(projectName, "project name", ErrWorkspaceInvalidConfiguration, func(errorType DomainErrorType, message, _ string) *DomainError {
+		return NewWorkspaceError(errorType, message)
+	})
 
-	if strings.TrimSpace(projectName) == "" {
-		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorInvalidConfiguration,
-			Message: "project name cannot be empty",
-		})
+	// If project name is empty, return early
+	if result.HasErrors() {
 		return result
 	}
 
+	// Check for duplicate project names
 	if workspace != nil {
 		for _, project := range workspace.Projects {
 			if project.Name == projectName {
-				result.AddError(WorkspaceError{
-					Type:    WorkspaceErrorProjectAlreadyExists,
-					Message: "project '" + projectName + "' already exists in workspace",
-				})
+				result.AddError(NewWorkspaceError(
+					ErrWorkspaceProjectAlreadyExists,
+					"project '"+projectName+"' already exists in workspace",
+				))
 				break
 			}
 		}
@@ -112,25 +40,24 @@ func ValidateWorkspaceProjectName(projectName string, workspace *Workspace) Work
 }
 
 // ValidateWorkspaceProjectExists validates that a project exists in the workspace
-func ValidateWorkspaceProjectExists(projectName string, workspace *Workspace) WorkspaceValidationResult {
-	result := NewWorkspaceValidationResult()
-
+func ValidateWorkspaceProjectExists(projectName string, workspace *Workspace) *ValidationResult {
+	// Validate workspace is not nil - use direct check since ValidateNotNil seems to have issues
 	if workspace == nil {
-		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorInvalidConfiguration,
-			Message: "workspace cannot be nil",
-		})
+		result := NewWorkspaceValidationResult()
+		result.AddError(NewWorkspaceError(ErrWorkspaceInvalidConfiguration, "workspace cannot be nil"))
 		return result
 	}
 
-	if strings.TrimSpace(projectName) == "" {
-		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorInvalidConfiguration,
-			Message: "project name cannot be empty",
-		})
-		return result
+	// Validate project name is not empty
+	nameResult := ValidateNotEmpty(projectName, "project name", ErrWorkspaceInvalidConfiguration, func(errorType DomainErrorType, message, _ string) *DomainError {
+		return NewWorkspaceError(errorType, message)
+	})
+	if nameResult.HasErrors() {
+		return nameResult
 	}
 
+	// Check if project exists
+	result := NewWorkspaceValidationResult()
 	found := false
 	for _, project := range workspace.Projects {
 		if project.Name == projectName {
@@ -140,38 +67,38 @@ func ValidateWorkspaceProjectExists(projectName string, workspace *Workspace) Wo
 	}
 
 	if !found {
-		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorProjectNotFound,
-			Message: "project '" + projectName + "' not found in workspace",
-		})
+		result.AddError(NewWorkspaceError(
+			ErrWorkspaceProjectNotFound,
+			"project '"+projectName+"' not found in workspace",
+		))
 	}
 
 	return result
 }
 
 // ValidateWorkspaceCreation validates workspace creation parameters
-func ValidateWorkspaceCreation(path string) WorkspaceValidationResult {
+func ValidateWorkspaceCreation(path string) *ValidationResult {
 	return ValidateWorkspacePath(path)
 }
 
 // ValidateWorkspaceHealth validates the health of a workspace (domain-only validation)
-func ValidateWorkspaceHealth(workspace *Workspace) WorkspaceValidationResult {
+func ValidateWorkspaceHealth(workspace *Workspace) *ValidationResult {
 	result := NewWorkspaceValidationResult()
 
 	if workspace == nil {
-		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorInvalidConfiguration,
-			Message: "workspace cannot be nil",
-		})
+		result.AddError(NewWorkspaceError(
+			ErrWorkspaceInvalidConfiguration,
+			"workspace cannot be nil",
+		))
 		return result
 	}
 
 	// Basic validation - check if workspace path is not empty
 	if workspace.Path == "" {
-		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorInvalidPath,
-			Message: "workspace path cannot be empty",
-		})
+		result.AddError(NewWorkspaceError(
+			ErrWorkspaceInvalidPath,
+			"workspace path cannot be empty",
+		))
 	}
 
 	// Note: Infrastructure-specific validation (like path validation) is now handled

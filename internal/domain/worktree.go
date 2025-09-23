@@ -6,12 +6,6 @@ import (
 	"time"
 )
 
-// Constants
-const (
-	// MaxPathLength is the maximum allowed length for worktree paths
-	MaxPathLength = 255
-)
-
 // Types
 
 // WorktreeStatus represents the current state of a worktree

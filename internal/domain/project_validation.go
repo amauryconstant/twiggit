@@ -1,108 +1,29 @@
 package domain
 
-import (
-	"strings"
-)
-
-// ProjectValidationResult represents the result of a project validation operation
-type ProjectValidationResult struct {
-	Valid    bool
-	Errors   []*ProjectError
-	Warnings []string
-}
-
-// AddError adds an error to the project validation result
-func (vr *ProjectValidationResult) AddError(err *ProjectError) {
-	vr.Valid = false
-	vr.Errors = append(vr.Errors, err)
-}
-
-// AddWarning adds a warning to the project validation result
-func (vr *ProjectValidationResult) AddWarning(warning string) {
-	vr.Warnings = append(vr.Warnings, warning)
-}
-
-// HasErrors returns true if there are validation errors
-func (vr *ProjectValidationResult) HasErrors() bool {
-	return len(vr.Errors) > 0
-}
-
-// FirstError returns the first validation error, or nil if none
-func (vr *ProjectValidationResult) FirstError() error {
-	if len(vr.Errors) > 0 {
-		return vr.Errors[0]
-	}
-	return nil
-}
-
-// NewProjectValidationResult creates a new ProjectValidationResult
-func NewProjectValidationResult() *ProjectValidationResult {
-	return &ProjectValidationResult{
-		Valid:    true,
-		Errors:   make([]*ProjectError, 0),
-		Warnings: make([]string, 0),
-	}
-}
+// ProjectValidationResult is a legacy type alias for backward compatibility during migration
+// Use unified ValidationResult from errors.go
+type ProjectValidationResult = ValidationResult
 
 // ValidateProjectName validates a project name according to business rules
 func ValidateProjectName(projectName string) *ProjectValidationResult {
-	result := NewProjectValidationResult()
-
-	trimmedName := strings.TrimSpace(projectName)
-	if trimmedName == "" {
-		result.AddError(NewProjectError(
-			ErrInvalidProjectName,
-			"project name cannot be empty",
-			"",
-		).WithSuggestion("Provide a valid project name"))
-		return result
-	}
-
-	// Additional validation rules can be added here as needed
-	// For now, we accept any non-empty trimmed string as valid
-
-	return result
+	return ValidateNotEmpty(projectName, "project name", ErrInvalidProjectName, func(errorType DomainErrorType, message, context string) *DomainError {
+		return NewProjectError(errorType, message, context).WithSuggestion("Provide a valid project name")
+	})
 }
 
 // ValidateGitRepoPath validates a git repository path according to business rules
 func ValidateGitRepoPath(gitRepoPath string) *ProjectValidationResult {
-	result := NewProjectValidationResult()
-
-	trimmedPath := strings.TrimSpace(gitRepoPath)
-	if trimmedPath == "" {
-		result.AddError(NewProjectError(
-			ErrInvalidGitRepoPath,
-			"git repository path cannot be empty",
-			"",
-		).WithSuggestion("Provide a valid git repository path"))
-		return result
-	}
-
-	// Additional validation rules can be added here as needed
-	// For now, we accept any non-empty trimmed string as valid
-	// Filesystem-specific validation is handled by the infrastructure layer
-
-	return result
+	return ValidateNotEmpty(gitRepoPath, "git repository path", ErrInvalidGitRepoPath, func(errorType DomainErrorType, message, context string) *DomainError {
+		return NewProjectError(errorType, message, context).WithSuggestion("Provide a valid git repository path")
+	})
 }
 
 // ValidateProjectCreation performs comprehensive validation for project creation
 func ValidateProjectCreation(projectName, gitRepoPath string) *ProjectValidationResult {
-	result := NewProjectValidationResult()
-
-	// Validate project name
-	nameResult := ValidateProjectName(projectName)
-	result.Errors = append(result.Errors, nameResult.Errors...)
-	result.Warnings = append(result.Warnings, nameResult.Warnings...)
-
-	// Validate git repository path
-	pathResult := ValidateGitRepoPath(gitRepoPath)
-	result.Errors = append(result.Errors, pathResult.Errors...)
-	result.Warnings = append(result.Warnings, pathResult.Warnings...)
-
-	// Set overall validity
-	result.Valid = len(result.Errors) == 0
-
-	return result
+	return MergeValidationResults(
+		ValidateProjectName(projectName),
+		ValidateGitRepoPath(gitRepoPath),
+	)
 }
 
 // ValidateProjectHealth validates the health status of a project (domain-only validation)
