@@ -4,15 +4,16 @@ import (
 	"context"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 // WorktreeRemover handles worktree removal operations
 type WorktreeRemover struct {
-	gitClient domain.GitClient
+	gitClient infrastructure.GitClient
 }
 
 // NewWorktreeRemover creates a new WorktreeRemover instance
-func NewWorktreeRemover(gitClient domain.GitClient) *WorktreeRemover {
+func NewWorktreeRemover(gitClient infrastructure.GitClient) *WorktreeRemover {
 	return &WorktreeRemover{
 		gitClient: gitClient,
 	}

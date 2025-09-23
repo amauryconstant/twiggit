@@ -365,16 +365,11 @@ func (s *WorkspaceTestSuite) TestWorkspace_EnhancedFeatures() {
 		workspace, err := NewWorkspace("/workspace")
 		s.Require().NoError(err)
 
-		// This should fail initially - we need to add health check
-		mockPathValidator := &MockPathValidator{
-			IsValidWorkspacePathFunc: func(path string) bool {
-				return false // Simulate invalid path for testing
-			},
-		}
-		health := workspace.GetHealth(mockPathValidator)
+		// This should pass now - domain validation only checks basic rules
+		health := workspace.GetHealth()
 		s.NotNil(health)
-		s.Equal("unhealthy", health.Status)
-		s.Equal("workspace path '/workspace' is not valid", health.Issues[0])
+		s.Equal("healthy", health.Status) // Changed: workspace with valid path is now healthy in domain layer
+		s.Empty(health.Issues)            // No domain-level validation issues
 		s.Equal(0, health.ProjectCount)
 		s.Equal(0, health.WorktreeCount)
 	})

@@ -25,10 +25,9 @@ const (
 
 // DiscoveryService handles the discovery and analysis of worktrees and projects
 type DiscoveryService struct {
-	gitClient   domain.GitClient
+	gitClient   infrastructure.GitClient
 	config      *config.Config
 	fileSystem  fs.FS
-	infra       infrastructure.InfrastructureService
 	concurrency int
 	mu          sync.RWMutex
 	cache       map[string]*discoveryResult
@@ -40,17 +39,11 @@ type discoveryResult struct {
 }
 
 // NewDiscoveryService creates a new DiscoveryService instance
-func NewDiscoveryService(gitClient domain.GitClient, config *config.Config, fileSystem fs.FS, pathValidator domain.PathValidator) *DiscoveryService {
-	return NewDiscoveryServiceWithInfra(gitClient, config, fileSystem, pathValidator, infrastructure.NewInfrastructureService(gitClient, fileSystem, pathValidator))
-}
-
-// NewDiscoveryServiceWithInfra creates a new DiscoveryService instance with custom InfrastructureService
-func NewDiscoveryServiceWithInfra(gitClient domain.GitClient, config *config.Config, fileSystem fs.FS, _ domain.PathValidator, infra infrastructure.InfrastructureService) *DiscoveryService {
+func NewDiscoveryService(gitClient infrastructure.GitClient, config *config.Config, fileSystem fs.FS) *DiscoveryService {
 	return &DiscoveryService{
 		gitClient:   gitClient,
 		config:      config,
 		fileSystem:  fileSystem,
-		infra:       infra,
 		concurrency: defaultConcurrency,
 		cache:       make(map[string]*discoveryResult),
 	}
@@ -63,13 +56,24 @@ func (ds *DiscoveryService) SetConcurrency(workers int) {
 	}
 }
 
+// pathExists checks if a path exists on the filesystem
+func (ds *DiscoveryService) pathExists(path string) bool {
+	// Convert absolute path to relative path for fs.FS interface
+	relPath := path
+	if len(path) > 0 && path[0] == '/' {
+		relPath = path[1:]
+	}
+	_, err := fs.Stat(ds.fileSystem, relPath)
+	return err == nil
+}
+
 // validatePath validates that a path is not empty and exists
 func (ds *DiscoveryService) validatePath(path, pathType string) error {
 	if path == "" {
 		return fmt.Errorf("%s path cannot be empty", pathType)
 	}
 
-	if !ds.infra.PathExists(path) {
+	if !ds.pathExists(path) {
 		return fmt.Errorf("%s path does not exist: %s", pathType, path)
 	}
 
@@ -97,7 +101,7 @@ func (ds *DiscoveryService) isBareRepositorySafe(ctx context.Context, path strin
 // DiscoverWorktrees discovers all worktrees in a workspaces directory using concurrent processing
 func (ds *DiscoveryService) DiscoverWorktrees(ctx context.Context, workspacesPath string) ([]*domain.Worktree, error) {
 	// Check if workspaces path exists, return empty list if it doesn't
-	if !ds.infra.PathExists(workspacesPath) {
+	if !ds.pathExists(workspacesPath) {
 		return []*domain.Worktree{}, nil
 	}
 
@@ -154,7 +158,7 @@ func (ds *DiscoveryService) AnalyzeWorktree(ctx context.Context, path string) (*
 // DiscoverProjects finds all Git repositories (projects) in the projects directory
 func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath string) ([]*domain.Project, error) {
 	// Check if projects path exists, return empty list if it doesn't
-	if !ds.infra.PathExists(projectsPath) {
+	if !ds.pathExists(projectsPath) {
 		return []*domain.Project{}, nil
 	}
 

@@ -3,7 +3,6 @@ package di
 import (
 	"testing"
 
-	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
 	"github.com/amaury/twiggit/internal/infrastructure/mise"
@@ -53,24 +52,6 @@ func TestContainer_InfrastructureDependencies(t *testing.T) {
 
 	_, ok = container.PathValidator().(*validation.PathValidatorImpl)
 	assert.True(t, ok, "PathValidator should be of type *validation.PathValidatorImpl")
-}
-
-func TestContainer_InfrastructureService(t *testing.T) {
-	cfg := &config.Config{
-		ProjectsPath:   "/test/projects",
-		WorkspacesPath: "/test/workspaces",
-		Workspace:      "/test/workspaces",
-	}
-
-	container := NewContainer(cfg)
-
-	// Test infrastructure service
-	infraService := container.InfrastructureService()
-	require.NotNil(t, infraService, "InfrastructureService should not be nil")
-
-	// Verify type
-	_, ok := infraService.(*infrastructure.InfrastructureServiceImpl)
-	assert.True(t, ok, "InfrastructureService should be of type *infrastructure.InfrastructureServiceImpl")
 }
 
 func TestContainer_ApplicationServices(t *testing.T) {
@@ -134,13 +115,9 @@ func TestContainer_ServiceDependencies(t *testing.T) {
 
 	// Test that services have the correct dependencies
 	validationService := container.ValidationService()
-	infraService := container.InfrastructureService()
 
-	// Validation service should depend on infrastructure service
-	// This is a bit tricky to test without reflection, but we can verify
-	// that the services are properly initialized
+	// Validation service should be properly initialized
 	assert.NotNil(t, validationService, "ValidationService should be initialized")
-	assert.NotNil(t, infraService, "InfrastructureService should be initialized")
 
 	// Discovery service should have the correct dependencies
 	discoveryService := container.DiscoveryService()
@@ -182,10 +159,6 @@ func TestContainer_SingletonBehavior(t *testing.T) {
 	pathValidator1 := container.PathValidator()
 	pathValidator2 := container.PathValidator()
 	assert.Same(t, pathValidator1, pathValidator2, "PathValidator should be a singleton")
-
-	infraService1 := container.InfrastructureService()
-	infraService2 := container.InfrastructureService()
-	assert.Same(t, infraService1, infraService2, "InfrastructureService should be a singleton")
 
 	validationService1 := container.ValidationService()
 	validationService2 := container.ValidationService()
@@ -238,12 +211,9 @@ func TestContainer_Interfaces(t *testing.T) {
 	container := NewContainer(cfg)
 
 	// Test that all services implement their expected interfaces
-	// GitClient is already of type domain.GitClient, no type assertion needed
-	assert.NotNil(t, container.GitClient(), "GitClient should implement domain.GitClient")
+	// GitClient is already of type infrastructure.GitClient, no type assertion needed
+	assert.NotNil(t, container.GitClient(), "GitClient should implement infrastructure.GitClient")
 
 	// PathValidator is already of type domain.PathValidator, no type assertion needed
 	assert.NotNil(t, container.PathValidator(), "PathValidator should implement domain.PathValidator")
-
-	// InfrastructureService is already an interface, so we just check it's not nil
-	assert.NotNil(t, container.InfrastructureService(), "InfrastructureService should not be nil")
 }

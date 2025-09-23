@@ -205,3 +205,28 @@ func (s WorktreeStatus) String() string {
 		return "invalid"
 	}
 }
+
+// WorktreeInfo represents information about a Git worktree (used by infrastructure layer)
+type WorktreeInfo struct {
+	// Path is the filesystem path to the worktree
+	Path string
+	// Branch is the branch name checked out in the worktree
+	Branch string
+	// Commit is the current commit hash
+	Commit string
+	// Clean indicates if the worktree has no uncommitted changes
+	Clean bool
+	// CommitTime is the timestamp when the commit was created
+	CommitTime time.Time
+}
+
+// Validate checks if the WorktreeInfo is valid
+func (w *WorktreeInfo) Validate() error {
+	if w.Path == "" {
+		return errors.New("path cannot be empty")
+	}
+	if w.Branch == "" {
+		return errors.New("branch cannot be empty")
+	}
+	return nil
+}

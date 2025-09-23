@@ -491,17 +491,10 @@ func (s *ProjectTestSuite) TestProject_EnhancedFeatures() {
 				return project
 			},
 			testFunc: func(project *Project) {
-				// Create mock path validator that returns false for /repo/path
-				mockPathValidator := &MockPathValidator{
-					IsValidGitRepoPathFunc: func(path string) bool {
-						return path == "/valid/repo"
-					},
-				}
-
-				health := project.GetHealth(mockPathValidator)
+				health := project.GetHealth()
 				s.NotNil(health)
-				s.Equal("unhealthy", health.Status)
-				s.Contains(health.Issues, "git repository not validated")
+				s.Equal("healthy", health.Status) // Changed: project with valid path is now healthy in domain layer
+				s.Empty(health.Issues)            // No domain-level validation issues
 				s.Equal(0, health.WorktreeCount)
 			},
 			expectError: false,

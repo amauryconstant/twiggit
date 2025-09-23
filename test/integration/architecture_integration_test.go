@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
-	"github.com/amaury/twiggit/internal/infrastructure/validation"
 	"github.com/amaury/twiggit/internal/services"
 	"github.com/amaury/twiggit/test/helpers"
 	"github.com/stretchr/testify/suite"
@@ -27,7 +27,7 @@ type ArchitectureIntegrationTestSuite struct {
 	tempDir          string
 	projectsDir      string
 	workspacesDir    string
-	gitClient        domain.GitClient
+	gitClient        infrastructure.GitClient
 	discoveryService *services.DiscoveryService
 	config           *config.Config
 }
@@ -67,11 +67,10 @@ func (s *ArchitectureIntegrationTestSuite) SetupSuite() {
 		Workspace:      s.workspacesDir, // Legacy field for backward compatibility
 	}
 
-	// Create path validator and filesystem
-	pathValidator := validation.NewPathValidator()
+	// Create filesystem
 	fileSystem := os.DirFS(s.tempDir) // Use temp directory as filesystem root for integration tests
 
-	s.discoveryService = services.NewDiscoveryService(s.gitClient, s.config, fileSystem, pathValidator)
+	s.discoveryService = services.NewDiscoveryService(s.gitClient, s.config, fileSystem)
 }
 
 func (s *ArchitectureIntegrationTestSuite) TearDownSuite() {

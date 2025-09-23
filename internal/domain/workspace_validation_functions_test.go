@@ -265,54 +265,33 @@ func TestValidateWorkspaceCreation(t *testing.T) {
 }
 
 func TestValidateWorkspaceHealth(t *testing.T) {
-	// Create a mock path validator for testing
-	mockPathValidator := &MockPathValidator{
-		IsValidWorkspacePathFunc: func(path string) bool {
-			return path == "/valid/path"
-		},
-	}
-
 	testCases := []struct {
 		name      string
 		workspace *Workspace
-		validator PathValidator
 		expected  WorkspaceValidationResult
 	}{
 		{
 			name:      "valid workspace should pass",
 			workspace: &Workspace{Path: "/valid/path"},
-			validator: mockPathValidator,
 			expected:  NewWorkspaceValidationResult(),
 		},
 		{
-			name:      "invalid path should fail",
+			name:      "invalid path should pass in domain validation (infrastructure handles path validation)",
 			workspace: &Workspace{Path: "/invalid/path"},
-			validator: mockPathValidator,
-			expected: NewWorkspaceValidationResult(
-				WorkspaceError{Type: WorkspaceErrorValidationFailed, Message: "workspace path '/invalid/path' is not valid"},
-			),
+			expected:  NewWorkspaceValidationResult(), // Domain validation only checks for empty path
 		},
 		{
 			name:      "nil workspace should fail",
 			workspace: nil,
-			validator: mockPathValidator,
 			expected: NewWorkspaceValidationResult(
 				WorkspaceError{Type: WorkspaceErrorInvalidConfiguration, Message: "workspace cannot be nil"},
-			),
-		},
-		{
-			name:      "nil validator should fail",
-			workspace: &Workspace{Path: "/valid/path"},
-			validator: nil,
-			expected: NewWorkspaceValidationResult(
-				WorkspaceError{Type: WorkspaceErrorInvalidConfiguration, Message: "path validator cannot be nil"},
 			),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := ValidateWorkspaceHealth(tc.workspace, tc.validator)
+			result := ValidateWorkspaceHealth(tc.workspace)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
