@@ -64,7 +64,8 @@ var _ = Describe("Delete Command", func() {
 	It("rejects extra arguments", func() {
 		session := cli.Run("delete", "extra-arg")
 		Eventually(session).Should(gexec.Exit(1))
-		Expect(string(session.Err.Contents())).To(ContainSubstring("unknown command"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("unknown command"))
 	})
 
 	It("supports all flags", func() {

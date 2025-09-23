@@ -31,7 +31,7 @@ func (wr *WorktreeRemover) Remove(ctx context.Context, worktreePath string, forc
 
 	repoRoot, err := wr.gitClient.GetRepositoryRoot(ctx, worktreePath)
 	if err != nil {
-		return domain.WrapError(
+		return domain.NewWorktreeError(
 			domain.ErrNotRepository,
 			"failed to get repository root",
 			worktreePath,
@@ -52,7 +52,7 @@ func (wr *WorktreeRemover) Remove(ctx context.Context, worktreePath string, forc
 
 	err = wr.gitClient.RemoveWorktree(ctx, repoRoot, worktreePath, force)
 	if err != nil {
-		return domain.WrapError(
+		return domain.NewWorktreeError(
 			domain.ErrGitCommand,
 			"failed to remove worktree",
 			worktreePath,

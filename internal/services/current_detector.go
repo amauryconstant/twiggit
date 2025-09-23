@@ -31,7 +31,7 @@ func (cd *CurrentDirectoryDetector) Detect(ctx context.Context, currentDir strin
 
 	repoRoot, err := cd.gitClient.GetRepositoryRoot(ctx, currentDir)
 	if err != nil {
-		return nil, domain.WrapError(
+		return nil, domain.NewWorktreeError(
 			domain.ErrNotRepository,
 			"failed to get repository root",
 			currentDir,
@@ -41,7 +41,7 @@ func (cd *CurrentDirectoryDetector) Detect(ctx context.Context, currentDir strin
 
 	worktrees, err := cd.gitClient.ListWorktrees(ctx, repoRoot)
 	if err != nil {
-		return nil, domain.WrapError(
+		return nil, domain.NewWorktreeError(
 			domain.ErrGitCommand,
 			"failed to list worktrees",
 			repoRoot,

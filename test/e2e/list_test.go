@@ -41,7 +41,8 @@ var _ = Describe("List Command", func() {
 	It("rejects extra arguments", func() {
 		session := cli.Run("list", "extra-arg")
 		Eventually(session).Should(gexec.Exit(1))
-		Expect(string(session.Err.Contents())).To(ContainSubstring("unknown command"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("unknown command"))
 	})
 
 	It("supports --all flag", func() {

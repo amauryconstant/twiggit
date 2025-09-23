@@ -36,19 +36,22 @@ var _ = Describe("Create Command", func() {
 	It("requires at most one argument", func() {
 		session := cli.Run("create", "branch1", "branch2")
 		Eventually(session).Should(gexec.Exit(1))
-		Expect(string(session.Err.Contents())).To(ContainSubstring("accepts at most 1 arg(s), received 2"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("accepts at most 1 arg(s), received 2"))
 	})
 
 	It("errors when no branch name provided and interactive mode not implemented", func() {
 		session := cli.Run("create")
 		Eventually(session).Should(gexec.Exit(1))
-		Expect(string(session.Err.Contents())).To(ContainSubstring("interactive mode not yet implemented"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("interactive mode not yet implemented"))
 	})
 
 	It("errors when empty branch name provided", func() {
 		session := cli.Run("create", "")
 		Eventually(session).Should(gexec.Exit(1))
-		Expect(string(session.Err.Contents())).To(ContainSubstring("branch name is required"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("branch name is required"))
 	})
 
 	It("supports verbose flag", func() {

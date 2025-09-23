@@ -3,12 +3,12 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/amaury/twiggit/internal/di"
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +25,6 @@ The worktree will be created in the configured workspace directory under the pro
 Examples:
   twiggit create feature/new-auth
   twiggit create  # Interactive mode`,
-		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCreateCommand(cmd, args, container)
 		},
@@ -44,22 +43,41 @@ func runCreateCommand(_ *cobra.Command, args []string, container *di.Container) 
 		branchName = args[0]
 	} else {
 		// Interactive mode - for now, return error
-		return errors.New("interactive mode not yet implemented - please provide a branch name")
+		return domain.NewWorktreeError(
+			domain.ErrValidation,
+			"interactive mode not yet implemented",
+			"",
+		).WithSuggestion("Provide a valid branch name as an argument")
 	}
 
 	if branchName == "" {
-		return errors.New("branch name is required")
+		return domain.NewWorktreeError(
+			domain.ErrInvalidBranchName,
+			"branch name is required",
+			"",
+		).WithSuggestion("Provide a valid branch name")
 	}
 
 	// Try to find repository root from current directory first
 	currentDir, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("failed to get current directory: %w", err)
+		return domain.NewWorktreeError(
+			domain.ErrInvalidPath,
+			"failed to get current directory",
+			"",
+			err,
+		).WithSuggestion("Check current directory permissions")
 	}
 
 	mainRepoPath, err := container.GitClient().GetRepositoryRoot(ctx, currentDir)
 	if err != nil {
-		return fmt.Errorf("failed to find repository root from current directory: %w", err)
+		return domain.NewWorktreeError(
+			domain.ErrNotRepository,
+			"failed to find repository root from current directory",
+			currentDir,
+			err,
+		).WithSuggestion("Ensure you are in a git repository directory").
+			WithSuggestion("Run 'git init' if this is a new repository")
 	}
 
 	// Get services from container
@@ -78,6 +96,7 @@ func runCreateCommand(_ *cobra.Command, args []string, container *di.Container) 
 	fmt.Printf("Creating worktree for branch '%s' at %s...\n", branchName, targetPath)
 	err = worktreeCreator.Create(ctx, mainRepoPath, branchName, targetPath)
 	if err != nil {
+		// The service layer already returns domain errors, wrap with CLI context
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
 
