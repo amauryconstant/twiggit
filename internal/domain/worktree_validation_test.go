@@ -7,63 +7,21 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-// ValidationTestSuite provides test setup for validation tests
-type ValidationTestSuite struct {
+// WorktreeValidationTestSuite provides test setup for worktree validation tests
+type WorktreeValidationTestSuite struct {
 	suite.Suite
 }
 
-func TestValidationSuite(t *testing.T) {
-	suite.Run(t, new(ValidationTestSuite))
+func TestWorktreeValidationSuite(t *testing.T) {
+	suite.Run(t, new(WorktreeValidationTestSuite))
 }
 
-func (s *ValidationTestSuite) TestValidationResult_AddError() {
-	result := NewValidationResult()
-	s.True(result.Valid)
-
-	err := NewWorktreeError(ErrInvalidBranchName, "test error", "")
-	result.AddError(err)
-
-	s.False(result.Valid)
-	s.Len(result.Errors, 1)
-	s.Equal(err, result.Errors[0])
-}
-
-func (s *ValidationTestSuite) TestValidationResult_AddWarning() {
-	result := NewValidationResult()
-	result.AddWarning("test warning")
-
-	s.True(result.Valid) // Warnings don't affect validity
-	s.Len(result.Warnings, 1)
-	s.Contains(result.Warnings, "test warning")
-}
-
-func (s *ValidationTestSuite) TestValidationResult_HasErrors() {
-	result := NewValidationResult()
-	s.False(result.HasErrors())
-
-	result.AddError(NewWorktreeError(ErrValidation, "test", ""))
-	s.True(result.HasErrors())
-}
-
-func (s *ValidationTestSuite) TestValidationResult_FirstError() {
-	result := NewValidationResult()
-	s.Require().NoError(result.FirstError())
-
-	err1 := NewWorktreeError(ErrValidation, "first error", "")
-	err2 := NewWorktreeError(ErrValidation, "second error", "")
-
-	result.AddError(err1)
-	result.AddError(err2)
-
-	s.Equal(err1, result.FirstError())
-}
-
-func (s *ValidationTestSuite) TestValidateBranchName() {
+func (s *WorktreeValidationTestSuite) TestValidateBranchName() {
 	tests := []struct {
 		name        string
 		branchName  string
 		expectValid bool
-		errorType   ErrorType
+		errorType   DomainErrorType
 		description string
 	}{
 		{"valid simple branch", "feature", true, ErrUnknown, ""},
@@ -98,7 +56,7 @@ func (s *ValidationTestSuite) TestValidateBranchName() {
 
 			if !tt.expectValid {
 				s.True(result.HasErrors(), "Should have errors when invalid")
-				s.True(IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
+				s.True(IsDomainErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
 				if tt.description != "" {
 					s.Contains(result.FirstError().Error(), tt.description, "Error should contain expected description")
 				}
@@ -107,12 +65,12 @@ func (s *ValidationTestSuite) TestValidateBranchName() {
 	}
 }
 
-func (s *ValidationTestSuite) TestValidatePath() {
+func (s *WorktreeValidationTestSuite) TestValidatePath() {
 	tests := []struct {
 		name        string
 		path        string
 		expectValid bool
-		errorType   ErrorType
+		errorType   DomainErrorType
 		description string
 	}{
 		{"valid absolute path", "/tmp/test", true, ErrUnknown, ""},
@@ -132,7 +90,7 @@ func (s *ValidationTestSuite) TestValidatePath() {
 
 			if !tt.expectValid {
 				s.True(result.HasErrors(), "Should have errors when invalid")
-				s.True(IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
+				s.True(IsDomainErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
 				if tt.description != "" {
 					s.Contains(result.FirstError().Error(), tt.description, "Error should contain expected description")
 				}
@@ -141,14 +99,14 @@ func (s *ValidationTestSuite) TestValidatePath() {
 	}
 }
 
-func (s *ValidationTestSuite) TestValidatePathWritable() {
+func (s *WorktreeValidationTestSuite) TestValidatePathWritable() {
 	// Test only pure business logic (path format validation)
 	// Filesystem operations are now handled by the service layer
 	tests := []struct {
 		name        string
 		path        string
 		expectValid bool
-		errorType   ErrorType
+		errorType   DomainErrorType
 	}{
 		{
 			name:        "valid path format",
@@ -183,13 +141,13 @@ func (s *ValidationTestSuite) TestValidatePathWritable() {
 
 			if !tt.expectValid {
 				s.True(result.HasErrors(), "Should have errors when invalid")
-				s.True(IsErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
+				s.True(IsDomainErrorType(result.FirstError(), tt.errorType), "Should have correct error type")
 			}
 		})
 	}
 }
 
-func (s *ValidationTestSuite) TestValidateWorktreeCreation() {
+func (s *WorktreeValidationTestSuite) TestValidateWorktreeCreation() {
 	// Test only pure business logic (format validation)
 	// Filesystem operations are now handled by the service layer
 	tests := []struct {
@@ -237,7 +195,7 @@ func (s *ValidationTestSuite) TestValidateWorktreeCreation() {
 	}
 }
 
-func (s *ValidationTestSuite) TestValidateBranchName_EdgeCases() {
+func (s *WorktreeValidationTestSuite) TestValidateBranchName_EdgeCases() {
 	// Test UTF-8 handling
 	s.Run("valid UTF-8 characters", func() {
 		result := ValidateBranchName("feature-🚀")
@@ -250,7 +208,7 @@ func (s *ValidationTestSuite) TestValidateBranchName_EdgeCases() {
 		invalidUTF8 := "feature-" + string([]byte{0xff, 0xfe})
 		result := ValidateBranchName(invalidUTF8)
 		s.False(result.Valid)
-		s.True(IsErrorType(result.FirstError(), ErrInvalidBranchName))
+		s.True(IsDomainErrorType(result.FirstError(), ErrInvalidBranchName))
 		s.Contains(result.FirstError().Error(), "invalid UTF-8")
 	})
 

@@ -46,7 +46,7 @@ func (s *ProjectValidationTestSuite) TestProjectValidationResult_HasErrors() {
 
 func (s *ProjectValidationTestSuite) TestProjectValidationResult_FirstError() {
 	result := NewProjectValidationResult()
-	s.Require().NoError(result.FirstError())
+	s.Nil(result.FirstError())
 
 	err := NewProjectError(ErrInvalidProjectName, "first error", "")
 	result.AddError(err)
@@ -67,7 +67,7 @@ func (s *ProjectValidationTestSuite) TestValidateProjectName() {
 		projectName    string
 		expectValid    bool
 		expectError    bool
-		errorType      ProjectErrorType
+		errorType      DomainErrorType
 		expectedErrMsg string
 	}{
 		{
@@ -133,7 +133,7 @@ func (s *ProjectValidationTestSuite) TestValidateGitRepoPath() {
 		gitRepoPath    string
 		expectValid    bool
 		expectError    bool
-		errorType      ProjectErrorType
+		errorType      DomainErrorType
 		expectedErrMsg string
 	}{
 		{

@@ -128,7 +128,7 @@ func (w *Workspace) GetWorktreeByPath(path string) (*Worktree, error) {
 			}
 		}
 	}
-	return nil, NewWorkspaceError(WorkspaceErrorWorktreeNotFound, "worktree not found at path: "+path)
+	return nil, NewWorkspaceError(ErrWorkspaceWorktreeNotFound, "worktree not found at path: "+path)
 }
 
 // GetStatistics returns statistics about the workspace
