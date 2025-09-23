@@ -5,20 +5,21 @@ import (
 	"fmt"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 // WorktreeCreator handles worktree creation operations
 type WorktreeCreator struct {
-	gitClient  domain.GitClient
+	gitClient  infrastructure.GitClient
 	validation *ValidationService
-	mise       domain.MiseIntegration
+	mise       infrastructure.MiseIntegration
 }
 
 // NewWorktreeCreator creates a new WorktreeCreator instance
 func NewWorktreeCreator(
-	gitClient domain.GitClient,
+	gitClient infrastructure.GitClient,
 	validation *ValidationService,
-	mise domain.MiseIntegration,
+	mise infrastructure.MiseIntegration,
 ) *WorktreeCreator {
 	return &WorktreeCreator{
 		gitClient:  gitClient,

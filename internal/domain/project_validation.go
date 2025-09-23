@@ -105,8 +105,8 @@ func ValidateProjectCreation(projectName, gitRepoPath string) *ProjectValidation
 	return result
 }
 
-// ValidateProjectHealth validates the health status of a project using path validator
-func ValidateProjectHealth(project *Project, pathValidator PathValidator) *ProjectValidationResult {
+// ValidateProjectHealth validates the health status of a project (domain-only validation)
+func ValidateProjectHealth(project *Project) *ProjectValidationResult {
 	result := NewProjectValidationResult()
 
 	// Basic validation - check if git repo path is not empty
@@ -118,14 +118,8 @@ func ValidateProjectHealth(project *Project, pathValidator PathValidator) *Proje
 		).WithSuggestion("Provide a valid git repository path"))
 	}
 
-	// Additional validation - check if git repo path looks valid
-	if project.GitRepo != "" && !pathValidator.IsValidGitRepoPath(project.GitRepo) {
-		result.AddError(NewProjectError(
-			ErrInvalidGitRepoPath,
-			"git repository not validated",
-			project.GitRepo,
-		).WithSuggestion("Check that the path points to a valid git repository"))
-	}
+	// Note: Infrastructure-specific validation (like path validation) is now handled
+	// by the service layer. Domain validation only checks basic business rules.
 
 	return result
 }

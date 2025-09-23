@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 // PathValidatorImpl implements PathValidator interface
@@ -14,7 +14,7 @@ type PathValidatorImpl struct {
 }
 
 // NewPathValidator creates a new PathValidator instance
-func NewPathValidator() domain.PathValidator {
+func NewPathValidator() infrastructure.PathValidator {
 	return &PathValidatorImpl{}
 }
 

@@ -171,7 +171,7 @@ func (w *Workspace) GetConfig(key string) (interface{}, bool) {
 }
 
 // GetHealth returns health status of the workspace
-func (w *Workspace) GetHealth(pathValidator PathValidator) *WorkspaceHealth {
+func (w *Workspace) GetHealth() *WorkspaceHealth {
 	health := &WorkspaceHealth{
 		Status:        "unknown",
 		Issues:        make([]string, 0),
@@ -180,7 +180,7 @@ func (w *Workspace) GetHealth(pathValidator PathValidator) *WorkspaceHealth {
 	}
 
 	// Validate workspace health using the new validation system
-	validationResult := ValidateWorkspaceHealth(w, pathValidator)
+	validationResult := ValidateWorkspaceHealth(w)
 	if !validationResult.IsValid() {
 		for _, err := range validationResult.Errors {
 			health.Issues = append(health.Issues, err.Message)

@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/amaury/twiggit/test/mocks"
@@ -16,34 +18,36 @@ func TestWorktreeCreator_Create(t *testing.T) {
 	t.Run("should create worktree successfully with existing branch", func(t *testing.T) {
 		// Setup mocks
 		mockGitClient := new(mocks.GitClientMock)
-		mockInfraService := new(mocks.InfrastructureServiceMock)
 		mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-		validationService := NewValidationService(mockInfraService)
+		// Create test directory structure for validation
+		tempDir := t.TempDir()
+		testFileSystem := os.DirFS(tempDir)
+		validationService := NewValidationService(testFileSystem)
 		creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
+		// Create test directories for validation
+		targetDir := filepath.Join(tempDir, "target")
+		projectDir := filepath.Join(tempDir, "project")
+		targetPath := filepath.Join(targetDir, "path")
+		require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), 0755))
+		require.NoError(t, os.MkdirAll(projectDir, 0755))
+
 		// Setup expectations
-		mockInfraService.On("PathExists", "/target/path").
-			Return(false)
-		mockInfraService.On("PathExists", "/target").
-			Return(true)
-		mockInfraService.On("PathWritable", "/target/path").
-			Return(true)
-		mockGitClient.On("IsGitRepository", ctx, "/project/path").
+		mockGitClient.On("IsGitRepository", ctx, projectDir).
 			Return(true, nil)
-		mockGitClient.On("BranchExists", ctx, "/project/path", "feature-branch").
+		mockGitClient.On("BranchExists", ctx, projectDir, "feature-branch").
 			Return(true)
-		mockGitClient.On("CreateWorktree", ctx, "/project/path", "feature-branch", "/target/path").
+		mockGitClient.On("CreateWorktree", ctx, projectDir, "feature-branch", targetPath).
 			Return(nil)
-		mockMiseIntegration.On("SetupWorktree", "/project/path", "/target/path").
+		mockMiseIntegration.On("SetupWorktree", projectDir, targetPath).
 			Return(nil)
 
 		// Execute
-		err := creator.Create(ctx, "/project/path", "feature-branch", "/target/path")
+		err := creator.Create(ctx, projectDir, "feature-branch", targetPath)
 
 		// Verify
 		require.NoError(t, err)
-		mockInfraService.AssertExpectations(t)
 		mockGitClient.AssertExpectations(t)
 		mockMiseIntegration.AssertExpectations(t)
 	})
@@ -51,34 +55,36 @@ func TestWorktreeCreator_Create(t *testing.T) {
 	t.Run("should create worktree successfully with new branch", func(t *testing.T) {
 		// Setup mocks
 		mockGitClient := new(mocks.GitClientMock)
-		mockInfraService := new(mocks.InfrastructureServiceMock)
 		mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-		validationService := NewValidationService(mockInfraService)
+		// Create test directory structure for validation
+		tempDir := t.TempDir()
+		testFileSystem := os.DirFS(tempDir)
+		validationService := NewValidationService(testFileSystem)
 		creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
+		// Create test directories for validation
+		targetDir := filepath.Join(tempDir, "target")
+		projectDir := filepath.Join(tempDir, "project")
+		targetPath := filepath.Join(targetDir, "path")
+		require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), 0755))
+		require.NoError(t, os.MkdirAll(projectDir, 0755))
+
 		// Setup expectations
-		mockInfraService.On("PathExists", "/target/path").
-			Return(false)
-		mockInfraService.On("PathExists", "/target").
-			Return(true)
-		mockInfraService.On("PathWritable", "/target/path").
-			Return(true)
-		mockGitClient.On("IsGitRepository", ctx, "/project/path").
+		mockGitClient.On("IsGitRepository", ctx, projectDir).
 			Return(true, nil)
-		mockGitClient.On("BranchExists", ctx, "/project/path", "new-branch").
+		mockGitClient.On("BranchExists", ctx, projectDir, "new-branch").
 			Return(false)
-		mockGitClient.On("CreateWorktree", ctx, "/project/path", "new-branch", "/target/path").
+		mockGitClient.On("CreateWorktree", ctx, projectDir, "new-branch", targetPath).
 			Return(nil)
-		mockMiseIntegration.On("SetupWorktree", "/project/path", "/target/path").
+		mockMiseIntegration.On("SetupWorktree", projectDir, targetPath).
 			Return(nil)
 
 		// Execute
-		err := creator.Create(ctx, "/project/path", "new-branch", "/target/path")
+		err := creator.Create(ctx, projectDir, "new-branch", targetPath)
 
 		// Verify
 		require.NoError(t, err)
-		mockInfraService.AssertExpectations(t)
 		mockGitClient.AssertExpectations(t)
 		mockMiseIntegration.AssertExpectations(t)
 	})
@@ -86,10 +92,9 @@ func TestWorktreeCreator_Create(t *testing.T) {
 	t.Run("should return error when project path is empty", func(t *testing.T) {
 		// Setup mocks
 		mockGitClient := new(mocks.GitClientMock)
-		mockInfraService := new(mocks.InfrastructureServiceMock)
 		mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-		validationService := NewValidationService(mockInfraService)
+		validationService := NewValidationService(os.DirFS("/tmp"))
 		creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
 		// Execute
@@ -100,66 +105,65 @@ func TestWorktreeCreator_Create(t *testing.T) {
 		assert.Contains(t, err.Error(), "project path cannot be empty")
 
 		// Verify no other calls were made
-		mockInfraService.AssertNotCalled(t, "PathWritable")
 		mockGitClient.AssertNotCalled(t, "IsGitRepository")
 	})
 
 	t.Run("should return error when validation fails", func(t *testing.T) {
 		// Setup mocks
 		mockGitClient := new(mocks.GitClientMock)
-		mockInfraService := new(mocks.InfrastructureServiceMock)
 		mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-		validationService := NewValidationService(mockInfraService)
+		// Create test directory structure for validation - simulate non-writable parent
+		tempDir := t.TempDir()
+		testFileSystem := os.DirFS(tempDir)
+		validationService := NewValidationService(testFileSystem)
 		creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
-		// Setup expectations - simulate path not writable
-		mockInfraService.On("PathExists", "/target/path").
-			Return(false)
-		mockInfraService.On("PathExists", "/target").
-			Return(true)
-		mockInfraService.On("PathWritable", "/target/path").
-			Return(false)
+		// Create project directory but not target parent directory to simulate validation failure
+		projectDir := filepath.Join(tempDir, "project")
+		require.NoError(t, os.MkdirAll(projectDir, 0755))
+		// Note: we don't create the target directory to simulate validation failure
 
-		// Execute
-		err := creator.Create(ctx, "/project/path", "invalid-branch", "/target/path")
+		// Execute - this should fail validation because target parent doesn't exist
+		err := creator.Create(ctx, projectDir, "invalid-branch", filepath.Join(tempDir, "nonexistent", "path"))
 
 		// Verify
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "validation failed")
 
-		mockInfraService.AssertExpectations(t)
 		mockGitClient.AssertNotCalled(t, "IsGitRepository")
 	})
 
 	t.Run("should return error when project is not a git repository", func(t *testing.T) {
 		// Setup mocks
 		mockGitClient := new(mocks.GitClientMock)
-		mockInfraService := new(mocks.InfrastructureServiceMock)
 		mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-		validationService := NewValidationService(mockInfraService)
+		// Create test directory structure for validation
+		tempDir := t.TempDir()
+		testFileSystem := os.DirFS(tempDir)
+		validationService := NewValidationService(testFileSystem)
 		creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
+		// Create test directories for validation
+		targetDir := filepath.Join(tempDir, "target")
+		projectDir := filepath.Join(tempDir, "project")
+		targetPath := filepath.Join(targetDir, "path")
+		require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), 0755))
+		require.NoError(t, os.MkdirAll(projectDir, 0755))
+
 		// Setup expectations
-		mockInfraService.On("PathExists", "/target/path").
-			Return(false)
-		mockInfraService.On("PathExists", "/target").
-			Return(true)
-		mockInfraService.On("PathWritable", "/target/path").
-			Return(true)
-		mockGitClient.On("IsGitRepository", ctx, "/project/path").
+		mockGitClient.On("IsGitRepository", ctx, projectDir).
 			Return(false, errors.New("not a git repository"))
 
 		// Execute
-		err := creator.Create(ctx, "/project/path", "feature-branch", "/target/path")
+		err := creator.Create(ctx, projectDir, "feature-branch", targetPath)
 
 		// Verify
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not a git repository")
 		assert.Contains(t, err.Error(), "failed to validate project repository")
 
-		mockInfraService.AssertExpectations(t)
 		mockGitClient.AssertExpectations(t)
 		mockGitClient.AssertNotCalled(t, "BranchExists")
 	})
@@ -167,66 +171,70 @@ func TestWorktreeCreator_Create(t *testing.T) {
 	t.Run("should return error when git repository check fails", func(t *testing.T) {
 		// Setup mocks
 		mockGitClient := new(mocks.GitClientMock)
-		mockInfraService := new(mocks.InfrastructureServiceMock)
 		mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-		validationService := NewValidationService(mockInfraService)
+		// Create test directory structure for validation
+		tempDir := t.TempDir()
+		testFileSystem := os.DirFS(tempDir)
+		validationService := NewValidationService(testFileSystem)
 		creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
+		// Create test directories for validation
+		targetDir := filepath.Join(tempDir, "target")
+		projectDir := filepath.Join(tempDir, "project")
+		targetPath := filepath.Join(targetDir, "path")
+		require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), 0755))
+		require.NoError(t, os.MkdirAll(projectDir, 0755))
+
 		// Setup expectations
-		mockInfraService.On("PathExists", "/target/path").
-			Return(false)
-		mockInfraService.On("PathExists", "/target").
-			Return(true)
-		mockInfraService.On("PathWritable", "/target/path").
-			Return(true)
-		mockGitClient.On("IsGitRepository", ctx, "/project/path").
+		mockGitClient.On("IsGitRepository", ctx, projectDir).
 			Return(false, errors.New("permission denied"))
 
 		// Execute
-		err := creator.Create(ctx, "/project/path", "feature-branch", "/target/path")
+		err := creator.Create(ctx, projectDir, "feature-branch", targetPath)
 
 		// Verify
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "not a git repository")
 		assert.Contains(t, err.Error(), "failed to validate project repository")
 
-		mockInfraService.AssertExpectations(t)
 		mockGitClient.AssertExpectations(t)
 	})
 
 	t.Run("should return error when worktree creation fails", func(t *testing.T) {
 		// Setup mocks
 		mockGitClient := new(mocks.GitClientMock)
-		mockInfraService := new(mocks.InfrastructureServiceMock)
 		mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-		validationService := NewValidationService(mockInfraService)
+		// Create test directory structure for validation
+		tempDir := t.TempDir()
+		testFileSystem := os.DirFS(tempDir)
+		validationService := NewValidationService(testFileSystem)
 		creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
+		// Create test directories for validation
+		targetDir := filepath.Join(tempDir, "target")
+		projectDir := filepath.Join(tempDir, "project")
+		targetPath := filepath.Join(targetDir, "path")
+		require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), 0755))
+		require.NoError(t, os.MkdirAll(projectDir, 0755))
+
 		// Setup expectations
-		mockInfraService.On("PathExists", "/target/path").
-			Return(false)
-		mockInfraService.On("PathExists", "/target").
-			Return(true)
-		mockInfraService.On("PathWritable", "/target/path").
-			Return(true)
-		mockGitClient.On("IsGitRepository", ctx, "/project/path").
+		mockGitClient.On("IsGitRepository", ctx, projectDir).
 			Return(true, nil)
-		mockGitClient.On("BranchExists", ctx, "/project/path", "feature-branch").
+		mockGitClient.On("BranchExists", ctx, projectDir, "feature-branch").
 			Return(true)
-		mockGitClient.On("CreateWorktree", ctx, "/project/path", "feature-branch", "/target/path").
+		mockGitClient.On("CreateWorktree", ctx, projectDir, "feature-branch", targetPath).
 			Return(errors.New("git worktree add failed"))
 
 		// Execute
-		err := creator.Create(ctx, "/project/path", "feature-branch", "/target/path")
+		err := creator.Create(ctx, projectDir, "feature-branch", targetPath)
 
 		// Verify
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "git command failed")
 		assert.Contains(t, err.Error(), "failed to create worktree")
 
-		mockInfraService.AssertExpectations(t)
 		mockGitClient.AssertExpectations(t)
 		mockMiseIntegration.AssertNotCalled(t, "SetupWorktree")
 	})
@@ -234,34 +242,36 @@ func TestWorktreeCreator_Create(t *testing.T) {
 	t.Run("should continue when mise setup fails", func(t *testing.T) {
 		// Setup mocks
 		mockGitClient := new(mocks.GitClientMock)
-		mockInfraService := new(mocks.InfrastructureServiceMock)
 		mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-		validationService := NewValidationService(mockInfraService)
+		// Create test directory structure for validation
+		tempDir := t.TempDir()
+		testFileSystem := os.DirFS(tempDir)
+		validationService := NewValidationService(testFileSystem)
 		creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
+		// Create test directories for validation
+		targetDir := filepath.Join(tempDir, "target")
+		projectDir := filepath.Join(tempDir, "project")
+		targetPath := filepath.Join(targetDir, "path")
+		require.NoError(t, os.MkdirAll(filepath.Dir(targetPath), 0755))
+		require.NoError(t, os.MkdirAll(projectDir, 0755))
+
 		// Setup expectations
-		mockInfraService.On("PathExists", "/target/path").
-			Return(false)
-		mockInfraService.On("PathExists", "/target").
-			Return(true)
-		mockInfraService.On("PathWritable", "/target/path").
-			Return(true)
-		mockGitClient.On("IsGitRepository", ctx, "/project/path").
+		mockGitClient.On("IsGitRepository", ctx, projectDir).
 			Return(true, nil)
-		mockGitClient.On("BranchExists", ctx, "/project/path", "feature-branch").
+		mockGitClient.On("BranchExists", ctx, projectDir, "feature-branch").
 			Return(true)
-		mockGitClient.On("CreateWorktree", ctx, "/project/path", "feature-branch", "/target/path").
+		mockGitClient.On("CreateWorktree", ctx, projectDir, "feature-branch", targetPath).
 			Return(nil)
-		mockMiseIntegration.On("SetupWorktree", "/project/path", "/target/path").
+		mockMiseIntegration.On("SetupWorktree", projectDir, targetPath).
 			Return(errors.New("mise not available"))
 
 		// Execute
-		err := creator.Create(ctx, "/project/path", "feature-branch", "/target/path")
+		err := creator.Create(ctx, projectDir, "feature-branch", targetPath)
 
 		// Verify
 		require.NoError(t, err, "Should not fail when mise setup fails")
-		mockInfraService.AssertExpectations(t)
 		mockGitClient.AssertExpectations(t)
 		mockMiseIntegration.AssertExpectations(t)
 	})
@@ -269,10 +279,11 @@ func TestWorktreeCreator_Create(t *testing.T) {
 
 func TestNewWorktreeCreator(t *testing.T) {
 	mockGitClient := new(mocks.GitClientMock)
-	mockInfraService := new(mocks.InfrastructureServiceMock)
 	mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-	validationService := NewValidationService(mockInfraService)
+	tempDir := t.TempDir()
+	testFileSystem := os.DirFS(tempDir)
+	validationService := NewValidationService(testFileSystem)
 	creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 
 	require.NotNil(t, creator, "WorktreeCreator should not be nil")

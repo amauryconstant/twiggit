@@ -1,22 +1,64 @@
 package services
 
 import (
+	"io/fs"
+	"os"
 	"path/filepath"
 
 	"github.com/amaury/twiggit/internal/domain"
-	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 // ValidationService handles validation operations that require infrastructure access
 type ValidationService struct {
-	infraService infrastructure.InfrastructureService
+	fileSystem fs.FS
 }
 
 // NewValidationService creates a new ValidationService instance
-func NewValidationService(infraService infrastructure.InfrastructureService) *ValidationService {
+func NewValidationService(fileSystem fs.FS) *ValidationService {
 	return &ValidationService{
-		infraService: infraService,
+		fileSystem: fileSystem,
 	}
+}
+
+// pathExists checks if a path exists on the filesystem
+func (s *ValidationService) pathExists(path string) bool {
+	// For testing with os.DirFS, we need to handle absolute paths
+	// In production, this would use the actual filesystem
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// pathWritable checks if a path is writable
+func (s *ValidationService) pathWritable(path string) bool {
+	// Check if path already exists
+	if s.pathExists(path) {
+		return false
+	}
+
+	// Check if parent directory exists and is writable
+	parentDir := filepath.Dir(path)
+
+	parentInfo, err := os.Stat(parentDir)
+	if err != nil {
+		return false
+	}
+
+	if !parentInfo.IsDir() {
+		return false
+	}
+
+	// Test writability by attempting to create a temporary file
+	tempFile := filepath.Join(parentDir, ".twiggit-write-test")
+	file, err := os.Create(tempFile)
+	if err != nil {
+		return false
+	}
+
+	// Clean up the temporary file
+	_ = file.Close()
+	_ = os.Remove(tempFile)
+
+	return true
 }
 
 // ValidatePathWritable checks if a path is writable using the infrastructure service
@@ -32,7 +74,7 @@ func (s *ValidationService) ValidatePathWritable(path string) *domain.Validation
 	}
 
 	// Check if path already exists
-	if s.infraService.PathExists(path) {
+	if s.pathExists(path) {
 		result.AddError(domain.NewWorktreeError(
 			domain.ErrPathNotWritable,
 			"path already exists",
@@ -43,7 +85,7 @@ func (s *ValidationService) ValidatePathWritable(path string) *domain.Validation
 
 	// Check if parent directory exists and is writable
 	parentDir := filepath.Dir(path)
-	if !s.infraService.PathExists(parentDir) {
+	if !s.pathExists(parentDir) {
 		result.AddError(domain.NewWorktreeError(
 			domain.ErrPathNotWritable,
 			"parent directory does not exist",
@@ -52,7 +94,7 @@ func (s *ValidationService) ValidatePathWritable(path string) *domain.Validation
 		return result
 	}
 
-	if !s.infraService.PathWritable(path) {
+	if !s.pathWritable(path) {
 		result.AddError(domain.NewWorktreeError(
 			domain.ErrPathNotWritable,
 			"parent directory is not writable",

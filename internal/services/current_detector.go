@@ -4,15 +4,16 @@ import (
 	"context"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 // CurrentDirectoryDetector handles detection of whether current directory is a worktree
 type CurrentDirectoryDetector struct {
-	gitClient domain.GitClient
+	gitClient infrastructure.GitClient
 }
 
 // NewCurrentDirectoryDetector creates a new CurrentDirectoryDetector instance
-func NewCurrentDirectoryDetector(gitClient domain.GitClient) *CurrentDirectoryDetector {
+func NewCurrentDirectoryDetector(gitClient infrastructure.GitClient) *CurrentDirectoryDetector {
 	return &CurrentDirectoryDetector{
 		gitClient: gitClient,
 	}

@@ -175,7 +175,7 @@ func (p *Project) GetWorktreeStatistics() *WorktreeStatistics {
 }
 
 // GetHealth returns health status of the project
-func (p *Project) GetHealth(pathValidator PathValidator) *ProjectHealth {
+func (p *Project) GetHealth() *ProjectHealth {
 	health := &ProjectHealth{
 		Status:        "unknown",
 		Issues:        make([]string, 0),
@@ -183,7 +183,7 @@ func (p *Project) GetHealth(pathValidator PathValidator) *ProjectHealth {
 	}
 
 	// Use new validation system
-	validationResult := ValidateProjectHealth(p, pathValidator)
+	validationResult := ValidateProjectHealth(p)
 
 	// Convert validation errors to health issues
 	for _, err := range validationResult.Errors {

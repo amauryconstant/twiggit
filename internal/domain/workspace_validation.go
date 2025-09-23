@@ -154,8 +154,8 @@ func ValidateWorkspaceCreation(path string) WorkspaceValidationResult {
 	return ValidateWorkspacePath(path)
 }
 
-// ValidateWorkspaceHealth validates the health of a workspace
-func ValidateWorkspaceHealth(workspace *Workspace, validator PathValidator) WorkspaceValidationResult {
+// ValidateWorkspaceHealth validates the health of a workspace (domain-only validation)
+func ValidateWorkspaceHealth(workspace *Workspace) WorkspaceValidationResult {
 	result := NewWorkspaceValidationResult()
 
 	if workspace == nil {
@@ -166,20 +166,16 @@ func ValidateWorkspaceHealth(workspace *Workspace, validator PathValidator) Work
 		return result
 	}
 
-	if validator == nil {
+	// Basic validation - check if workspace path is not empty
+	if workspace.Path == "" {
 		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorInvalidConfiguration,
-			Message: "path validator cannot be nil",
+			Type:    WorkspaceErrorInvalidPath,
+			Message: "workspace path cannot be empty",
 		})
-		return result
 	}
 
-	if !validator.IsValidWorkspacePath(workspace.Path) {
-		result.AddError(WorkspaceError{
-			Type:    WorkspaceErrorValidationFailed,
-			Message: "workspace path '" + workspace.Path + "' is not valid",
-		})
-	}
+	// Note: Infrastructure-specific validation (like path validation) is now handled
+	// by the service layer. Domain validation only checks basic business rules.
 
 	return result
 }

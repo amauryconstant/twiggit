@@ -2,7 +2,6 @@
 package di
 
 import (
-	"github.com/amaury/twiggit/internal/domain"
 	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
@@ -16,13 +15,10 @@ import (
 // Container manages all application dependencies
 type Container struct {
 	// Infrastructure dependencies
-	gitClient     domain.GitClient
+	gitClient     infrastructure.GitClient
 	config        *config.Config
 	fileSystem    fs.FS
-	pathValidator domain.PathValidator
-
-	// Infrastructure services
-	infraService infrastructure.InfrastructureService
+	pathValidator infrastructure.PathValidator
 
 	// Application services
 	validationService        *services.ValidationService
@@ -30,7 +26,7 @@ type Container struct {
 	worktreeCreator          *services.WorktreeCreator
 	worktreeRemover          *services.WorktreeRemover
 	currentDirectoryDetector *services.CurrentDirectoryDetector
-	miseIntegration          *mise.MiseIntegration
+	miseIntegration          infrastructure.MiseIntegration
 }
 
 // NewContainer creates and initializes the dependency container
@@ -52,28 +48,20 @@ func (c *Container) initializeInfrastructure() {
 	c.fileSystem = os.DirFS("/")
 	c.pathValidator = validation.NewPathValidator()
 
-	// Create infrastructure services
-	c.infraService = infrastructure.NewInfrastructureService(
-		c.gitClient,
-		c.fileSystem,
-		c.pathValidator,
-	)
-
 	// Create mise integration
 	c.miseIntegration = mise.NewMiseIntegration()
 }
 
 // initializeServices sets up application services
 func (c *Container) initializeServices() {
-	// Create validation service (depends on infrastructure service)
-	c.validationService = services.NewValidationService(c.infraService)
+	// Create validation service (depends on filesystem)
+	c.validationService = services.NewValidationService(c.fileSystem)
 
 	// Create discovery service (depends on infrastructure)
 	c.discoveryService = services.NewDiscoveryService(
 		c.gitClient,
 		c.config,
 		c.fileSystem,
-		c.pathValidator,
 	)
 
 	// Create specialized worktree services
@@ -95,7 +83,7 @@ func (c *Container) initializeServices() {
 // Getters for services
 
 // GitClient returns the Git client instance
-func (c *Container) GitClient() domain.GitClient {
+func (c *Container) GitClient() infrastructure.GitClient {
 	return c.gitClient
 }
 
@@ -110,13 +98,8 @@ func (c *Container) FileSystem() fs.FS {
 }
 
 // PathValidator returns the path validator instance
-func (c *Container) PathValidator() domain.PathValidator {
+func (c *Container) PathValidator() infrastructure.PathValidator {
 	return c.pathValidator
-}
-
-// InfrastructureService returns the infrastructure service instance
-func (c *Container) InfrastructureService() infrastructure.InfrastructureService {
-	return c.infraService
 }
 
 // ValidationService returns the validation service instance
@@ -145,6 +128,6 @@ func (c *Container) CurrentDirectoryDetector() *services.CurrentDirectoryDetecto
 }
 
 // MiseIntegration returns the mise integration instance
-func (c *Container) MiseIntegration() *mise.MiseIntegration {
+func (c *Container) MiseIntegration() infrastructure.MiseIntegration {
 	return c.miseIntegration
 }
