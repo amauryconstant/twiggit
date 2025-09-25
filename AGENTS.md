@@ -6,7 +6,7 @@
 
 - **Purpose**: Pragmatic git worktree management tool with focus on rebase workflows
 - **Architecture**: Go CLI with domain-driven design, clear separation of concerns
-- **Core Commands**: `list`, `create`, `delete`, `switch`, `cd`, `setup-shell`
+- **Core Commands**: `list`, `create`, `delete`, `cd`, `setup-shell`
 - **Key Technologies**: Cobra, go-git, Koanf, Testify, Ginkgo/Gomega, Carapace
 
 ### Critical Specification Keywords

@@ -29,7 +29,7 @@ func TestMain_SubcommandStructure(t *testing.T) {
 	require.NotNil(t, rootCmd)
 
 	// Check that all expected subcommands exist
-	expectedCommands := []string{"create", "switch", "delete", "list"}
+	expectedCommands := []string{"cd", "create", "delete", "list", "setup-shell"}
 
 	commandNames := make([]string, len(rootCmd.Commands()))
 	for i, cmd := range rootCmd.Commands() {

@@ -21,7 +21,7 @@ test/
 │   ├── global_cli_test.go   # Global CLI behavior tests
 │   ├── help_test.go         # Help command tests
 │   ├── list_test.go         # List command tests
-│   └── switch_test.go       # Switch command tests
+│   └── cd_test.go           # CD command tests
 ├── fixtures/           # Test data and test cases
 │   ├── domain_cases.go      # Domain layer test cases
 │   └── infrastructure_cases.go # Infrastructure layer test cases
@@ -89,7 +89,7 @@ End-to-end tests verify CLI functionality from user perspective:
 - `global_cli_test.go`: Global CLI behavior tests
 - `help_test.go`: Help command tests
 - `list_test.go`: List command tests
-- `switch_test.go`: Switch command tests
+- `cd_test.go`: CD command tests
 
 ### Integration Tests (`test/integration/`)
 
