@@ -31,10 +31,11 @@ Perfect for developers who work with multiple branches across different projects
 	rootCmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
 
 	// Add subcommands (ordered by usage frequency)
-	rootCmd.AddCommand(NewSwitchCmd(container))
+	rootCmd.AddCommand(NewCdCmd(container))
 	rootCmd.AddCommand(NewListCmd(container))
 	rootCmd.AddCommand(NewCreateCmd(container))
 	rootCmd.AddCommand(NewDeleteCmd(container))
+	rootCmd.AddCommand(NewSetupShellCmd(container))
 
 	// Set up custom error handling for all commands
 	rootCmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
@@ -93,7 +94,7 @@ func wrapCommandsWithErrorHandling(rootCmd *cobra.Command, _ *di.Container) {
 // validateCommandArguments validates arguments for specific commands
 func validateCommandArguments(cmd *cobra.Command, args []string) error {
 	switch cmd.Name() {
-	case "create", "switch":
+	case "create", "cd":
 		if len(args) > 1 {
 			return fmt.Errorf("accepts at most 1 arg(s), received %d", len(args))
 		}

@@ -221,7 +221,7 @@ func NewProjectError(errType DomainErrorType, message string, path string, cause
 // Example:
 //
 //	err := NewWorktreeError(ErrWorktreeExists, "worktree already exists", path)
-//	    .WithSuggestion("Use 'twiggit switch' to navigate to existing worktree")
+//	    .WithSuggestion("Use 'twiggit cd' to navigate to existing worktree")
 //
 //	// With underlying cause:
 //	err := NewWorktreeError(ErrGitCommand, "git command failed", path, gitErr)

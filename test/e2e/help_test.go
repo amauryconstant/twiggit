@@ -45,10 +45,11 @@ var _ = Describe("Help Command", func() {
 		Eventually(session).Should(gexec.Exit(0))
 
 		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("switch"))
+		Expect(output).To(ContainSubstring("cd"))
 		Expect(output).To(ContainSubstring("list"))
 		Expect(output).To(ContainSubstring("create"))
 		Expect(output).To(ContainSubstring("delete"))
+		Expect(output).To(ContainSubstring("setup-shell"))
 	})
 
 	It("shows command descriptions", func() {
@@ -56,9 +57,10 @@ var _ = Describe("Help Command", func() {
 		Eventually(session).Should(gexec.Exit(0))
 
 		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Switch to a project or worktree"))
+		Expect(output).To(ContainSubstring("Change directory to a project or worktree"))
 		Expect(output).To(ContainSubstring("List all available worktrees"))
 		Expect(output).To(ContainSubstring("Create a new Git worktree"))
 		Expect(output).To(ContainSubstring("Delete Git worktrees"))
+		Expect(output).To(ContainSubstring("Setup shell integration"))
 	})
 })

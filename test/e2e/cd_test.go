@@ -11,42 +11,42 @@ import (
 	"github.com/amaury/twiggit/test/helpers"
 )
 
-var _ = Describe("Switch Command", func() {
+var _ = Describe("Cd Command", func() {
 	var cli *helpers.TwiggitCLI
 
 	BeforeEach(func() {
 		cli = helpers.NewTwiggitCLI()
 	})
 
-	It("shows help for switch command", func() {
-		session := cli.Run("switch", "--help")
+	It("shows help for cd command", func() {
+		session := cli.Run("cd", "--help")
 		Eventually(session).Should(gexec.Exit(0))
 
 		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("twiggit switch <project|project/branch>"))
-		Expect(output).To(ContainSubstring("Switch to a project repository or worktree"))
+		Expect(output).To(ContainSubstring("twiggit cd <project|project/branch>"))
+		Expect(output).To(ContainSubstring("Change directory to a project repository or worktree"))
 	})
 
 	It("shows examples in help", func() {
-		session := cli.Run("switch", "--help")
+		session := cli.Run("cd", "--help")
 		Eventually(session).Should(gexec.Exit(0))
 
 		output := string(session.Out.Contents())
 		Expect(output).To(ContainSubstring("Examples:"))
-		Expect(output).To(ContainSubstring("twiggit switch myproject"))
-		Expect(output).To(ContainSubstring("twiggit switch myproject/feature-branch"))
-		Expect(output).To(ContainSubstring("twiggit switch feature-branch"))
+		Expect(output).To(ContainSubstring("twiggit cd myproject"))
+		Expect(output).To(ContainSubstring("twiggit cd myproject/feature-branch"))
+		Expect(output).To(ContainSubstring("twiggit cd feature-branch"))
 	})
 
 	It("accepts at most one argument", func() {
-		session := cli.Run("switch", "project1", "project2")
+		session := cli.Run("cd", "project1", "project2")
 		Eventually(session).Should(gexec.Exit(1))
 		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
 		Expect(string(session.Out.Contents())).To(ContainSubstring("accepts at most 1 arg(s), received 2"))
 	})
 
 	It("shows context help when no arguments provided", func() {
-		session := cli.RunWithDir("/tmp", "switch")
+		session := cli.RunWithDir("/tmp", "cd")
 		Eventually(session).Should(gexec.Exit(1))
 		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
 		Expect(string(session.Out.Contents())).To(ContainSubstring("no target specified"))
@@ -54,13 +54,13 @@ var _ = Describe("Switch Command", func() {
 	})
 
 	It("handles project switching format", func() {
-		session := cli.Run("switch", "--help")
+		session := cli.Run("cd", "--help")
 		Eventually(session).Should(gexec.Exit(0))
-		Expect(string(session.Out.Contents())).To(ContainSubstring("twiggit switch <project|project/branch>"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("twiggit cd <project|project/branch>"))
 	})
 
 	It("handles worktree switching format", func() {
-		session := cli.Run("switch", "--help")
+		session := cli.Run("cd", "--help")
 		Eventually(session).Should(gexec.Exit(0))
 		Expect(string(session.Out.Contents())).To(ContainSubstring("project/branch"))
 	})

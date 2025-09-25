@@ -24,7 +24,7 @@ import (
 //	   Type: worktree
 //
 //	💡 Suggestions:
-//	   • Use 'twiggit switch' to navigate to existing worktree
+//	   • Use 'twiggit cd' to navigate to existing worktree
 //	   • Use 'twiggit list' to see all available worktrees
 func FormatDomainError(err error) error {
 	if err == nil {
