@@ -47,10 +47,10 @@ var _ = Describe("Cd Command", func() {
 
 	It("shows context help when no arguments provided", func() {
 		session := cli.RunWithDir("/tmp", "cd")
-		Eventually(session).Should(gexec.Exit(1))
-		Expect(string(session.Out.Contents())).To(ContainSubstring("❌"))
-		Expect(string(session.Out.Contents())).To(ContainSubstring("no target specified"))
-		Expect(string(session.Out.Contents())).To(ContainSubstring("Provide a target in the format"))
+		Eventually(session).Should(gexec.Exit(0))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("Current context: Outside git repository"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("Available targets:"))
+		Expect(string(session.Out.Contents())).To(ContainSubstring("twiggit cd <project>"))
 	})
 
 	It("handles project switching format", func() {

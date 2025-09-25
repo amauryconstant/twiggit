@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/amaury/twiggit/internal/di"
@@ -44,141 +43,10 @@ Examples:
 func runCdCommand(_ *cobra.Command, args []string, container *di.Container) error {
 	ctx := context.Background()
 
-	if len(args) == 0 {
-		// Try to use current context for intelligent switching
-		project, err := detectCurrentContext(ctx, container)
-		if err != nil {
-			return domain.NewWorktreeError(
-				domain.ErrValidation,
-				"no target specified",
-				"",
-			).WithSuggestion("Provide a target in the format 'project' or 'project/branch'")
-		}
-
-		if project != "" {
-			fmt.Printf("Current project: %s\n", project)
-			fmt.Printf("Available targets:\n")
-			fmt.Printf("  twiggit cd %s          # main repository\n", project)
-			fmt.Printf("  twiggit cd %s/<branch> # worktree\n", project)
-			return nil
-		}
-
-		return domain.NewWorktreeError(
-			domain.ErrValidation,
-			"no target specified",
-			"",
-		).WithSuggestion("Provide a target in the format 'project' or 'project/branch'")
-	}
-
-	target := args[0]
-
-	// Handle relative branch names when in project context
-	if !strings.Contains(target, "/") {
-		project, err := detectCurrentContext(ctx, container)
-		if err == nil && project != "" && target != project {
-			// User said "cd feature-branch" while in project context
-			// But only if target is not the same as project name
-			return cdToWorktree(ctx, container, fmt.Sprintf("%s/%s", project, target))
-		}
-	}
-
-	// Original logic
-	if strings.Contains(target, "/") {
-		return cdToWorktree(ctx, container, target)
-	}
-
-	return cdToProject(ctx, container, target)
-}
-
-// cdToProject changes directory to a main project repository
-func cdToProject(ctx context.Context, container *di.Container, project string) error {
-	// Get services from container
-	discoveryService := container.DiscoveryService()
-	projects, err := discoveryService.DiscoverProjects(ctx, container.Config().ProjectsPath)
-	if err != nil {
-		return domain.NewWorkspaceError(
-			domain.ErrWorkspaceProjectNotFound,
-			fmt.Sprintf("project '%s' not found", project),
-			err,
-		).WithSuggestion("Check project name spelling").
-			WithSuggestion("Verify project exists in projects directory").
-			WithSuggestion("Use 'twiggit list' to see available projects")
-	}
-
-	// Find the target project
-	var targetPath string
-	for _, p := range projects {
-		if p.Name == project {
-			targetPath = p.GitRepo
-			break
-		}
-	}
-
-	if targetPath == "" {
-		return domain.NewWorkspaceError(
-			domain.ErrWorkspaceProjectNotFound,
-			fmt.Sprintf("project '%s' not found", project),
-		).WithSuggestion("Check project name spelling").
-			WithSuggestion("Verify project exists in projects directory").
-			WithSuggestion("Use 'twiggit list' to see available projects")
-	}
-
-	return changeDirectory(targetPath)
-}
-
-// cdToWorktree changes directory to a specific worktree
-func cdToWorktree(ctx context.Context, container *di.Container, target string) error {
-	parts := strings.Split(target, "/")
-	if len(parts) != 2 {
-		return domain.NewWorktreeError(
-			domain.ErrValidation,
-			"invalid worktree format",
-			"",
-		).WithSuggestion("Use the format 'project/branch' to specify a worktree")
-	}
-
-	project, branch := parts[0], parts[1]
-
-	// Get services from container
-	discoveryService := container.DiscoveryService()
-	worktrees, err := discoveryService.DiscoverWorktrees(ctx, container.Config().WorkspacesPath)
-	if err != nil {
-		return domain.NewWorkspaceError(
-			domain.ErrWorkspaceWorktreeNotFound,
-			fmt.Sprintf("worktree '%s' not found", target),
-			err,
-		).WithSuggestion("Check worktree name spelling").
-			WithSuggestion("Verify worktree exists for this project").
-			WithSuggestion("Use 'twiggit list' to see available worktrees")
-	}
-
-	// Find the target worktree
-	var targetPath string
-	for _, wt := range worktrees {
-		// Check if worktree matches project and branch
-		if strings.Contains(wt.Path, project) && wt.Branch == branch {
-			targetPath = wt.Path
-			break
-		}
-	}
-
-	if targetPath == "" {
-		return domain.NewWorkspaceError(
-			domain.ErrWorkspaceWorktreeNotFound,
-			fmt.Sprintf("worktree '%s' not found", target),
-		).WithSuggestion("Check worktree name spelling").
-			WithSuggestion("Verify worktree exists for this project").
-			WithSuggestion("Use 'twiggit list' to see available worktrees")
-	}
-
-	return changeDirectory(targetPath)
-}
-
-// detectCurrentContext detects the current project context from the working directory
-func detectCurrentContext(ctx context.Context, container *di.Container) (project string, err error) {
+	// Get current directory
 	currentDir, err := os.Getwd()
 	if err != nil {
-		return "", domain.NewWorktreeError(
+		return domain.NewWorktreeError(
 			domain.ErrInvalidPath,
 			"failed to get current directory",
 			"",
@@ -186,15 +54,115 @@ func detectCurrentContext(ctx context.Context, container *di.Container) (project
 		).WithSuggestion("Check current directory permissions")
 	}
 
-	// Check if we're in a git repository
-	repoRoot, err := container.GitClient().GetRepositoryRoot(ctx, currentDir)
+	// Create context detector and resolver
+	config := container.Config()
+	contextDetector := domain.NewContextDetector(config.WorkspacesPath, config.ProjectsPath)
+	contextResolver := domain.NewContextResolver(config.WorkspacesPath, config.ProjectsPath)
+
+	// Detect current context
+	currentContext, err := contextDetector.Detect(currentDir)
 	if err != nil {
-		return "", nil // Not in git repo, no context
+		return domain.NewWorktreeError(
+			domain.ErrValidation,
+			"failed to detect current context",
+			"",
+			err,
+		).WithSuggestion("Ensure you are in a valid directory")
 	}
 
-	// Extract project name from repository root
-	projectName := filepath.Base(repoRoot)
-	return projectName, nil
+	if len(args) == 0 {
+		// Show context-aware help when no target specified
+		return showContextAwareHelp(currentContext, container)
+	}
+
+	target := args[0]
+
+	// Resolve target based on current context
+	resolution, err := contextResolver.Resolve(target, currentContext)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target '%s': %w", target, err)
+	}
+
+	// Validate target exists before navigation
+	if err := validateTargetExists(ctx, container, resolution); err != nil {
+		return err
+	}
+
+	// Change to the resolved target path
+	return changeDirectory(resolution.TargetPath)
+}
+
+// showContextAwareHelp displays context-aware help when no target is specified
+func showContextAwareHelp(context *domain.Context, _ *di.Container) error {
+	switch context.Type {
+	case domain.ContextProject:
+		fmt.Printf("Current project: %s\n", context.ProjectName)
+		fmt.Printf("Available targets:\n")
+		fmt.Printf("  twiggit cd %s          # stay in current project\n", context.ProjectName)
+		fmt.Printf("  twiggit cd main        # stay in current project (alias)\n")
+		fmt.Printf("  twiggit cd <branch>    # navigate to worktree of current project\n")
+		fmt.Printf("  twiggit cd <project>   # navigate to different project\n")
+		fmt.Printf("  twiggit cd <project>/<branch> # navigate to cross-project worktree\n")
+
+	case domain.ContextWorktree:
+		fmt.Printf("Current worktree: %s/%s\n", context.ProjectName, context.BranchName)
+		fmt.Printf("Available targets:\n")
+		fmt.Printf("  twiggit cd main        # navigate to main project directory\n")
+		fmt.Printf("  twiggit cd %s          # navigate to main project directory\n", context.ProjectName)
+		fmt.Printf("  twiggit cd <branch>    # navigate to different worktree of same project\n")
+		fmt.Printf("  twiggit cd <project>   # navigate to different project\n")
+		fmt.Printf("  twiggit cd <project>/<branch> # navigate to cross-project worktree\n")
+
+	case domain.ContextOutsideGit:
+		fmt.Printf("Current context: Outside git repository\n")
+		fmt.Printf("Available targets:\n")
+		fmt.Printf("  twiggit cd <project>   # navigate to project main directory\n")
+		fmt.Printf("  twiggit cd <project>/<branch> # navigate to cross-project worktree\n")
+
+	case domain.ContextUnknown:
+		fmt.Printf("Current context: Unknown\n")
+		fmt.Printf("Available targets:\n")
+		fmt.Printf("  twiggit cd <project>   # navigate to project main directory\n")
+		fmt.Printf("  twiggit cd <project>/<branch> # navigate to cross-project worktree\n")
+	}
+
+	return nil
+}
+
+// validateTargetExists validates that the resolved target actually exists
+func validateTargetExists(_ context.Context, _ *di.Container, resolution *domain.ContextResolution) error {
+	// Check if the target path exists
+	if _, err := os.Stat(resolution.TargetPath); os.IsNotExist(err) {
+		switch resolution.TargetType {
+		case "project":
+			return domain.NewWorkspaceError(
+				domain.ErrWorkspaceProjectNotFound,
+				fmt.Sprintf("project '%s' not found at %s", resolution.ProjectName, resolution.TargetPath),
+				err,
+			).WithSuggestion("Check project name spelling").
+				WithSuggestion("Verify project exists in projects directory").
+				WithSuggestion("Use 'twiggit list' to see available projects")
+
+		case "worktree":
+			return domain.NewWorkspaceError(
+				domain.ErrWorkspaceWorktreeNotFound,
+				fmt.Sprintf("worktree '%s/%s' not found at %s", resolution.ProjectName, resolution.BranchName, resolution.TargetPath),
+				err,
+			).WithSuggestion("Check worktree name spelling").
+				WithSuggestion("Verify worktree exists for this project").
+				WithSuggestion("Use 'twiggit list' to see available worktrees")
+
+		default:
+			return domain.NewWorkspaceError(
+				domain.ErrWorkspaceDiscoveryFailed,
+				"target not found at "+resolution.TargetPath,
+				err,
+			).WithSuggestion("Check target name spelling").
+				WithSuggestion("Verify target exists")
+		}
+	}
+
+	return nil
 }
 
 // changeDirectory changes the current working directory

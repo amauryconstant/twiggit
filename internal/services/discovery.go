@@ -84,12 +84,6 @@ func (ds *DiscoveryService) isGitRepositorySafe(ctx context.Context, path string
 	return err == nil && isRepo
 }
 
-// isMainRepositorySafe safely checks if a path is a main repository, returning false on errors
-func (ds *DiscoveryService) isMainRepositorySafe(ctx context.Context, path string) bool {
-	isMainRepo, err := ds.gitClient.IsMainRepository(ctx, path)
-	return err == nil && isMainRepo
-}
-
 // isBareRepositorySafe safely checks if a path is a bare repository, returning false on errors
 func (ds *DiscoveryService) isBareRepositorySafe(ctx context.Context, path string) bool {
 	isBare, err := ds.gitClient.IsBareRepository(ctx, path)
@@ -184,7 +178,13 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath s
 		absoluteProjectPath := ds.convertToAbsolutePath(projectPath)
 
 		// Check if it's a main git repository (not a worktree)
-		if !ds.isMainRepositorySafe(ctx, absoluteProjectPath) {
+		isMainRepo, err := ds.gitClient.IsMainRepository(ctx, absoluteProjectPath)
+		if err != nil {
+			// Log the error but continue processing other projects
+			// This prevents one failing project from blocking all discovery
+			continue
+		}
+		if !isMainRepo {
 			continue
 		}
 
