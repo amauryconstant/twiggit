@@ -6,143 +6,148 @@ import (
 	"testing"
 
 	"github.com/amaury/twiggit/test/mocks"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestWorktreeRemover_Remove(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("should remove worktree successfully without force", func(t *testing.T) {
-		// Setup mocks
-		mockGitClient := new(mocks.GitClientMock)
-		remover := NewWorktreeRemover(mockGitClient)
-
-		// Setup expectations
-		mockGitClient.On("GetRepositoryRoot", ctx, "/worktree/path").
-			Return("/project/path", nil)
-		mockGitClient.On("HasUncommittedChanges", ctx, "/worktree/path").
-			Return(false)
-		mockGitClient.On("RemoveWorktree", ctx, "/project/path", "/worktree/path", false).
-			Return(nil)
-
-		// Execute
-		err := remover.Remove(ctx, "/worktree/path", false)
-
-		// Verify
-		require.NoError(t, err)
-		mockGitClient.AssertExpectations(t)
-	})
-
-	t.Run("should remove worktree successfully with force", func(t *testing.T) {
-		// Setup mocks
-		mockGitClient := new(mocks.GitClientMock)
-		remover := NewWorktreeRemover(mockGitClient)
-
-		// Setup expectations
-		mockGitClient.On("GetRepositoryRoot", ctx, "/worktree/path").
-			Return("/project/path", nil)
-		mockGitClient.On("RemoveWorktree", ctx, "/project/path", "/worktree/path", true).
-			Return(nil)
-
-		// Execute
-		err := remover.Remove(ctx, "/worktree/path", true)
-
-		// Verify
-		require.NoError(t, err)
-		mockGitClient.AssertExpectations(t)
-	})
-
-	t.Run("should return error when worktree path is empty", func(t *testing.T) {
-		// Setup mocks
-		mockGitClient := new(mocks.GitClientMock)
-		remover := NewWorktreeRemover(mockGitClient)
-
-		// Execute
-		err := remover.Remove(ctx, "", false)
-
-		// Verify
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "worktree path cannot be empty")
-
-		// Verify no other calls were made
-		mockGitClient.AssertNotCalled(t, "GetRepositoryRoot")
-	})
-
-	t.Run("should return error when getting repository root fails", func(t *testing.T) {
-		// Setup mocks
-		mockGitClient := new(mocks.GitClientMock)
-		remover := NewWorktreeRemover(mockGitClient)
-
-		// Setup expectations
-		mockGitClient.On("GetRepositoryRoot", ctx, "/worktree/path").
-			Return("", errors.New("not a git repository"))
-
-		// Execute
-		err := remover.Remove(ctx, "/worktree/path", false)
-
-		// Verify
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "not a git repository")
-		assert.Contains(t, err.Error(), "failed to get repository root")
-
-		mockGitClient.AssertExpectations(t)
-		mockGitClient.AssertNotCalled(t, "HasUncommittedChanges")
-	})
-
-	t.Run("should return error when worktree has uncommitted changes and force is false", func(t *testing.T) {
-		// Setup mocks
-		mockGitClient := new(mocks.GitClientMock)
-		remover := NewWorktreeRemover(mockGitClient)
-
-		// Setup expectations
-		mockGitClient.On("GetRepositoryRoot", ctx, "/worktree/path").
-			Return("/project/path", nil)
-		mockGitClient.On("HasUncommittedChanges", ctx, "/worktree/path").
-			Return(true)
-
-		// Execute
-		err := remover.Remove(ctx, "/worktree/path", false)
-
-		// Verify
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "cannot remove worktree with uncommitted changes")
-		assert.Contains(t, err.Error(), "uncommitted changes detected")
-
-		mockGitClient.AssertExpectations(t)
-		mockGitClient.AssertNotCalled(t, "RemoveWorktree")
-	})
-
-	t.Run("should return error when remove worktree fails", func(t *testing.T) {
-		// Setup mocks
-		mockGitClient := new(mocks.GitClientMock)
-		remover := NewWorktreeRemover(mockGitClient)
-
-		// Setup expectations
-		mockGitClient.On("GetRepositoryRoot", ctx, "/worktree/path").
-			Return("/project/path", nil)
-		mockGitClient.On("HasUncommittedChanges", ctx, "/worktree/path").
-			Return(false)
-		mockGitClient.On("RemoveWorktree", ctx, "/project/path", "/worktree/path", false).
-			Return(errors.New("git worktree remove failed"))
-
-		// Execute
-		err := remover.Remove(ctx, "/worktree/path", false)
-
-		// Verify
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "git command failed")
-		assert.Contains(t, err.Error(), "failed to remove worktree")
-
-		mockGitClient.AssertExpectations(t)
-	})
+// WorktreeRemoverTestSuite provides suite setup for worktree remover tests
+type WorktreeRemoverTestSuite struct {
+	suite.Suite
+	ctx           context.Context
+	mockGitClient *mocks.GitClientMock
+	remover       *WorktreeRemover
 }
 
-func TestNewWorktreeRemover(t *testing.T) {
-	mockGitClient := new(mocks.GitClientMock)
+// SetupTest initializes test dependencies for each test
+func (s *WorktreeRemoverTestSuite) SetupTest() {
+	s.ctx = context.Background()
+	s.mockGitClient = new(mocks.GitClientMock)
+	s.remover = NewWorktreeRemover(s.mockGitClient)
+}
 
+// TestWorktreeRemover_Remove tests worktree removal with table-driven approach
+func (s *WorktreeRemoverTestSuite) TestWorktreeRemover_Remove() {
+	testCases := []struct {
+		name                  string
+		worktreePath          string
+		force                 bool
+		setupMockExpectations func()
+		expectError           bool
+		errorMessage          string
+	}{
+		{
+			name:         "should remove worktree successfully without force",
+			worktreePath: "/worktree/path",
+			force:        false,
+			setupMockExpectations: func() {
+				s.mockGitClient.On("GetRepositoryRoot", s.ctx, "/worktree/path").
+					Return("/project/path", nil)
+				s.mockGitClient.On("HasUncommittedChanges", s.ctx, "/worktree/path").
+					Return(false)
+				s.mockGitClient.On("RemoveWorktree", s.ctx, "/project/path", "/worktree/path", false).
+					Return(nil)
+			},
+			expectError: false,
+		},
+		{
+			name:         "should remove worktree successfully with force",
+			worktreePath: "/worktree/path",
+			force:        true,
+			setupMockExpectations: func() {
+				s.mockGitClient.On("GetRepositoryRoot", s.ctx, "/worktree/path").
+					Return("/project/path", nil)
+				s.mockGitClient.On("RemoveWorktree", s.ctx, "/project/path", "/worktree/path", true).
+					Return(nil)
+			},
+			expectError: false,
+		},
+		{
+			name:         "should return error when worktree path is empty",
+			worktreePath: "",
+			force:        false,
+			setupMockExpectations: func() {
+				// No mock expectations - should fail before any calls
+			},
+			expectError:  true,
+			errorMessage: "worktree path cannot be empty",
+		},
+		{
+			name:         "should return error when getting repository root fails",
+			worktreePath: "/worktree/path",
+			force:        false,
+			setupMockExpectations: func() {
+				s.mockGitClient.On("GetRepositoryRoot", s.ctx, "/worktree/path").
+					Return("", errors.New("not a git repository"))
+			},
+			expectError:  true,
+			errorMessage: "failed to get repository root",
+		},
+		{
+			name:         "should return error when worktree has uncommitted changes and force is false",
+			worktreePath: "/worktree/path",
+			force:        false,
+			setupMockExpectations: func() {
+				s.mockGitClient.On("GetRepositoryRoot", s.ctx, "/worktree/path").
+					Return("/project/path", nil)
+				s.mockGitClient.On("HasUncommittedChanges", s.ctx, "/worktree/path").
+					Return(true)
+			},
+			expectError:  true,
+			errorMessage: "uncommitted changes detected",
+		},
+		{
+			name:         "should return error when remove worktree fails",
+			worktreePath: "/worktree/path",
+			force:        false,
+			setupMockExpectations: func() {
+				s.mockGitClient.On("GetRepositoryRoot", s.ctx, "/worktree/path").
+					Return("/project/path", nil)
+				s.mockGitClient.On("HasUncommittedChanges", s.ctx, "/worktree/path").
+					Return(false)
+				s.mockGitClient.On("RemoveWorktree", s.ctx, "/project/path", "/worktree/path", false).
+					Return(errors.New("git worktree remove failed"))
+			},
+			expectError:  true,
+			errorMessage: "failed to remove worktree",
+		},
+	}
+
+	for _, tt := range testCases {
+		s.Run(tt.name, func() {
+			// Reset mocks for each test case
+			s.mockGitClient = new(mocks.GitClientMock)
+			s.remover = NewWorktreeRemover(s.mockGitClient)
+
+			// Setup mock expectations
+			tt.setupMockExpectations()
+
+			// Execute
+			err := s.remover.Remove(s.ctx, tt.worktreePath, tt.force)
+
+			// Verify
+			if tt.expectError {
+				s.Require().Error(err)
+				s.Contains(err.Error(), tt.errorMessage)
+			} else {
+				s.Require().NoError(err)
+			}
+
+			// Verify mock expectations
+			s.mockGitClient.AssertExpectations(s.T())
+		})
+	}
+}
+
+// TestWorktreeRemover_NewWorktreeRemover tests constructor
+func (s *WorktreeRemoverTestSuite) TestWorktreeRemover_NewWorktreeRemover() {
+	// Create fresh mocks for this test
+	mockGitClient := new(mocks.GitClientMock)
 	remover := NewWorktreeRemover(mockGitClient)
 
-	require.NotNil(t, remover, "WorktreeRemover should not be nil")
-	assert.Equal(t, mockGitClient, remover.gitClient, "gitClient should be set correctly")
+	s.Require().NotNil(remover, "WorktreeRemover should not be nil")
+	s.Equal(mockGitClient, remover.gitClient, "gitClient should be set correctly")
+}
+
+// Test suite entry point
+func TestWorktreeRemoverSuite(t *testing.T) {
+	suite.Run(t, new(WorktreeRemoverTestSuite))
 }

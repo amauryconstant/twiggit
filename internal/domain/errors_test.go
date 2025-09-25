@@ -342,7 +342,7 @@ func TestErrorWrappingBehavior(t *testing.T) {
 
 	t.Run("nested error wrapping", func(t *testing.T) {
 		original := errors.New("disk full")
-		middle := NewWorktreeError(ErrPathNotWritable, "cannot write file", "/tmp", original)
+		middle := NewWorktreeError(ErrPathNotWritable, "cannot write file", t.TempDir(), original)
 		top := NewWorktreeError(ErrGitCommand, "git operation failed", "/repo", middle)
 
 		assert.Equal(t, middle, top.Cause)

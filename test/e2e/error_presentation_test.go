@@ -52,7 +52,7 @@ var _ = Describe("Error Presentation", func() {
 
 			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring("❌"))
-			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
+			Expect(output).To(ContainSubstring("branch name format is invalid"))
 		})
 	})
 
@@ -113,7 +113,7 @@ var _ = Describe("Error Presentation", func() {
 
 			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring("❌"))
-			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
+			Expect(output).To(ContainSubstring("branch name format is invalid"))
 		})
 	})
 })

@@ -155,6 +155,13 @@ go 1.21
 	err := os.WriteFile("go.mod", []byte(goModContent), 0000)
 	s.Require().NoError(err)
 
+	// On some systems (like when running as root), even 0000 permissions allow reading
+	// So we need to check if the file is actually readable and adjust the test accordingly
+	if _, readErr := os.ReadFile("go.mod"); readErr == nil {
+		// File is readable (likely running as root), remove it to trigger the error condition
+		os.Remove("go.mod")
+	}
+
 	version := Version()
 	s.Equal("dev", version)
 }
