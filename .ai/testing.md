@@ -22,8 +22,8 @@
 #### Integration Tests
 - **Purpose**: Test component interactions and workflows
 - **Scope**: Real git repositories in temporary directories
-- **Approach**: Test how services work together with real dependencies
-- **Tools**: Build tags to separate from unit tests, skip in short mode with `testing.Short()`
+- **Approach**: Test how services work together with real dependencies using Testify suites
+- **Tools**: Testify suites with build tags to separate from unit tests, skip in short mode with `testing.Short()`
 - **WILL Provide**: Slower execution than unit tests, but still isolated environment
 - **When to use**: For service interactions, git operations, configuration workflows
 
@@ -42,8 +42,13 @@
 ### Coverage Requirements
 
 - **Overall test coverage**: SHOULD exceed 80%
-- **Critical path coverage**: SHALL have 100% coverage for core business logic
-- **Error handling coverage**: SHALL test all error paths and edge cases
+- **Happy path coverage**: SHALL have 100% coverage for expected behavior and critical business logic
+- **Error handling coverage**: SHOULD test error paths but 100% coverage not required for all scenarios
+- **Package-specific strategies**:
+  - **cmd/ package**: Tested via E2E tests only (no coverage monitoring)
+  - **Infrastructure packages**: Integration tests preferred for external dependencies
+  - **Utility packages**: Unit tests with appropriate mocking/temporary files
+  - **Services packages**: Focus on happy paths and critical business logic
 
 ### Test Quality
 
@@ -69,67 +74,142 @@
 - `mise run build:e2e` - Build CLI binary for E2E tests
 - `mise run build:clean` - Clean build artifacts
 
+## Testing Framework Strategy
+
+### Framework Selection Rationale
+
+- **Unit Tests**: SHALL use Testify suite pattern for consistency and better setup/teardown management
+- **Integration Tests**: SHALL use Testify suites with build tags for structured test organization and consistent assertions
+- **E2E Tests**: SHALL use Ginkgo/Gomega for CLI interaction testing and user workflow descriptions
+
+### Mock Strategy Guidelines
+
+- **Service Tests**: SHALL use centralized mocks from `test/mocks/` package to promote reuse and consistency
+- **Domain Tests**: SHOULD use inline mocks within test files to keep them self-contained and avoid over-engineering
+- **Infrastructure Tests**: MAY use either approach based on complexity and reuse needs
+
+### Test Structure Standards
+
+- **Unit Tests**: SHALL follow table-driven test patterns within Testify suites
+- **Integration Tests**: SHALL use real git repositories in temporary directories with proper cleanup
+- **E2E Tests**: SHALL build actual binaries and test complete user workflows
+
 ## Concrete Test Examples
 
 For comprehensive Go code patterns and testing structure, see code-style-guide.md. This section provides concrete examples aligned with the testing philosophy.
 
-### Unit Test Example (Testify)
+### Unit Test Example (Testify Suite)
 ```go
-func TestProjectValidator_ValidateName(t *testing.T) {
-    validator := NewProjectValidator()
+type ProjectTestSuite struct {
+    suite.Suite
+    Project   *Project
+    Workspace *Workspace
+}
+
+func (s *ProjectTestSuite) SetupTest() {
+    var err error
+    s.Project, err = NewProject("test-project", "/repo/path")
+    s.Require().NoError(err)
     
-    tests := []struct {
-        name    string
-        input   string
-        wantErr bool
+    s.Workspace, err = NewWorkspace("/test/workspace")
+    s.Require().NoError(err)
+}
+
+func TestProjectSuite(t *testing.T) {
+    suite.Run(t, new(ProjectTestSuite))
+}
+
+func (s *ProjectTestSuite) TestProject_NewProject() {
+    testCases := []struct {
+        name         string
+        projectName  string
+        gitRepo      string
+        expectError  bool
+        errorMessage string
     }{
-        {"valid name", "my-project", false},
-        {"empty name", "", true},
-        {"invalid chars", "my@project", true},
+        {
+            name:        "valid project",
+            projectName: "my-project",
+            gitRepo:     "/path/to/repo",
+            expectError: false,
+        },
+        {
+            name:         "empty project name",
+            projectName:  "",
+            gitRepo:      "/path/to/repo",
+            expectError:  true,
+            errorMessage: "project name cannot be empty",
+        },
     }
     
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            err := validator.ValidateName(tt.input)
-            if tt.wantErr {
-                assert.Error(t, err)
+    for _, tt := range testCases {
+        s.Run(tt.name, func() {
+            project, err := NewProject(tt.projectName, tt.gitRepo)
+            
+            if tt.expectError {
+                s.Assert().Error(err)
+                s.Assert().Contains(err.Error(), tt.errorMessage)
             } else {
-                assert.NoError(t, err)
+                s.Assert().NoError(err)
+                s.Assert().Equal(tt.projectName, project.Name())
+                s.Assert().Equal(tt.gitRepo, project.GitRepoPath())
             }
         })
     }
 }
 ```
 
-### Integration Test Example (Ginkgo/Gomega)
+### Integration Test Example (Testify Suite)
 ```go
-var _ = Describe("WorktreeCreator", func() {
-    var tempDir string
-    var creator *WorktreeCreator
+//go:build integration
+// +build integration
+
+package integration
+
+import (
+    "testing"
+    "github.com/stretchr/testify/suite"
+)
+
+type WorktreeIntegrationTestSuite struct {
+    suite.Suite
+    testRepo        *IntegrationTestRepo
+    worktreeCreator *services.WorktreeCreator
+}
+
+func (s *WorktreeIntegrationTestSuite) SetupSuite() {
+    // Skip if not in integration test mode
+    if testing.Short() {
+        s.T().Skip("Skipping integration test")
+    }
     
-    BeforeEach(func() {
-        var err error
-        tempDir, err = os.MkdirTemp("", "twiggit-test")
-        Expect(err).ToNot(HaveOccurred())
-        creator = NewWorktreeCreator()
-    })
+    // Create test git repository
+    s.testRepo = NewTestGitRepo(s.T())
     
-    AfterEach(func() {
-        os.RemoveAll(tempDir)
-    })
+    // Initialize services with real dependencies
+    s.worktreeCreator = services.NewWorktreeCreator(/* real dependencies */)
+}
+
+func (s *WorktreeIntegrationTestSuite) TearDownSuite() {
+    if s.testRepo != nil {
+        s.testRepo.Cleanup()
+    }
+}
+
+func TestWorktreeIntegrationSuite(t *testing.T) {
+    suite.Run(t, new(WorktreeIntegrationTestSuite))
+}
+
+func (s *WorktreeIntegrationTestSuite) TestCreateWorktreeFromExistingBranch() {
+    worktreePath := filepath.Join(filepath.Dir(s.testRepo.RepoDir()), "feature-worktree")
     
-    It("should create worktree from existing branch", func() {
-        // Setup real git repository
-        repoPath := filepath.Join(tempDir, "repo")
-        // ... git setup code
-        
-        worktreePath := filepath.Join(tempDir, "worktree")
-        err := creator.CreateWorktree(repoPath, worktreePath, "main")
-        
-        Expect(err).ToNot(HaveOccurred())
-        Expect(worktreePath).To(BeADirectory())
-    })
-})
+    err := s.worktreeCreator.Create(context.Background(), s.testRepo.RepoDir(), "feature-1", worktreePath)
+    s.Assert().NoError(err)
+    
+    // Verify worktree was created
+    _, err = os.Stat(worktreePath)
+    s.Assert().NoError(err, "Worktree directory should exist")
+}
 ```
 
 ## Testing Anti-Patterns
@@ -141,6 +221,8 @@ var _ = Describe("WorktreeCreator", func() {
 3. **Ignoring error paths**: Tests SHOULD NOT ignore error paths; test both success and failure scenarios
 4. **Flaky tests**: Tests SHOULD NOT be flaky; ensure tests are deterministic and reliable
 5. **Slow unit tests**: Unit tests SHOULD NOT be slow; move slow operations to integration tests
+6. **Coverage-driven testing**: Tests SHOULD NOT focus on coverage percentage; focus on meaningful tests for happy paths and critical business logic
+7. **Wrong test type for package**: Tests SHOULD NOT use unit tests for CLI commands or integration tests for simple utilities; match test type to package responsibility
 
 ### Test Organization Anti-Patterns
 
@@ -157,6 +239,8 @@ var _ = Describe("WorktreeCreator", func() {
 3. **Skipping integration tests**: Testing SHOULD NOT skip integration tests; don't rely only on unit tests; test real interactions
 4. **Ignoring E2E tests**: Testing SHOULD NOT ignore E2E tests; don't skip user-facing tests; they catch real-world issues
 5. **Treating tests as second-class code**: Tests SHOULD NOT be treated as second-class code; tests should be as clean as production code
+6. **One-size-fits-all testing**: Testing SHOULD NOT use the same approach for all packages; match test strategy to package responsibility and dependencies
+7. **Inconsistent framework usage**: Tests SHALL NOT mix testing frameworks within the same test type; use the designated framework for each test type
 
 ### Optional Testing Restrictions
 - **Parallel Test Execution**: Tests MAY NOT be executed in parallel if they interfere with each other
@@ -209,4 +293,8 @@ Test environments SHALL include:
 
 ## Summary
 
-This testing philosophy provides a comprehensive framework for building high-quality, maintainable tests that provide real value. By focusing on pragmatic TDD, clear testing hierarchy, and consistent patterns, we ensure that tests serve as a safety net for refactoring while providing confidence in the system's correctness. The separation between unit, integration, and E2E tests allows us to test at the right level of abstraction for each scenario, balancing speed with realism.
+This testing philosophy provides a comprehensive framework for building high-quality, maintainable tests that provide real value. By focusing on pragmatic TDD, clear testing hierarchy, and consistent patterns, we ensure that tests serve as a safety net for refactoring while providing confidence in the system's correctness. 
+
+The separation between unit, integration, and E2E tests allows us to test at the right level of abstraction for each scenario, balancing speed with realism. Our framework strategy ensures consistency across the codebase while leveraging the strengths of each testing approach: Testify suites for structured unit and integration testing, and Ginkgo/Gomega for expressive E2E workflow testing.
+
+This documentation SHALL be kept current with implementation to ensure that our testing practices remain aligned with our architectural vision and quality standards.
