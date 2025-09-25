@@ -439,7 +439,7 @@ const (
     DefaultProjectName    = "default"
     DefaultBranchName     = "main"
     MaxProjectNameLength  = 50
-    ConfigFileName        = "twiggit.yaml"
+    ConfigFileName        = "twiggit.toml"
     ConfigEnvPrefix       = "TWIGGIT_"
     
     // Error messages
@@ -466,7 +466,7 @@ const (
     dn = "default"
     mb = "main"
     mx = 50
-    cf = "twiggit.yaml"
+    cf = "twiggit.toml"
     ep = "TWIGGIT_"
     
     // Unclear error codes

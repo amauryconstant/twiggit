@@ -9,11 +9,14 @@ import (
 
 	"github.com/amaury/twiggit/internal/di"
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/spf13/cobra"
 )
 
 // NewCreateCmd creates the create command
 func NewCreateCmd(container *di.Container) *cobra.Command {
+	var sourceBranch string
+
 	cmd := &cobra.Command{
 		Use:   "create [branch-name]",
 		Short: "Create a new Git worktree",
@@ -24,17 +27,21 @@ The worktree will be created in the configured workspace directory under the pro
 
 Examples:
   twiggit create feature/new-auth
+  twiggit create --source develop feature/new-auth
   twiggit create  # Interactive mode`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreateCommand(cmd, args, container)
+			return runCreateCommand(cmd, args, container, sourceBranch)
 		},
 	}
+
+	// Add flags
+	cmd.Flags().StringVarP(&sourceBranch, "source", "s", "", "Source branch to create worktree from (default: main or default_source_branch from config)")
 
 	return cmd
 }
 
 // runCreateCommand implements the create command functionality
-func runCreateCommand(_ *cobra.Command, args []string, container *di.Container) error {
+func runCreateCommand(_ *cobra.Command, args []string, container *di.Container, sourceBranchFlag string) error {
 	ctx := context.Background()
 
 	// Determine branch name
@@ -57,6 +64,9 @@ func runCreateCommand(_ *cobra.Command, args []string, container *di.Container) 
 			"",
 		).WithSuggestion("Provide a valid branch name")
 	}
+
+	// Determine source branch using priority: --source flag → config → "main" fallback
+	sourceBranch := determineSourceBranch(sourceBranchFlag, container.Config())
 
 	// Try to find repository root from current directory first
 	currentDir, err := os.Getwd()
@@ -86,14 +96,23 @@ func runCreateCommand(_ *cobra.Command, args []string, container *di.Container) 
 	// Determine target path for worktree using project-aware logic
 	targetPath := determineWorktreePath(mainRepoPath, branchName, container.Config().WorkspacesPath)
 
-	// Check if branch exists for logging purposes
+	// Check if source branch exists
+	if !container.GitClient().BranchExists(ctx, mainRepoPath, sourceBranch) {
+		return domain.NewWorktreeError(
+			domain.ErrGitCommand,
+			fmt.Sprintf("source branch '%s' does not exist", sourceBranch),
+			mainRepoPath,
+		).WithSuggestion("Check available branches with 'git branch'")
+	}
+
+	// Check if target branch exists for logging purposes
 	branchExists := container.GitClient().BranchExists(ctx, mainRepoPath, branchName)
 	if !branchExists {
-		fmt.Printf("Branch '%s' does not exist, it will be created...\n", branchName)
+		fmt.Printf("Branch '%s' does not exist, it will be created from '%s'...\n", branchName, sourceBranch)
 	}
 
 	// Create the worktree using service layer
-	fmt.Printf("Creating worktree for branch '%s' at %s...\n", branchName, targetPath)
+	fmt.Printf("Creating worktree for branch '%s' from '%s' at %s...\n", branchName, sourceBranch, targetPath)
 	err = worktreeCreator.Create(ctx, mainRepoPath, branchName, targetPath)
 	if err != nil {
 		// The service layer already returns domain errors, wrap with CLI context
@@ -123,4 +142,18 @@ func extractProjectNameFromPath(repoPath string) string {
 func determineWorktreePath(repoPath, branchName, workspacesDir string) string {
 	projectName := extractProjectNameFromPath(repoPath)
 	return filepath.Join(workspacesDir, projectName, branchName)
+}
+
+// determineSourceBranch determines the source branch using priority order:
+// --source flag → config default_source_branch → "main" fallback
+func determineSourceBranch(sourceFlag string, config *config.Config) string {
+	if sourceFlag != "" {
+		return sourceFlag
+	}
+
+	if config.DefaultSourceBranch != "" {
+		return config.DefaultSourceBranch
+	}
+
+	return "main"
 }

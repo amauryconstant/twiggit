@@ -456,10 +456,10 @@ func (ds *DiscoveryService) convertToAbsolutePath(relativePath string) string {
 		return relativePath
 	}
 
-	// If the path is ".", use the Workspace path (legacy support)
+	// If the path is ".", use the WorkspacesPath
 	if relativePath == "." {
-		if ds.config.Workspace != "" {
-			return ds.config.Workspace
+		if ds.config.WorkspacesPath != "" {
+			return ds.config.WorkspacesPath
 		}
 		// Fallback to ProjectsPath if Workspace is not set
 		if ds.config.ProjectsPath != "" {
@@ -489,9 +489,9 @@ func (ds *DiscoveryService) convertToAbsolutePath(relativePath string) string {
 	}
 
 	// For other cases (like relative paths within the workspace),
-	// join with the Workspace path
-	if ds.config.Workspace != "" {
-		return filepath.Join(ds.config.Workspace, relativePath)
+	// join with the WorkspacesPath
+	if ds.config.WorkspacesPath != "" {
+		return filepath.Join(ds.config.WorkspacesPath, relativePath)
 	}
 
 	// Fallback: assume it's already absolute or handle as needed

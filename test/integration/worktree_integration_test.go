@@ -87,7 +87,7 @@ func (s *WorktreeIntegrationTestSuite) SetupSuite() {
 	client := git.NewClient()
 	s.gitClient = client
 	s.config = &config.Config{
-		Workspace: s.testRepo.TempDir,
+		WorkspacesPath: s.testRepo.TempDir,
 	}
 
 	// Create filesystem
@@ -249,7 +249,7 @@ func (s *WorktreeIntegrationTestSuite) TestDiscoveryService() {
 	s.Require().NoError(err)
 
 	// Test discovery
-	config := &config.Config{Workspace: workspaceDir}
+	config := &config.Config{WorkspacesPath: workspaceDir}
 	fileSystem := os.DirFS(workspaceDir)
 	discoveryService := services.NewDiscoveryService(gitClient, config, fileSystem)
 
@@ -296,7 +296,7 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 
 	gitClient := git.NewClient()
 	config := &config.Config{
-		Workspace: testRepo.TempDir,
+		WorkspacesPath: testRepo.TempDir,
 	}
 	fileSystem := os.DirFS("/") // Use real filesystem for integration tests
 	_ = services.NewDiscoveryService(gitClient, config, fileSystem)
@@ -360,7 +360,7 @@ func (s *WorktreeIntegrationTestSuite) TestPerformance() {
 		}
 	}
 
-	config := &config.Config{Workspace: workspaceDir}
+	config := &config.Config{WorkspacesPath: workspaceDir}
 	fileSystem := os.DirFS(workspaceDir)
 	discoveryService := services.NewDiscoveryService(gitClient, config, fileSystem)
 	discoveryService.SetConcurrency(4) // Test with concurrent processing

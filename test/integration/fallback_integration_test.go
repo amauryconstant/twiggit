@@ -345,14 +345,14 @@ func TestErrorRecoveryScenarios(t *testing.T) {
 		defer os.RemoveAll(tempDir)
 
 		// Create invalid workspace configuration
-		invalidConfigPath := filepath.Join(tempDir, "invalid-config.yaml")
-		err = os.WriteFile(invalidConfigPath, []byte("invalid: yaml: content: [unclosed"), 0644)
+		invalidConfigPath := filepath.Join(tempDir, "invalid-config.toml")
+		err = os.WriteFile(invalidConfigPath, []byte("invalid = toml: content = [unclosed"), 0644)
 		require.NoError(t, err)
 
 		// Test workspace configuration error with recovery suggestions
-		configErr := errors.New("yaml: line 1: cannot unmarshal !!str into []string")
+		configErr := errors.New("toml: line 1: cannot unmarshal into []string")
 		workspaceErr := domain.NewWorkspaceError(domain.ErrWorkspaceInvalidConfiguration, "failed to parse workspace config", configErr).
-			WithSuggestion("Check YAML syntax").
+			WithSuggestion("Check TOML syntax").
 			WithSuggestion("Validate configuration file format").
 			WithSuggestion("Use workspace init command to create valid config")
 
@@ -360,7 +360,7 @@ func TestErrorRecoveryScenarios(t *testing.T) {
 		assert.Equal(t, domain.ErrWorkspaceInvalidConfiguration, workspaceErr.Type)
 		assert.Equal(t, configErr, workspaceErr.Cause)
 		assert.Len(t, workspaceErr.Suggestions, 3)
-		assert.Contains(t, workspaceErr.Suggestions[0], "YAML syntax")
+		assert.Contains(t, workspaceErr.Suggestions[0], "TOML syntax")
 		assert.Contains(t, workspaceErr.Suggestions[1], "configuration file")
 		assert.Contains(t, workspaceErr.Suggestions[2], "workspace init")
 	})

@@ -105,7 +105,7 @@ func TestErrorWrappingIntegration(t *testing.T) {
 	})
 
 	t.Run("workspace error with configuration error", func(t *testing.T) {
-		configErr := errors.New("yaml: line 2: cannot unmarshal !!str `invalid` into []string")
+		configErr := errors.New("toml: line 2: cannot unmarshal invalid into []string")
 		workspaceErr := domain.NewWorkspaceError(domain.ErrWorkspaceInvalidConfiguration, "config parsing failed", configErr)
 
 		assert.Equal(t, configErr, workspaceErr.Cause)

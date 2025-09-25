@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
@@ -20,10 +20,10 @@ type Config struct {
 	ProjectsPath string `koanf:"projects_path"`
 	// WorkspacesPath is the directory containing worktree checkouts
 	WorkspacesPath string `koanf:"workspaces_path"`
-	// Workspace is the legacy field for backward compatibility (maps to WorkspacesPath)
-	Workspace string `koanf:"workspace"`
 	// Project is the currently active project name
 	Project string `koanf:"project"`
+	// DefaultSourceBranch is the default source branch for creating worktrees
+	DefaultSourceBranch string `koanf:"default_source_branch"`
 	// Verbose enables detailed logging
 	Verbose bool `koanf:"verbose"`
 	// Quiet suppresses non-essential output
@@ -38,12 +38,12 @@ func NewConfig() *Config {
 	}
 
 	return &Config{
-		ProjectsPath:   filepath.Join(home, "Projects"),
-		WorkspacesPath: filepath.Join(home, "Workspaces"),
-		Workspace:      filepath.Join(home, "Workspaces"), // Legacy field
-		Project:        "",
-		Verbose:        false,
-		Quiet:          false,
+		ProjectsPath:        filepath.Join(home, "Projects"),
+		WorkspacesPath:      filepath.Join(home, "Workspaces"),
+		Project:             "",
+		DefaultSourceBranch: "", // Empty by default, will fallback to "main" in CLI
+		Verbose:             false,
+		Quiet:               false,
 	}
 }
 
@@ -56,7 +56,7 @@ func LoadConfig() (*Config, error) {
 	configPaths := config.getConfigPaths()
 	for _, configPath := range configPaths {
 		if _, err := os.Stat(configPath); err == nil {
-			if err := k.Load(file.Provider(configPath), yaml.Parser()); err != nil {
+			if err := k.Load(file.Provider(configPath), toml.Parser()); err != nil {
 				return nil, fmt.Errorf("failed to load config from %s: %w", configPath, err)
 			}
 			break // Use first found config file
@@ -65,7 +65,7 @@ func LoadConfig() (*Config, error) {
 
 	// Load from environment variables (higher priority)
 	if err := k.Load(env.Provider("TWIGGIT_", ".", func(s string) string {
-		// Convert TWIGGIT_WORKSPACE -> workspace (lowercase)
+		// Convert TWIGGIT_WORKSPACES_PATH -> workspaces_path (lowercase)
 		return strings.ToLower(s[8:]) // Remove "TWIGGIT_" prefix and lowercase
 	}), nil); err != nil {
 		return nil, fmt.Errorf("failed to load environment variables: %w", err)
@@ -86,8 +86,8 @@ func LoadConfig() (*Config, error) {
 
 // Validate checks if the configuration is valid
 func (c *Config) Validate() error {
-	// Normalize config for backward compatibility
-	c.normalize()
+	// Ensure ProjectsPath is set (fallback to sibling of WorkspacesPath)
+	c.ensureProjectsPathFallback()
 
 	if c.WorkspacesPath == "" {
 		return errors.New("workspaces path cannot be empty")
@@ -101,30 +101,19 @@ func (c *Config) Validate() error {
 		return errors.New("verbose and quiet cannot both be enabled")
 	}
 
-	return nil
-}
-
-// normalize handles backward compatibility by mapping legacy fields to new ones
-func (c *Config) normalize() {
-	// If only the legacy Workspace field is set, use it for WorkspacesPath
-	// and set ProjectsPath to a sibling directory
-	if c.Workspace != "" && c.WorkspacesPath == "" {
-		c.WorkspacesPath = c.Workspace
-		// Set ProjectsPath to parent/Projects if Workspace is parent/Workspaces
-		parent := filepath.Dir(c.Workspace)
-		if filepath.Base(c.Workspace) == "Workspaces" {
-			c.ProjectsPath = filepath.Join(parent, "Projects")
-		} else {
-			// Fallback: create Projects directory alongside Workspace
-			c.ProjectsPath = filepath.Join(parent, "Projects")
+	// Validate default_source_branch if provided
+	if c.DefaultSourceBranch != "" {
+		// Git branch names should not contain spaces, special characters, or start with -
+		if !isValidBranchName(c.DefaultSourceBranch) {
+			return fmt.Errorf("invalid default source branch name: %s", c.DefaultSourceBranch)
 		}
 	}
 
-	// Ensure WorkspacesPath is set (fallback to legacy Workspace)
-	if c.WorkspacesPath == "" {
-		c.WorkspacesPath = c.Workspace
-	}
+	return nil
+}
 
+// ensureProjectsPathFallback ensures ProjectsPath is set (fallback to sibling of WorkspacesPath)
+func (c *Config) ensureProjectsPathFallback() {
 	// Ensure ProjectsPath is set (fallback to sibling of WorkspacesPath)
 	if c.ProjectsPath == "" {
 		parent := filepath.Dir(c.WorkspacesPath)
@@ -142,16 +131,55 @@ func (c *Config) getConfigPaths() []string {
 
 	paths := make([]string, 0, 3)
 
-	// XDG_CONFIG_HOME/twiggit/config.yaml
+	// XDG_CONFIG_HOME/twiggit/config.toml
 	if xdgConfigHome := os.Getenv("XDG_CONFIG_HOME"); xdgConfigHome != "" {
-		paths = append(paths, filepath.Join(xdgConfigHome, "twiggit", "config.yaml"))
+		paths = append(paths, filepath.Join(xdgConfigHome, "twiggit", "config.toml"))
 	}
 
-	// ~/.config/twiggit/config.yaml
-	paths = append(paths, filepath.Join(home, ".config", "twiggit", "config.yaml"))
+	// ~/.config/twiggit/config.toml
+	paths = append(paths, filepath.Join(home, ".config", "twiggit", "config.toml"))
 
-	// ~/.twiggit.yaml (legacy)
-	paths = append(paths, filepath.Join(home, ".twiggit.yaml"))
+	// ~/.twiggit.toml (legacy)
+	paths = append(paths, filepath.Join(home, ".twiggit.toml"))
 
 	return paths
+}
+
+// isValidBranchName checks if a branch name follows Git branch naming rules
+func isValidBranchName(name string) bool {
+	// Git branch names cannot:
+	// - Start with a dot
+	// - Start with a dash
+	// - Contain spaces
+	// - Contain consecutive dots
+	// - End with a dot or slash
+	// - Contain invalid characters: ~^:?*[
+	// - Be empty
+	// - Be "HEAD" (reserved)
+
+	if name == "" || name == "HEAD" {
+		return false
+	}
+
+	if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "-") {
+		return false
+	}
+
+	if strings.HasSuffix(name, ".") || strings.HasSuffix(name, "/") {
+		return false
+	}
+
+	if strings.Contains(name, " ") || strings.Contains(name, "..") {
+		return false
+	}
+
+	// Check for invalid Git characters
+	invalidChars := "~^:?*[@#"
+	for _, char := range name {
+		if strings.ContainsRune(invalidChars, char) {
+			return false
+		}
+	}
+
+	return true
 }

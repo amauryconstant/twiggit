@@ -31,7 +31,7 @@ func (s *DiscoveryServiceTestSuite) SetupTest() {
 	s.GitClient = &mocks.GitClientMock{}
 
 	// Create test config with mock git client - use /tmp to match test filesystem
-	s.Config = &config.Config{Workspace: "/tmp"}
+	s.Config = &config.Config{WorkspacesPath: "/tmp"}
 	testFileSystem := os.DirFS("/tmp")
 
 	s.Service = NewDiscoveryService(s.GitClient, s.Config, testFileSystem)
@@ -52,7 +52,7 @@ func (s *DiscoveryServiceTestSuite) TearDownTest() {
 func (s *DiscoveryServiceTestSuite) TestDiscoveryService_NewDiscoveryService() {
 	gitClient := &mocks.GitClientMock{}
 
-	testConfig := &config.Config{Workspace: s.T().TempDir()}
+	testConfig := &config.Config{WorkspacesPath: s.T().TempDir()}
 	testFileSystem := os.DirFS("/tmp")
 
 	service := NewDiscoveryService(gitClient, testConfig, testFileSystem)
@@ -161,7 +161,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
 		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
-			testConfig := &config.Config{Workspace: "/tmp"}
+			testConfig := &config.Config{WorkspacesPath: "/tmp"}
 			testFileSystem := os.DirFS("/tmp")
 			service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
@@ -241,7 +241,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_AnalyzeWorktree() {
 		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
-			testConfig := &config.Config{Workspace: "/tmp"}
+			testConfig := &config.Config{WorkspacesPath: "/tmp"}
 			testFileSystem := os.DirFS("/tmp")
 			service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 			tt.setupMocks(mockGit)
@@ -324,7 +324,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 		s.Run(tt.name, func() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
-			testConfig := &config.Config{Workspace: "/tmp"}
+			testConfig := &config.Config{WorkspacesPath: "/tmp"}
 			testFileSystem := os.DirFS("/tmp")
 			service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
@@ -356,7 +356,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_Performance() {
 	s.Run("should handle concurrent discovery efficiently", func() {
 		// Setup
 		mockGit := &mocks.GitClientMock{}
-		testConfig := &config.Config{Workspace: "/tmp"}
+		testConfig := &config.Config{WorkspacesPath: "/tmp"}
 		testFileSystem := os.DirFS("/tmp")
 		service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 		service.SetConcurrency(4) // Test with 4 workers
@@ -476,7 +476,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects_WithPu
 			// while still using directory operations directly
 
 			// Setup test dependencies
-			testConfig := &config.Config{Workspace: "/tmp"}
+			testConfig := &config.Config{WorkspacesPath: "/tmp"}
 			testFileSystem := os.DirFS("/tmp")
 
 			// Create service
@@ -598,7 +598,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_ConvertToWorktree_WithP
 
 	for _, tt := range testCases {
 		s.Run(tt.name, func() {
-			testConfig := &config.Config{Workspace: "/tmp"}
+			testConfig := &config.Config{WorkspacesPath: "/tmp"}
 			testFileSystem := os.DirFS("/tmp")
 			s.Service = NewDiscoveryService(s.GitClient, testConfig, testFileSystem)
 

@@ -42,8 +42,7 @@ var _ = Describe("Error Presentation", func() {
 				ContainSubstring("project 'nonexistent-project' not found"),
 				ContainSubstring("worktree 'nonexistent-project' not found"),
 				ContainSubstring("worktree 'shell-integration/nonexistent-project' not found"),
-				ContainSubstring("worktree 'twiggit/nonexistent-project' not found"),
-			))
+				ContainSubstring("worktree 'twiggit/nonexistent-project' not found")))
 		})
 
 		It("should display invalid branch name errors with proper formatting", func() {
@@ -53,7 +52,7 @@ var _ = Describe("Error Presentation", func() {
 
 			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring("❌"))
-			Expect(output).To(ContainSubstring("branch name format is invalid"))
+			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
 		})
 	})
 
@@ -90,8 +89,7 @@ var _ = Describe("Error Presentation", func() {
 				ContainSubstring("project 'nonexistent-project' not found"),
 				ContainSubstring("worktree 'nonexistent-project' not found"),
 				ContainSubstring("worktree 'shell-integration/nonexistent-project' not found"),
-				ContainSubstring("worktree 'twiggit/nonexistent-project' not found"),
-			))
+				ContainSubstring("worktree 'twiggit/nonexistent-project' not found")))
 		})
 	})
 
@@ -115,7 +113,7 @@ var _ = Describe("Error Presentation", func() {
 
 			output := string(session.Out.Contents())
 			Expect(output).To(ContainSubstring("❌"))
-			Expect(output).To(ContainSubstring("branch name format is invalid"))
+			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
 		})
 	})
 })
