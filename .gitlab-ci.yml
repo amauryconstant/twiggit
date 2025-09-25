@@ -33,8 +33,13 @@ build-docker-image:
     DOCKER_DRIVER: overlay2
     DOCKER_BUILDKIT: 1
     DOCKER_CONTENT_TRUST: 1
-    MISE_VERSION: v2025.9.13
-    IMAGE_TAG: $MISE_VERSION
+    MISE_VERSION: v2025.9.18
+    ALPINE_VERSION: 3.22
+    BASH_VERSION: 5.2.37-r0
+    ZSH_VERSION: 5.9-r5
+    FISH_VERSION: 4.0.2-r0
+    DOCKER_IMAGE_VERSION: 0.1.0
+    IMAGE_TAG: $DOCKER_IMAGE_VERSION
     CACHE_IMAGE: $CI_REGISTRY_IMAGE/twiggit-ci:cache
     GIT_STRATEGY: fetch
   before_script:
@@ -47,7 +52,11 @@ build-docker-image:
     - >
       docker buildx build
       --build-arg BUILDKIT_INLINE_CACHE=1
+      --build-arg ALPINE_VERSION=$ALPINE_VERSION
       --build-arg MISE_VERSION=$MISE_VERSION
+      --build-arg BASH_VERSION=$BASH_VERSION
+      --build-arg ZSH_VERSION=$ZSH_VERSION
+      --build-arg FISH_VERSION=$FISH_VERSION
       --cache-from=type=registry,ref=$CACHE_IMAGE
       --cache-to=type=registry,ref=$CACHE_IMAGE,mode=max
       --tag $CI_REGISTRY_IMAGE/twiggit-ci:$IMAGE_TAG
@@ -67,7 +76,7 @@ build-docker-image:
 .defaults:
   image: $CI_REGISTRY_IMAGE/twiggit-ci:latest
   variables:
-    MISE_VERSION: v2025.9.13
+    MISE_VERSION: v2025.9.18
     MISE_ENV: ci
     MISE_DATA_DIR: $CI_PROJECT_DIR/.mise/data
     MISE_CACHE_DIR: $CI_PROJECT_DIR/.mise/cache
