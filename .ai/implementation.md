@@ -4,10 +4,11 @@
 
 ### Test Coverage
 - >80% test coverage SHALL be achieved for business logic
+- Happy paths and critical business logic SHALL have 100% coverage
 - Unit, integration, and E2E tests SHALL be included
-- External dependencies SHALL be mocked in unit tests
+- External dependencies SHALL be mocked in unit tests OR tested via integration tests
 - Real git repositories SHALL be used in integration tests
-- CLI behavior SHALL be validated through E2E tests
+- CLI behavior SHALL be validated through E2E tests (cmd/ package uses E2E tests only)
 - Tests that fail in CI environment SHALL NOT be committed
 
 ### Testing Framework Usage

@@ -1,14 +1,16 @@
 # Testing Infrastructure
 
-This directory contains the simplified testing infrastructure for the twiggit project.
+This directory contains the testing infrastructure for the twiggit project.
 
 ## Overview
 
-The testing infrastructure has been streamlined to reduce complexity and improve maintainability:
+The testing infrastructure provides organized utilities and patterns for testing across all levels:
 
-- **Simplified Structure**: Reduced from ~1000 lines of over-engineered infrastructure to ~310 lines of focused utilities
-- **Standard Patterns**: Uses standard Go table-driven test patterns instead of custom runners
-- **Clear Organization**: Separated concerns between helpers, fixtures, and integration tests
+- **Structured Organization**: Clear separation between helpers, fixtures, integration tests, and E2E tests
+- **Comprehensive Coverage**: Support for unit, integration, and end-to-end testing
+- **Utility-Focused**: Provides essential helpers and fixtures without over-engineering
+
+For detailed testing philosophy, quality standards, and framework strategy, see [../.ai/testing.md](../.ai/testing.md).
 
 ## Directory Structure
 
@@ -67,10 +69,7 @@ The helpers package provides essential testing utilities:
 - `Run()`: Executes CLI commands with gexec session
 - `RunWithDir()`: Executes CLI commands in specific directory
 
-#### Assertion Helpers (`assertion_helpers.go`)
-- `AssertDirExists()`: Directory existence assertions
-- `AssertFileExists()`: File existence assertions
-- `AssertFileContains()`: File content assertions
+
 
 ### Fixtures Package (`test/fixtures/`)
 
@@ -106,47 +105,7 @@ Mock implementations for testing:
 
 ## Usage Patterns
 
-### Standard Table-Driven Tests
-
-Instead of using custom test runners, use standard Go patterns:
-
-```go
-func TestSomething(t *testing.T) {
-    testCases := []struct {
-        name     string
-        input    string
-        expected string
-        wantErr  bool
-    }{
-        {
-            name:     "simple case",
-            input:    "test",
-            expected: "result",
-            wantErr:  false,
-        },
-        {
-            name:     "error case",
-            input:    "",
-            expected: "",
-            wantErr:  true,
-        },
-    }
-
-    for _, tt := range testCases {
-        t.Run(tt.name, func(t *testing.T) {
-            result, err := FunctionUnderTest(tt.input)
-            
-            if tt.wantErr {
-                assert.Error(t, err)
-                return
-            }
-            
-            assert.NoError(t, err)
-            assert.Equal(t, tt.expected, result)
-        })
-    }
-}
-```
+For detailed testing patterns, framework usage, and examples, see [../.ai/testing.md](../.ai/testing.md). This section focuses on infrastructure-specific usage.
 
 ### Git Repository Testing
 
@@ -168,41 +127,63 @@ func TestGitOperation(t *testing.T) {
 ### E2E Testing
 
 ```go
-func TestCreateCommand(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping E2E test")
-    }
+var _ = Describe("Create Command", func() {
+    var cli *helpers.TwiggitCLI
 
-    // Create CLI wrapper
-    cli := helpers.NewTwiggitCLI()
-    
-    // Run CLI command
-    session := cli.Run("create", "feature-branch")
-    defer session.Terminate()
-    
-    // Verify results
-    Expect(session.ExitCode()).To(Equal(0))
-    Expect(session.Out.Contents()).To(ContainSubstring("Created worktree"))
+    BeforeEach(func() {
+        cli = helpers.NewTwiggitCLI()
+    })
+
+    It("creates worktree from existing branch", func() {
+        session := cli.Run("create", "feature-branch")
+        Eventually(session).Should(gexec.Exit(0))
+
+        output := string(session.Out.Contents())
+        Expect(output).To(ContainSubstring("Created worktree"))
+    })
 }
+```
 
 ### Integration Testing
 
 ```go
-func TestFullWorkflow(t *testing.T) {
+type WorkflowIntegrationTestSuite struct {
+    suite.Suite
+    testRepo *helpers.GitRepo
+    workspace string
+    cleanup   func()
+}
+
+func (s *WorkflowIntegrationTestSuite) SetupSuite() {
     if testing.Short() {
-        t.Skip("Skipping integration test")
+        s.T().Skip("Skipping integration test")
     }
-
+    
     // Create test environment
-    workspace, cleanup := helpers.TempDir(t, "workspace-*")
-    defer cleanup()
+    s.workspace, s.cleanup = helpers.TempDir(s.T(), "workspace-*")
+    s.testRepo = helpers.NewGitRepo(s.T(), "test-repo-*")
+}
 
+func (s *WorkflowIntegrationTestSuite) TearDownSuite() {
+    if s.testRepo != nil {
+        s.testRepo.Cleanup()
+    }
+    if s.cleanup != nil {
+        s.cleanup()
+    }
+}
+
+func TestWorkflowIntegrationSuite(t *testing.T) {
+    suite.Run(t, new(WorkflowIntegrationTestSuite))
+}
+
+func (s *WorkflowIntegrationTestSuite) TestFullWorkflow() {
     // Set up test repositories and worktrees
-    // ... test setup ...
+    // ... test setup using s.testRepo and s.workspace ...
 
     // Test the complete workflow
-    err := YourWorkflowFunction(workspace)
-    assert.NoError(t, err)
+    err := YourWorkflowFunction(s.workspace)
+    s.Assert().NoError(err)
 }
 ```
 
@@ -213,17 +194,19 @@ The old `internal/testutil` structure has been replaced with this simplified app
 ### Key Changes
 
 1. **Removed Over-Engineered Components**:
-   - `NewTableTestRunner()` → Standard `for _, tt := range testCases` loops
-   - Complex suite structures → Simple testify suites or standard tests
+   - `NewTableTestRunner()` → Standard `for _, tt := range testCases` loops within Testify suites
+   - Complex suite structures → Consistent Testify suite pattern across unit/integration tests
    - Over-abstracted utilities → Focused, single-purpose helpers
 
 2. **Simplified Imports**:
    - `github.com/amaury/twiggit/internal/testutil` → `github.com/amaury/twiggit/test/helpers`
    - `github.com/amaury/twiggit/internal/testutil/git` → `github.com/amaury/twiggit/test/helpers`
+   - Added consistent Testify suite usage for unit and integration tests
 
 3. **Standard Patterns**:
-   - Custom test runners → Standard Go table-driven tests
-   - Complex setup/teardown → Simple defer cleanup patterns
+   - Custom test runners → Standard Go table-driven tests within Testify suites
+   - Complex setup/teardown → Consistent Testify suite SetupTest/TearDownTest patterns
+   - Mixed testing frameworks → Consistent framework usage per test type
 
 ### Benefits
 
@@ -273,28 +256,32 @@ mise run test:race     # Run tests with race detection
 
 ## Best Practices
 
-1. **Use Table-Driven Tests**: For testing multiple scenarios with the same logic
-2. **Cleanup Resources**: Always use `defer` for cleanup operations
-3. **Test Names**: Use descriptive test names that explain the scenario
-4. **Test Isolation**: Each test should be independent and not rely on execution order
-5. **Mock External Dependencies**: Use mocks for external services and filesystem operations
-6. **Integration Tests**: Mark integration tests with build tags and skip in short mode
+For comprehensive testing best practices, framework selection, and quality standards, see [../.ai/testing.md](../.ai/testing.md).
 
-## Contributing
+### Infrastructure-Specific Guidelines
 
-When adding new test utilities:
-
-1. **Place in Correct Package**: 
+1. **Place Utilities Correctly**: 
    - General utilities → `test/helpers/`
    - Test data → `test/fixtures/`
    - Integration tests → `test/integration/`
+   - E2E tests → `test/e2e/`
 
-2. **Follow Existing Patterns**:
-   - Use standard Go patterns
+2. **Use Helpers Appropriately**:
+   - `git.go`: For git repository setup and operations
+   - `temp.go`: For temporary directory/file management
+   - `cli.go`: For E2E CLI testing only
+   - `mise.go`: For mise integration testing
+
+3. **Keep Infrastructure Simple**:
+   - Avoid over-engineering test utilities
+   - Focus on single responsibility per helper
+   - Prefer composition over inheritance
+
+4. **Document Thoroughly**:
    - Include comprehensive godoc comments
    - Add example usage in comments
+   - Explain cleanup responsibilities
 
-3. **Keep It Simple**:
-   - Avoid over-engineering
-   - Focus on single responsibility
-   - Prefer composition over inheritance
+## Contributing
+
+When adding new test utilities, follow the infrastructure-specific guidelines in the Best Practices section above. For testing philosophy and framework decisions, refer to [../.ai/testing.md](../.ai/testing.md).
