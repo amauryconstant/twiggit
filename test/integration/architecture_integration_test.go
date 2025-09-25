@@ -64,7 +64,6 @@ func (s *ArchitectureIntegrationTestSuite) SetupSuite() {
 	s.config = &config.Config{
 		ProjectsPath:   s.projectsDir,
 		WorkspacesPath: s.workspacesDir,
-		Workspace:      s.workspacesDir, // Legacy field for backward compatibility
 	}
 
 	// Create filesystem

@@ -4,6 +4,10 @@
 package e2e
 
 import (
+	"os"
+	"path/filepath"
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -62,5 +66,141 @@ var _ = Describe("Create Command", func() {
 	It("supports quiet flag", func() {
 		session := cli.Run("create", "--help", "--quiet")
 		Eventually(session).Should(gexec.Exit(0))
+	})
+
+	Describe("default_source_branch configuration", func() {
+		var tempDir string
+		var cleanup func()
+		var configDir string
+		var configPath string
+
+		BeforeEach(func() {
+			// Create a temporary directory for testing
+			var err error
+			tempDir, err = os.MkdirTemp("", "twiggit-config-test")
+			Expect(err).NotTo(HaveOccurred())
+
+			cleanup = func() {
+				os.RemoveAll(tempDir)
+			}
+
+			configDir = filepath.Join(tempDir, "twiggit")
+			configPath = filepath.Join(configDir, "config.toml")
+
+			// Create config directory
+			err = os.MkdirAll(configDir, 0755)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Set XDG_CONFIG_HOME to point to our temp directory so the config is found
+			oldXdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+			os.Setenv("XDG_CONFIG_HOME", tempDir)
+
+			// Update cleanup to restore environment variable
+			originalCleanup := cleanup
+			cleanup = func() {
+				if oldXdgConfigHome != "" {
+					os.Setenv("XDG_CONFIG_HOME", oldXdgConfigHome)
+				} else {
+					os.Unsetenv("XDG_CONFIG_HOME")
+				}
+				originalCleanup()
+			}
+
+			// Initialize a git repository for testing using the git helper
+			t := &testing.T{}
+			gitRepo := helpers.NewGitRepo(t, "twiggit-e2e-test")
+			tempDir = gitRepo.Path
+
+			// Update cleanup to include git repo cleanup
+			currentCleanup := cleanup
+			cleanup = func() {
+				gitRepo.Cleanup()
+				currentCleanup()
+			}
+		})
+
+		AfterEach(func() {
+			cleanup()
+		})
+
+		It("uses default_source_branch from config when no --source flag provided", func() {
+			// Create config with custom default source branch
+			configContent := `default_source_branch = "develop"`
+			err := os.WriteFile(configPath, []byte(configContent), 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Run create command with custom environment
+			session := cli.RunWithDir(tempDir, "create", "feature-branch")
+			Eventually(session).Should(gexec.Exit(1)) // Will fail due to no git repo, but we can check the error message
+
+			output := string(session.Out.Contents())
+			// The error should mention 'develop' branch, not 'main'
+			Expect(output).To(ContainSubstring("source branch 'develop' does not exist"))
+			Expect(output).NotTo(ContainSubstring("source branch 'main' does not exist"))
+		})
+
+		It("overrides config default_source_branch with --source flag", func() {
+			// Create config with default source branch
+			configContent := `default_source_branch = "develop"`
+			err := os.WriteFile(configPath, []byte(configContent), 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Run create command with --source flag
+			session := cli.RunWithDir(tempDir, "create", "--source", "main", "feature-branch")
+			Eventually(session).Should(gexec.Exit(1)) // Will fail due to no git repo
+
+			output := string(session.Out.Contents())
+			// The error should mention 'main' branch (from --source flag), not 'develop' (from config)
+			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
+			Expect(output).NotTo(ContainSubstring("source branch 'develop' does not exist"))
+		})
+
+		It("falls back to 'main' when no config and no --source flag", func() {
+			// No config file created
+
+			// Run create command without any configuration
+			session := cli.RunWithDir(tempDir, "create", "feature-branch")
+			Eventually(session).Should(gexec.Exit(1)) // Will fail due to no git repo
+
+			output := string(session.Out.Contents())
+			// The error should mention 'main' branch (default fallback)
+			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
+		})
+
+		It("respects configuration priority: --source flag > config > default", func() {
+			// Create config with default source branch
+			configContent := `default_source_branch = "develop"`
+			err := os.WriteFile(configPath, []byte(configContent), 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Test 1: Default behavior (should use config)
+			session1 := cli.RunWithDir(tempDir, "create", "feature-branch")
+			Eventually(session1).Should(gexec.Exit(1))
+			output1 := string(session1.Out.Contents())
+			Expect(output1).To(ContainSubstring("source branch 'develop' does not exist"))
+
+			// Test 2: With --source flag (should override config)
+			session2 := cli.RunWithDir(tempDir, "create", "--source", "main", "feature-branch")
+			Eventually(session2).Should(gexec.Exit(1))
+			output2 := string(session2.Out.Contents())
+			Expect(output2).To(ContainSubstring("source branch 'main' does not exist"))
+			Expect(output2).NotTo(ContainSubstring("source branch 'develop' does not exist"))
+		})
+
+		It("handles invalid default_source_branch in config", func() {
+			// Create config with invalid branch name
+			configContent := `default_source_branch = "invalid@branch#name"`
+			err := os.WriteFile(configPath, []byte(configContent), 0644)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Run create command - should fail at config loading
+			session := cli.RunWithDir(tempDir, "create", "feature-branch")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Err.Contents())
+			// Should show config validation error for invalid branch name
+			Expect(output).To(ContainSubstring("Failed to load configuration"))
+			Expect(output).To(ContainSubstring("invalid default source branch name"))
+		})
 	})
 })

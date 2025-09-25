@@ -1,0 +1,27 @@
+# Twiggit Configuration File
+# Copy this file to ~/.config/twiggit/twiggit.toml or ~/.twiggit.toml
+
+# Directory containing git project repositories
+# Default: $HOME/Projects
+projects_path = "~/Projects"
+
+# Directory containing worktree checkouts  
+# Default: $HOME/Workspaces
+workspaces_path = "~/Workspaces"
+
+# Default source branch for creating new worktrees
+# When not specified, defaults to "main"
+# Can be overridden with --source flag in create command
+default_source_branch = "main"
+
+# Currently active project name
+# This can be set to avoid specifying the project context repeatedly
+# project = "my-project"
+
+# Enable detailed logging output
+# Default: false
+verbose = false
+
+# Suppress non-essential output
+# Default: false  
+quiet = false

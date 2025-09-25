@@ -17,7 +17,6 @@ func TestNewContainer(t *testing.T) {
 	cfg := &config.Config{
 		ProjectsPath:   "/test/projects",
 		WorkspacesPath: "/test/workspaces",
-		Workspace:      "/test/workspaces",
 	}
 
 	// Create container
@@ -34,7 +33,6 @@ func TestContainer_InfrastructureDependencies(t *testing.T) {
 	cfg := &config.Config{
 		ProjectsPath:   "/test/projects",
 		WorkspacesPath: "/test/workspaces",
-		Workspace:      "/test/workspaces",
 	}
 
 	container := NewContainer(cfg)
@@ -58,7 +56,6 @@ func TestContainer_ApplicationServices(t *testing.T) {
 	cfg := &config.Config{
 		ProjectsPath:   "/test/projects",
 		WorkspacesPath: "/test/workspaces",
-		Workspace:      "/test/workspaces",
 	}
 
 	container := NewContainer(cfg)
@@ -91,7 +88,6 @@ func TestContainer_MiseIntegration(t *testing.T) {
 	cfg := &config.Config{
 		ProjectsPath:   "/test/projects",
 		WorkspacesPath: "/test/workspaces",
-		Workspace:      "/test/workspaces",
 	}
 
 	container := NewContainer(cfg)
@@ -108,7 +104,6 @@ func TestContainer_ServiceDependencies(t *testing.T) {
 	cfg := &config.Config{
 		ProjectsPath:   "/test/projects",
 		WorkspacesPath: "/test/workspaces",
-		Workspace:      "/test/workspaces",
 	}
 
 	container := NewContainer(cfg)
@@ -138,7 +133,6 @@ func TestContainer_SingletonBehavior(t *testing.T) {
 	cfg := &config.Config{
 		ProjectsPath:   "/test/projects",
 		WorkspacesPath: "/test/workspaces",
-		Workspace:      "/test/workspaces",
 	}
 
 	container := NewContainer(cfg)
@@ -205,7 +199,6 @@ func TestContainer_Interfaces(t *testing.T) {
 	cfg := &config.Config{
 		ProjectsPath:   "/test/projects",
 		WorkspacesPath: "/test/workspaces",
-		Workspace:      "/test/workspaces",
 	}
 
 	container := NewContainer(cfg)
