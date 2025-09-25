@@ -9,6 +9,7 @@ import (
 
 	"github.com/amaury/twiggit/internal/domain"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/config"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/stretchr/testify/suite"
@@ -146,6 +147,51 @@ func (s *GitClientContextTestSuite) TestListWorktrees_UsingGoGit() {
 	s.Equal(mainRepo, worktrees[0].Path)
 }
 
+// TestCheckCandidateWorktree_ErrorHandling tests error handling in checkCandidateWorktree
+func (s *GitClientContextTestSuite) TestCheckCandidateWorktree_ErrorHandling() {
+	ctx := context.Background()
+
+	// Setup main repository
+	mainRepoPath, _ := s.setupRepositoryWithInitialCommit("main-repo")
+
+	// Test with a non-existent candidate path
+	nonExistentPath := filepath.Join(s.TempDir, "non-existent-candidate")
+
+	// This should return nil, nil (not a git repository)
+	worktreeInfo, err := s.Client.checkCandidateWorktree(ctx, nonExistentPath, mainRepoPath)
+	s.Require().NoError(err)
+	s.Nil(worktreeInfo)
+}
+
+// TestCheckCandidateWorktree_GetWorktreeStatusError tests error handling when GetWorktreeStatus fails
+func (s *GitClientContextTestSuite) TestCheckCandidateWorktree_GetWorktreeStatusError() {
+	ctx := context.Background()
+
+	// Setup main repository
+	mainRepoPath, _ := s.setupRepositoryWithInitialCommit("main-repo")
+
+	// Create a candidate directory that is a git repository but has issues
+	candidatePath := filepath.Join(s.TempDir, "candidate-repo")
+	_, err := git.PlainInit(candidatePath, false)
+	s.Require().NoError(err)
+
+	// Add origin remote pointing to main repo to make it pass the hasOriginRemote check
+	repo, err := git.PlainOpen(candidatePath)
+	s.Require().NoError(err)
+
+	_, err = repo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{mainRepoPath},
+	})
+	s.Require().NoError(err)
+
+	// Now test checkCandidateWorktree - it should fail at GetWorktreeStatus
+	// because the candidate repository doesn't have any commits
+	worktreeInfo, err := s.Client.checkCandidateWorktree(ctx, candidatePath, mainRepoPath)
+	s.Require().Error(err) // Should fail due to no commits in candidate repo
+	s.Nil(worktreeInfo)
+}
+
 // TestGetAllBranches_UsingGoGit tests that GetAllBranches uses go-git instead of CLI
 func (s *GitClientContextTestSuite) TestGetAllBranches_UsingGoGit() {
 	ctx := context.Background()
@@ -161,6 +207,41 @@ func (s *GitClientContextTestSuite) TestGetAllBranches_UsingGoGit() {
 	s.Require().NoError(err)
 	s.Contains(branches, "master") // go-git default branch name
 	s.Contains(branches, "feature/test")
+}
+
+// TestGetAllBranches_ContextCancellation tests context cancellation in GetAllBranches
+func (s *GitClientContextTestSuite) TestGetAllBranches_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	repoPath := filepath.Join(s.TempDir, "repo")
+	_, err := git.PlainInit(repoPath, false)
+	s.Require().NoError(err)
+
+	// This should fail with context canceled error
+	branches, err := s.Client.GetAllBranches(ctx, repoPath)
+	s.Require().Error(err)
+	s.Nil(branches)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestGetAllBranches_InvalidPath tests error handling for invalid paths
+func (s *GitClientContextTestSuite) TestGetAllBranches_InvalidPath() {
+	ctx := context.Background()
+
+	// Test with empty path
+	branches, err := s.Client.GetAllBranches(ctx, "")
+	s.Require().Error(err)
+	s.Nil(branches)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+
+	// Test with non-existent path
+	branches, err = s.Client.GetAllBranches(ctx, "/non/existent/path")
+	s.Require().Error(err)
+	s.Nil(branches)
+	s.True(domain.IsDomainErrorType(err, domain.ErrGitCommand))
 }
 
 // TestGetWorktreeStatus_UsingGoGit tests that GetWorktreeStatus uses go-git instead of CLI
@@ -197,6 +278,57 @@ func (s *GitClientContextTestSuite) TestGetWorktreeStatus_UsingGoGit() {
 	s.True(status.Clean) // Should be clean after commit
 }
 
+// TestGetWorktreeStatus_ContextCancellation tests context cancellation in GetWorktreeStatus
+func (s *GitClientContextTestSuite) TestGetWorktreeStatus_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	repoPath := filepath.Join(s.TempDir, "repo")
+	_, err := git.PlainInit(repoPath, false)
+	s.Require().NoError(err)
+
+	// This should fail with context canceled error
+	status, err := s.Client.GetWorktreeStatus(ctx, repoPath)
+	s.Require().Error(err)
+	s.Nil(status)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestGetWorktreeStatus_InvalidPath tests error handling for invalid paths
+func (s *GitClientContextTestSuite) TestGetWorktreeStatus_InvalidPath() {
+	ctx := context.Background()
+
+	// Test with empty path
+	status, err := s.Client.GetWorktreeStatus(ctx, "")
+	s.Require().Error(err)
+	s.Nil(status)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+
+	// Test with non-existent path
+	status, err = s.Client.GetWorktreeStatus(ctx, "/non/existent/path")
+	s.Require().Error(err)
+	s.Nil(status)
+	s.True(domain.IsDomainErrorType(err, domain.ErrWorktreeNotFound))
+}
+
+// TestGetWorktreeStatus_NonGitRepository tests error handling for non-git repository
+func (s *GitClientContextTestSuite) TestGetWorktreeStatus_NonGitRepository() {
+	ctx := context.Background()
+
+	// Create a directory that's not a git repository
+	nonGitDir := filepath.Join(s.TempDir, "non-git-repo")
+	err := os.MkdirAll(nonGitDir, 0755)
+	s.Require().NoError(err)
+
+	// This should fail with not a repository error
+	status, err := s.Client.GetWorktreeStatus(ctx, nonGitDir)
+	s.Require().Error(err)
+	s.Nil(status)
+	s.True(domain.IsDomainErrorType(err, domain.ErrNotRepository))
+}
+
 // TestHasUncommittedChanges_UsingGoGit tests that HasUncommittedChanges uses go-git instead of CLI
 func (s *GitClientContextTestSuite) TestHasUncommittedChanges_UsingGoGit() {
 	ctx := context.Background()
@@ -220,6 +352,45 @@ func (s *GitClientContextTestSuite) TestHasUncommittedChanges_UsingGoGit() {
 	s.True(hasChanges)
 }
 
+// TestHasUncommittedChanges_ContextCancellation tests context cancellation in HasUncommittedChanges
+func (s *GitClientContextTestSuite) TestHasUncommittedChanges_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	repoPath := filepath.Join(s.TempDir, "repo")
+	_, err := git.PlainInit(repoPath, false)
+	s.Require().NoError(err)
+
+	// This should return false (not error) for context cancellation
+	hasChanges := s.Client.HasUncommittedChanges(ctx, repoPath)
+	s.False(hasChanges)
+}
+
+// TestHasUncommittedChanges_EmptyPath tests behavior with empty path
+func (s *GitClientContextTestSuite) TestHasUncommittedChanges_EmptyPath() {
+	ctx := context.Background()
+
+	// Test with empty path
+	hasChanges := s.Client.HasUncommittedChanges(ctx, "")
+	s.False(hasChanges)
+}
+
+// TestHasUncommittedChanges_NonGitRepository tests behavior with non-git repository
+func (s *GitClientContextTestSuite) TestHasUncommittedChanges_NonGitRepository() {
+	ctx := context.Background()
+
+	// Create a directory that's not a git repository
+	nonGitDir := filepath.Join(s.TempDir, "non-git-repo")
+	err := os.MkdirAll(nonGitDir, 0755)
+	s.Require().NoError(err)
+
+	// This should return false (not error) for non-git repository
+	hasChanges := s.Client.HasUncommittedChanges(ctx, nonGitDir)
+	s.False(hasChanges)
+}
+
 // TestGetCurrentBranch_UsingGoGit tests that GetCurrentBranch uses go-git instead of CLI
 func (s *GitClientContextTestSuite) TestGetCurrentBranch_UsingGoGit() {
 	ctx := context.Background()
@@ -239,6 +410,41 @@ func (s *GitClientContextTestSuite) TestGetCurrentBranch_UsingGoGit() {
 	branch, err = s.Client.GetCurrentBranch(ctx, mainRepo)
 	s.Require().NoError(err)
 	s.Equal("feature/new-branch", branch)
+}
+
+// TestGetCurrentBranch_ContextCancellation tests context cancellation in GetCurrentBranch
+func (s *GitClientContextTestSuite) TestGetCurrentBranch_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	repoPath := filepath.Join(s.TempDir, "repo")
+	_, err := git.PlainInit(repoPath, false)
+	s.Require().NoError(err)
+
+	// This should fail with context canceled error
+	branch, err := s.Client.GetCurrentBranch(ctx, repoPath)
+	s.Require().Error(err)
+	s.Empty(branch)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestGetCurrentBranch_InvalidPath tests error handling for invalid paths
+func (s *GitClientContextTestSuite) TestGetCurrentBranch_InvalidPath() {
+	ctx := context.Background()
+
+	// Test with empty path
+	branch, err := s.Client.GetCurrentBranch(ctx, "")
+	s.Require().Error(err)
+	s.Empty(branch)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+
+	// Test with non-existent path
+	branch, err = s.Client.GetCurrentBranch(ctx, "/non/existent/path")
+	s.Require().Error(err)
+	s.Empty(branch)
+	s.True(domain.IsDomainErrorType(err, domain.ErrGitCommand))
 }
 
 // TestCreateWorktree_UsingGoGit tests that CreateWorktree uses go-git instead of CLI
@@ -264,6 +470,70 @@ func (s *GitClientContextTestSuite) TestCreateWorktree_UsingGoGit() {
 	s.True(isRepo)
 }
 
+// TestCreateWorktree_ContextCancellation tests context cancellation in CreateWorktree
+func (s *GitClientContextTestSuite) TestCreateWorktree_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	mainRepo := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	worktreePath := filepath.Join(s.TempDir, "worktree1")
+
+	// This should fail with context canceled error
+	err = s.Client.CreateWorktree(ctx, mainRepo, "feature/test-branch", worktreePath)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestCreateWorktree_InvalidInputs tests error handling for invalid inputs
+func (s *GitClientContextTestSuite) TestCreateWorktree_InvalidInputs() {
+	ctx := context.Background()
+
+	mainRepo := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	worktreePath := filepath.Join(s.TempDir, "worktree1")
+
+	// Test with empty repo path
+	err = s.Client.CreateWorktree(ctx, "", "feature/test-branch", worktreePath)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+
+	// Test with empty branch name
+	err = s.Client.CreateWorktree(ctx, mainRepo, "", worktreePath)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+
+	// Test with empty target path
+	err = s.Client.CreateWorktree(ctx, mainRepo, "feature/test-branch", "")
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+}
+
+// TestCreateWorktree_TargetPathExists tests error handling when target path already exists
+func (s *GitClientContextTestSuite) TestCreateWorktree_TargetPathExists() {
+	ctx := context.Background()
+
+	mainRepo := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// Create a directory that already exists
+	worktreePath := filepath.Join(s.TempDir, "existing-worktree")
+	err = os.MkdirAll(worktreePath, 0755)
+	s.Require().NoError(err)
+
+	// This should fail with worktree exists error
+	err = s.Client.CreateWorktree(ctx, mainRepo, "feature/test-branch", worktreePath)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrWorktreeExists))
+}
+
 // TestRemoveWorktree_UsingGoGit tests that RemoveWorktree uses go-git instead of CLI
 func (s *GitClientContextTestSuite) TestRemoveWorktree_UsingGoGit() {
 	ctx := context.Background()
@@ -281,6 +551,69 @@ func (s *GitClientContextTestSuite) TestRemoveWorktree_UsingGoGit() {
 	s.Require().NoError(err)
 
 	// Verify the worktree directory was removed
+	s.NoDirExists(worktreePath)
+}
+
+// TestRemoveWorktree_ContextCancellation tests context cancellation in RemoveWorktree
+func (s *GitClientContextTestSuite) TestRemoveWorktree_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	mainRepo := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	worktreePath := filepath.Join(s.TempDir, "worktree1")
+
+	// This should fail with context canceled error
+	err = s.Client.RemoveWorktree(ctx, mainRepo, worktreePath, false)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestRemoveWorktree_NonExistentWorktree tests error handling for non-existent worktree
+func (s *GitClientContextTestSuite) TestRemoveWorktree_NonExistentWorktree() {
+	ctx := context.Background()
+
+	mainRepo := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	nonExistentPath := filepath.Join(s.TempDir, "non-existent")
+
+	// This should fail with worktree not found error
+	err = s.Client.RemoveWorktree(ctx, mainRepo, nonExistentPath, false)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrWorktreeNotFound))
+}
+
+// TestRemoveWorktree_UncommittedChanges tests error handling for worktree with uncommitted changes
+func (s *GitClientContextTestSuite) TestRemoveWorktree_UncommittedChanges() {
+	ctx := context.Background()
+
+	// Setup main repository with initial commit
+	mainRepo, _ := s.setupRepositoryWithInitialCommit("main")
+
+	// Create a worktree first
+	worktreePath := filepath.Join(s.TempDir, "worktree1")
+	err := s.Client.CreateWorktree(ctx, mainRepo, "feature/test-branch", worktreePath)
+	s.Require().NoError(err)
+
+	// Add uncommitted changes to the worktree
+	uncommittedFile := filepath.Join(worktreePath, "uncommitted.txt")
+	err = os.WriteFile(uncommittedFile, []byte("uncommitted content"), 0644)
+	s.Require().NoError(err)
+
+	// This should fail with uncommitted changes error
+	err = s.Client.RemoveWorktree(ctx, mainRepo, worktreePath, false)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrUncommittedChanges))
+
+	// Now remove with force flag - should succeed
+	err = s.Client.RemoveWorktree(ctx, mainRepo, worktreePath, true)
+	s.Require().NoError(err)
 	s.NoDirExists(worktreePath)
 }
 
@@ -308,6 +641,57 @@ func (s *GitClientContextTestSuite) TestGetRepositoryRoot_UsingGoGit() {
 	s.Equal(mainRepo, root)
 }
 
+// TestGetRepositoryRoot_ContextCancellation tests context cancellation in GetRepositoryRoot
+func (s *GitClientContextTestSuite) TestGetRepositoryRoot_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	repoPath := filepath.Join(s.TempDir, "repo")
+	_, err := git.PlainInit(repoPath, false)
+	s.Require().NoError(err)
+
+	// This should fail with context canceled error
+	root, err := s.Client.GetRepositoryRoot(ctx, repoPath)
+	s.Require().Error(err)
+	s.Empty(root)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestGetRepositoryRoot_InvalidPath tests error handling for invalid paths
+func (s *GitClientContextTestSuite) TestGetRepositoryRoot_InvalidPath() {
+	ctx := context.Background()
+
+	// Test with empty path
+	root, err := s.Client.GetRepositoryRoot(ctx, "")
+	s.Require().Error(err)
+	s.Empty(root)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+
+	// Test with non-existent path
+	root, err = s.Client.GetRepositoryRoot(ctx, "/non/existent/path")
+	s.Require().Error(err)
+	s.Empty(root)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+}
+
+// TestGetRepositoryRoot_NonGitRepository tests error handling for non-git repository
+func (s *GitClientContextTestSuite) TestGetRepositoryRoot_NonGitRepository() {
+	ctx := context.Background()
+
+	// Create a directory that's not a git repository
+	nonGitDir := filepath.Join(s.TempDir, "non-git-repo")
+	err := os.MkdirAll(nonGitDir, 0755)
+	s.Require().NoError(err)
+
+	// This should fail with not a repository error
+	root, err := s.Client.GetRepositoryRoot(ctx, nonGitDir)
+	s.Require().Error(err)
+	s.Empty(root)
+	s.True(domain.IsDomainErrorType(err, domain.ErrNotRepository))
+}
+
 // TestGetRemoteBranches_UsingGoGit tests that GetRemoteBranches uses go-git instead of CLI
 func (s *GitClientContextTestSuite) TestGetRemoteBranches_UsingGoGit() {
 	ctx := context.Background()
@@ -323,6 +707,62 @@ func (s *GitClientContextTestSuite) TestGetRemoteBranches_UsingGoGit() {
 	s.Empty(remoteBranches)
 }
 
+// TestGetRemoteBranches_ContextCancellation tests context cancellation in GetRemoteBranches
+func (s *GitClientContextTestSuite) TestGetRemoteBranches_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	mainRepo := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// This should fail with context canceled error
+	_, err = s.Client.GetRemoteBranches(ctx, mainRepo)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestGetRemoteBranches_InvalidPath tests error handling for invalid paths
+func (s *GitClientContextTestSuite) TestGetRemoteBranches_InvalidPath() {
+	ctx := context.Background()
+
+	// Test with empty path
+	remoteBranches, err := s.Client.GetRemoteBranches(ctx, "")
+	s.Require().Error(err)
+	s.Nil(remoteBranches)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+
+	// Test with non-existent path
+	remoteBranches, err = s.Client.GetRemoteBranches(ctx, "/non/existent/path")
+	s.Require().Error(err)
+	s.Nil(remoteBranches)
+	s.True(domain.IsDomainErrorType(err, domain.ErrGitCommand))
+}
+
+// TestGetRemoteBranches_WithRemote tests with actual remote branches
+func (s *GitClientContextTestSuite) TestGetRemoteBranches_WithRemote() {
+	ctx := context.Background()
+
+	// Setup repository
+	mainRepo := filepath.Join(s.TempDir, "main")
+	repo, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// Add a remote with some branches (simulated)
+	_, err = repo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{"https://github.com/user/repo.git"},
+	})
+	s.Require().NoError(err)
+
+	// Get remote branches - should be empty since we haven't actually fetched any
+	remoteBranches, err := s.Client.GetRemoteBranches(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.Empty(remoteBranches) // No actual remote branches without fetching
+}
+
 // TestBranchExists_UsingGoGit tests that BranchExists uses go-git instead of CLI
 func (s *GitClientContextTestSuite) TestBranchExists_UsingGoGit() {
 	ctx := context.Background()
@@ -336,6 +776,43 @@ func (s *GitClientContextTestSuite) TestBranchExists_UsingGoGit() {
 
 	// Non-existent branch should not exist
 	exists = s.Client.BranchExists(ctx, mainRepo, "non-existent")
+	s.False(exists)
+}
+
+// TestBranchExists_ContextCancellation tests context cancellation in BranchExists
+func (s *GitClientContextTestSuite) TestBranchExists_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	repoPath := filepath.Join(s.TempDir, "repo")
+	_, err := git.PlainInit(repoPath, false)
+	s.Require().NoError(err)
+
+	// This should return false (not error) for context cancellation
+	exists := s.Client.BranchExists(ctx, repoPath, "master")
+	s.False(exists)
+}
+
+// TestBranchExists_EmptyInputs tests behavior with empty inputs
+func (s *GitClientContextTestSuite) TestBranchExists_EmptyInputs() {
+	ctx := context.Background()
+
+	repoPath := filepath.Join(s.TempDir, "repo")
+	_, err := git.PlainInit(repoPath, false)
+	s.Require().NoError(err)
+
+	// Test with empty repo path
+	exists := s.Client.BranchExists(ctx, "", "master")
+	s.False(exists)
+
+	// Test with empty branch name
+	exists = s.Client.BranchExists(ctx, repoPath, "")
+	s.False(exists)
+
+	// Test with both empty
+	exists = s.Client.BranchExists(ctx, "", "")
 	s.False(exists)
 }
 
@@ -370,6 +847,209 @@ func (s *GitClientContextTestSuite) TestIsMainRepository_ContextCancellation() {
 	_, err = s.Client.IsMainRepository(ctx, mainRepo)
 	s.Require().Error(err)
 	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestIsMainRepository_NoOriginRemote tests repository without origin remote
+func (s *GitClientContextTestSuite) TestIsMainRepository_NoOriginRemote() {
+	ctx := context.Background()
+
+	// Setup a repository without origin remote
+	mainRepo := filepath.Join(s.TempDir, "no-origin-repo")
+	_, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// Should be main repository (no origin remote)
+	isMain, err := s.Client.IsMainRepository(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.True(isMain)
+}
+
+// TestIsMainRepository_WithRemoteOrigin tests repository with remote origin (GitHub/GitLab)
+func (s *GitClientContextTestSuite) TestIsMainRepository_WithRemoteOrigin() {
+	ctx := context.Background()
+
+	// Setup a repository with remote origin
+	mainRepo := filepath.Join(s.TempDir, "remote-origin-repo")
+	repo, err := git.PlainInit(mainRepo, false)
+	s.Require().NoError(err)
+
+	// Add a remote origin pointing to GitHub
+	_, err = repo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{"https://github.com/user/repo.git"},
+	})
+	s.Require().NoError(err)
+
+	// Should be main repository (remote origin)
+	isMain, err := s.Client.IsMainRepository(ctx, mainRepo)
+	s.Require().NoError(err)
+	s.True(isMain)
+}
+
+// TestIsMainRepository_WorktreeWithLocalOrigin tests worktree with local origin
+func (s *GitClientContextTestSuite) TestIsMainRepository_WorktreeWithLocalOrigin() {
+	ctx := context.Background()
+
+	// Setup main repository
+	mainRepoPath := filepath.Join(s.TempDir, "main-repo")
+	_, err := git.PlainInit(mainRepoPath, false)
+	s.Require().NoError(err)
+
+	// Setup worktree repository
+	worktreePath := filepath.Join(s.TempDir, "worktree-repo")
+	worktreeRepo, err := git.PlainInit(worktreePath, false)
+	s.Require().NoError(err)
+
+	// Add origin pointing to main repository (same workspace)
+	_, err = worktreeRepo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{mainRepoPath},
+	})
+	s.Require().NoError(err)
+
+	// Should NOT be main repository (has local origin in same workspace)
+	isMain, err := s.Client.IsMainRepository(ctx, worktreePath)
+	s.Require().NoError(err)
+	s.False(isMain)
+}
+
+// TestIsBareRepository_WithContext tests context support in IsBareRepository
+func (s *GitClientContextTestSuite) TestIsBareRepository_WithContext() {
+	ctx := context.Background()
+
+	// Setup a bare git repository
+	bareRepoDir := filepath.Join(s.TempDir, "bare-repo")
+	_, err := git.PlainInit(bareRepoDir, true) // true = bare repository
+	s.Require().NoError(err)
+
+	// Setup a regular git repository
+	regularRepoDir := filepath.Join(s.TempDir, "regular-repo")
+	_, err = git.PlainInit(regularRepoDir, false) // false = regular repository
+	s.Require().NoError(err)
+
+	// Test bare repository detection
+	isBare, err := s.Client.IsBareRepository(ctx, bareRepoDir)
+	s.Require().NoError(err)
+	s.True(isBare)
+
+	// Test regular repository detection
+	isBare, err = s.Client.IsBareRepository(ctx, regularRepoDir)
+	s.Require().NoError(err)
+	s.False(isBare)
+}
+
+// TestIsBareRepository_ContextCancellation tests context cancellation handling
+func (s *GitClientContextTestSuite) TestIsBareRepository_ContextCancellation() {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel the context immediately
+	cancel()
+
+	bareRepoDir := filepath.Join(s.TempDir, "bare-repo")
+	_, err := git.PlainInit(bareRepoDir, true)
+	s.Require().NoError(err)
+
+	// This should fail with context canceled error
+	_, err = s.Client.IsBareRepository(ctx, bareRepoDir)
+	s.Require().Error(err)
+	s.True(domain.IsDomainErrorType(err, domain.ErrValidation))
+}
+
+// TestIsBareRepository_InvalidPath tests error handling for invalid paths
+func (s *GitClientContextTestSuite) TestIsBareRepository_InvalidPath() {
+	ctx := context.Background()
+
+	// Test with empty path
+	isBare, err := s.Client.IsBareRepository(ctx, "")
+	s.Require().Error(err)
+	s.False(isBare)
+	s.True(domain.IsDomainErrorType(err, domain.ErrInvalidPath))
+
+	// Test with non-existent path
+	isBare, err = s.Client.IsBareRepository(ctx, "/non/existent/path")
+	s.Require().Error(err)
+	s.False(isBare)
+	s.True(domain.IsDomainErrorType(err, domain.ErrGitCommand))
+}
+
+// TestCheckCandidateWorktree tests the checkCandidateWorktree function
+func (s *GitClientContextTestSuite) TestCheckCandidateWorktree() {
+	ctx := context.Background()
+
+	// Setup main repository
+	mainRepoPath, _ := s.setupRepositoryWithInitialCommit("main-repo")
+
+	// Create a worktree directory that is NOT a valid worktree
+	candidatePath := filepath.Join(s.TempDir, "candidate")
+	err := os.MkdirAll(candidatePath, 0755)
+	s.Require().NoError(err)
+
+	// Test candidate that is not a git repository
+	worktreeInfo, err := s.Client.checkCandidateWorktree(ctx, candidatePath, mainRepoPath)
+	s.Require().NoError(err)
+	s.Nil(worktreeInfo)
+
+	// Test candidate that is a git repository but not a worktree
+	_, err = git.PlainInit(candidatePath, false)
+	s.Require().NoError(err)
+
+	worktreeInfo, err = s.Client.checkCandidateWorktree(ctx, candidatePath, mainRepoPath)
+	s.Require().NoError(err)
+	s.Nil(worktreeInfo) // Should be nil because it doesn't have main repo as origin
+}
+
+// TestHasOriginRemote tests the hasOriginRemote function
+func (s *GitClientContextTestSuite) TestHasOriginRemote() {
+	// Setup main repository
+	mainRepoPath, _ := s.setupRepositoryWithInitialCommit("main-repo")
+
+	// Create a separate repository
+	otherRepoPath := filepath.Join(s.TempDir, "other-repo")
+	otherRepo, err := git.PlainInit(otherRepoPath, false)
+	s.Require().NoError(err)
+
+	// Test that it doesn't have main repo as origin (since we didn't set it up)
+	hasOrigin := s.Client.hasOriginRemote(context.Background(), otherRepoPath, mainRepoPath)
+	s.False(hasOrigin)
+
+	// Add a remote to make it a proper worktree setup
+	_, err = otherRepo.CreateRemote(&config.RemoteConfig{
+		Name: "origin",
+		URLs: []string{mainRepoPath},
+	})
+	s.Require().NoError(err)
+
+	// Test again - should still be false because paths don't match exactly
+	hasOrigin = s.Client.hasOriginRemote(context.Background(), otherRepoPath, mainRepoPath)
+	s.True(hasOrigin) // Should be true now that we added the origin remote
+}
+
+// TestGetWorktreeStatusCLI tests the CLI fallback for worktree status
+func (s *GitClientContextTestSuite) TestGetWorktreeStatusCLI() {
+	ctx := context.Background()
+
+	// Setup a repository with initial commit
+	repoPath, _ := s.setupRepositoryWithInitialCommit("cli-test-repo")
+
+	// Test CLI fallback method
+	worktreeInfo, err := s.Client.getWorktreeStatusCLI(ctx, repoPath)
+	s.Require().NoError(err)
+	s.NotNil(worktreeInfo)
+	s.Equal(repoPath, worktreeInfo.Path)
+	s.Equal("master", worktreeInfo.Branch) // go-git uses "master" as default
+	s.NotEmpty(worktreeInfo.Commit)
+	s.True(worktreeInfo.Clean)
+}
+
+// TestGetWorktreeStatusCLI_ErrorHandling tests error handling in CLI method
+func (s *GitClientContextTestSuite) TestGetWorktreeStatusCLI_ErrorHandling() {
+	ctx := context.Background()
+
+	// Test with non-existent directory
+	worktreeInfo, err := s.Client.getWorktreeStatusCLI(ctx, "/non/existent/path")
+	s.Require().Error(err)
+	s.Nil(worktreeInfo)
+	s.True(domain.IsDomainErrorType(err, domain.ErrGitCommand))
 }
 
 func TestGitClientContextTestSuite(t *testing.T) {

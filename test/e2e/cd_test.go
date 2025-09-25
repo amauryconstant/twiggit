@@ -4,6 +4,8 @@
 package e2e
 
 import (
+	"os"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
@@ -46,7 +48,11 @@ var _ = Describe("Cd Command", func() {
 	})
 
 	It("shows context help when no arguments provided", func() {
-		session := cli.RunWithDir("/tmp", "cd")
+		tempDir, err := os.MkdirTemp("", "twiggit-cd-test")
+		Expect(err).NotTo(HaveOccurred())
+		defer os.RemoveAll(tempDir)
+
+		session := cli.RunWithDir(tempDir, "cd")
 		Eventually(session).Should(gexec.Exit(0))
 		Expect(string(session.Out.Contents())).To(ContainSubstring("Current context: Outside git repository"))
 		Expect(string(session.Out.Contents())).To(ContainSubstring("Available targets:"))

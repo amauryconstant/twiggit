@@ -144,6 +144,16 @@ test:
         echo "Integration coverage is empty, using unit coverage only"
         cp coverage_unit.out coverage.out
       fi
+    - echo "📊 Checking coverage threshold..."
+    - |
+      TOTAL_COVERAGE=$(mise x -- go tool cover -func=coverage.out | grep "total:" | awk '{print $3}' | sed 's/%//')
+      echo "Total coverage: ${TOTAL_COVERAGE}%"
+      if awk "BEGIN {exit !($TOTAL_COVERAGE < 80.0)}"; then
+        echo "❌ Coverage threshold not met: ${TOTAL_COVERAGE}% (minimum required: 80.0%)"
+        exit 1
+      else
+        echo "✅ Coverage threshold met: ${TOTAL_COVERAGE}% (minimum required: 80.0%)"
+      fi
     - echo "🏃 Running race condition tests..."
     - mise run test:race
     - echo "🔨 Building CLI for E2E tests..."

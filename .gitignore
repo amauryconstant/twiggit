@@ -9,6 +9,10 @@ twiggit
 
 # Test coverage
 coverage*
+*.out
+*_coverage.out
+*_coverage.html
+*_coverage.xml
 
 # Test binaries
 *.test

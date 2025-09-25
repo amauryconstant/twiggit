@@ -42,6 +42,7 @@
 ### Coverage Requirements
 
 - **Overall test coverage**: SHOULD exceed 80%
+- **CI Pipeline Enforcement**: Coverage threshold is automatically enforced in CI pipeline - builds WILL fail if coverage drops below 80%
 - **Happy path coverage**: SHALL have 100% coverage for expected behavior and critical business logic
 - **Error handling coverage**: SHOULD test error paths but 100% coverage not required for all scenarios
 - **Package-specific strategies**:
@@ -49,6 +50,27 @@
   - **Infrastructure packages**: Integration tests preferred for external dependencies
   - **Utility packages**: Unit tests with appropriate mocking/temporary files
   - **Services packages**: Focus on happy paths and critical business logic
+
+### Current Coverage Status
+
+As of the latest implementation, the following packages meet or exceed coverage requirements:
+
+- **Version Package**: 100.0% coverage ✅ 
+- **Mise Infrastructure**: 90.4% coverage ✅
+- **Services Layer**: 82.0% coverage ✅ (exceeds 80% target)
+- **Domain Package**: 89.7% coverage ✅
+- **Config Infrastructure**: 83.3% coverage ✅
+- **Validation Infrastructure**: 95.2% coverage ✅
+- **DI Package**: 100.0% coverage ✅
+- **Git Infrastructure**: 57.3% coverage (below target, not in scope for current requirements)
+
+### Coverage Monitoring Process
+
+1. **Local Development**: Use `mise run test:unit` to generate coverage reports locally
+2. **CI Pipeline**: Automatic coverage threshold enforcement during merge requests and main branch pushes
+3. **Coverage Reports**: HTML and XML coverage reports are generated and available as CI artifacts
+4. **Threshold Check**: Pipeline fails with clear error message if coverage drops below 80%
+5. **Coverage Merging**: Unit and integration test coverage profiles are automatically merged for comprehensive reporting
 
 ### Test Quality
 

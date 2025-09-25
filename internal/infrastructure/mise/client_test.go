@@ -155,7 +155,7 @@ func (s *MiseClientTestSuite) TestCopyConfigFiles_WithSingleFile() {
 	s.Require().NoError(err)
 
 	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{".mise.local.toml"})
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	// Verify file was copied
 	targetFile := filepath.Join(targetDir, ".mise.local.toml")
@@ -184,7 +184,7 @@ func (s *MiseClientTestSuite) TestCopyConfigFiles_WithNestedFile() {
 	s.Require().NoError(err)
 
 	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{"mise/config.local.toml"})
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	// Verify file was copied with directory structure
 	targetFile := filepath.Join(targetDir, "mise", "config.local.toml")
@@ -202,7 +202,7 @@ func (s *MiseClientTestSuite) TestCopyConfigFiles_WithNonexistentSourceFile() {
 	s.Require().NoError(err)
 
 	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{"nonexistent.toml"})
-	s.Error(err)
+	s.Require().Error(err)
 	s.Contains(err.Error(), "failed to read source file")
 }
 
@@ -220,8 +220,27 @@ func (s *MiseClientTestSuite) TestCopyConfigFiles_WithUnwritableTarget() {
 	err = os.MkdirAll(targetDir, 0444) // read-only
 	s.Require().NoError(err)
 
+	// On some systems (like when running as root), even 0444 permissions allow writing
+	// So we need to check if the directory is actually writable and skip the test if it is
+	testFile := filepath.Join(targetDir, ".test-write")
+	if writeErr := os.WriteFile(testFile, []byte("test"), 0644); writeErr == nil {
+		// Directory is writable (likely running as root), clean up and skip the error expectation
+		os.Remove(testFile)
+		// Instead, let's test with a different approach - make the parent directory read-only after creation
+		parentDir := filepath.Dir(targetDir)
+		os.Chmod(parentDir, 0555)       // read-only parent
+		defer os.Chmod(parentDir, 0755) // restore permissions
+
+		// Now try to create a new subdirectory which should fail
+		newTargetDir := filepath.Join(parentDir, "new-target")
+		err = integration.CopyConfigFiles(s.tempDir, newTargetDir, []string{".mise.local.toml"})
+		s.Require().Error(err)
+		// The error message might vary, just ensure there's an error
+		return
+	}
+
 	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{".mise.local.toml"})
-	s.Error(err)
+	s.Require().Error(err)
 	s.Contains(err.Error(), "failed to write target file")
 }
 
@@ -291,7 +310,7 @@ func (s *MiseClientTestSuite) TestSetExecPath_WithEmptyPath() {
 	integration := NewMiseIntegration()
 
 	integration.SetExecPath("")
-	s.Equal("", integration.execPath)
+	s.Empty(integration.execPath)
 	s.False(integration.IsEnabled())
 }
 
@@ -299,7 +318,7 @@ func (s *MiseClientTestSuite) TestTrustDirectory_WithNonexistentDirectory() {
 	integration := NewMiseIntegration()
 
 	err := integration.TrustDirectory("/nonexistent/directory")
-	s.Error(err)
+	s.Require().Error(err)
 	s.Contains(err.Error(), "directory does not exist")
 }
 
@@ -339,7 +358,7 @@ func (s *MiseClientTestSuite) TestSetupWorktree_WithNonexistentTarget() {
 	targetDir := "/nonexistent/target"
 
 	err := integration.SetupWorktree(sourceDir, targetDir)
-	s.Error(err)
+	s.Require().Error(err)
 	s.Contains(err.Error(), "worktree path does not exist")
 }
 
@@ -378,12 +397,12 @@ func (s *MiseClientTestSuite) TestSetupWorktree_WithConfigFiles() {
 	s.Require().NoError(err)
 
 	err = integration.SetupWorktree(sourceDir, targetDir)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	// Verify config file was copied
 	targetMiseFile := filepath.Join(targetDir, ".mise.local.toml")
 	_, err = os.Stat(targetMiseFile)
-	s.NoError(err)
+	s.Require().NoError(err)
 }
 
 func (s *MiseClientTestSuite) TestSetupWorktree_WithDisabledIntegration() {
@@ -405,10 +424,10 @@ func (s *MiseClientTestSuite) TestSetupWorktree_WithDisabledIntegration() {
 	s.Require().NoError(err)
 
 	err = integration.SetupWorktree(sourceDir, targetDir)
-	s.NoError(err)
+	s.Require().NoError(err)
 
 	// Should still copy config files even when disabled
 	targetMiseFile := filepath.Join(targetDir, ".mise.local.toml")
 	_, err = os.Stat(targetMiseFile)
-	s.NoError(err)
+	s.Require().NoError(err)
 }
