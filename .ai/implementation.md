@@ -114,6 +114,18 @@
 - Error codes SHALL follow POSIX standards
 - Error handling SHALL not leak sensitive information
 
+## Context System Implementation
+
+### Core Components
+- **ContextDetector**: WILL detect current user context (project, worktree, outside git)
+- **ContextResolver**: WILL resolve target identifiers based on current context
+- **Context Types**: WILL include `ContextProject`, `ContextWorktree`, `ContextOutsideGit`, `ContextUnknown`
+
+### Implementation Files
+- `internal/domain/context.go` - WILL contain core context system implementation
+- `internal/domain/context_test.go` - WILL contain comprehensive test suite
+- `cmd/cd.go` - WILL contain context-aware cd command implementation
+
 ## Code Organization Requirements
 
 ### Package Structure

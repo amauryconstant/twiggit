@@ -61,8 +61,8 @@ func runListCommand(cmd *cobra.Command, _ []string, container *di.Container) err
 	// Get services from container
 	discoveryService := container.DiscoveryService()
 
-	// Determine workspace path and scope
-	workspacePath := container.Config().WorkspacesPath
+	// Get configuration paths
+	workspacesPath := container.Config().WorkspacesPath
 	currentDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current directory: %w", err)
@@ -73,9 +73,40 @@ func runListCommand(cmd *cobra.Command, _ []string, container *di.Container) err
 	inGitRepo := err == nil
 
 	// Determine scope based on location and --all flag
+	workspacePath := workspacesPath
 	if !allFlag && inGitRepo {
 		// Inside git repo without --all: show current project only
-		workspacePath = filepath.Dir(repoRoot)
+		// Find the project name and use the workspaces path for that project
+
+		// Check if we're in a worktree by looking for .git file
+		dotGitPath := filepath.Join(repoRoot, ".git")
+		if gitFileContent, err := os.ReadFile(dotGitPath); err == nil {
+			// .git is a file, indicating we're in a worktree
+			gitFileStr := strings.TrimSpace(string(gitFileContent))
+			if strings.HasPrefix(gitFileStr, "gitdir: ") {
+				// Extract the actual git directory path
+				gitDir := strings.TrimPrefix(gitFileStr, "gitdir: ")
+				// The gitdir path is: /home/amaury/Projects/twiggit/.git/worktrees/shell-integration
+				// We need to extract "twiggit" from this path
+				// Split the path and find the project name (parent of .git)
+				pathParts := strings.Split(gitDir, string(filepath.Separator))
+				for i, part := range pathParts {
+					if part == ".git" && i > 0 {
+						projectName := pathParts[i-1]
+						workspacePath = filepath.Join(workspacesPath, projectName)
+						break
+					}
+				}
+			} else {
+				// Fallback to original logic
+				projectName := filepath.Base(repoRoot)
+				workspacePath = filepath.Join(workspacesPath, projectName)
+			}
+		} else {
+			// .git is a directory, indicating we're in the main repository
+			projectName := filepath.Base(repoRoot)
+			workspacePath = filepath.Join(workspacesPath, projectName)
+		}
 	}
 	// Otherwise: show all projects (either --all flag or not in git repo)
 

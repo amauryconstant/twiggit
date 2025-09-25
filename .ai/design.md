@@ -94,6 +94,21 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 - From workspace folder: Change SHALL occur to different worktree of current project
 - From outside git: Project and worktree specification SHALL be required
 
+**Identifier resolution rules**:
+
+| Context | Input Format | Interpretation | Target |
+|---------|--------------|----------------|---------|
+| **Project folder** | `<branch>` | Worktree branch name | `~/Workspaces/current-project/<branch>` |
+| **Project folder** | `<project>` | Different project name | `~/Projects/<project>` |
+| **Project folder** | `<project>/<branch>` | Cross-project worktree | `~/Workspaces/<project>/<branch>` |
+| **Workspace folder** | `<branch>` | Different worktree of same project | `~/Workspaces/current-project/<branch>` |
+| **Workspace folder** | `main` | Main project directory (special case) | `~/Projects/current-project` |
+| **Workspace folder** | `<project>` | Different project name | `~/Projects/<project>` |
+| **Workspace folder** | `<project>/<branch>` | Cross-project worktree | `~/Workspaces/<project>/<branch>` |
+| **Outside git** | `<branch>` | Invalid - requires project context | Error |
+| **Outside git** | `<project>` | Project main directory | `~/Projects/<project>` |
+| **Outside git** | `<project>/<branch>` | Cross-project worktree | `~/Workspaces/<project>/<branch>` |
+
 #### `delete` - Delete a git worktree
 **Safety checks (always enforced)**:
 - Uncommitted changes SHALL be checked - abort SHALL occur if found
@@ -138,15 +153,69 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 
 ## Context Detection & Behavior
 
+### Context-Aware Navigation System
+
+**Key Behaviors**:
+- **Project Context**: `cd <branch>` SHALL navigate to worktree, `cd <project>` SHALL navigate to different project, `cd <project>/<branch>` SHALL navigate to cross-project worktree
+- **Worktree Context**: `cd main` SHALL navigate to main project, `cd <branch>` SHALL navigate to different worktree, `cd <project>` SHALL navigate to different project
+- **Outside Git Context**: `cd <project>` SHALL navigate to project main, `cd <project>/<branch>` SHALL navigate to cross-project worktree
+
+### Context-Aware Identifier Resolution
+
+The system WILL resolve target identifiers based on current context using the following rules:
+
+#### From Project Context
+- `<branch>` WILL resolve to worktree of current project
+- `<project>` WILL resolve to different project's main directory  
+- `main` WILL resolve to current project's main directory
+
+#### From Worktree Context  
+- `<branch>` WILL resolve to different worktree of same project
+- `main` WILL resolve to main project directory
+- `<project>` WILL resolve to different project's main directory
+
+#### From Outside Git Context
+- `<project>` WILL resolve to project's main directory
+- `<project>/<branch>` WILL resolve to cross-project worktree
+
+### Navigation Requirements
+
+#### Core Functionality
+- The system SHALL provide context-aware navigation for all supported contexts
+- Context detection SHALL distinguish between project, worktree, and outside git contexts
+- Identifier resolution SHALL handle `<project>`, `<branch>`, and `<project>/<branch>` formats
+- Navigation SHALL validate target existence before changing directories
+
+#### Error Handling
+- Error messages SHALL be context-aware and provide actionable guidance
+- The system SHALL NOT proceed with navigation if target doesn't exist
+- Invalid targets SHALL result in clear error messages with suggestions
+
+#### User Experience
+- Navigation behaviors SHOULD match developer expectations based on context
+- Completion SHOULD provide appropriate suggestions based on current context
+- Error messages SHOULD include suggested actions for resolution
+
 ### Context Detection Rules
 1. **Project folder**: `.git/` directory found in current or parent directories
    - Directory tree WILL be traversed up until finding `.git/` or reaching filesystem root
    - First `.git/` found WILL be used (closest to current directory)
+   - Project folder SHALL be distinguished from worktree folder by path structure
 2. **Workspace folder**: Path matches `$HOME/Workspaces/<project>/<branch>/` pattern  
    - Exact pattern matching SHALL be used with configurable base directories
    - Alternative workspace detection patterns MAY be supported in future
    - Workspace SHALL be validated to contain valid git worktree
+   - Workspace folder SHALL be distinguished from project folder by path structure
 3. **Outside git**: No `.git/` found and not in workspace pattern
+
+### Context Detection Priority
+- Context detection SHALL be performed before identifier resolution
+- Workspace folder detection SHALL take precedence over project folder detection when both patterns match
+- Context type SHALL be determined using the following priority:
+  1. **Workspace folder** (if path matches workspace pattern and contains valid worktree)
+  2. **Project folder** (if `.git/` found and path doesn't match workspace pattern)
+  3. **Outside git** (neither condition met)
+- Context detection results SHALL be cached for performance during single command execution
 
 ### Edge Case Handling
 - **Nested directories**: Context SHALL be determined by closest valid parent directory

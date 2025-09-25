@@ -164,6 +164,49 @@ var _ = Describe("WorktreeCreator", func() {
 - **Test Data Management**: External test data MAY NOT be used; all test data SHOULD be generated within tests
 - **Test Environment Variables**: Tests MAY NOT rely on specific environment variable configurations
 
+## Shell Integration Testing
+
+### Testing Philosophy
+Shell integration tests WILL validate that the context-aware navigation system works correctly across all supported shells and contexts.
+
+### Test Requirements
+
+#### Core Functionality Testing
+- Tests SHALL validate context detection for all three context types (project, worktree, outside)
+- Tests SHALL verify identifier resolution from all contexts
+- Tests SHALL confirm special case handling for `main` branch navigation
+- Tests SHALL validate cross-project navigation scenarios
+
+#### Shell Compatibility Testing
+- Tests SHALL verify bash shell integration with proper `builtin cd` usage
+- Tests SHALL validate zsh shell integration with completion support
+- Tests SHALL confirm fish shell integration with completion support
+- Tests SHALL ensure escape hatch functionality works in all supported shells
+
+#### Error Handling Testing
+- Tests SHALL validate context-aware error messages
+- Tests SHALL confirm proper error handling for invalid targets
+- Tests SHALL verify that navigation fails gracefully when targets don't exist
+
+### Test Data Requirements
+Test environments SHALL include:
+- Multiple project repositories with varied worktree structures
+- Cross-project navigation scenarios with different project layouts
+- Edge cases for context detection and resolution
+- Invalid target scenarios for error handling validation
+
+### Quality Standards
+- Test coverage SHOULD exceed 80% for all navigation functionality
+- Integration tests SHOULD cover real-world usage scenarios
+- Tests SHOULD validate both successful and failed navigation attempts
+- Performance SHOULD be acceptable for environments with many projects
+
+### Testing Best Practices
+- Tests SHOULD use realistic project and worktree structures
+- Test data SHOULD represent common developer workflows
+- Error scenarios SHOULD include helpful user guidance validation
+- Tests SHOULD NOT rely on specific file system layouts beyond the configured paths
+
 ## Summary
 
 This testing philosophy provides a comprehensive framework for building high-quality, maintainable tests that provide real value. By focusing on pragmatic TDD, clear testing hierarchy, and consistent patterns, we ensure that tests serve as a safety net for refactoring while providing confidence in the system's correctness. The separation between unit, integration, and E2E tests allows us to test at the right level of abstraction for each scenario, balancing speed with realism.

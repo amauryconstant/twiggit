@@ -4,7 +4,9 @@ package git
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -129,26 +131,32 @@ func (c *Client) IsMainRepository(ctx context.Context, path string) (bool, error
 	// Check if origin remote points to another repository in the same workspace
 	workspaceDir := filepath.Dir(path)
 	for _, url := range originRemote.URLs {
-		// Remove file:// prefix if present
-		cleanURL := url
-		if strings.HasPrefix(url, "file://") {
-			cleanURL = strings.TrimPrefix(url, "file://")
-		}
+		// Only check local file URLs (not remote URLs like GitHub/GitLab)
+		isRemoteURL := strings.Contains(url, "://") || strings.HasPrefix(url, "git@") || strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://")
 
-		// Convert to absolute path if it's relative
-		absURL := cleanURL
-		if !filepath.IsAbs(cleanURL) {
-			absURL = filepath.Join(path, cleanURL)
-		}
+		if !isRemoteURL {
+			// Remove file:// prefix if present
+			cleanURL := url
+			if strings.HasPrefix(url, "file://") {
+				cleanURL = strings.TrimPrefix(url, "file://")
+			}
 
-		// Check if the origin URL points to a directory within the same workspace
-		if strings.HasPrefix(absURL, workspaceDir) && absURL != path {
-			// Origin points to another repository in the same workspace - this is a worktree
-			return false, nil
+			// Convert to absolute path if it's relative
+			absURL := cleanURL
+			if !filepath.IsAbs(cleanURL) {
+				absURL = filepath.Join(path, cleanURL)
+			}
+
+			// Check if the origin URL points to a directory within the same workspace
+			if strings.HasPrefix(absURL, workspaceDir) && absURL != path {
+				// Origin points to another repository in the same workspace - this is a worktree
+				return false, nil
+			}
 		}
 	}
 
 	// Origin doesn't point to another repository in the same workspace - this is a main repository
+	// This includes repositories with remote origins (like GitHub/GitLab) and local repositories
 	return true, nil
 }
 
@@ -543,7 +551,14 @@ func (c *Client) GetWorktreeStatus(ctx context.Context, worktreePath string) (*d
 		return nil, domain.NewWorktreeError(domain.ErrNotRepository, "worktree is not a git repository", worktreePath)
 	}
 
-	return c.getWorktreeStatusGoGit(ctx, worktreePath)
+	// Try go-git first
+	result, err := c.getWorktreeStatusGoGit(ctx, worktreePath)
+	if err == nil {
+		return result, nil
+	}
+
+	// If go-git fails, try CLI fallback
+	return c.getWorktreeStatusCLI(ctx, worktreePath)
 }
 
 // getWorktreeStatusGoGit gets worktree status using go-git library
@@ -589,6 +604,54 @@ func (c *Client) getWorktreeStatusGoGit(_ context.Context, worktreePath string) 
 		Branch:     branch,
 		Commit:     head.Hash().String(),
 		Clean:      status.IsClean(),
+		CommitTime: commitTime,
+	}, nil
+}
+
+// getWorktreeStatusCLI gets worktree status using git CLI commands as fallback
+func (c *Client) getWorktreeStatusCLI(_ context.Context, worktreePath string) (*domain.WorktreeInfo, error) {
+	// Get current branch name
+	branchCmd := exec.Command("git", "-C", worktreePath, "symbolic-ref", "--short", "HEAD")
+	branchOutput, err := branchCmd.Output()
+	if err != nil {
+		return nil, domain.NewWorktreeError(domain.ErrGitCommand, "failed to get branch name", worktreePath, err)
+	}
+	branch := strings.TrimSpace(string(branchOutput))
+
+	// Get commit hash
+	commitCmd := exec.Command("git", "-C", worktreePath, "rev-parse", "HEAD")
+	commitOutput, err := commitCmd.Output()
+	if err != nil {
+		return nil, domain.NewWorktreeError(domain.ErrGitCommand, "failed to get commit hash", worktreePath, err)
+	}
+	commit := strings.TrimSpace(string(commitOutput))
+
+	// Get commit timestamp
+	timeCmd := exec.Command("git", "-C", worktreePath, "log", "-1", "--format=%ct", "HEAD")
+	timeOutput, err := timeCmd.Output()
+	if err != nil {
+		return nil, domain.NewWorktreeError(domain.ErrGitCommand, "failed to get commit time", worktreePath, err)
+	}
+
+	timestamp, err := strconv.ParseInt(strings.TrimSpace(string(timeOutput)), 10, 64)
+	if err != nil {
+		return nil, domain.NewWorktreeError(domain.ErrGitCommand, "failed to parse commit time", worktreePath, err)
+	}
+	commitTime := time.Unix(timestamp, 0)
+
+	// Check if working directory is clean
+	statusCmd := exec.Command("git", "-C", worktreePath, "status", "--porcelain")
+	statusOutput, err := statusCmd.Output()
+	if err != nil {
+		return nil, domain.NewWorktreeError(domain.ErrGitCommand, "failed to get status", worktreePath, err)
+	}
+	clean := len(strings.TrimSpace(string(statusOutput))) == 0
+
+	return &domain.WorktreeInfo{
+		Path:       worktreePath,
+		Branch:     branch,
+		Commit:     commit,
+		Clean:      clean,
 		CommitTime: commitTime,
 	}, nil
 }
