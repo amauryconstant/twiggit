@@ -13,6 +13,7 @@ import (
 
 	"github.com/amaury/twiggit/internal/di"
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +27,10 @@ type DeleteScope struct {
 
 // NewDeleteCmd creates the delete command
 func NewDeleteCmd(container *di.Container) *cobra.Command {
+	var keepBranch bool
+	var mergedOnly bool
+	var changeDir bool
+
 	cmd := &cobra.Command{
 		Use:   "delete",
 		Short: "Delete Git worktrees",
@@ -45,7 +50,7 @@ Examples:
   twiggit delete --dry-run    # Preview what would be deleted
   twiggit delete --force      # Skip confirmation and safety checks`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runDeleteCommand(cmd, args, container)
+			return runDeleteCommand(cmd, args, container, keepBranch, mergedOnly, changeDir)
 		},
 	}
 
@@ -53,12 +58,15 @@ Examples:
 	cmd.Flags().Bool("dry-run", false, "Show what would be deleted without actually deleting")
 	cmd.Flags().Bool("force", false, "Skip interactive confirmation and safety checks")
 	cmd.Flags().BoolP("verbose", "v", false, "Show detailed deletion process")
+	cmd.Flags().Bool("keep-branch", false, "Keep branch after removing worktree")
+	cmd.Flags().Bool("merged-only", false, "Only delete worktrees for merged branches")
+	cmd.Flags().BoolP("change-dir", "C", false, "Change to main project directory after deletion")
 
 	return cmd
 }
 
 // runDeleteCommand implements the delete command functionality
-func runDeleteCommand(cmd *cobra.Command, _ []string, container *di.Container) error {
+func runDeleteCommand(cmd *cobra.Command, _ []string, container *di.Container, keepBranch, mergedOnly, changeDir bool) error {
 	ctx := context.Background()
 
 	// Get flags
@@ -97,7 +105,7 @@ func runDeleteCommand(cmd *cobra.Command, _ []string, container *di.Container) e
 	}
 
 	// Perform deletion
-	return performDeletion(ctx, container, candidates, dryRun, force, verbose)
+	return performDeletion(ctx, container, candidates, dryRun, force, verbose, keepBranch, mergedOnly, changeDir)
 }
 
 // determineDeleteScope determines the deletion scope based on current location
@@ -205,7 +213,7 @@ func showDeletionConfirmation(candidates []*domain.Worktree, workspacePath strin
 }
 
 // performDeletion executes the worktree deletion
-func performDeletion(ctx context.Context, container *di.Container, candidates []*domain.Worktree, dryRun, force, verbose bool) error {
+func performDeletion(ctx context.Context, container *di.Container, candidates []*domain.Worktree, dryRun, force, verbose, keepBranch, mergedOnly, changeDir bool) error {
 	if dryRun {
 		fmt.Println("DRY RUN: No worktrees would be deleted")
 		return nil
@@ -214,13 +222,26 @@ func performDeletion(ctx context.Context, container *di.Container, candidates []
 	var failed []string
 	var success int
 	worktreeRemover := container.WorktreeRemover()
+	gitClient := container.GitClient()
 
 	for _, wt := range candidates {
 		if verbose {
 			fmt.Printf("Deleting worktree: %s\n", wt.Path)
 		}
 
-		err := worktreeRemover.Remove(ctx, wt.Path, force)
+		// Check merged-only flag
+		if mergedOnly {
+			shouldSkip, err := shouldSkipDueToMergeStatus(ctx, gitClient, wt, verbose)
+			if err != nil {
+				failed = append(failed, wt.Path)
+				continue
+			}
+			if shouldSkip {
+				continue
+			}
+		}
+
+		err := worktreeRemover.Remove(ctx, wt.Path, force, keepBranch)
 		if err != nil {
 			if verbose {
 				fmt.Printf("Failed to delete %s: %v\n", wt.Path, err)
@@ -234,10 +255,55 @@ func performDeletion(ctx context.Context, container *di.Container, candidates []
 		}
 	}
 
+	return finalizeDeletion(ctx, gitClient, candidates, failed, success, changeDir)
+}
+
+// shouldSkipDueToMergeStatus checks if a worktree should be skipped due to merged-only flag
+func shouldSkipDueToMergeStatus(ctx context.Context, gitClient infrastructure.GitClient, wt *domain.Worktree, verbose bool) (bool, error) {
+	repoRoot, err := gitClient.GetRepositoryRoot(ctx, wt.Path)
+	if err != nil {
+		if verbose {
+			fmt.Printf("Failed to get repository root for %s: %v\n", wt.Path, err)
+		}
+		return true, fmt.Errorf("failed to get repository root: %w", err)
+	}
+
+	isMerged, err := gitClient.IsBranchMerged(ctx, repoRoot, wt.Branch)
+	if err != nil {
+		if verbose {
+			fmt.Printf("Failed to check if branch %s is merged: %v\n", wt.Branch, err)
+		}
+		return true, fmt.Errorf("failed to check merge status: %w", err)
+	}
+
+	if !isMerged {
+		if verbose {
+			fmt.Printf("Skipping %s: branch %s is not merged\n", wt.Path, wt.Branch)
+		}
+		return true, nil
+	}
+
+	return false, nil
+}
+
+// finalizeDeletion prints summary and handles change-dir functionality
+func finalizeDeletion(ctx context.Context, gitClient infrastructure.GitClient, candidates []*domain.Worktree, failed []string, success int, changeDir bool) error {
 	// Summary
 	fmt.Printf("Deletion complete: %d succeeded, %d failed\n", success, len(failed))
 	if len(failed) > 0 {
 		return fmt.Errorf("%d worktrees failed to delete", len(failed))
+	}
+
+	// Change to main project directory if requested and deletion was successful
+	if changeDir && success > 0 {
+		// Get the repository root of the first successfully deleted worktree
+		for _, wt := range candidates {
+			repoRoot, err := gitClient.GetRepositoryRoot(ctx, wt.Path)
+			if err == nil {
+				fmt.Printf("%s\n", repoRoot)
+				break
+			}
+		}
 	}
 
 	return nil

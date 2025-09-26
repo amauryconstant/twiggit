@@ -26,6 +26,8 @@ type GitClient interface {
 	GetAllBranches(ctx context.Context, repoPath string) ([]string, error)
 	GetRemoteBranches(ctx context.Context, repoPath string) ([]string, error)
 	BranchExists(ctx context.Context, repoPath, branch string) bool
+	DeleteBranch(ctx context.Context, repoPath, branch string) error
+	IsBranchMerged(ctx context.Context, repoPath, branch string) (bool, error)
 
 	// Status operations
 	HasUncommittedChanges(ctx context.Context, repoPath string) bool

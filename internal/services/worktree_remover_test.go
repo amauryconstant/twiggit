@@ -121,7 +121,7 @@ func (s *WorktreeRemoverTestSuite) TestWorktreeRemover_Remove() {
 			tt.setupMockExpectations()
 
 			// Execute
-			err := s.remover.Remove(s.ctx, tt.worktreePath, tt.force)
+			err := s.remover.Remove(s.ctx, tt.worktreePath, tt.force, false)
 
 			// Verify
 			if tt.expectError {

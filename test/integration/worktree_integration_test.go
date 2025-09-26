@@ -194,7 +194,7 @@ func (s *WorktreeIntegrationTestSuite) TestFullWorktreeLifecycle() {
 		s.Assert().NoError(err)
 
 		// Remove the worktree (use force since mise config was copied)
-		err = s.worktreeRemover.Remove(context.Background(), worktreePath, true)
+		err = s.worktreeRemover.Remove(context.Background(), worktreePath, true, false)
 		s.Assert().NoError(err)
 
 		// Verify it was removed
@@ -327,7 +327,7 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 	})
 
 	s.Run("should handle removal of non-existent worktree", func() {
-		err := worktreeRemover.Remove(context.Background(), "/non/existent/worktree", false)
+		err := worktreeRemover.Remove(context.Background(), "/non/existent/worktree", false, false)
 		s.Assert().Error(err)
 	})
 }

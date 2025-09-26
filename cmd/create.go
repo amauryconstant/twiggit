@@ -16,6 +16,7 @@ import (
 // NewCreateCmd creates the create command
 func NewCreateCmd(container *di.Container) *cobra.Command {
 	var sourceBranch string
+	var changeDir bool
 
 	cmd := &cobra.Command{
 		Use:   "create [branch-name]",
@@ -30,18 +31,19 @@ Examples:
   twiggit create --source develop feature/new-auth
   twiggit create  # Interactive mode`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCreateCommand(cmd, args, container, sourceBranch)
+			return runCreateCommand(cmd, args, container, sourceBranch, changeDir)
 		},
 	}
 
 	// Add flags
 	cmd.Flags().StringVarP(&sourceBranch, "source", "s", "", "Source branch to create worktree from (default: main or default_source_branch from config)")
+	cmd.Flags().BoolVarP(&changeDir, "change-dir", "C", false, "Change to new worktree directory after creation")
 
 	return cmd
 }
 
 // runCreateCommand implements the create command functionality
-func runCreateCommand(_ *cobra.Command, args []string, container *di.Container, sourceBranchFlag string) error {
+func runCreateCommand(_ *cobra.Command, args []string, container *di.Container, sourceBranchFlag string, changeDir bool) error {
 	ctx := context.Background()
 
 	// Determine branch name
@@ -134,6 +136,11 @@ func runCreateCommand(_ *cobra.Command, args []string, container *di.Container, 
 	}
 	fmt.Printf("   Path:   %s\n", targetPath)
 	fmt.Printf("   Navigate: cd %s\n", targetPath)
+
+	// Output path for shell wrapper if change-dir flag is used
+	if changeDir {
+		fmt.Printf("%s\n", targetPath)
+	}
 
 	return nil
 }

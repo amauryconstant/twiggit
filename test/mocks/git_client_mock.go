@@ -91,6 +91,18 @@ func (m *GitClientMock) GetRemoteBranches(ctx context.Context, repoPath string) 
 	return args.Get(0).([]string), args.Error(1)
 }
 
+// DeleteBranch deletes a branch from the repository
+func (m *GitClientMock) DeleteBranch(ctx context.Context, repoPath, branch string) error {
+	args := m.Called(ctx, repoPath, branch)
+	return args.Error(0)
+}
+
+// IsBranchMerged checks if a branch has been merged into the current branch
+func (m *GitClientMock) IsBranchMerged(ctx context.Context, repoPath, branch string) (bool, error) {
+	args := m.Called(ctx, repoPath, branch)
+	return args.Bool(0), args.Error(1)
+}
+
 // SetupValidRepo sets up a valid repository mock
 func (m *GitClientMock) SetupValidRepo(ctx context.Context, path string) *GitClientMock {
 	m.On("IsGitRepository", ctx, path).Return(true, nil)

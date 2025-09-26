@@ -4,8 +4,10 @@
 package e2e
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -386,6 +388,148 @@ var _ = Describe("Create Command", func() {
 			Expect(output).To(ContainSubstring("❌"))
 			Expect(output).To(ContainSubstring("branch name format is invalid"))
 			Expect(output).NotTo(ContainSubstring("source branch"))
+		})
+	})
+
+	Describe("-C/--change-dir flag", func() {
+		var tempDir string
+		var cleanup func()
+		var gitRepo *helpers.GitRepo
+		var configDir string
+		var configPath string
+		var workspaceDir string
+
+		BeforeEach(func() {
+			// Create a temporary directory for testing
+			var err error
+			tempDir, err = os.MkdirTemp("", "twiggit-change-dir-test")
+			Expect(err).NotTo(HaveOccurred())
+
+			cleanup = func() {
+				os.RemoveAll(tempDir)
+			}
+
+			configDir = filepath.Join(tempDir, "twiggit")
+			configPath = filepath.Join(configDir, "config.toml")
+			workspaceDir = filepath.Join(tempDir, "workspaces")
+
+			// Create config and workspace directories
+			err = os.MkdirAll(configDir, 0755)
+			Expect(err).NotTo(HaveOccurred())
+			err = os.MkdirAll(workspaceDir, 0755)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Set XDG_CONFIG_HOME to point to our temp directory so the config is found
+			oldXdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+			os.Setenv("XDG_CONFIG_HOME", tempDir)
+
+			// Update cleanup to restore environment variable
+			originalCleanup := cleanup
+			cleanup = func() {
+				if oldXdgConfigHome != "" {
+					os.Setenv("XDG_CONFIG_HOME", oldXdgConfigHome)
+				} else {
+					os.Unsetenv("XDG_CONFIG_HOME")
+				}
+				originalCleanup()
+			}
+
+			// Initialize a git repository for testing using the git helper
+			t := &testing.T{}
+			gitRepo = helpers.NewGitRepo(t, "twiggit-change-dir-test")
+			tempDir = gitRepo.Path
+
+			// Update cleanup to include git repo cleanup
+			currentCleanup := cleanup
+			cleanup = func() {
+				gitRepo.Cleanup()
+				currentCleanup()
+			}
+
+			// Ensure we have a 'main' branch for the tests
+			// The NewGitRepo helper might create 'master' as default, so switch to 'main'
+			gitRepo.GitCmd(t, "checkout", "-b", "main")
+
+			// Create the project directory under workspace (worktree creator expects this structure)
+			projectName := filepath.Base(gitRepo.Path)
+			projectDir := filepath.Join(workspaceDir, projectName)
+			err = os.MkdirAll(projectDir, 0755)
+			Expect(err).NotTo(HaveOccurred())
+
+			// Create config with workspace path
+			configContent := fmt.Sprintf(`workspaces_path = "%s"`, workspaceDir)
+			err = os.WriteFile(configPath, []byte(configContent), 0644)
+			Expect(err).NotTo(HaveOccurred())
+		})
+
+		AfterEach(func() {
+			cleanup()
+		})
+
+		It("shows -C/--change-dir flag in help", func() {
+			session := cli.Run("create", "--help")
+			Eventually(session).Should(gexec.Exit(0))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("-C, --change-dir"))
+			Expect(output).To(ContainSubstring("Change to new worktree directory after creation"))
+		})
+
+		It("supports -C flag (short form)", func() {
+			session := cli.Run("create", "-C", "--help")
+			Eventually(session).Should(gexec.Exit(0))
+		})
+
+		It("supports --change-dir flag (long form)", func() {
+			session := cli.Run("create", "--change-dir", "--help")
+			Eventually(session).Should(gexec.Exit(0))
+		})
+
+		It("outputs worktree path when -C flag is used", func() {
+			session := cli.RunWithDir(tempDir, "create", "-C", "feature-branch")
+			Eventually(session).Should(gexec.Exit(0))
+
+			output := string(session.Out.Contents())
+			// Should output the path that would be changed to
+			Expect(output).To(ContainSubstring("/feature-branch"))
+			// Should contain success message
+			Expect(output).To(ContainSubstring("✅ Worktree created successfully"))
+			// The path should be the last line (for shell wrapper consumption)
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+			Expect(lines[len(lines)-1]).To(ContainSubstring("/feature-branch"))
+		})
+
+		It("outputs worktree path when --change-dir flag is used", func() {
+			session := cli.RunWithDir(tempDir, "create", "--change-dir", "feature-branch")
+			Eventually(session).Should(gexec.Exit(0))
+
+			output := string(session.Out.Contents())
+			// Should output the path that would be changed to
+			Expect(output).To(ContainSubstring("/feature-branch"))
+			// Should contain success message
+			Expect(output).To(ContainSubstring("✅ Worktree created successfully"))
+			// The path should be the last line (for shell wrapper consumption)
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+			Expect(lines[len(lines)-1]).To(ContainSubstring("/feature-branch"))
+		})
+
+		It("does not output path when -C flag is not used", func() {
+			session := cli.RunWithDir(tempDir, "create", "feature-branch")
+			Eventually(session).Should(gexec.Exit(0))
+
+			output := string(session.Out.Contents())
+			// Should contain success message
+			Expect(output).To(ContainSubstring("✅ Worktree created successfully"))
+			// Should contain navigate message
+			Expect(output).To(ContainSubstring("Navigate: cd"))
+			// Should not output the path as a standalone line when flag is not used
+			lines := strings.Split(strings.TrimSpace(output), "\n")
+			// Last line should be the navigate message, not a standalone path
+			lastLine := lines[len(lines)-1]
+			Expect(lastLine).To(ContainSubstring("Navigate: cd"))
+			// The last line should not be just the path (it should be the navigate message)
+			expectedPath := strings.TrimSpace(filepath.Join(workspaceDir, filepath.Base(tempDir), "feature-branch"))
+			Expect(lastLine).NotTo(Equal(expectedPath))
 		})
 	})
 })

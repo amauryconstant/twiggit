@@ -3,6 +3,7 @@ package git
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -927,4 +928,108 @@ func (c *Client) hasUncommittedChangesGoGit(_ context.Context, repoPath string) 
 
 	// Check if status is clean
 	return !status.IsClean()
+}
+
+// DeleteBranch deletes a branch from the repository
+func (c *Client) DeleteBranch(ctx context.Context, repoPath, branch string) error {
+	if repoPath == "" {
+		return domain.NewWorktreeError(domain.ErrInvalidPath, "repository path cannot be empty", "")
+	}
+	if branch == "" {
+		return domain.NewWorktreeError(domain.ErrValidation, "branch name cannot be empty", "")
+	}
+
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return domain.NewWorktreeError(domain.ErrValidation, "context cancelled", "", ctx.Err())
+	default:
+	}
+
+	// First check if it's a git repository
+	isRepo, err := c.IsGitRepository(ctx, repoPath)
+	if err != nil {
+		return domain.NewWorktreeError(domain.ErrGitCommand, "failed to check repository", repoPath, err)
+	}
+	if !isRepo {
+		return domain.NewWorktreeError(domain.ErrNotRepository, "not a git repository", repoPath)
+	}
+
+	// Check if branch exists
+	if !c.BranchExists(ctx, repoPath, branch) {
+		return domain.NewWorktreeError(domain.ErrValidation, "branch does not exist", branch)
+	}
+
+	// Open the repository
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return domain.NewWorktreeError(domain.ErrGitCommand, "failed to open repository", repoPath, err)
+	}
+
+	// Get the current branch to avoid deleting the currently checked out branch
+	currentBranch, err := c.GetCurrentBranch(ctx, repoPath)
+	if err != nil {
+		return domain.NewWorktreeError(domain.ErrGitCommand, "failed to get current branch", repoPath, err)
+	}
+
+	if currentBranch == branch {
+		return domain.NewWorktreeError(domain.ErrValidation, "cannot delete currently checked out branch", branch)
+	}
+
+	// Delete the branch using go-git
+	branchRef := plumbing.NewBranchReferenceName(branch)
+	err = repo.Storer.RemoveReference(branchRef)
+	if err != nil {
+		return domain.NewWorktreeError(domain.ErrGitCommand, "failed to delete branch", branch, err)
+	}
+
+	return nil
+}
+
+// IsBranchMerged checks if a branch has been merged into the current branch
+func (c *Client) IsBranchMerged(ctx context.Context, repoPath, branch string) (bool, error) {
+	if repoPath == "" {
+		return false, domain.NewWorktreeError(domain.ErrInvalidPath, "repository path cannot be empty", "")
+	}
+	if branch == "" {
+		return false, domain.NewWorktreeError(domain.ErrValidation, "branch name cannot be empty", "")
+	}
+
+	// Check if context is cancelled
+	select {
+	case <-ctx.Done():
+		return false, domain.NewWorktreeError(domain.ErrValidation, "context cancelled", "", ctx.Err())
+	default:
+	}
+
+	// First check if it's a git repository
+	isRepo, err := c.IsGitRepository(ctx, repoPath)
+	if err != nil {
+		return false, domain.NewWorktreeError(domain.ErrGitCommand, "failed to check repository", repoPath, err)
+	}
+	if !isRepo {
+		return false, domain.NewWorktreeError(domain.ErrNotRepository, "not a git repository", repoPath)
+	}
+
+	// Check if branch exists
+	if !c.BranchExists(ctx, repoPath, branch) {
+		return false, domain.NewWorktreeError(domain.ErrValidation, "branch does not exist", branch)
+	}
+
+	// Use git CLI to check if branch is merged (more reliable than go-git for this operation)
+	cmd := exec.Command("git", "-C", repoPath, "merge-base", "--is-ancestor", branch, "HEAD")
+	err = cmd.Run()
+	if err != nil {
+		exitErr := &exec.ExitError{}
+		if errors.As(err, &exitErr) {
+			// Exit code 1 means branch is not merged
+			if exitErr.ExitCode() == 1 {
+				return false, nil
+			}
+		}
+		return false, domain.NewWorktreeError(domain.ErrGitCommand, "failed to check if branch is merged", branch, err)
+	}
+
+	// If command succeeded, branch is merged
+	return true, nil
 }

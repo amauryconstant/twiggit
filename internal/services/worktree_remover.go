@@ -20,7 +20,7 @@ func NewWorktreeRemover(gitClient infrastructure.GitClient) *WorktreeRemover {
 }
 
 // Remove removes a worktree with safety checks
-func (wr *WorktreeRemover) Remove(ctx context.Context, worktreePath string, force bool) error {
+func (wr *WorktreeRemover) Remove(ctx context.Context, worktreePath string, force bool, keepBranch bool) error {
 	if worktreePath == "" {
 		return domain.NewWorktreeError(
 			domain.ErrValidation,
@@ -50,14 +50,42 @@ func (wr *WorktreeRemover) Remove(ctx context.Context, worktreePath string, forc
 		}
 	}
 
-	err = wr.gitClient.RemoveWorktree(ctx, repoRoot, worktreePath, force)
-	if err != nil {
+	// Get the branch name before removing the worktree if we need to keep it
+	var branchName string
+	if keepBranch {
+		var branchErr error
+		branchName, branchErr = wr.gitClient.GetCurrentBranch(ctx, worktreePath)
+		if branchErr != nil {
+			return domain.NewWorktreeError(
+				domain.ErrGitCommand,
+				"failed to get current branch",
+				worktreePath,
+				branchErr,
+			).WithSuggestion("Ensure the worktree has a valid branch checked out")
+		}
+	}
+
+	removeErr := wr.gitClient.RemoveWorktree(ctx, repoRoot, worktreePath, force)
+	if removeErr != nil {
 		return domain.NewWorktreeError(
 			domain.ErrGitCommand,
 			"failed to remove worktree",
 			worktreePath,
-			err,
+			removeErr,
 		).WithSuggestion("Check that the worktree exists and is not currently in use")
+	}
+
+	// If keepBranch is true, delete the branch from the main repository
+	if keepBranch && branchName != "" {
+		deleteErr := wr.gitClient.DeleteBranch(ctx, repoRoot, branchName)
+		if deleteErr != nil {
+			return domain.NewWorktreeError(
+				domain.ErrGitCommand,
+				"failed to delete branch",
+				branchName,
+				deleteErr,
+			).WithSuggestion("The worktree was removed but the branch could not be deleted")
+		}
 	}
 
 	return nil
