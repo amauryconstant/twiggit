@@ -33,14 +33,12 @@ func TestContextDetector_Detect(t *testing.T) {
 		{
 			name: "detect worktree context",
 			setup: func() *ContextDetector {
-				detector := NewContextDetector("/home/amaury/Workspaces", "/home/amaury/Projects")
-				// Mock the filesystem to return true for the project path
-				detector.fsChecker = &MockFileSystemChecker{
+				mockFS := &MockFileSystemChecker{
 					ExistsFunc: func(path string) bool {
 						return path == "/home/amaury/Projects/twiggit"
 					},
 				}
-				return detector
+				return NewContextDetector("/home/amaury/Workspaces", "/home/amaury/Projects", mockFS)
 			},
 			currentDir:    "/home/amaury/Workspaces/twiggit/shell-integration",
 			expectedType:  ContextWorktree,
@@ -50,14 +48,12 @@ func TestContextDetector_Detect(t *testing.T) {
 		{
 			name: "detect project context",
 			setup: func() *ContextDetector {
-				detector := NewContextDetector("/home/amaury/Workspaces", "/home/amaury/Projects")
-				// For project context, we don't need the filesystem check
-				detector.fsChecker = &MockFileSystemChecker{
+				mockFS := &MockFileSystemChecker{
 					ExistsFunc: func(path string) bool {
 						return true
 					},
 				}
-				return detector
+				return NewContextDetector("/home/amaury/Workspaces", "/home/amaury/Projects", mockFS)
 			},
 			currentDir:    "/home/amaury/Projects/twiggit",
 			expectedType:  ContextProject,
@@ -67,14 +63,12 @@ func TestContextDetector_Detect(t *testing.T) {
 		{
 			name: "detect outside git context",
 			setup: func() *ContextDetector {
-				detector := NewContextDetector("/home/amaury/Workspaces", "/home/amaury/Projects")
-				// For outside git context, we don't need the filesystem check
-				detector.fsChecker = &MockFileSystemChecker{
+				mockFS := &MockFileSystemChecker{
 					ExistsFunc: func(path string) bool {
 						return false
 					},
 				}
-				return detector
+				return NewContextDetector("/home/amaury/Workspaces", "/home/amaury/Projects", mockFS)
 			},
 			currentDir:    "/home/amaury/Documents",
 			expectedType:  ContextOutsideGit,
@@ -84,14 +78,12 @@ func TestContextDetector_Detect(t *testing.T) {
 		{
 			name: "error on empty current directory",
 			setup: func() *ContextDetector {
-				detector := NewContextDetector("", "")
-				// For error case, filesystem checker doesn't matter
-				detector.fsChecker = &MockFileSystemChecker{
+				mockFS := &MockFileSystemChecker{
 					ExistsFunc: func(path string) bool {
 						return false
 					},
 				}
-				return detector
+				return NewContextDetector("", "", mockFS)
 			},
 			currentDir:    "",
 			expectedType:  ContextOutsideGit,
@@ -363,4 +355,23 @@ func TestContext_IsInWorktreeContext(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.context.IsInWorktreeContext())
 		})
 	}
+}
+
+func TestContextDetector_WithInjectedFileSystemChecker(t *testing.T) {
+	// RED: This test WILL fail until we update the constructor to accept FileSystemChecker
+	mockFS := &MockFileSystemChecker{
+		ExistsFunc: func(path string) bool {
+			return true
+		},
+	}
+
+	// This constructor call SHOULD accept FileSystemChecker parameter but currently doesn't
+	detector := NewContextDetector("/workspaces", "/projects", mockFS)
+
+	require.NotNil(t, detector, "ContextDetector should be created with injected FileSystemChecker")
+
+	// Verify the injected checker is used
+	context, err := detector.Detect("/workspaces/test-project/feature-branch")
+	require.NoError(t, err)
+	assert.Equal(t, ContextWorktree, context.Type)
 }

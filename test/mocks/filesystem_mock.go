@@ -2,10 +2,11 @@
 package mocks
 
 import (
-	"github.com/stretchr/testify/mock"
 	"io/fs"
 	"os"
 	"time"
+
+	"github.com/stretchr/testify/mock"
 )
 
 // MockFileInfo implements fs.FileInfo for testing
@@ -152,6 +153,12 @@ func (m *FileSystemMock) Open(name string) (fs.File, error) {
 	return args.Get(0).(fs.File), args.Error(1)
 }
 
+// Exists mocks the Exists operation
+func (m *FileSystemMock) Exists(path string) bool {
+	args := m.Called(path)
+	return args.Bool(0)
+}
+
 // SetupPermissionError sets up the mock to return permission errors for all operations
 func (m *FileSystemMock) SetupPermissionError() *FileSystemMock {
 	m.On("Stat", mock.Anything).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: "test", Err: os.ErrPermission})
@@ -185,8 +192,8 @@ func (m *FileSystemMock) SetupMkdirAllError(path string, err error) *FileSystemM
 	return m
 }
 
-// SetupRealFilesystem sets up the mock to delegate to real filesystem operations
-func (m *FileSystemMock) SetupRealFilesystem() *FileSystemMock {
+// SetupFileSystem sets up the mock to delegate to real filesystem operations
+func (m *FileSystemMock) SetupFileSystem() *FileSystemMock {
 	// This method is deprecated - use specific mock expectations instead
 	return m
 }

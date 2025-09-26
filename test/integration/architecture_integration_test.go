@@ -67,7 +67,7 @@ func (s *ArchitectureIntegrationTestSuite) SetupSuite() {
 	}
 
 	// Create filesystem
-	fileSystem := infrastructure.NewRealFileSystem()
+	fileSystem := infrastructure.NewOSFileSystem()
 
 	s.discoveryService = services.NewDiscoveryService(s.gitClient, s.config, fileSystem)
 }

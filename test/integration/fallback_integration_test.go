@@ -50,7 +50,7 @@ func TestDiscoveryFallback(t *testing.T) {
 
 		// Create config and discovery service
 		cfg := &config.Config{}
-		discovery := services.NewDiscoveryService(mockGitClient, cfg, infrastructure.NewRealFileSystem())
+		discovery := services.NewDiscoveryService(mockGitClient, cfg, infrastructure.NewOSFileSystem())
 
 		// Test fallback discovery
 		projects, err := discovery.DiscoverProjectsWithFallback(context.Background(), tempDir)
@@ -84,7 +84,7 @@ func TestDiscoveryFallback(t *testing.T) {
 			Return(true, nil)
 
 		cfg := &config.Config{}
-		discovery := services.NewDiscoveryService(mockGitClient, cfg, infrastructure.NewRealFileSystem())
+		discovery := services.NewDiscoveryService(mockGitClient, cfg, infrastructure.NewOSFileSystem())
 
 		// Test fallback discovery
 		projects, err := discovery.DiscoverProjectsWithFallback(context.Background(), tempDir)
@@ -105,7 +105,7 @@ func TestDiscoveryFallback(t *testing.T) {
 			Return(false, errors.New("git client error"))
 
 		cfg := &config.Config{}
-		discovery := services.NewDiscoveryService(mockGitClient, cfg, infrastructure.NewRealFileSystem())
+		discovery := services.NewDiscoveryService(mockGitClient, cfg, infrastructure.NewOSFileSystem())
 
 		// Test fallback discovery with non-existent directory
 		projects, err := discovery.DiscoverProjectsWithFallback(context.Background(), nonExistentDir)
@@ -155,7 +155,7 @@ func TestWorktreeCreatorFallback(t *testing.T) {
 			Return(nil) // Success for fallback paths
 
 		// Create worktree creator service with writable directory
-		fileSystem := infrastructure.NewRealFileSystem()
+		fileSystem := infrastructure.NewOSFileSystem()
 		validation := services.NewValidationService(fileSystem)
 		miseMock := &mocks.MiseIntegrationMock{}
 		miseMock.On("IsAvailable").Return(false)
@@ -184,7 +184,7 @@ func TestWorktreeCreatorFallback(t *testing.T) {
 
 		// Create worktree creator service
 		mockGitClient := &mocks.GitClientMock{}
-		fileSystem := infrastructure.NewRealFileSystem()
+		fileSystem := infrastructure.NewOSFileSystem()
 		validation := services.NewValidationService(fileSystem)
 		miseMock := &mocks.MiseIntegrationMock{}
 		miseMock.On("IsAvailable").Return(false)
@@ -220,7 +220,7 @@ func TestWorktreeCreatorFallback(t *testing.T) {
 		mockGitClient.On("CreateWorktree", context.Background(), "test-project", "test-branch", filepath.Join(tempDir, "test-branch")).
 			Return(errors.New("fallback also failed"))
 
-		fileSystem := infrastructure.NewRealFileSystem()
+		fileSystem := infrastructure.NewOSFileSystem()
 		validation := services.NewValidationService(fileSystem)
 		miseMock := &mocks.MiseIntegrationMock{}
 		miseMock.On("IsAvailable").Return(false)
@@ -287,7 +287,7 @@ func TestErrorRecoveryScenarios(t *testing.T) {
 		mockGitClient.On("CreateWorktree", context.Background(), "test-project", "test-branch", filepath.Join(tempDir, "test-branch")).
 			Return(nil) // Success for fallback path
 
-		fileSystem := infrastructure.NewRealFileSystem()
+		fileSystem := infrastructure.NewOSFileSystem()
 		validation := services.NewValidationService(fileSystem)
 		miseMock := &mocks.MiseIntegrationMock{}
 		miseMock.On("IsAvailable").Return(false)
@@ -330,7 +330,7 @@ func TestErrorRecoveryScenarios(t *testing.T) {
 		mockGitClient.On("CreateWorktree", context.Background(), "test-project", "test-branch", filepath.Join(tempDir, "test-branch")).
 			Return(nil) // Success for alternative paths
 
-		fileSystem := infrastructure.NewRealFileSystem()
+		fileSystem := infrastructure.NewOSFileSystem()
 		validation := services.NewValidationService(fileSystem)
 		miseMock := &mocks.MiseIntegrationMock{}
 		miseMock.On("IsAvailable").Return(false)
@@ -427,9 +427,9 @@ func TestFallbackIntegration(t *testing.T) {
 
 		// Create services
 		cfg := &config.Config{}
-		discovery := services.NewDiscoveryService(mockGitClient, cfg, infrastructure.NewRealFileSystem())
+		discovery := services.NewDiscoveryService(mockGitClient, cfg, infrastructure.NewOSFileSystem())
 
-		validation := services.NewValidationService(infrastructure.NewRealFileSystem())
+		validation := services.NewValidationService(infrastructure.NewOSFileSystem())
 		miseMock := &mocks.MiseIntegrationMock{}
 		miseMock.On("IsAvailable").Return(false)
 		miseMock.On("SetupWorktree", "test-project", filepath.Join(tempDir, "test-branch")).

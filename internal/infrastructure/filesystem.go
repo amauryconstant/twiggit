@@ -31,18 +31,21 @@ type FileSystem interface {
 
 	// Remove removes the named file or directory.
 	Remove(name string) error
+
+	// Exists checks if a path exists in the filesystem.
+	Exists(path string) bool
 }
 
-// RealFileSystem is a concrete implementation of FileSystem that uses the actual OS filesystem
-type RealFileSystem struct{}
+// OSFileSystem is a concrete implementation of FileSystem that uses the actual OS filesystem
+type OSFileSystem struct{}
 
-// NewRealFileSystem creates a new RealFileSystem instance
-func NewRealFileSystem() *RealFileSystem {
-	return &RealFileSystem{}
+// NewOSFileSystem creates a new OSFileSystem instance
+func NewOSFileSystem() *OSFileSystem {
+	return &OSFileSystem{}
 }
 
 // Open implements fs.FS
-func (fsys *RealFileSystem) Open(name string) (fs.File, error) {
+func (fsys *OSFileSystem) Open(name string) (fs.File, error) {
 	file, err := os.DirFS("/").Open(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %w", name, err)
@@ -51,7 +54,7 @@ func (fsys *RealFileSystem) Open(name string) (fs.File, error) {
 }
 
 // Stat implements FileSystem
-func (fsys *RealFileSystem) Stat(name string) (fs.FileInfo, error) {
+func (fsys *OSFileSystem) Stat(name string) (fs.FileInfo, error) {
 	info, err := os.Stat(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to stat file %s: %w", name, err)
@@ -60,7 +63,7 @@ func (fsys *RealFileSystem) Stat(name string) (fs.FileInfo, error) {
 }
 
 // ReadDir implements FileSystem
-func (fsys *RealFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
+func (fsys *OSFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
 	entries, err := os.ReadDir(name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", name, err)
@@ -69,7 +72,7 @@ func (fsys *RealFileSystem) ReadDir(name string) ([]fs.DirEntry, error) {
 }
 
 // MkdirAll implements FileSystem
-func (fsys *RealFileSystem) MkdirAll(path string, perm os.FileMode) error {
+func (fsys *OSFileSystem) MkdirAll(path string, perm os.FileMode) error {
 	if err := os.MkdirAll(path, perm); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", path, err)
 	}
@@ -77,7 +80,7 @@ func (fsys *RealFileSystem) MkdirAll(path string, perm os.FileMode) error {
 }
 
 // ReadFile implements FileSystem
-func (fsys *RealFileSystem) ReadFile(filename string) ([]byte, error) {
+func (fsys *OSFileSystem) ReadFile(filename string) ([]byte, error) {
 	data, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %w", filename, err)
@@ -86,7 +89,7 @@ func (fsys *RealFileSystem) ReadFile(filename string) ([]byte, error) {
 }
 
 // WriteFile implements FileSystem
-func (fsys *RealFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
+func (fsys *OSFileSystem) WriteFile(filename string, data []byte, perm os.FileMode) error {
 	if err := os.WriteFile(filename, data, perm); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filename, err)
 	}
@@ -95,9 +98,16 @@ func (fsys *RealFileSystem) WriteFile(filename string, data []byte, perm os.File
 
 // Remove implements FileSystem
 // Remove removes the named file or directory.
-func (fsys *RealFileSystem) Remove(name string) error {
+func (fsys *OSFileSystem) Remove(name string) error {
 	if err := os.Remove(name); err != nil {
 		return fmt.Errorf("failed to remove file %s: %w", name, err)
 	}
 	return nil
+}
+
+// Exists implements FileSystem
+// Exists checks if a path exists using os.Stat
+func (fsys *OSFileSystem) Exists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

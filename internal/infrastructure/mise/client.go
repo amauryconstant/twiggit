@@ -3,9 +3,10 @@ package mise
 
 import (
 	"fmt"
-	"github.com/amaury/twiggit/internal/infrastructure"
 	"os/exec"
 	"path/filepath"
+
+	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 // MiseIntegration handles integration with Mise development environment tool
@@ -37,7 +38,7 @@ func NewMiseIntegration(opts ...Option) *MiseIntegration {
 	integration := &MiseIntegration{
 		execPath:   "mise",
 		enabled:    true,
-		fileSystem: infrastructure.NewRealFileSystem(),
+		fileSystem: infrastructure.NewOSFileSystem(),
 	}
 
 	// Apply options
