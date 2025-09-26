@@ -30,7 +30,7 @@ func (s *WorktreeCreatorTestSuite) SetupTest() {
 	s.mockGitClient = new(mocks.GitClientMock)
 	s.mockMiseIntegration = new(mocks.MiseIntegrationMock)
 	s.tempDir = s.T().TempDir()
-	testFileSystem := infrastructure.NewRealFileSystem()
+	testFileSystem := infrastructure.NewOSFileSystem()
 	s.validationService = NewValidationService(testFileSystem)
 	s.creator = NewWorktreeCreator(s.mockGitClient, s.validationService, s.mockMiseIntegration)
 }
@@ -229,7 +229,7 @@ func (s *WorktreeCreatorTestSuite) TestWorktreeCreator_NewWorktreeCreator() {
 	mockGitClient := new(mocks.GitClientMock)
 	mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-	testFileSystem := infrastructure.NewRealFileSystem()
+	testFileSystem := infrastructure.NewOSFileSystem()
 	validationService := NewValidationService(testFileSystem)
 	creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 

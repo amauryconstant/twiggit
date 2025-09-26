@@ -56,7 +56,7 @@ func runCdCommand(_ *cobra.Command, args []string, container *di.Container) erro
 
 	// Create context detector and resolver
 	config := container.Config()
-	contextDetector := domain.NewContextDetector(config.WorkspacesPath, config.ProjectsPath)
+	contextDetector := domain.NewContextDetector(config.WorkspacesPath, config.ProjectsPath, container.FileSystemChecker())
 	contextResolver := domain.NewContextResolver(config.WorkspacesPath, config.ProjectsPath)
 
 	// Detect current context

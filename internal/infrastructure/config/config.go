@@ -96,7 +96,7 @@ type configLoader struct {
 // LoadConfig loads configuration from files and environment variables with optional configuration
 func LoadConfig(opts ...Option) (*Config, error) {
 	loader := &configLoader{
-		fileSystem: infrastructure.NewRealFileSystem(),
+		fileSystem: infrastructure.NewOSFileSystem(),
 	}
 
 	// Apply options

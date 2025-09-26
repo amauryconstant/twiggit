@@ -3,7 +3,6 @@ package domain
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -75,15 +74,6 @@ type FileSystemChecker interface {
 	Exists(path string) bool
 }
 
-// DefaultFileSystemChecker is the default implementation using os.Stat
-type DefaultFileSystemChecker struct{}
-
-// Exists checks if a path exists using os.Stat
-func (d *DefaultFileSystemChecker) Exists(path string) bool {
-	_, err := os.Stat(path)
-	return err == nil
-}
-
 // ContextDetector handles detection of user context
 type ContextDetector struct {
 	// workspaceBasePath is the base path for workspaces (e.g., "$HOME/Workspaces")
@@ -95,11 +85,11 @@ type ContextDetector struct {
 }
 
 // NewContextDetector creates a new ContextDetector instance
-func NewContextDetector(workspaceBasePath, projectsBasePath string) *ContextDetector {
+func NewContextDetector(workspaceBasePath, projectsBasePath string, fsChecker FileSystemChecker) *ContextDetector {
 	return &ContextDetector{
 		workspaceBasePath: workspaceBasePath,
 		projectsBasePath:  projectsBasePath,
-		fsChecker:         &DefaultFileSystemChecker{},
+		fsChecker:         fsChecker,
 	}
 }
 

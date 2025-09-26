@@ -2,6 +2,7 @@
 package di
 
 import (
+	"github.com/amaury/twiggit/internal/domain"
 	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/internal/infrastructure/config"
 	"github.com/amaury/twiggit/internal/infrastructure/git"
@@ -13,10 +14,11 @@ import (
 // Container manages all application dependencies
 type Container struct {
 	// Infrastructure dependencies
-	gitClient     infrastructure.GitClient
-	config        *config.Config
-	fileSystem    infrastructure.FileSystem
-	pathValidator infrastructure.PathValidator
+	gitClient         infrastructure.GitClient
+	config            *config.Config
+	fileSystem        infrastructure.FileSystem
+	pathValidator     infrastructure.PathValidator
+	fileSystemChecker domain.FileSystemChecker
 
 	// Application services
 	validationService        *services.ValidationService
@@ -43,8 +45,9 @@ func NewContainer(cfg *config.Config) *Container {
 func (c *Container) initializeInfrastructure() {
 	// Create core infrastructure dependencies
 	c.gitClient = git.NewClient()
-	c.fileSystem = infrastructure.NewRealFileSystem()
+	c.fileSystem = infrastructure.NewOSFileSystem()
 	c.pathValidator = validation.NewPathValidator()
+	c.fileSystemChecker = c.fileSystem // Use the same instance for both dependencies
 
 	// Create mise integration
 	c.miseIntegration = mise.NewMiseIntegration(mise.WithFileSystem(c.fileSystem))
@@ -128,4 +131,9 @@ func (c *Container) CurrentDirectoryDetector() *services.CurrentDirectoryDetecto
 // MiseIntegration returns the mise integration instance
 func (c *Container) MiseIntegration() infrastructure.MiseIntegration {
 	return c.miseIntegration
+}
+
+// FileSystemChecker returns the filesystem checker instance
+func (c *Container) FileSystemChecker() domain.FileSystemChecker {
+	return c.fileSystemChecker
 }
