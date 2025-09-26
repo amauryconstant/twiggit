@@ -203,4 +203,189 @@ var _ = Describe("Create Command", func() {
 			Expect(output).To(ContainSubstring("invalid default source branch name"))
 		})
 	})
+
+	Describe("validation order and error priority", func() {
+		var tempDir string
+		var cleanup func()
+		var gitRepo *helpers.GitRepo
+
+		BeforeEach(func() {
+			t := &testing.T{}
+			gitRepo = helpers.NewGitRepo(t, "twiggit-validation-test")
+			tempDir = gitRepo.Path
+
+			cleanup = func() {
+				gitRepo.Cleanup()
+			}
+		})
+
+		AfterEach(func() {
+			cleanup()
+		})
+
+		It("validates branch name format before checking source branch existence", func() {
+			// Create a git repo with only the default branch (no 'main' branch)
+			// This simulates CI environment where 'main' might not exist
+
+			// Run create command with invalid branch name
+			session := cli.RunWithDir(tempDir, "create", "invalid@branch#name")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Out.Contents())
+			// Should fail with branch name validation error, not source branch error
+			Expect(output).To(ContainSubstring("❌"))
+			Expect(output).To(ContainSubstring("branch name format is invalid"))
+			Expect(output).NotTo(ContainSubstring("source branch"))
+		})
+
+		It("validates branch name format before checking if we're in a git repository", func() {
+			// Run create command with invalid branch name from a non-git directory
+			nonGitDir, tempCleanup := helpers.TempDir(&testing.T{}, "non-git-dir")
+			defer tempCleanup()
+
+			session := cli.RunWithDir(nonGitDir, "create", "invalid@branch#name")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Out.Contents())
+			// Should fail with branch name validation error, not git repository error
+			Expect(output).To(ContainSubstring("❌"))
+			Expect(output).To(ContainSubstring("branch name format is invalid"))
+			Expect(output).NotTo(ContainSubstring("not a git repository"))
+		})
+
+		It("checks source branch existence only after branch name validation passes", func() {
+			// Use a valid branch name format but non-existent source branch
+			session := cli.RunWithDir(tempDir, "create", "valid-branch-name")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Out.Contents())
+			// Should fail with source branch error, not branch name validation error
+			Expect(output).To(ContainSubstring("❌"))
+			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
+			Expect(output).NotTo(ContainSubstring("branch name format is invalid"))
+		})
+
+		It("handles multiple validation errors correctly", func() {
+			// Create a git repo with a branch that has invalid characters
+			t := &testing.T{}
+			gitRepoWithBranches := helpers.NewGitRepoWithBranches(t, "twiggit-multi-validation", []string{"develop"})
+			defer gitRepoWithBranches.Cleanup()
+
+			// Test with invalid branch name - should only show branch name validation error
+			session := cli.RunWithDir(gitRepoWithBranches.Path, "create", "invalid@branch#name")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("❌"))
+			Expect(output).To(ContainSubstring("branch name format is invalid"))
+			// Should not mention other potential errors
+			Expect(output).NotTo(ContainSubstring("source branch"))
+		})
+	})
+
+	Describe("git repository state scenarios", func() {
+		var tempDir string
+		var cleanup func()
+
+		BeforeEach(func() {
+			var err error
+			tempDir, err = os.MkdirTemp("", "twiggit-git-state-test")
+			Expect(err).NotTo(HaveOccurred())
+
+			cleanup = func() {
+				os.RemoveAll(tempDir)
+			}
+		})
+
+		AfterEach(func() {
+			cleanup()
+		})
+
+		It("works correctly in repository with only 'master' branch (no 'main')", func() {
+			// Create a git repository and rename default branch to 'master'
+			t := &testing.T{}
+			gitRepo := helpers.NewGitRepo(t, "twiggit-master-branch")
+			defer gitRepo.Cleanup()
+
+			// Rename the default branch to 'master' instead of 'main'
+			gitRepo.GitCmd(t, "branch", "-m", "master")
+
+			// Test with valid branch name - should fail because source branch 'main' doesn't exist
+			session := cli.RunWithDir(gitRepo.Path, "create", "feature-branch")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("❌"))
+			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
+
+			// Test with --source flag pointing to 'master' - should work differently
+			session2 := cli.RunWithDir(gitRepo.Path, "create", "--source", "master", "feature-branch")
+			Eventually(session2).Should(gexec.Exit(1))
+
+			output2 := string(session2.Out.Contents())
+			// Should not fail with source branch error since 'master' exists
+			Expect(output2).NotTo(ContainSubstring("source branch 'master' does not exist"))
+			// But might fail with other errors (like worktree creation, which is expected)
+		})
+
+		It("works correctly in repository with custom default branch", func() {
+			// Create a git repository with custom default branch name
+			t := &testing.T{}
+			gitRepo := helpers.NewGitRepo(t, "twiggit-custom-branch")
+			defer gitRepo.Cleanup()
+
+			// Rename the default branch to something custom
+			gitRepo.GitCmd(t, "branch", "-m", "develop")
+
+			// Test with valid branch name - should fail because source branch 'main' doesn't exist
+			session := cli.RunWithDir(gitRepo.Path, "create", "feature-branch")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("❌"))
+			Expect(output).To(ContainSubstring("source branch 'main' does not exist"))
+		})
+
+		It("works correctly in shallow clone (CI scenario)", func() {
+			// Create a git repository and simulate shallow clone
+			t := &testing.T{}
+			gitRepo := helpers.NewGitRepo(t, "twiggit-shallow-clone")
+			defer gitRepo.Cleanup()
+
+			// Create a shallow clone (depth 1) to simulate CI environment
+			shallowDir, shallowCleanup := helpers.TempDir(t, "shallow-clone")
+			defer shallowCleanup()
+
+			// Clone with depth 1
+			gitRepo.GitCmd(t, "clone", "--depth", "1", "file://"+gitRepo.Path, shallowDir)
+
+			// Test with invalid branch name - should still validate branch name first
+			session := cli.RunWithDir(shallowDir, "create", "invalid@branch#name")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("❌"))
+			Expect(output).To(ContainSubstring("branch name format is invalid"))
+			Expect(output).NotTo(ContainSubstring("source branch"))
+		})
+
+		It("works correctly in detached HEAD state (CI scenario)", func() {
+			// Create a git repository and simulate detached HEAD
+			t := &testing.T{}
+			gitRepo := helpers.NewGitRepo(t, "twiggit-detached-head")
+			defer gitRepo.Cleanup()
+
+			// Create a commit and checkout detached HEAD
+			gitRepo.GitCmd(t, "checkout", "--detach", "HEAD")
+
+			// Test with invalid branch name - should still validate branch name first
+			session := cli.RunWithDir(gitRepo.Path, "create", "invalid@branch#name")
+			Eventually(session).Should(gexec.Exit(1))
+
+			output := string(session.Out.Contents())
+			Expect(output).To(ContainSubstring("❌"))
+			Expect(output).To(ContainSubstring("branch name format is invalid"))
+			Expect(output).NotTo(ContainSubstring("source branch"))
+		})
+	})
 })

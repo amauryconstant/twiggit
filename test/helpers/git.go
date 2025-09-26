@@ -114,6 +114,12 @@ NODE_ENV = "development"
 	gitCmd(t, g.Path, "commit", "-m", "Add mise configuration")
 }
 
+// GitCmd runs a git command in this repository
+func (g *GitRepo) GitCmd(t *testing.T, args ...string) {
+	t.Helper()
+	gitCmd(t, g.Path, args...)
+}
+
 // gitCmd runs a git command in the repository directory
 func gitCmd(t *testing.T, repoPath string, args ...string) {
 	t.Helper()

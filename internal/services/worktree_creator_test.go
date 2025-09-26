@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"github.com/amaury/twiggit/test/mocks"
 	"github.com/stretchr/testify/suite"
 )
@@ -29,7 +30,7 @@ func (s *WorktreeCreatorTestSuite) SetupTest() {
 	s.mockGitClient = new(mocks.GitClientMock)
 	s.mockMiseIntegration = new(mocks.MiseIntegrationMock)
 	s.tempDir = s.T().TempDir()
-	testFileSystem := os.DirFS(s.tempDir)
+	testFileSystem := infrastructure.NewRealFileSystem()
 	s.validationService = NewValidationService(testFileSystem)
 	s.creator = NewWorktreeCreator(s.mockGitClient, s.validationService, s.mockMiseIntegration)
 }
@@ -228,8 +229,7 @@ func (s *WorktreeCreatorTestSuite) TestWorktreeCreator_NewWorktreeCreator() {
 	mockGitClient := new(mocks.GitClientMock)
 	mockMiseIntegration := new(mocks.MiseIntegrationMock)
 
-	tempDir := s.T().TempDir()
-	testFileSystem := os.DirFS(tempDir)
+	testFileSystem := infrastructure.NewRealFileSystem()
 	validationService := NewValidationService(testFileSystem)
 	creator := NewWorktreeCreator(mockGitClient, validationService, mockMiseIntegration)
 

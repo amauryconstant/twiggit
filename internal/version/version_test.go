@@ -4,13 +4,15 @@ import (
 	"os"
 	"testing"
 
+	"github.com/amaury/twiggit/test/mocks"
 	"github.com/stretchr/testify/suite"
 )
 
 type VersionTestSuite struct {
 	suite.Suite
-	originalDir string
-	tempDir     string
+	originalDir    string
+	tempDir        string
+	mockFileSystem *mocks.FileSystemMock
 }
 
 func (s *VersionTestSuite) SetupTest() {
@@ -20,6 +22,9 @@ func (s *VersionTestSuite) SetupTest() {
 
 	s.tempDir, err = os.MkdirTemp("", "version-test-*")
 	s.Require().NoError(err)
+
+	// Initialize mock filesystem
+	s.mockFileSystem = mocks.NewFileSystemMock()
 
 	// Change to temp directory for testing
 	err = os.Chdir(s.tempDir)
@@ -53,11 +58,14 @@ require (
 )
 `
 
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	s.Require().NoError(err)
+	// Mock reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(goModContent), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("1.2.3", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithVersionCommentAndExtraSpaces() {
@@ -72,12 +80,15 @@ require (
 )
 `
 
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	s.Require().NoError(err)
+	// Mock reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(goModContent), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	// The regex captures the version without leading spaces, but trims the result
 	s.Equal("2.0.1", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithNoVersionComment() {
@@ -91,11 +102,14 @@ require (
 )
 `
 
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	s.Require().NoError(err)
+	// Mock reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(goModContent), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("dev", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithMalformedVersionComment() {
@@ -110,11 +124,14 @@ require (
 )
 `
 
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	s.Require().NoError(err)
+	// Mock reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(goModContent), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("dev", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithDifferentCommentFormat() {
@@ -131,39 +148,36 @@ require (
 )
 `
 
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	s.Require().NoError(err)
+	// Mock reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(goModContent), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("3.4.5", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithMissingGoModFile() {
-	// Don't create go.mod file
-	version := Version()
+	// Mock file not found error
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte{}, &os.PathError{Op: "read", Path: "go.mod", Err: os.ErrNotExist})
+
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("dev", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithUnreadableGoModFile() {
-	// Create go.mod file but make it unreadable
-	goModContent := `module github.com/test/twiggit
+	// Mock permission error when reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte{}, &os.PathError{Op: "read", Path: "go.mod", Err: os.ErrPermission})
 
-// Version: 4.5.6
-go 1.21
-`
-
-	err := os.WriteFile("go.mod", []byte(goModContent), 0000)
-	s.Require().NoError(err)
-
-	// On some systems (like when running as root), even 0000 permissions allow reading
-	// So we need to check if the file is actually readable and adjust the test accordingly
-	if _, readErr := os.ReadFile("go.mod"); readErr == nil {
-		// File is readable (likely running as root), remove it to trigger the error condition
-		os.Remove("go.mod")
-	}
-
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("dev", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithComplexVersion() {
@@ -178,11 +192,14 @@ require (
 )
 `
 
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	s.Require().NoError(err)
+	// Mock reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(goModContent), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("1.0.0-alpha.1+build.123", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithMultipleVersionComments() {
@@ -199,11 +216,14 @@ require (
 )
 `
 
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	s.Require().NoError(err)
+	// Mock reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(goModContent), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("5.0.0", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithVersionInDifferentContext() {
@@ -220,18 +240,23 @@ require (
 )
 `
 
-	err := os.WriteFile("go.mod", []byte(goModContent), 0644)
-	s.Require().NoError(err)
+	// Mock reading go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(goModContent), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("8.9.0", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *VersionTestSuite) TestVersion_WithEmptyFile() {
-	// Create empty go.mod file
-	err := os.WriteFile("go.mod", []byte(""), 0644)
-	s.Require().NoError(err)
+	// Mock reading empty go.mod file
+	s.mockFileSystem.On("ReadFile", "go.mod").Return([]byte(""), nil)
 
-	version := Version()
+	version := Version(WithFileSystem(s.mockFileSystem))
 	s.Equal("dev", version)
+
+	// Verify mock expectations
+	s.mockFileSystem.AssertExpectations(s.T())
 }

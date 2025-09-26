@@ -3,22 +3,46 @@ package mise
 
 import (
 	"fmt"
-	"os"
+	"github.com/amaury/twiggit/internal/infrastructure"
 	"os/exec"
 	"path/filepath"
 )
 
 // MiseIntegration handles integration with Mise development environment tool
 type MiseIntegration struct {
-	execPath string
-	enabled  bool
+	execPath   string
+	enabled    bool
+	fileSystem infrastructure.FileSystem
 }
 
-// NewMiseIntegration creates a new MiseIntegration instance
-func NewMiseIntegration() *MiseIntegration {
+// Option is a functional option for configuring MiseIntegration
+type Option func(*MiseIntegration)
+
+// WithFileSystem sets a custom filesystem for MiseIntegration
+func WithFileSystem(fs infrastructure.FileSystem) Option {
+	return func(mi *MiseIntegration) {
+		mi.fileSystem = fs
+	}
+}
+
+// WithExecPath sets a custom exec path for MiseIntegration
+func WithExecPath(path string) Option {
+	return func(mi *MiseIntegration) {
+		mi.execPath = path
+	}
+}
+
+// NewMiseIntegration creates a new MiseIntegration instance with optional configuration
+func NewMiseIntegration(opts ...Option) *MiseIntegration {
 	integration := &MiseIntegration{
-		execPath: "mise",
-		enabled:  true,
+		execPath:   "mise",
+		enabled:    true,
+		fileSystem: infrastructure.NewRealFileSystem(),
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(integration)
 	}
 
 	// Check if mise is available on system
@@ -38,7 +62,7 @@ func (mi *MiseIntegration) IsAvailable() bool {
 // SetupWorktree sets up mise configuration for a new worktree
 func (mi *MiseIntegration) SetupWorktree(sourceRepoPath, worktreePath string) error {
 	// Validate target directory exists
-	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+	if _, err := mi.fileSystem.Stat(worktreePath); err != nil {
 		return fmt.Errorf("worktree path does not exist: %s", worktreePath)
 	}
 
@@ -72,13 +96,13 @@ func (mi *MiseIntegration) DetectConfigFiles(repoPath string) []string {
 
 	// Check for .mise.local.toml
 	miseLocalFile := filepath.Join(repoPath, ".mise.local.toml")
-	if _, err := os.Stat(miseLocalFile); err == nil {
+	if _, err := mi.fileSystem.Stat(miseLocalFile); err == nil {
 		configFiles = append(configFiles, ".mise.local.toml")
 	}
 
 	// Check for mise/config.local.toml
 	miseConfigFile := filepath.Join(repoPath, "mise", "config.local.toml")
-	if _, err := os.Stat(miseConfigFile); err == nil {
+	if _, err := mi.fileSystem.Stat(miseConfigFile); err == nil {
 		configFiles = append(configFiles, "mise/config.local.toml")
 	}
 
@@ -93,18 +117,18 @@ func (mi *MiseIntegration) CopyConfigFiles(sourceDir, targetDir string, configFi
 
 		// Create target directory if needed
 		targetFileDir := filepath.Dir(targetFile)
-		if err := os.MkdirAll(targetFileDir, 0755); err != nil {
+		if err := mi.fileSystem.MkdirAll(targetFileDir, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", targetFileDir, err)
 		}
 
 		// Read source file
-		content, err := os.ReadFile(sourceFile)
+		content, err := mi.fileSystem.ReadFile(sourceFile)
 		if err != nil {
 			return fmt.Errorf("failed to read source file %s: %w", sourceFile, err)
 		}
 
 		// Write to target file
-		if err := os.WriteFile(targetFile, content, 0644); err != nil {
+		if err := mi.fileSystem.WriteFile(targetFile, content, 0644); err != nil {
 			return fmt.Errorf("failed to write target file %s: %w", targetFile, err)
 		}
 	}
@@ -115,7 +139,7 @@ func (mi *MiseIntegration) CopyConfigFiles(sourceDir, targetDir string, configFi
 // TrustDirectory runs 'mise trust' on the specified directory if mise is available
 func (mi *MiseIntegration) TrustDirectory(dirPath string) error {
 	// Validate directory exists
-	if _, err := os.Stat(dirPath); os.IsNotExist(err) {
+	if _, err := mi.fileSystem.Stat(dirPath); err != nil {
 		return fmt.Errorf("directory does not exist: %s", dirPath)
 	}
 

@@ -1,20 +1,19 @@
 package services
 
 import (
-	"io/fs"
-	"os"
 	"path/filepath"
 
 	"github.com/amaury/twiggit/internal/domain"
+	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 // ValidationService handles validation operations that require infrastructure access
 type ValidationService struct {
-	fileSystem fs.FS
+	fileSystem infrastructure.FileSystem
 }
 
 // NewValidationService creates a new ValidationService instance
-func NewValidationService(fileSystem fs.FS) *ValidationService {
+func NewValidationService(fileSystem infrastructure.FileSystem) *ValidationService {
 	return &ValidationService{
 		fileSystem: fileSystem,
 	}
@@ -22,9 +21,7 @@ func NewValidationService(fileSystem fs.FS) *ValidationService {
 
 // pathExists checks if a path exists on the filesystem
 func (s *ValidationService) pathExists(path string) bool {
-	// For testing with os.DirFS, we need to handle absolute paths
-	// In production, this would use the actual filesystem
-	_, err := os.Stat(path)
+	_, err := s.fileSystem.Stat(path)
 	return err == nil
 }
 
@@ -38,7 +35,7 @@ func (s *ValidationService) pathWritable(path string) bool {
 	// Check if parent directory exists and is writable
 	parentDir := filepath.Dir(path)
 
-	parentInfo, err := os.Stat(parentDir)
+	parentInfo, err := s.fileSystem.Stat(parentDir)
 	if err != nil {
 		return false
 	}
@@ -49,14 +46,13 @@ func (s *ValidationService) pathWritable(path string) bool {
 
 	// Test writability by attempting to create a temporary file
 	tempFile := filepath.Join(parentDir, ".twiggit-write-test")
-	file, err := os.Create(tempFile)
+	err = s.fileSystem.WriteFile(tempFile, []byte("test"), 0644)
 	if err != nil {
 		return false
 	}
 
 	// Clean up the temporary file
-	_ = file.Close()
-	_ = os.Remove(tempFile)
+	_ = s.fileSystem.Remove(tempFile)
 
 	return true
 }
