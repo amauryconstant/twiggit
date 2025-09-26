@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A pragmatic tool for managing git worktrees with a focus on rebase workflows. Context-aware operations SHALL be provided for creating, listing, switching, and deleting worktrees across multiple projects.
+A pragmatic tool for managing git worktrees with a focus on rebase workflows. Context-aware operations SHALL be provided for creating, listing, navigating, and deleting worktrees across multiple projects.
 
 ## Directory Structure & Defaults
 
@@ -150,6 +150,20 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 #### `help` - Display help text
 - Basic help text SHALL be returned
 - Usage patterns and available commands SHALL be shown
+
+## Command Structure
+
+The command structure SHALL be organized as follows:
+
+```go
+cmd/
+├── create.go          // Create command implementation
+├── delete.go          // Delete command implementation  
+├── list.go            // List command implementation
+├── cd.go              // CD (change directory) command implementation
+├── setup-shell.go     // Shell setup command implementation
+└── root.go            // Root command and CLI setup
+```
 
 ## Context Detection & Behavior
 
