@@ -55,3 +55,8 @@ run = "go run main.go --help"
 [tasks."dev:tidy"]
 description = "Clean up go.mod and go.sum"
 run = "go mod tidy"
+
+[tasks."dev:cli"]
+description = "Build the CLI binary"
+depends = ["build:cli"]
+run = "cp ./bin/twiggit $HOME/.local/bin"
