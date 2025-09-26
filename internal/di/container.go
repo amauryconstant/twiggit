@@ -8,8 +8,6 @@ import (
 	"github.com/amaury/twiggit/internal/infrastructure/mise"
 	"github.com/amaury/twiggit/internal/infrastructure/validation"
 	"github.com/amaury/twiggit/internal/services"
-	"io/fs"
-	"os"
 )
 
 // Container manages all application dependencies
@@ -17,7 +15,7 @@ type Container struct {
 	// Infrastructure dependencies
 	gitClient     infrastructure.GitClient
 	config        *config.Config
-	fileSystem    fs.FS
+	fileSystem    infrastructure.FileSystem
 	pathValidator infrastructure.PathValidator
 
 	// Application services
@@ -45,11 +43,11 @@ func NewContainer(cfg *config.Config) *Container {
 func (c *Container) initializeInfrastructure() {
 	// Create core infrastructure dependencies
 	c.gitClient = git.NewClient()
-	c.fileSystem = os.DirFS("/")
+	c.fileSystem = infrastructure.NewRealFileSystem()
 	c.pathValidator = validation.NewPathValidator()
 
 	// Create mise integration
-	c.miseIntegration = mise.NewMiseIntegration()
+	c.miseIntegration = mise.NewMiseIntegration(mise.WithFileSystem(c.fileSystem))
 }
 
 // initializeServices sets up application services
@@ -93,7 +91,7 @@ func (c *Container) Config() *config.Config {
 }
 
 // FileSystem returns the file system instance
-func (c *Container) FileSystem() fs.FS {
+func (c *Container) FileSystem() infrastructure.FileSystem {
 	return c.fileSystem
 }
 

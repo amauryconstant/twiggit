@@ -65,6 +65,12 @@ func runCreateCommand(_ *cobra.Command, args []string, container *di.Container, 
 		).WithSuggestion("Provide a valid branch name")
 	}
 
+	// Validate branch name format
+	validationResult := domain.ValidateBranchName(branchName)
+	if !validationResult.Valid {
+		return fmt.Errorf("branch name validation failed: %w", validationResult.ToError())
+	}
+
 	// Determine source branch using priority: --source flag → config → "main" fallback
 	sourceBranch := determineSourceBranch(sourceBranchFlag, container.Config())
 

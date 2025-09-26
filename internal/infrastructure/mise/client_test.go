@@ -1,10 +1,13 @@
 package mise
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/amaury/twiggit/test/mocks"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -74,174 +77,215 @@ func (s *MiseClientTestSuite) TestDetectConfigFiles_WithNoConfigFiles() {
 }
 
 func (s *MiseClientTestSuite) TestDetectConfigFiles_WithMiseLocalToml() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create .mise.local.toml file
+	// Setup mock to return file exists for .mise.local.toml
 	miseLocalFile := filepath.Join(s.tempDir, ".mise.local.toml")
-	err := os.WriteFile(miseLocalFile, []byte("[tools]\nnode = \"20.0.0\""), 0644)
-	s.Require().NoError(err)
+	mockFileInfo := mocks.NewMockFileInfoWithDetails(".mise.local.toml", 25, 0644, time.Now(), false)
+	mockFileSystem.On("Stat", miseLocalFile).Return(mockFileInfo, nil)
+
+	// Setup mock to return file not found for mise/config.local.toml
+	miseConfigFile := filepath.Join(s.tempDir, "mise", "config.local.toml")
+	mockFileSystem.On("Stat", miseConfigFile).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: miseConfigFile, Err: os.ErrNotExist})
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 
 	configFiles := integration.DetectConfigFiles(s.tempDir)
 	s.Equal([]string{".mise.local.toml"}, configFiles)
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestDetectConfigFiles_WithMiseConfigLocalToml() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create mise/config.local.toml file
-	miseDir := filepath.Join(s.tempDir, "mise")
-	err := os.MkdirAll(miseDir, 0755)
-	s.Require().NoError(err)
+	// Setup mock to return file not found for .mise.local.toml
+	miseLocalFile := filepath.Join(s.tempDir, ".mise.local.toml")
+	mockFileSystem.On("Stat", miseLocalFile).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: miseLocalFile, Err: os.ErrNotExist})
 
-	configFile := filepath.Join(miseDir, "config.local.toml")
-	err = os.WriteFile(configFile, []byte("[tools]\ngo = \"1.21\""), 0644)
-	s.Require().NoError(err)
+	// Setup mock to return file exists for mise/config.local.toml
+	miseConfigFile := filepath.Join(s.tempDir, "mise", "config.local.toml")
+	mockFileInfo := mocks.NewMockFileInfoWithDetails("config.local.toml", 20, 0644, time.Now(), false)
+	mockFileSystem.On("Stat", miseConfigFile).Return(mockFileInfo, nil)
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 
 	configFiles := integration.DetectConfigFiles(s.tempDir)
 	s.Equal([]string{"mise/config.local.toml"}, configFiles)
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestDetectConfigFiles_WithBothConfigFiles() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create .mise.local.toml file
+	// Setup mock to return file exists for .mise.local.toml
 	miseLocalFile := filepath.Join(s.tempDir, ".mise.local.toml")
-	err := os.WriteFile(miseLocalFile, []byte("[tools]\nnode = \"20.0.0\""), 0644)
-	s.Require().NoError(err)
+	mockFileInfo1 := mocks.NewMockFileInfoWithDetails(".mise.local.toml", 25, 0644, time.Now(), false)
+	mockFileSystem.On("Stat", miseLocalFile).Return(mockFileInfo1, nil)
 
-	// Create mise/config.local.toml file
-	miseDir := filepath.Join(s.tempDir, "mise")
-	err = os.MkdirAll(miseDir, 0755)
-	s.Require().NoError(err)
+	// Setup mock to return file exists for mise/config.local.toml
+	miseConfigFile := filepath.Join(s.tempDir, "mise", "config.local.toml")
+	mockFileInfo2 := mocks.NewMockFileInfoWithDetails("config.local.toml", 20, 0644, time.Now(), false)
+	mockFileSystem.On("Stat", miseConfigFile).Return(mockFileInfo2, nil)
 
-	configFile := filepath.Join(miseDir, "config.local.toml")
-	err = os.WriteFile(configFile, []byte("[tools]\ngo = \"1.21\""), 0644)
-	s.Require().NoError(err)
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 
 	configFiles := integration.DetectConfigFiles(s.tempDir)
 	s.ElementsMatch([]string{".mise.local.toml", "mise/config.local.toml"}, configFiles)
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestDetectConfigFiles_WithNonexistentDirectory() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
+
+	// Setup mock to return file not found for both config files
+	miseLocalFile := filepath.Join("/nonexistent/directory", ".mise.local.toml")
+	mockFileSystem.On("Stat", miseLocalFile).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: miseLocalFile, Err: os.ErrNotExist})
+
+	miseConfigFile := filepath.Join("/nonexistent/directory", "mise", "config.local.toml")
+	mockFileSystem.On("Stat", miseConfigFile).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: miseConfigFile, Err: os.ErrNotExist})
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 
 	configFiles := integration.DetectConfigFiles("/nonexistent/directory")
 	s.Empty(configFiles)
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestCopyConfigFiles_WithEmptyList() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 
 	targetDir := filepath.Join(s.tempDir, "target")
-	err := os.MkdirAll(targetDir, 0755)
+
+	err := integration.CopyConfigFiles(s.tempDir, targetDir, []string{})
 	s.Require().NoError(err)
 
-	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{})
-	s.NoError(err)
+	// Verify mock expectations (no calls should be made for empty list)
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestCopyConfigFiles_WithSingleFile() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create source file
+	// Setup mock expectations
 	sourceFile := filepath.Join(s.tempDir, ".mise.local.toml")
 	content := []byte("[tools]\nnode = \"20.0.0\"")
-	err := os.WriteFile(sourceFile, content, 0644)
-	s.Require().NoError(err)
-
-	// Create target directory
 	targetDir := filepath.Join(s.tempDir, "target")
-	err = os.MkdirAll(targetDir, 0755)
-	s.Require().NoError(err)
-
-	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{".mise.local.toml"})
-	s.Require().NoError(err)
-
-	// Verify file was copied
 	targetFile := filepath.Join(targetDir, ".mise.local.toml")
-	copiedContent, err := os.ReadFile(targetFile)
+
+	// Mock reading source file
+	mockFileSystem.On("ReadFile", sourceFile).Return(content, nil)
+
+	// Mock creating target directory (same as target dir for .mise.local.toml)
+	mockFileSystem.On("MkdirAll", targetDir, os.FileMode(0755)).Return(nil)
+
+	// Mock writing target file
+	mockFileSystem.On("WriteFile", targetFile, content, os.FileMode(0644)).Return(nil)
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
+
+	err := integration.CopyConfigFiles(s.tempDir, targetDir, []string{".mise.local.toml"})
 	s.Require().NoError(err)
-	s.Equal(content, copiedContent)
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestCopyConfigFiles_WithNestedFile() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create source directory structure
-	sourceMiseDir := filepath.Join(s.tempDir, "mise")
-	err := os.MkdirAll(sourceMiseDir, 0755)
-	s.Require().NoError(err)
-
-	// Create source file
-	sourceFile := filepath.Join(sourceMiseDir, "config.local.toml")
+	// Setup mock expectations
+	sourceFile := filepath.Join(s.tempDir, "mise", "config.local.toml")
 	content := []byte("[tools]\ngo = \"1.21\"")
-	err = os.WriteFile(sourceFile, content, 0644)
-	s.Require().NoError(err)
-
-	// Create target directory
 	targetDir := filepath.Join(s.tempDir, "target")
-	err = os.MkdirAll(targetDir, 0755)
+	targetMiseDir := filepath.Join(targetDir, "mise")
+	targetFile := filepath.Join(targetMiseDir, "config.local.toml")
+
+	// Mock reading source file
+	mockFileSystem.On("ReadFile", sourceFile).Return(content, nil)
+
+	// Mock creating target directory structure
+	mockFileSystem.On("MkdirAll", targetMiseDir, os.FileMode(0755)).Return(nil)
+
+	// Mock writing target file
+	mockFileSystem.On("WriteFile", targetFile, content, os.FileMode(0644)).Return(nil)
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
+
+	err := integration.CopyConfigFiles(s.tempDir, targetDir, []string{"mise/config.local.toml"})
 	s.Require().NoError(err)
 
-	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{"mise/config.local.toml"})
-	s.Require().NoError(err)
-
-	// Verify file was copied with directory structure
-	targetFile := filepath.Join(targetDir, "mise", "config.local.toml")
-	copiedContent, err := os.ReadFile(targetFile)
-	s.Require().NoError(err)
-	s.Equal(content, copiedContent)
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestCopyConfigFiles_WithNonexistentSourceFile() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create target directory
+	// Setup mock expectations
+	sourceFile := filepath.Join(s.tempDir, "nonexistent.toml")
 	targetDir := filepath.Join(s.tempDir, "target")
-	err := os.MkdirAll(targetDir, 0755)
-	s.Require().NoError(err)
 
-	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{"nonexistent.toml"})
+	// Mock reading source file to return error
+	mockFileSystem.On("ReadFile", sourceFile).Return([]byte{}, &os.PathError{Op: "read", Path: sourceFile, Err: os.ErrNotExist})
+
+	// Mock MkdirAll (this will be called even though ReadFile fails)
+	mockFileSystem.On("MkdirAll", targetDir, os.FileMode(0755)).Return(nil)
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
+
+	err := integration.CopyConfigFiles(s.tempDir, targetDir, []string{"nonexistent.toml"})
 	s.Require().Error(err)
 	s.Contains(err.Error(), "failed to read source file")
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestCopyConfigFiles_WithUnwritableTarget() {
-	integration := NewMiseIntegration()
+	// Create a mock filesystem that simulates permission errors
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create source file
-	sourceFile := filepath.Join(s.tempDir, ".mise.local.toml")
-	content := []byte("[tools]\nnode = \"20.0.0\"")
-	err := os.WriteFile(sourceFile, content, 0644)
-	s.Require().NoError(err)
-
-	// Create target directory that's not writable
+	// Setup mock to fail on directory creation (simulating permission error)
 	targetDir := filepath.Join(s.tempDir, "target")
-	err = os.MkdirAll(targetDir, 0444) // read-only
-	s.Require().NoError(err)
+	targetFileDir := targetDir // For .mise.local.toml, target dir is same as target dir
+	mockFileSystem.On("MkdirAll", targetFileDir, os.FileMode(0755)).Return(&os.PathError{Op: "mkdir", Path: targetFileDir, Err: os.ErrPermission})
 
-	// On some systems (like when running as root), even 0444 permissions allow writing
-	// So we need to check if the directory is actually writable and skip the test if it is
-	testFile := filepath.Join(targetDir, ".test-write")
-	if writeErr := os.WriteFile(testFile, []byte("test"), 0644); writeErr == nil {
-		// Directory is writable (likely running as root), clean up and skip the error expectation
-		os.Remove(testFile)
-		// Instead, let's test with a different approach - make the parent directory read-only after creation
-		parentDir := filepath.Dir(targetDir)
-		os.Chmod(parentDir, 0555)       // read-only parent
-		defer os.Chmod(parentDir, 0755) // restore permissions
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 
-		// Now try to create a new subdirectory which should fail
-		newTargetDir := filepath.Join(parentDir, "new-target")
-		err = integration.CopyConfigFiles(s.tempDir, newTargetDir, []string{".mise.local.toml"})
-		s.Require().Error(err)
-		// The error message might vary, just ensure there's an error
-		return
-	}
-
-	err = integration.CopyConfigFiles(s.tempDir, targetDir, []string{".mise.local.toml"})
+	// Test copy operation - should fail due to mock filesystem error
+	err := integration.CopyConfigFiles(s.tempDir, targetDir, []string{".mise.local.toml"})
 	s.Require().Error(err)
-	s.Contains(err.Error(), "failed to write target file")
+	s.Contains(err.Error(), "failed to create directory")
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestDisable() {
@@ -315,119 +359,194 @@ func (s *MiseClientTestSuite) TestSetExecPath_WithEmptyPath() {
 }
 
 func (s *MiseClientTestSuite) TestTrustDirectory_WithNonexistentDirectory() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	err := integration.TrustDirectory("/nonexistent/directory")
+	// Setup mock to return error for directory stat
+	nonexistentDir := "/nonexistent/directory"
+	mockFileSystem.On("Stat", nonexistentDir).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: nonexistentDir, Err: os.ErrNotExist})
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
+
+	err := integration.TrustDirectory(nonexistentDir)
 	s.Require().Error(err)
 	s.Contains(err.Error(), "directory does not exist")
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestTrustDirectory_WithDisabledIntegration() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
+
+	// Setup mock to return success for directory stat (this will be called even when disabled)
+	testDir := filepath.Join(s.tempDir, "test")
+	mockFileInfo := mocks.NewMockFileInfoWithDetails("test", 0, 0755, time.Now(), true)
+	mockFileSystem.On("Stat", testDir).Return(mockFileInfo, nil)
+
+	// Create integration with mock filesystem and disable it
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 	integration.Disable()
 
-	// Create a test directory
-	testDir := filepath.Join(s.tempDir, "test")
-	err := os.MkdirAll(testDir, 0755)
-	s.Require().NoError(err)
+	err := integration.TrustDirectory(testDir)
+	s.Require().NoError(err) // Should not error when disabled
 
-	err = integration.TrustDirectory(testDir)
-	s.NoError(err) // Should not error when disabled
+	// Verify mock expectations (no calls should be made when disabled)
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestTrustDirectory_WithEnabledIntegration() {
-	integration := &MiseIntegration{
-		execPath: "echo", // Use echo to simulate mise command
-		enabled:  true,
-	}
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create a test directory
+	// Setup mock to return success for directory stat
 	testDir := filepath.Join(s.tempDir, "test")
-	err := os.MkdirAll(testDir, 0755)
+	mockFileInfo := mocks.NewMockFileInfoWithDetails("test", 0, 0755, time.Now(), true)
+	mockFileSystem.On("Stat", testDir).Return(mockFileInfo, nil)
+
+	// Create integration with mock filesystem and custom exec path
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem), WithExecPath("echo"))
+
+	err := integration.TrustDirectory(testDir)
+	// Should not error since echo command should succeed
 	s.Require().NoError(err)
 
-	err = integration.TrustDirectory(testDir)
-	// Should not error since echo command should succeed
-	s.NoError(err)
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestSetupWorktree_WithNonexistentTarget() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
+	// Setup mock to return error for target directory stat
 	sourceDir := s.tempDir
 	targetDir := "/nonexistent/target"
+	mockFileSystem.On("Stat", targetDir).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: targetDir, Err: os.ErrNotExist})
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 
 	err := integration.SetupWorktree(sourceDir, targetDir)
 	s.Require().Error(err)
 	s.Contains(err.Error(), "worktree path does not exist")
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestSetupWorktree_WithNoConfigFiles() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create source directory (no config files)
+	// Setup mock expectations
 	sourceDir := filepath.Join(s.tempDir, "source")
-	err := os.MkdirAll(sourceDir, 0755)
-	s.Require().NoError(err)
-
-	// Create target directory
 	targetDir := filepath.Join(s.tempDir, "target")
-	err = os.MkdirAll(targetDir, 0755)
-	s.Require().NoError(err)
 
-	err = integration.SetupWorktree(sourceDir, targetDir)
-	s.NoError(err) // Should succeed even with no config files
+	// Mock target directory exists
+	mockFileInfo := mocks.NewMockFileInfoWithDetails("target", 0, 0755, time.Now(), true)
+	mockFileSystem.On("Stat", targetDir).Return(mockFileInfo, nil)
+
+	// Mock no config files found in source
+	miseLocalFile := filepath.Join(sourceDir, ".mise.local.toml")
+	miseConfigFile := filepath.Join(sourceDir, "mise", "config.local.toml")
+	mockFileSystem.On("Stat", miseLocalFile).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: miseLocalFile, Err: os.ErrNotExist})
+	mockFileSystem.On("Stat", miseConfigFile).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: miseConfigFile, Err: os.ErrNotExist})
+
+	// Create integration with mock filesystem
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
+
+	err := integration.SetupWorktree(sourceDir, targetDir)
+	s.Require().NoError(err) // Should succeed even with no config files
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestSetupWorktree_WithConfigFiles() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
 
-	// Create source directory with config file
+	// Setup mock expectations
 	sourceDir := filepath.Join(s.tempDir, "source")
-	err := os.MkdirAll(sourceDir, 0755)
-	s.Require().NoError(err)
-
-	miseFile := filepath.Join(sourceDir, ".mise.local.toml")
-	err = os.WriteFile(miseFile, []byte("[tools]\nnode = \"20.0.0\""), 0644)
-	s.Require().NoError(err)
-
-	// Create target directory
 	targetDir := filepath.Join(s.tempDir, "target")
-	err = os.MkdirAll(targetDir, 0755)
-	s.Require().NoError(err)
-
-	err = integration.SetupWorktree(sourceDir, targetDir)
-	s.Require().NoError(err)
-
-	// Verify config file was copied
+	sourceMiseFile := filepath.Join(sourceDir, ".mise.local.toml")
 	targetMiseFile := filepath.Join(targetDir, ".mise.local.toml")
-	_, err = os.Stat(targetMiseFile)
+	content := []byte("[tools]\nnode = \"20.0.0\"")
+
+	// Mock target directory exists
+	targetDirInfo := mocks.NewMockFileInfoWithDetails("target", 0, 0755, time.Now(), true)
+	mockFileSystem.On("Stat", targetDir).Return(targetDirInfo, nil)
+
+	// Mock config file exists in source
+	sourceMiseFileInfo := mocks.NewMockFileInfoWithDetails(".mise.local.toml", 25, 0644, time.Now(), false)
+	mockFileSystem.On("Stat", sourceMiseFile).Return(sourceMiseFileInfo, nil)
+
+	// Mock no other config files
+	miseConfigFile := filepath.Join(sourceDir, "mise", "config.local.toml")
+	mockFileSystem.On("Stat", miseConfigFile).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: miseConfigFile, Err: os.ErrNotExist})
+
+	// Mock reading source file
+	mockFileSystem.On("ReadFile", sourceMiseFile).Return(content, nil)
+
+	// Mock creating target directory (MkdirAll is called for target file directory)
+	mockFileSystem.On("MkdirAll", targetDir, os.FileMode(0755)).Return(nil)
+
+	// Mock writing target file
+	mockFileSystem.On("WriteFile", targetMiseFile, content, os.FileMode(0644)).Return(nil)
+
+	// Create integration with mock filesystem and disable mise to avoid trust command
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
+	integration.Disable()
+
+	err := integration.SetupWorktree(sourceDir, targetDir)
 	s.Require().NoError(err)
+
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }
 
 func (s *MiseClientTestSuite) TestSetupWorktree_WithDisabledIntegration() {
-	integration := NewMiseIntegration()
+	// Create mock filesystem
+	mockFileSystem := mocks.NewFileSystemMock()
+
+	// Setup mock expectations
+	sourceDir := filepath.Join(s.tempDir, "source")
+	targetDir := filepath.Join(s.tempDir, "target")
+	sourceMiseFile := filepath.Join(sourceDir, ".mise.local.toml")
+	targetMiseFile := filepath.Join(targetDir, ".mise.local.toml")
+	content := []byte("[tools]\nnode = \"20.0.0\"")
+
+	// Mock target directory exists
+	targetDirInfo := mocks.NewMockFileInfoWithDetails("target", 0, 0755, time.Now(), true)
+	mockFileSystem.On("Stat", targetDir).Return(targetDirInfo, nil)
+
+	// Mock config file exists in source
+	sourceMiseFileInfo := mocks.NewMockFileInfoWithDetails(".mise.local.toml", 25, 0644, time.Now(), false)
+	mockFileSystem.On("Stat", sourceMiseFile).Return(sourceMiseFileInfo, nil)
+
+	// Mock no other config files
+	miseConfigFile := filepath.Join(sourceDir, "mise", "config.local.toml")
+	mockFileSystem.On("Stat", miseConfigFile).Return((fs.FileInfo)(nil), &os.PathError{Op: "stat", Path: miseConfigFile, Err: os.ErrNotExist})
+
+	// Mock reading source file
+	mockFileSystem.On("ReadFile", sourceMiseFile).Return(content, nil)
+
+	// Mock creating target directory (MkdirAll is called for target file directory)
+	mockFileSystem.On("MkdirAll", targetDir, os.FileMode(0755)).Return(nil)
+
+	// Mock writing target file
+	mockFileSystem.On("WriteFile", targetMiseFile, content, os.FileMode(0644)).Return(nil)
+
+	// Create integration with mock filesystem and disable it
+	integration := NewMiseIntegration(WithFileSystem(mockFileSystem))
 	integration.Disable()
 
-	// Create source directory with config file
-	sourceDir := filepath.Join(s.tempDir, "source")
-	err := os.MkdirAll(sourceDir, 0755)
+	err := integration.SetupWorktree(sourceDir, targetDir)
 	s.Require().NoError(err)
 
-	miseFile := filepath.Join(sourceDir, ".mise.local.toml")
-	err = os.WriteFile(miseFile, []byte("[tools]\nnode = \"20.0.0\""), 0644)
-	s.Require().NoError(err)
-
-	// Create target directory
-	targetDir := filepath.Join(s.tempDir, "target")
-	err = os.MkdirAll(targetDir, 0755)
-	s.Require().NoError(err)
-
-	err = integration.SetupWorktree(sourceDir, targetDir)
-	s.Require().NoError(err)
-
-	// Should still copy config files even when disabled
-	targetMiseFile := filepath.Join(targetDir, ".mise.local.toml")
-	_, err = os.Stat(targetMiseFile)
-	s.Require().NoError(err)
+	// Verify mock expectations
+	mockFileSystem.AssertExpectations(s.T())
 }

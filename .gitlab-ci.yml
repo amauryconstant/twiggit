@@ -132,38 +132,14 @@ test:
   stage: test
   extends: .defaults
   script:
-    - echo "🧪 Running unit tests with coverage..."
-    - mise x -- go test -short -coverprofile=coverage_unit.out -covermode=atomic ./...
-    - echo "🔍 Running integration tests with coverage..."
-    - mise x -- go test -tags=integration -coverprofile=coverage_integration.out -covermode=atomic ./test/integration/...
-    - echo "📊 Merging coverage profiles..."
-    - |
-      if [ -s coverage_integration.out ] && [ $(grep -c "^[^m]" coverage_integration.out) -gt 1 ]; then
-        mise x -- go run github.com/wadey/gocovmerge@latest coverage_unit.out coverage_integration.out > coverage.out
-      else
-        echo "Integration coverage is empty, using unit coverage only"
-        cp coverage_unit.out coverage.out
-      fi
-    - echo "📊 Checking coverage threshold..."
-    - |
-      TOTAL_COVERAGE=$(mise x -- go tool cover -func=coverage.out | grep "total:" | awk '{print $3}' | sed 's/%//')
-      echo "Total coverage: ${TOTAL_COVERAGE}%"
-      if awk "BEGIN {exit !($TOTAL_COVERAGE < 80.0)}"; then
-        echo "❌ Coverage threshold not met: ${TOTAL_COVERAGE}% (minimum required: 80.0%)"
-        exit 1
-      else
-        echo "✅ Coverage threshold met: ${TOTAL_COVERAGE}% (minimum required: 80.0%)"
-      fi
+    - echo "🧪 Running tests and calculating coverage..."
+    - mise run ci:coverage
     - echo "🏃 Running race condition tests..."
     - mise run test:race
     - echo "🔨 Building CLI for E2E tests..."
     - mise run build:e2e
     - echo "🎯 Running end-to-end tests..."
     - mise run test:e2e
-    - echo "📊 Converting coverage to HTML and XML..."
-    - mise x -- go tool cover -html=coverage.out -o coverage.html
-    - mise x -- gocover-cobertura < coverage.out > coverage.xml
-  coverage: '/^total:.*\s+(\d+\.\d+)%$/'
   artifacts:
     reports:
       coverage_report:

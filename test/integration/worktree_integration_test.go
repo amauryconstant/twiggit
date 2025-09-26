@@ -91,7 +91,7 @@ func (s *WorktreeIntegrationTestSuite) SetupSuite() {
 	}
 
 	// Create filesystem
-	fileSystem := os.DirFS("/") // Use real filesystem for integration tests
+	fileSystem := infrastructure.NewRealFileSystem()
 
 	s.discoveryService = services.NewDiscoveryService(s.gitClient, s.config, fileSystem)
 	validationService := services.NewValidationService(fileSystem)
@@ -250,7 +250,7 @@ func (s *WorktreeIntegrationTestSuite) TestDiscoveryService() {
 
 	// Test discovery
 	config := &config.Config{WorkspacesPath: workspaceDir}
-	fileSystem := os.DirFS(workspaceDir)
+	fileSystem := infrastructure.NewRealFileSystem()
 	discoveryService := services.NewDiscoveryService(gitClient, config, fileSystem)
 
 	s.Run("should discover all projects", func() {
@@ -298,7 +298,7 @@ func (s *WorktreeIntegrationTestSuite) TestErrorHandling() {
 	config := &config.Config{
 		WorkspacesPath: testRepo.TempDir,
 	}
-	fileSystem := os.DirFS("/") // Use real filesystem for integration tests
+	fileSystem := infrastructure.NewRealFileSystem()
 	_ = services.NewDiscoveryService(gitClient, config, fileSystem)
 	validationService := services.NewValidationService(fileSystem)
 	miseService := mise.NewMiseIntegration()
@@ -361,7 +361,7 @@ func (s *WorktreeIntegrationTestSuite) TestPerformance() {
 	}
 
 	config := &config.Config{WorkspacesPath: workspaceDir}
-	fileSystem := os.DirFS(workspaceDir)
+	fileSystem := infrastructure.NewRealFileSystem()
 	discoveryService := services.NewDiscoveryService(gitClient, config, fileSystem)
 	discoveryService.SetConcurrency(4) // Test with concurrent processing
 

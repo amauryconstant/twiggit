@@ -67,7 +67,7 @@ func (s *ArchitectureIntegrationTestSuite) SetupSuite() {
 	}
 
 	// Create filesystem
-	fileSystem := os.DirFS(s.tempDir) // Use temp directory as filesystem root for integration tests
+	fileSystem := infrastructure.NewRealFileSystem()
 
 	s.discoveryService = services.NewDiscoveryService(s.gitClient, s.config, fileSystem)
 }

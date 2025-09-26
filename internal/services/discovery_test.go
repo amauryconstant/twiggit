@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -15,6 +16,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 )
+
+// mockDirEntry creates a mock directory entry for testing using centralized mock
+func mockDirEntry(name string) fs.DirEntry {
+	return mocks.NewMockDirEntry(name, true)
+}
 
 // DiscoveryServiceTestSuite provides hybrid suite setup for discovery service tests
 type DiscoveryServiceTestSuite struct {
@@ -35,7 +41,7 @@ func (s *DiscoveryServiceTestSuite) SetupTest() {
 
 	// Create test config with mock git client - use temp directory for test isolation
 	s.Config = &config.Config{WorkspacesPath: s.TempDir}
-	testFileSystem := os.DirFS(s.TempDir)
+	testFileSystem := mocks.NewFileSystemMock()
 
 	s.Service = NewDiscoveryService(s.GitClient, s.Config, testFileSystem)
 	s.Cleanup = func() {
@@ -56,7 +62,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_NewDiscoveryService() {
 
 	tempDir := s.T().TempDir()
 	testConfig := &config.Config{WorkspacesPath: tempDir}
-	testFileSystem := os.DirFS(tempDir)
+	testFileSystem := mocks.NewFileSystemMock()
 
 	service := NewDiscoveryService(gitClient, testConfig, testFileSystem)
 
@@ -70,19 +76,34 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
 	testCases := []struct {
 		name          string
 		workspacePath string
-		setupMocks    func(*mocks.GitClientMock, string)
+		setupMocks    func(*mocks.GitClientMock, string, *mocks.FileSystemMock)
 		expectedCount int
 		expectError   bool
 	}{
 		{
 			name:          "should discover worktrees in workspace directory",
 			workspacePath: "test-workspace",
-			setupMocks: func(m *mocks.GitClientMock, workspacePath string) {
+			setupMocks: func(m *mocks.GitClientMock, workspacePath string, mockFS *mocks.FileSystemMock) {
 				// Setup directory structure in test - use absolute path for creation, relative for FileSystem
 				absWorkspacePath := filepath.Join(s.TempDir, workspacePath)
-				s.Require().NoError(os.MkdirAll(filepath.Join(absWorkspacePath, "project1"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absWorkspacePath, "project1", "worktree1"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absWorkspacePath, "project1", "worktree2"), 0755))
+				absProjectPath := filepath.Join(absWorkspacePath, "project1")
+				absWorktree1Path := filepath.Join(absProjectPath, "worktree1")
+				absWorktree2Path := filepath.Join(absProjectPath, "worktree2")
+
+				// Mock directory structure
+				mockFS.On("ReadDir", absWorkspacePath).Return([]fs.DirEntry{
+					mockDirEntry("project1"),
+				}, nil)
+				mockFS.On("ReadDir", absProjectPath).Return([]fs.DirEntry{
+					mockDirEntry("worktree1"),
+					mockDirEntry("worktree2"),
+				}, nil)
+
+				// Mock Stat calls for pathExists
+				mockFS.On("Stat", absWorkspacePath).Return(mocks.NewMockFileInfo("test-workspace", true), nil)
+				mockFS.On("Stat", absProjectPath).Return(mocks.NewMockFileInfo("project1", true), nil)
+				mockFS.On("Stat", absWorktree1Path).Return(mocks.NewMockFileInfo("worktree1", true), nil)
+				mockFS.On("Stat", absWorktree2Path).Return(mocks.NewMockFileInfo("worktree2", true), nil)
 
 				// Mock git repository detection for project directory (main repository) and worktree paths
 				m.On("IsGitRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
@@ -144,9 +165,10 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
 		{
 			name:          "should handle empty workspace gracefully",
 			workspacePath: "empty-workspace",
-			setupMocks: func(m *mocks.GitClientMock, workspacePath string) {
+			setupMocks: func(m *mocks.GitClientMock, workspacePath string, mockFS *mocks.FileSystemMock) {
 				absWorkspacePath := filepath.Join(s.TempDir, workspacePath)
-				s.Require().NoError(os.MkdirAll(absWorkspacePath, 0755))
+				mockFS.On("ReadDir", absWorkspacePath).Return([]fs.DirEntry{}, nil)
+				mockFS.On("Stat", absWorkspacePath).Return(mocks.NewMockFileInfo("empty-workspace", true), nil)
 			},
 			expectedCount: 0,
 			expectError:   false,
@@ -154,7 +176,10 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
 		{
 			name:          "should return empty list for non-existent workspace",
 			workspacePath: "non-existent",
-			setupMocks:    func(m *mocks.GitClientMock, workspacePath string) {},
+			setupMocks: func(m *mocks.GitClientMock, workspacePath string, mockFS *mocks.FileSystemMock) {
+				absWorkspacePath := filepath.Join(s.TempDir, workspacePath)
+				mockFS.On("Stat", absWorkspacePath).Return((*mocks.MockFileInfo)(nil), os.ErrNotExist)
+			},
 			expectedCount: 0,
 			expectError:   false,
 		},
@@ -165,14 +190,14 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverWorktrees() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
 			testConfig := &config.Config{WorkspacesPath: s.TempDir}
-			testFileSystem := os.DirFS(s.TempDir)
+			testFileSystem := mocks.NewFileSystemMock()
 			service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
 			// Cleanup
 			defer func() { _ = os.RemoveAll(filepath.Join(s.TempDir, tt.workspacePath)) }()
 
 			// Setup mocks
-			tt.setupMocks(mockGit, tt.workspacePath)
+			tt.setupMocks(mockGit, tt.workspacePath, testFileSystem)
 
 			// Test
 			ctx := context.Background()
@@ -245,7 +270,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_AnalyzeWorktree() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
 			testConfig := &config.Config{WorkspacesPath: s.TempDir}
-			testFileSystem := os.DirFS(s.TempDir)
+			testFileSystem := mocks.NewFileSystemMock()
 			service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 			tt.setupMocks(mockGit)
 
@@ -273,19 +298,29 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 	testCases := []struct {
 		name          string
 		workspacePath string
-		setupMocks    func(*mocks.GitClientMock, string)
+		setupMocks    func(*mocks.GitClientMock, string, *mocks.FileSystemMock)
 		expectedCount int
 		expectError   bool
 	}{
 		{
 			name:          "should find all git repositories in workspace",
 			workspacePath: "test-workspace",
-			setupMocks: func(m *mocks.GitClientMock, workspacePath string) {
+			setupMocks: func(m *mocks.GitClientMock, workspacePath string, mockFS *mocks.FileSystemMock) {
 				// Create test directory structure - use absolute path for creation, relative for FileSystem
 				absWorkspacePath := filepath.Join(s.TempDir, workspacePath)
-				s.Require().NoError(os.MkdirAll(filepath.Join(absWorkspacePath, "project1"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absWorkspacePath, "project2"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absWorkspacePath, "not-a-project"), 0755))
+				mockFS.On("MkdirAll", filepath.Join(absWorkspacePath, "project1"), fs.FileMode(0755)).Return(nil)
+				mockFS.On("MkdirAll", filepath.Join(absWorkspacePath, "project2"), fs.FileMode(0755)).Return(nil)
+				mockFS.On("MkdirAll", filepath.Join(absWorkspacePath, "not-a-project"), fs.FileMode(0755)).Return(nil)
+
+				// Mock Stat calls for pathExists validation
+				mockFS.On("Stat", absWorkspacePath).Return(mocks.NewMockFileInfo("test-workspace", true), nil)
+
+				// Mock ReadDir calls for directory listing
+				mockFS.On("ReadDir", absWorkspacePath).Return([]fs.DirEntry{
+					mockDirEntry("project1"),
+					mockDirEntry("project2"),
+					mockDirEntry("not-a-project"),
+				}, nil)
 
 				// Mock main repository detection
 				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
@@ -304,9 +339,16 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 		{
 			name:          "should handle workspace with no git repositories",
 			workspacePath: "no-repos",
-			setupMocks: func(m *mocks.GitClientMock, workspacePath string) {
+			setupMocks: func(m *mocks.GitClientMock, workspacePath string, mockFS *mocks.FileSystemMock) {
 				absWorkspacePath := filepath.Join(s.TempDir, workspacePath)
-				s.Require().NoError(os.MkdirAll(filepath.Join(absWorkspacePath, "regular-dir"), 0755))
+				mockFS.On("MkdirAll", filepath.Join(absWorkspacePath, "regular-dir"), fs.FileMode(0755)).Return(nil)
+				mockFS.On("Stat", absWorkspacePath).Return(mocks.NewMockFileInfo("no-repos", true), nil)
+
+				// Mock ReadDir calls for directory listing
+				mockFS.On("ReadDir", absWorkspacePath).Return([]fs.DirEntry{
+					mockDirEntry("regular-dir"),
+				}, nil)
+
 				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
 					return filepath.IsAbs(path) && filepath.Base(path) == "regular-dir"
 				})).Return(false, nil)
@@ -317,7 +359,10 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 		{
 			name:          "should return empty list for non-existent workspace",
 			workspacePath: "non-existent-projects",
-			setupMocks:    func(m *mocks.GitClientMock, workspacePath string) {},
+			setupMocks: func(m *mocks.GitClientMock, workspacePath string, mockFS *mocks.FileSystemMock) {
+				absWorkspacePath := filepath.Join(s.TempDir, workspacePath)
+				mockFS.On("Stat", absWorkspacePath).Return((*mocks.MockFileInfo)(nil), os.ErrNotExist)
+			},
 			expectedCount: 0,
 			expectError:   false,
 		},
@@ -328,14 +373,14 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects() {
 			// Setup
 			mockGit := &mocks.GitClientMock{}
 			testConfig := &config.Config{WorkspacesPath: s.TempDir}
-			testFileSystem := os.DirFS(s.TempDir)
+			testFileSystem := mocks.NewFileSystemMock()
 			service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
 			// Cleanup
 			defer func() { _ = os.RemoveAll(filepath.Join(s.TempDir, tt.workspacePath)) }()
 
 			// Setup mocks
-			tt.setupMocks(mockGit, tt.workspacePath)
+			tt.setupMocks(mockGit, tt.workspacePath, testFileSystem)
 
 			// Test
 			ctx := context.Background()
@@ -360,7 +405,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_Performance() {
 		// Setup
 		mockGit := &mocks.GitClientMock{}
 		testConfig := &config.Config{WorkspacesPath: s.TempDir}
-		testFileSystem := os.DirFS(s.TempDir)
+		testFileSystem := mocks.NewFileSystemMock()
 		service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 		service.SetConcurrency(4) // Test with 4 workers
 
@@ -372,13 +417,24 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_Performance() {
 		for i := 0; i < projectCount; i++ {
 			projectPath := filepath.Join(workspacePath, fmt.Sprintf("project%d", i))
 			absProjectPath := filepath.Join(s.TempDir, projectPath)
-			s.Require().NoError(os.MkdirAll(absProjectPath, 0755))
+			testFileSystem.On("MkdirAll", absProjectPath, fs.FileMode(0755)).Return(nil)
 
 			// Mock each as main repository
 			mockGit.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
 				return filepath.IsAbs(path) && filepath.Base(path) == fmt.Sprintf("project%d", i)
 			})).Return(true, nil)
 		}
+
+		// Mock Stat call for workspace path validation
+		absWorkspacePath := filepath.Join(s.TempDir, workspacePath)
+		testFileSystem.On("Stat", absWorkspacePath).Return(mocks.NewMockFileInfo("perf-test", true), nil)
+
+		// Mock ReadDir calls for directory listing
+		var projectEntries []fs.DirEntry
+		for i := 0; i < projectCount; i++ {
+			projectEntries = append(projectEntries, mockDirEntry(fmt.Sprintf("project%d", i)))
+		}
+		testFileSystem.On("ReadDir", absWorkspacePath).Return(projectEntries, nil)
 
 		// Test with timing
 		start := time.Now()
@@ -404,7 +460,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects_WithPu
 	testCases := []struct {
 		name           string
 		projectsPath   string
-		setupMocks     func(*mocks.GitClientMock, string)
+		setupMocks     func(*mocks.GitClientMock, string, *mocks.FileSystemMock)
 		expectError    bool
 		expectedErrMsg string
 		expectedCount  int
@@ -412,12 +468,22 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects_WithPu
 		{
 			name:         "should create pure Project entities without I/O in domain",
 			projectsPath: "test-projects",
-			setupMocks: func(gitMock *mocks.GitClientMock, projectsPath string) {
+			setupMocks: func(gitMock *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
 				// Create test directory structure - use absolute path for creation, relative for FileSystem
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "project1"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "project2"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "not-a-repo"), 0755))
+				mockFS.On("MkdirAll", filepath.Join(absProjectsPath, "project1"), fs.FileMode(0755)).Return(nil)
+				mockFS.On("MkdirAll", filepath.Join(absProjectsPath, "project2"), fs.FileMode(0755)).Return(nil)
+				mockFS.On("MkdirAll", filepath.Join(absProjectsPath, "not-a-repo"), fs.FileMode(0755)).Return(nil)
+
+				// Mock Stat calls for pathExists validation
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("test-projects", true), nil)
+
+				// Mock ReadDir calls for directory listing
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{
+					mockDirEntry("project1"),
+					mockDirEntry("project2"),
+					mockDirEntry("not-a-repo"),
+				}, nil)
 
 				// Mock git repository checks
 				gitMock.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
@@ -436,9 +502,11 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects_WithPu
 		{
 			name:         "should return empty list for non-existent projects path",
 			projectsPath: "nonexistent-projects",
-			setupMocks: func(gitMock *mocks.GitClientMock, projectsPath string) {
-				// No infrastructure validation needed anymore - DiscoveryService uses fs.FS directly
-				// No git calls should be made for non-existent path
+			setupMocks: func(gitMock *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock Stat to return error for non-existent path
+				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
+				mockFS.On("Stat", absProjectsPath).Return((*mocks.MockFileInfo)(nil), os.ErrNotExist)
+				// No ReadDir mock needed since Stat returns error, so ReadDir won't be called
 			},
 			expectError:   false,
 			expectedCount: 0, // Should return empty list, not error
@@ -446,13 +514,24 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects_WithPu
 		{
 			name:         "should filter out non-git repositories using infrastructure",
 			projectsPath: "mixed-projects",
-			setupMocks: func(gitMock *mocks.GitClientMock, projectsPath string) {
+			setupMocks: func(gitMock *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
 				// Create test directory structure
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "valid-project"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "another-valid"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "invalid-project"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "error-project"), 0755))
+				mockFS.On("MkdirAll", filepath.Join(absProjectsPath, "valid-project"), fs.FileMode(0755)).Return(nil)
+				mockFS.On("MkdirAll", filepath.Join(absProjectsPath, "another-valid"), fs.FileMode(0755)).Return(nil)
+				mockFS.On("MkdirAll", filepath.Join(absProjectsPath, "invalid-project"), fs.FileMode(0755)).Return(nil)
+				mockFS.On("MkdirAll", filepath.Join(absProjectsPath, "error-project"), fs.FileMode(0755)).Return(nil)
+
+				// Mock Stat calls for pathExists validation
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("mixed-projects", true), nil)
+
+				// Mock ReadDir calls for directory listing
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{
+					mockDirEntry("valid-project"),
+					mockDirEntry("another-valid"),
+					mockDirEntry("invalid-project"),
+					mockDirEntry("error-project"),
+				}, nil)
 
 				// Mock git checks - only some are valid repositories
 				gitMock.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
@@ -480,13 +559,13 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjects_WithPu
 
 			// Setup test dependencies
 			testConfig := &config.Config{WorkspacesPath: s.TempDir}
-			testFileSystem := os.DirFS(s.TempDir)
+			testFileSystem := mocks.NewFileSystemMock()
 
 			// Create service
 			s.Service = NewDiscoveryService(s.GitClient, testConfig, testFileSystem)
 
 			// Setup mocks
-			tt.setupMocks(s.GitClient, tt.projectsPath)
+			tt.setupMocks(s.GitClient, tt.projectsPath, testFileSystem)
 
 			ctx := context.Background()
 			projects, err := s.Service.DiscoverProjects(ctx, tt.projectsPath)
@@ -602,7 +681,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_ConvertToWorktree_WithP
 	for _, tt := range testCases {
 		s.Run(tt.name, func() {
 			testConfig := &config.Config{WorkspacesPath: s.TempDir}
-			testFileSystem := os.DirFS(s.TempDir)
+			testFileSystem := mocks.NewFileSystemMock()
 			s.Service = NewDiscoveryService(s.GitClient, testConfig, testFileSystem)
 
 			worktree, err := s.Service.convertToWorktree(tt.worktreeInfo)
@@ -634,7 +713,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjectsWithFal
 	testCases := []struct {
 		name          string
 		projectsPath  string
-		setupMocks    func(*mocks.GitClientMock, string)
+		setupMocks    func(*mocks.GitClientMock, string, *mocks.FileSystemMock)
 		expectedCount int
 		expectError   bool
 		errorMessage  string
@@ -642,12 +721,17 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjectsWithFal
 		{
 			name:         "should succeed when primary discovery works",
 			projectsPath: "test-projects",
-			setupMocks: func(m *mocks.GitClientMock, projectsPath string) {
-				// Create test directory structure
+			setupMocks: func(m *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock directory structure with project1, project2, and not-a-repo
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "project1"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "project2"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "not-a-repo"), 0755))
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{
+					mockDirEntry("project1"),
+					mockDirEntry("project2"),
+					mockDirEntry("not-a-repo"),
+				}, nil)
+
+				// Mock Stat calls for pathExists
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("test-projects", true), nil)
 
 				// Mock main repository detection for all directories
 				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
@@ -666,14 +750,16 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjectsWithFal
 		{
 			name:         "should use fallback when primary discovery fails",
 			projectsPath: "fallback-test-projects",
-			setupMocks: func(m *mocks.GitClientMock, projectsPath string) {
-				// Create test directory structure that fallback will find
+			setupMocks: func(m *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock directory structure with project1 and project2
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				// Create parent directory first
-				s.Require().NoError(os.MkdirAll(absProjectsPath, 0755))
-				// Create subdirectories
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "project1"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "project2"), 0755))
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{
+					mockDirEntry("project1"),
+					mockDirEntry("project2"),
+				}, nil)
+
+				// Mock Stat calls for pathExists
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("fallback-test-projects", true), nil)
 
 				// Mock primary discovery calls to succeed
 				m.On("IsMainRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
@@ -689,27 +775,12 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjectsWithFal
 		{
 			name:         "should return error when both primary and fallback discovery fail",
 			projectsPath: "nonexistent-projects",
-			setupMocks: func(m *mocks.GitClientMock, projectsPath string) {
-				// Create directory that will cause fallback to fail
+			setupMocks: func(m *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock filesystem to return permission error when reading directory
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				s.Require().NoError(os.MkdirAll(absProjectsPath, 0000)) // No permissions
-
-				// On some systems (like when running as root), even 0000 permissions allow reading
-				// So we need to check if the directory is actually readable and adjust the test accordingly
-				if _, err := os.ReadDir(absProjectsPath); err == nil {
-					// Directory is readable (likely running as root), remove it and create a different error condition
-					os.RemoveAll(absProjectsPath)
-					// Create a directory with a file that has no permissions to trigger a different error
-					s.Require().NoError(os.MkdirAll(absProjectsPath, 0755))
-					noPermFile := filepath.Join(absProjectsPath, "no-permission-file")
-					s.Require().NoError(os.WriteFile(noPermFile, []byte("test"), 0000))
-					// Now try to read the directory with the no-permission file
-					if _, err := os.ReadDir(absProjectsPath); err == nil {
-						// Still readable, remove the file and make the directory itself unreadable
-						os.Remove(noPermFile)
-						os.Chmod(absProjectsPath, 0000)
-					}
-				}
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{}, errors.New("permission denied"))
+				// For fallback to fail with ReadDir error, path must exist but ReadDir must fail
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("nonexistent-projects", true), nil)
 			},
 			expectError:  true,
 			errorMessage: "failed to discover projects with fallback",
@@ -717,10 +788,11 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjectsWithFal
 		{
 			name:         "should handle empty projects directory",
 			projectsPath: "empty-projects",
-			setupMocks: func(m *mocks.GitClientMock, projectsPath string) {
-				// Create empty directory
+			setupMocks: func(m *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock empty directory
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				s.Require().NoError(os.MkdirAll(absProjectsPath, 0755))
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{}, nil)
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("empty-projects", true), nil)
 			},
 			expectedCount: 0,
 			expectError:   false,
@@ -732,18 +804,16 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_DiscoverProjectsWithFal
 			// Setup
 			mockGit := &mocks.GitClientMock{}
 			testConfig := &config.Config{WorkspacesPath: s.TempDir}
-			testFileSystem := os.DirFS(s.TempDir)
+			testFileSystem := mocks.NewFileSystemMock()
 			service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
 			// Cleanup
 			defer func() {
-				// Make sure directory is readable before cleanup
-				_ = os.Chmod(filepath.Join(s.TempDir, tt.projectsPath), 0755)
 				_ = os.RemoveAll(filepath.Join(s.TempDir, tt.projectsPath))
 			}()
 
 			// Setup mocks
-			tt.setupMocks(mockGit, tt.projectsPath)
+			tt.setupMocks(mockGit, tt.projectsPath, testFileSystem)
 
 			// Test
 			ctx := context.Background()
@@ -768,19 +838,31 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_fallbackProjectDiscover
 	testCases := []struct {
 		name          string
 		projectsPath  string
-		setupMocks    func(*mocks.GitClientMock, string)
+		setupMocks    func(*mocks.GitClientMock, string, *mocks.FileSystemMock)
 		expectedCount int
 		expectError   bool
 	}{
 		{
 			name:         "should discover projects with basic git repository check",
 			projectsPath: "fallback-test",
-			setupMocks: func(m *mocks.GitClientMock, projectsPath string) {
-				// Create test directory structure
+			setupMocks: func(m *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock directory structure with repo1, repo2, and not-repo
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "repo1"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "repo2"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "not-repo"), 0755))
+				absRepo1Path := filepath.Join(absProjectsPath, "repo1")
+				absRepo2Path := filepath.Join(absProjectsPath, "repo2")
+				absNotRepoPath := filepath.Join(absProjectsPath, "not-repo")
+
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{
+					mockDirEntry("repo1"),
+					mockDirEntry("repo2"),
+					mockDirEntry("not-repo"),
+				}, nil)
+
+				// Mock Stat calls for pathExists
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("fallback-test", true), nil)
+				mockFS.On("Stat", absRepo1Path).Return(mocks.NewMockFileInfo("repo1", true), nil)
+				mockFS.On("Stat", absRepo2Path).Return(mocks.NewMockFileInfo("repo2", true), nil)
+				mockFS.On("Stat", absNotRepoPath).Return(mocks.NewMockFileInfo("not-repo", true), nil)
 
 				// Mock basic git repository checks
 				m.On("IsGitRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
@@ -799,11 +881,21 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_fallbackProjectDiscover
 		{
 			name:         "should handle git repository check errors gracefully",
 			projectsPath: "error-test",
-			setupMocks: func(m *mocks.GitClientMock, projectsPath string) {
-				// Create test directory structure
+			setupMocks: func(m *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock directory structure with valid-repo and error-repo
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "valid-repo"), 0755))
-				s.Require().NoError(os.MkdirAll(filepath.Join(absProjectsPath, "error-repo"), 0755))
+				absValidRepoPath := filepath.Join(absProjectsPath, "valid-repo")
+				absErrorRepoPath := filepath.Join(absProjectsPath, "error-repo")
+
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{
+					mockDirEntry("valid-repo"),
+					mockDirEntry("error-repo"),
+				}, nil)
+
+				// Mock Stat calls for pathExists
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("error-test", true), nil)
+				mockFS.On("Stat", absValidRepoPath).Return(mocks.NewMockFileInfo("valid-repo", true), nil)
+				mockFS.On("Stat", absErrorRepoPath).Return(mocks.NewMockFileInfo("error-repo", true), nil)
 
 				// Mock mixed responses
 				m.On("IsGitRepository", mock.AnythingOfType("context.backgroundCtx"), mock.MatchedBy(func(path string) bool {
@@ -819,8 +911,11 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_fallbackProjectDiscover
 		{
 			name:         "should return empty list for non-existent path",
 			projectsPath: "nonexistent",
-			setupMocks: func(m *mocks.GitClientMock, projectsPath string) {
-				// No directories exist
+			setupMocks: func(m *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock filesystem to return error for non-existent path
+				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
+				// Note: ReadDir won't be called if Stat returns os.ErrNotExist due to pathExists check
+				mockFS.On("Stat", absProjectsPath).Return((*mocks.MockFileInfo)(nil), os.ErrNotExist)
 			},
 			expectedCount: 0,
 			expectError:   false,
@@ -828,27 +923,12 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_fallbackProjectDiscover
 		{
 			name:         "should return error when directory read fails",
 			projectsPath: "permission-denied",
-			setupMocks: func(m *mocks.GitClientMock, projectsPath string) {
-				// Create directory that will cause read error
+			setupMocks: func(m *mocks.GitClientMock, projectsPath string, mockFS *mocks.FileSystemMock) {
+				// Mock filesystem to return permission error when reading directory
 				absProjectsPath := filepath.Join(s.TempDir, projectsPath)
-				s.Require().NoError(os.MkdirAll(absProjectsPath, 0000)) // No permissions
-
-				// On some systems (like when running as root), even 0000 permissions allow reading
-				// So we need to check if the directory is actually readable and adjust the test accordingly
-				if _, err := os.ReadDir(absProjectsPath); err == nil {
-					// Directory is readable (likely running as root), remove it and create a different error condition
-					os.RemoveAll(absProjectsPath)
-					// Create a directory with a file that has no permissions to trigger a different error
-					s.Require().NoError(os.MkdirAll(absProjectsPath, 0755))
-					noPermFile := filepath.Join(absProjectsPath, "no-permission-file")
-					s.Require().NoError(os.WriteFile(noPermFile, []byte("test"), 0000))
-					// Now try to read the directory with the no-permission file
-					if _, err := os.ReadDir(absProjectsPath); err == nil {
-						// Still readable, remove the file and make the directory itself unreadable
-						os.Remove(noPermFile)
-						os.Chmod(absProjectsPath, 0000)
-					}
-				}
+				mockFS.On("ReadDir", absProjectsPath).Return([]fs.DirEntry{}, errors.New("permission denied"))
+				// Path must exist (Stat succeeds) but ReadDir must fail for error to be returned
+				mockFS.On("Stat", absProjectsPath).Return(mocks.NewMockFileInfo("permission-denied", true), nil)
 			},
 			expectError: true,
 		},
@@ -859,14 +939,14 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_fallbackProjectDiscover
 			// Setup
 			mockGit := &mocks.GitClientMock{}
 			testConfig := &config.Config{WorkspacesPath: s.TempDir}
-			testFileSystem := os.DirFS(s.TempDir)
+			testFileSystem := mocks.NewFileSystemMock()
 			service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
 			// Cleanup
 			defer func() { _ = os.RemoveAll(filepath.Join(s.TempDir, tt.projectsPath)) }()
 
 			// Setup mocks
-			tt.setupMocks(mockGit, tt.projectsPath)
+			tt.setupMocks(mockGit, tt.projectsPath, testFileSystem)
 
 			// Test
 			ctx := context.Background()
@@ -891,7 +971,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_ClearCache() {
 		// Setup
 		mockGit := &mocks.GitClientMock{}
 		testConfig := &config.Config{WorkspacesPath: s.TempDir}
-		testFileSystem := os.DirFS(s.TempDir)
+		testFileSystem := mocks.NewFileSystemMock()
 		service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
 		// Add some items to cache
@@ -913,7 +993,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_ClearCache() {
 		// Setup
 		mockGit := &mocks.GitClientMock{}
 		testConfig := &config.Config{WorkspacesPath: s.TempDir}
-		testFileSystem := os.DirFS(s.TempDir)
+		testFileSystem := mocks.NewFileSystemMock()
 		service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
 		// Verify cache is initially empty
@@ -930,7 +1010,7 @@ func (s *DiscoveryServiceTestSuite) TestDiscoveryService_ClearCache() {
 		// Setup
 		mockGit := &mocks.GitClientMock{}
 		testConfig := &config.Config{WorkspacesPath: s.TempDir}
-		testFileSystem := os.DirFS(s.TempDir)
+		testFileSystem := mocks.NewFileSystemMock()
 		service := NewDiscoveryService(mockGit, testConfig, testFileSystem)
 
 		// Add items to cache

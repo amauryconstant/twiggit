@@ -5,8 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -28,7 +26,7 @@ const (
 type DiscoveryService struct {
 	gitClient   infrastructure.GitClient
 	config      *config.Config
-	fileSystem  fs.FS
+	fileSystem  infrastructure.FileSystem
 	concurrency int
 	mu          sync.RWMutex
 	cache       map[string]*discoveryResult
@@ -40,7 +38,7 @@ type discoveryResult struct {
 }
 
 // NewDiscoveryService creates a new DiscoveryService instance
-func NewDiscoveryService(gitClient infrastructure.GitClient, config *config.Config, fileSystem fs.FS) *DiscoveryService {
+func NewDiscoveryService(gitClient infrastructure.GitClient, config *config.Config, fileSystem infrastructure.FileSystem) *DiscoveryService {
 	return &DiscoveryService{
 		gitClient:   gitClient,
 		config:      config,
@@ -61,7 +59,7 @@ func (ds *DiscoveryService) SetConcurrency(workers int) {
 func (ds *DiscoveryService) pathExists(path string) bool {
 	// Convert to absolute path first to ensure we check the correct location
 	absolutePath := ds.convertToAbsolutePath(path)
-	_, err := os.Stat(absolutePath)
+	_, err := ds.fileSystem.Stat(absolutePath)
 	return err == nil
 }
 
@@ -160,7 +158,7 @@ func (ds *DiscoveryService) DiscoverProjects(ctx context.Context, projectsPath s
 
 	// Find all directories in projects directory
 	absoluteProjectsPath := ds.convertToAbsolutePath(projectsPath)
-	entries, err := os.ReadDir(absoluteProjectsPath)
+	entries, err := ds.fileSystem.ReadDir(absoluteProjectsPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read projects directory: %w", err)
 	}
@@ -228,7 +226,7 @@ func (ds *DiscoveryService) fallbackProjectDiscovery(ctx context.Context, projec
 
 	// Try to read directory with basic error handling
 	absolutePath := ds.convertToAbsolutePath(projectsPath)
-	entries, err := os.ReadDir(absolutePath)
+	entries, err := ds.fileSystem.ReadDir(absolutePath)
 	if err != nil {
 		return nil, fmt.Errorf("fallback discovery failed: %w", err)
 	}
@@ -267,7 +265,7 @@ func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, w
 
 	// Read the workspaces directory to find project subdirectories
 	absoluteWorkspacesPath := ds.convertToAbsolutePath(workspacesPath)
-	entries, err := os.ReadDir(absoluteWorkspacesPath)
+	entries, err := ds.fileSystem.ReadDir(absoluteWorkspacesPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read workspaces directory: %w", err)
 	}
@@ -286,7 +284,7 @@ func (ds *DiscoveryService) findWorktreePathsInWorkspaces(ctx context.Context, w
 		}
 
 		// Then, look for worktree directories within each project directory
-		worktreeEntries, err := os.ReadDir(absoluteProjectDir)
+		worktreeEntries, err := ds.fileSystem.ReadDir(absoluteProjectDir)
 		if err != nil {
 			continue // Skip on error
 		}

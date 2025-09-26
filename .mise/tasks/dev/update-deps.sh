@@ -1,4 +1,5 @@
 #!/bin/bash
+#MISE description="Update the CI dependencies"
 set -euo pipefail
 
 echo "🔄 Updating CI dependencies securely..."

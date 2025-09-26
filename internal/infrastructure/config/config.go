@@ -10,8 +10,9 @@ import (
 
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/env"
-	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
+
+	"github.com/amaury/twiggit/internal/infrastructure"
 )
 
 // Config represents the application configuration
@@ -47,16 +48,75 @@ func NewConfig() *Config {
 	}
 }
 
-// LoadConfig loads configuration from files and environment variables
-func LoadConfig() (*Config, error) {
+// fileProvider implements a koanf provider that uses our FileSystem interface
+type fileProvider struct {
+	fs   infrastructure.FileSystem
+	path string
+}
+
+// NewFileProvider creates a new file provider that uses our FileSystem interface
+func NewFileProvider(fs infrastructure.FileSystem, path string) koanf.Provider {
+	return &fileProvider{
+		fs:   fs,
+		path: path,
+	}
+}
+
+// ReadBytes reads the configuration file bytes
+func (p *fileProvider) ReadBytes() ([]byte, error) {
+	data, err := p.fs.ReadFile(p.path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+	return data, nil
+}
+
+// Read returns the raw configuration data
+func (p *fileProvider) Read() (map[string]interface{}, error) {
+	// Return empty map to let koanf handle the parsing with the TOML parser
+	// The TOML parser will use the ReadBytes method internally
+	return map[string]interface{}{}, nil
+}
+
+// Option is a functional option for configuring Config loading
+type Option func(*configLoader)
+
+// WithFileSystem sets a custom filesystem for config loading
+func WithFileSystem(fs infrastructure.FileSystem) Option {
+	return func(cl *configLoader) {
+		cl.fileSystem = fs
+	}
+}
+
+// configLoader handles configuration loading with configurable dependencies
+type configLoader struct {
+	fileSystem infrastructure.FileSystem
+}
+
+// LoadConfig loads configuration from files and environment variables with optional configuration
+func LoadConfig(opts ...Option) (*Config, error) {
+	loader := &configLoader{
+		fileSystem: infrastructure.NewRealFileSystem(),
+	}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(loader)
+	}
+
+	return loader.load()
+}
+
+// load handles the actual configuration loading logic
+func (cl *configLoader) load() (*Config, error) {
 	config := NewConfig()
 	k := koanf.New(".")
 
 	// Load from configuration files (lower priority)
 	configPaths := config.getConfigPaths()
 	for _, configPath := range configPaths {
-		if _, err := os.Stat(configPath); err == nil {
-			if err := k.Load(file.Provider(configPath), toml.Parser()); err != nil {
+		if _, err := cl.fileSystem.Stat(configPath); err == nil {
+			if err := k.Load(NewFileProvider(cl.fileSystem, configPath), toml.Parser()); err != nil {
 				return nil, fmt.Errorf("failed to load config from %s: %w", configPath, err)
 			}
 			break // Use first found config file

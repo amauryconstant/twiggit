@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
+	"github.com/amaury/twiggit/test/mocks"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -12,11 +14,13 @@ import (
 type ConfigTestSuite struct {
 	suite.Suite
 	originalEnv map[string]string
+	mockFS      *mocks.FileSystemMock
 }
 
 // SetupTest saves original environment variables for each test
 func (s *ConfigTestSuite) SetupTest() {
 	s.originalEnv = make(map[string]string)
+	s.mockFS = mocks.NewFileSystemMock()
 	envVars := []string{
 		"TWIGGIT_WORKSPACES_PATH",
 		"TWIGGIT_PROJECT",
@@ -75,7 +79,22 @@ func (s *ConfigTestSuite) TestConfig_LoadFromEnvironment() {
 	s.Require().NoError(os.Setenv("TWIGGIT_VERBOSE", "true"))
 	s.Require().NoError(os.Setenv("TWIGGIT_QUIET", "false"))
 
-	config, err := LoadConfig()
+	// Mock Stat calls to return "file not found" for all config paths
+	// This ensures no config files are found and only environment variables are used
+	home := os.Getenv("HOME")
+	xdgConfigHome := os.Getenv("XDG_CONFIG_HOME")
+
+	configPaths := []string{
+		filepath.Join(xdgConfigHome, "twiggit", "config.toml"),
+		filepath.Join(home, ".config", "twiggit", "config.toml"),
+		filepath.Join(home, ".twiggit.toml"),
+	}
+
+	for _, path := range configPaths {
+		s.mockFS.On("Stat", path).Return((*mocks.MockFileInfo)(nil), os.ErrNotExist)
+	}
+
+	config, err := LoadConfig(WithFileSystem(s.mockFS))
 	s.Require().NoError(err)
 
 	s.Equal("/custom/workspace", config.WorkspacesPath)
@@ -89,7 +108,6 @@ func (s *ConfigTestSuite) TestConfig_LoadFromFile() {
 	// Create temporary config file in the expected XDG structure
 	tempDir := s.T().TempDir()
 	configDir := filepath.Join(tempDir, "twiggit")
-	s.Require().NoError(os.MkdirAll(configDir, 0755))
 	configFile := filepath.Join(configDir, "config.toml")
 
 	configContent := `workspaces_path = "/file/workspace"
@@ -97,13 +115,18 @@ project = "file-project"
 verbose = true
 quiet = false
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
-	s.Require().NoError(err)
+
+	// Mock the Stat call to return a valid FileInfo (file exists)
+	mockFileInfo := mocks.NewMockFileInfoWithDetails("config.toml", int64(len(configContent)), 0644, time.Now(), false)
+	s.mockFS.On("Stat", configFile).Return(mockFileInfo, nil)
+
+	// Mock the ReadFile call to return the config content
+	s.mockFS.On("ReadFile", configFile).Return([]byte(configContent), nil)
 
 	// Set XDG_CONFIG_HOME to temp directory
 	s.Require().NoError(os.Setenv("XDG_CONFIG_HOME", tempDir))
 
-	config, err := LoadConfig()
+	config, err := LoadConfig(WithFileSystem(s.mockFS))
 	s.Require().NoError(err)
 
 	s.Equal("/file/workspace", config.WorkspacesPath)
@@ -111,6 +134,9 @@ quiet = false
 	s.True(config.Verbose)
 	s.False(config.Quiet)
 	s.Empty(config.DefaultSourceBranch) // Default value
+
+	// Verify mock expectations
+	s.mockFS.AssertExpectations(s.T())
 }
 
 // TestConfig_EnvironmentOverridesFile tests that environment variables override file values
@@ -118,22 +144,26 @@ func (s *ConfigTestSuite) TestConfig_EnvironmentOverridesFile() {
 	// Create temporary config file
 	tempDir := s.T().TempDir()
 	configFile := filepath.Join(tempDir, "twiggit", "config.toml")
-	s.Require().NoError(os.MkdirAll(filepath.Dir(configFile), 0755))
 
 	configContent := `
-workspace = "/file/workspace"
+workspaces_path = "/file/workspace"
 project = "file-project"
 verbose = false
 `
-	err := os.WriteFile(configFile, []byte(configContent), 0644)
-	s.Require().NoError(err)
+
+	// Mock the Stat call to return a valid FileInfo (file exists)
+	mockFileInfo := mocks.NewMockFileInfoWithDetails("config.toml", int64(len(configContent)), 0644, time.Now(), false)
+	s.mockFS.On("Stat", configFile).Return(mockFileInfo, nil)
+
+	// Mock the ReadFile call to return the config content
+	s.mockFS.On("ReadFile", configFile).Return([]byte(configContent), nil)
 
 	// Set environment variables to override file values
 	s.Require().NoError(os.Setenv("XDG_CONFIG_HOME", tempDir))
 	s.Require().NoError(os.Setenv("TWIGGIT_WORKSPACES_PATH", "/env/workspace"))
 	s.Require().NoError(os.Setenv("TWIGGIT_VERBOSE", "true"))
 
-	config, err := LoadConfig()
+	config, err := LoadConfig(WithFileSystem(s.mockFS))
 	s.Require().NoError(err)
 
 	// Environment should override file
@@ -141,6 +171,9 @@ verbose = false
 	s.True(config.Verbose)
 	// File value should be used where env not set
 	s.Equal("file-project", config.Project)
+
+	// Verify mock expectations
+	s.mockFS.AssertExpectations(s.T())
 }
 
 // TestConfig_Validate tests config validation with table-driven approach
