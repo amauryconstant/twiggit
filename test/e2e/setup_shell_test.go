@@ -178,6 +178,33 @@ var _ = Describe("Setup-Shell Command", func() {
 		Expect(output).To(ContainSubstring("builtin cd"))
 	})
 
+	It("mentions zfunctions as advanced option for zsh", func() {
+		session := cli.Run("setup-shell", "--shell", "zsh")
+		Eventually(session).Should(gexec.Exit(0))
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("Advanced users"))
+		Expect(output).To(ContainSubstring("zsh functions"))
+	})
+
+	It("does not show zfunctions note for bash", func() {
+		session := cli.Run("setup-shell", "--shell", "bash")
+		Eventually(session).Should(gexec.Exit(0))
+
+		output := string(session.Out.Contents())
+		Expect(output).NotTo(ContainSubstring("Advanced users"))
+		Expect(output).NotTo(ContainSubstring("zsh functions"))
+	})
+
+	It("does not show zfunctions note for fish", func() {
+		session := cli.Run("setup-shell", "--shell", "fish")
+		Eventually(session).Should(gexec.Exit(0))
+
+		output := string(session.Out.Contents())
+		Expect(output).NotTo(ContainSubstring("Advanced users"))
+		Expect(output).NotTo(ContainSubstring("zsh functions"))
+	})
+
 	It("shows warning about shell built-in override", func() {
 		session := cli.Run("setup-shell", "--shell", "bash")
 		Eventually(session).Should(gexec.Exit(0))
