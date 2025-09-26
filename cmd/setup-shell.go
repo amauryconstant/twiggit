@@ -312,6 +312,11 @@ func displaySetupInstructions(shellInfo *ShellInfo) error {
 	fmt.Printf("• All other twiggit commands (list, create, delete) work normally\n")
 	fmt.Printf("• The wrapper only affects 'twiggit cd' commands\n")
 
+	// Add zfunctions note for zsh users
+	if shellInfo.Type == ShellZsh {
+		fmt.Printf("\n💡 Advanced users: For zsh functions integration, see documentation.\n")
+	}
+
 	return nil
 }
 
@@ -324,11 +329,13 @@ twiggit() {
     if [[ "$1" == "cd" ]]; then
         # Handle twiggit cd command
         local target_path
-        target_path=$(command twiggit cd "${@:2}")
-        if [[ $? -eq 0 ]]; then
+        target_path=$(command twiggit cd "${@:2}" 2>&1)
+        local exit_code=$?
+        if [[ $exit_code -eq 0 ]]; then
             builtin cd "$target_path"
         else
-            return $?
+            echo "$target_path" >&2
+            return $exit_code
         fi
     else
         # Pass through all other twiggit commands
@@ -345,11 +352,13 @@ twiggit() {
     if [[ "$1" == "cd" ]]; then
         # Handle twiggit cd command
         local target_path
-        target_path=$(command twiggit cd "${@:2}")
-        if [[ $? -eq 0 ]]; then
+        target_path=$(command twiggit cd "${@:2}" 2>&1)
+        local exit_code=$?
+        if [[ $exit_code -eq 0 ]]; then
             builtin cd "$target_path"
         else
-            return $?
+            echo "$target_path" >&2
+            return $exit_code
         fi
     else
         # Pass through all other twiggit commands
@@ -365,11 +374,13 @@ twiggit() {
 function twiggit
     if test "$argv[1]" = "cd"
         # Handle twiggit cd command
-        set target_path (command twiggit cd $argv[2..-1])
-        if test $status -eq 0
+        set target_path (command twiggit cd $argv[2..-1] 2>&1)
+        set exit_code $status
+        if test $exit_code -eq 0
             builtin cd $target_path
         else
-            return $status
+            echo $target_path >&2
+            return $exit_code
         end
     else
         # Pass through all other twiggit commands

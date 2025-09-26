@@ -267,12 +267,14 @@ func (t *ShellIntegrationTest) getWrapperFunctionForShell(shell string) string {
 		return `twiggit() {
     if [[ "$1" == "cd" ]]; then
         local target_path
-        target_path=$(command twiggit cd "${@:2}")
-        if [[ $? -eq 0 ]]; then
+        target_path=$(command twiggit cd "${@:2}" 2>&1)
+        local exit_code=$?
+        if [[ $exit_code -eq 0 ]]; then
             builtin cd "$target_path"
             echo "CHANGED_TO:$PWD"
         else
-            return $?
+            echo "$target_path" >&2
+            return $exit_code
         fi
     else
         command twiggit "$@"
@@ -283,12 +285,14 @@ func (t *ShellIntegrationTest) getWrapperFunctionForShell(shell string) string {
 		return `twiggit() {
     if [[ "$1" == "cd" ]]; then
         local target_path
-        target_path=$(command twiggit cd "${@:2}")
-        if [[ $? -eq 0 ]]; then
+        target_path=$(command twiggit cd "${@:2}" 2>&1)
+        local exit_code=$?
+        if [[ $exit_code -eq 0 ]]; then
             builtin cd "$target_path"
             echo "CHANGED_TO:$PWD"
         else
-            return $?
+            echo "$target_path" >&2
+            return $exit_code
         fi
     else
         command twiggit "$@"
@@ -298,11 +302,12 @@ func (t *ShellIntegrationTest) getWrapperFunctionForShell(shell string) string {
 	case "fish":
 		return `function twiggit
     if test "$argv[1]" = "cd"
-        set target_path (command twiggit cd $argv[2..-1])
+        set target_path (command twiggit cd $argv[2..-1] 2>&1)
         if test $status -eq 0
             builtin cd $target_path
             echo "CHANGED_TO:$PWD"
         else
+            echo $target_path >&2
             return $status
         end
     else
@@ -433,6 +438,38 @@ var _ = Describe("Shell Integration", func() {
 				Skip("bash shell not available")
 			}
 			test.testErrorHandling("bash")
+		})
+
+		It("forwards error messages to stderr", func() {
+			if !isShellAvailable("bash") {
+				Skip("bash shell not available")
+			}
+
+			script := fmt.Sprintf(`
+# Set up test environment
+export PATH="%s:$PATH"
+export TWIGGIT_TEST_MODE=1
+
+# Define the twiggit wrapper function
+%s
+
+# Test error message forwarding
+if twiggit cd nonexistent-project 2>error.log; then
+    echo "ERROR_SHOULD_HAVE_FAILED"
+else
+    echo "ERROR_CODE:$?"
+    if [ -f error.log ]; then
+        echo "ERROR_MESSAGE:$(cat error.log)"
+    fi
+fi
+`,
+				filepath.Dir(test.cliPath),
+				test.getWrapperFunctionForShell("bash"))
+
+			output, err := test.runInShell("bash", script)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output).To(ContainSubstring("ERROR_CODE:"))
+			Expect(output).To(ContainSubstring("ERROR_MESSAGE:"))
 		})
 	})
 
