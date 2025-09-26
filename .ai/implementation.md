@@ -39,7 +39,7 @@
 - Shell wrapper function generation SHALL be tested with mock shell configurations
 - Escape hatch behavior SHALL be tested with builtin cd functionality
 - Shell configuration file modification SHALL be tested with temporary files
-- Directory switching output SHALL be tested for correct path format
+- Directory navigation output SHALL be tested for correct path format
 - Shell wrapper installation SHALL be tested with integration tests
 
 ## Quality Requirements

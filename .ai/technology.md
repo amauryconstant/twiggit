@@ -80,7 +80,7 @@ go-git storage and filesystem abstractions SHALL be used for custom worktree imp
 Koanf SHALL load configuration in priority order: defaults → config file → environment variables → command flags.
 
 ### Shell Integration Strategy
-Carapace SHALL generate completion scripts. Directory switching SHALL use shell wrapper functions that intercept command output.
+Carapace SHALL generate completion scripts. Directory navigation SHALL use shell wrapper functions that intercept command output.
 
 ## Technology-Specific Constraints
 
@@ -106,7 +106,7 @@ Carapace SHALL generate completion scripts. Directory switching SHALL use shell 
 
 ### Shell Integration Constraints
 - Carapace SHALL be used for shell completion generation
-- Shell wrapper functions SHALL be generated for directory switching
+- Shell wrapper functions SHALL be generated for directory navigation
 - Shell detection SHALL be performed automatically during setup
 
 ## Decision Framework

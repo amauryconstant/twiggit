@@ -11,7 +11,7 @@ cmd/                    # CLI entry points
 ├── create.go          # Create command implementation
 ├── delete.go          # Delete command implementation
 ├── list.go            # List command implementation
-├── switch.go          # Switch command implementation
+├── cd.go              # CD (change directory) command implementation
 └── root.go            # Root command and CLI setup
 
 internal/              # Private application code
