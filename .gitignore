@@ -29,11 +29,5 @@ twiggit
 .DS_Store
 Thumbs.db
 
-# AI
-.ai/**
-!.ai/design.md
-!.ai/technology.md
-!.ai/implementation.md
-!.ai/documentation-design.md
-!.ai/testing.md
-!.ai/code-style-guide.md
+# Legacy
+legacy
