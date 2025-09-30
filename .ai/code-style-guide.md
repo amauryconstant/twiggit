@@ -39,20 +39,24 @@ import "fmt"
 
 // Project represents a git worktree project
 type Project struct {
-    name     string
-    path     string
-    worktree *Worktree
+    name      string
+    path      string
+    worktrees []*Worktree
 }
 
-// NewProject creates a new project instance
+// NewProject creates a new project instance (idempotent)
 func NewProject(name, path string) (*Project, error) {
     if name == "" {
         return nil, fmt.Errorf("project name cannot be empty")
     }
+    if path == "" {
+        return nil, fmt.Errorf("project path cannot be empty")
+    }
     
     return &Project{
-        name: name,
-        path: path,
+        name:      name,
+        path:      path,
+        worktrees: []*Worktree{}, // Initialize empty slice
     }, nil
 }
 ```
@@ -146,21 +150,27 @@ func GetProject(name string) *Project {
 // Good: Clear, focused interfaces
 package infrastructure
 
-import "github.com/go-git/go-git/v5/plumbing"
+import (
+    "github.com/go-git/go-git/v5"
+    "github.com/go-git/go-git/v5/plumbing"
+)
 
-// GitClient defines the contract for git operations
+// GitClient defines the contract for git operations (functional, idempotent)
 type GitClient interface {
-    // CreateWorktree creates a new git worktree
-    CreateWorktree(path string, ref plumbing.ReferenceName) (*git.Worktree, error)
+    // CreateWorktree creates a new git worktree (idempotent)
+    CreateWorktree(repoPath, worktreePath string, ref plumbing.ReferenceName) (*git.Worktree, error)
     
-    // ListWorktrees returns all existing worktrees
-    ListWorktrees() ([]*git.Worktree, error)
+    // ListWorktrees returns all existing worktrees (idempotent)
+    ListWorktrees(repoPath string) ([]*git.Worktree, error)
     
-    // DeleteWorktree removes a worktree
-    DeleteWorktree(path string) error
+    // DeleteWorktree removes a worktree (idempotent, no-op if already deleted)
+    DeleteWorktree(worktreePath string) error
     
-    // GetCurrentBranch returns the current branch name
-    GetCurrentBranch() (plumbing.ReferenceName, error)
+    // GetCurrentBranch returns the current branch name (idempotent)
+    GetCurrentBranch(repoPath string) (plumbing.ReferenceName, error)
+    
+    // ValidateRepository checks if path contains valid git repository (pure function)
+    ValidateRepository(path string) error
 }
 
 // ConfigManager defines configuration operations

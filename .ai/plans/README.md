@@ -1,6 +1,6 @@
 # Twiggit Implementation Plans
 
-This directory contains 10 sequential implementation plans for building the twiggit CLI tool, a pragmatic git worktree management system with sophisticated context detection.
+This directory contains 10 sequential implementation phases for building the twiggit CLI tool, a pragmatic git worktree management system with sophisticated context detection.
 
 ## Implementation Sequence
 
