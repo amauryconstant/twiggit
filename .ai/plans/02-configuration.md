@@ -45,7 +45,7 @@ func DefaultConfig() *Config {
 	home, _ := os.UserHomeDir()
 	return &Config{
 		ProjectsDirectory:  filepath.Join(home, "Projects"),
-		WorktreesDirectory: filepath.Join(home, "Workspaces"),
+		WorktreesDirectory: filepath.Join(home, "Worktrees"),
 		DefaultSourceBranch: "main",
 		GitImplementation: "go-git",
 	}
@@ -271,7 +271,7 @@ func TestConfigManager_Load_Defaults(t *testing.T) {
 	// Verify defaults are loaded
 	home, _ := os.UserHomeDir()
 	assert.Equal(t, filepath.Join(home, "Projects"), config.ProjectsDirectory)
-	assert.Equal(t, filepath.Join(home, "Workspaces"), config.WorktreesDirectory)
+	assert.Equal(t, filepath.Join(home, "Worktrees"), config.WorktreesDirectory)
 	assert.Equal(t, "main", config.DefaultSourceBranch)
 	assert.Equal(t, "go-git", config.GitImplementation)
 }
@@ -283,7 +283,7 @@ func TestConfigManager_Load_ConfigFile(t *testing.T) {
 	
 	configContent := `
 projects_dir = "/custom/projects"
-worktrees_dir = "/custom/workspaces"
+worktrees_dir = "/custom/worktrees"
 default_source_branch = "develop"
 git_implementation = "system-git"
 `
@@ -298,7 +298,7 @@ git_implementation = "system-git"
 	
 	// Mock the config file path
 	manager.ko.Set("projects_dir", "/custom/projects")
-	manager.ko.Set("worktrees_dir", "/custom/workspaces")
+	manager.ko.Set("worktrees_dir", "/custom/worktrees")
 	manager.ko.Set("default_source_branch", "develop")
 	manager.ko.Set("git_implementation", "system-git")
 	
@@ -308,7 +308,7 @@ git_implementation = "system-git"
 	
 	// Verify config file values are loaded
 	assert.Equal(t, "/custom/projects", config.ProjectsDirectory)
-	assert.Equal(t, "/custom/workspaces", config.WorktreesDirectory)
+	assert.Equal(t, "/custom/worktrees", config.WorktreesDirectory)
 	assert.Equal(t, "develop", config.DefaultSourceBranch)
 	assert.Equal(t, "system-git", config.GitImplementation)
 }
@@ -316,7 +316,7 @@ git_implementation = "system-git"
 func TestConfigManager_Load_EnvironmentVariables(t *testing.T) {
 	// Set environment variables
 	os.Setenv("TWIGGIT_PROJECTS_DIR", "/env/projects")
-	os.Setenv("TWIGGIT_WORKTREES_DIR", "/env/workspaces")
+	os.Setenv("TWIGGIT_WORKTREES_DIR", "/env/worktrees")
 	os.Setenv("TWIGGIT_DEFAULT_SOURCE_BRANCH", "env-main")
 	defer func() {
 		os.Unsetenv("TWIGGIT_PROJECTS_DIR")
@@ -331,7 +331,7 @@ func TestConfigManager_Load_EnvironmentVariables(t *testing.T) {
 	
 	// Verify environment variables override defaults
 	assert.Equal(t, "/env/projects", config.ProjectsDirectory)
-	assert.Equal(t, "/env/workspaces", config.WorktreesDirectory)
+	assert.Equal(t, "/env/worktrees", config.WorktreesDirectory)
 	assert.Equal(t, "env-main", config.DefaultSourceBranch)
 }
 
@@ -341,7 +341,7 @@ func TestConfigManager_ValidateConfig(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		config := &domain.Config{
 			ProjectsDirectory:  "/valid/projects",
-			WorktreesDirectory: "/valid/workspaces",
+			WorktreesDirectory: "/valid/worktrees",
 			DefaultSourceBranch: "main",
 			GitImplementation: "go-git",
 		}
@@ -353,7 +353,7 @@ func TestConfigManager_ValidateConfig(t *testing.T) {
 	t.Run("invalid relative paths", func(t *testing.T) {
 		config := &domain.Config{
 			ProjectsDirectory:  "relative/projects",
-			WorktreesDirectory: "/valid/workspaces",
+			WorktreesDirectory: "/valid/worktrees",
 			DefaultSourceBranch: "main",
 			GitImplementation: "go-git",
 		}
@@ -366,7 +366,7 @@ func TestConfigManager_ValidateConfig(t *testing.T) {
 	t.Run("invalid git implementation", func(t *testing.T) {
 		config := &domain.Config{
 			ProjectsDirectory:  "/valid/projects",
-			WorktreesDirectory: "/valid/workspaces",
+			WorktreesDirectory: "/valid/worktrees",
 			DefaultSourceBranch: "main",
 			GitImplementation: "invalid-git",
 		}
@@ -436,7 +436,7 @@ var _ = ginkgo.Describe("Configuration Integration", func() {
 			configPath := filepath.Join(tempDir, "config.toml")
 			configContent := `
 projects_dir = "/test/projects"
-worktrees_dir = "/test/workspaces"
+worktrees_dir = "/test/worktrees"
 default_source_branch = "develop"
 git_implementation = "system-git"
 `
@@ -451,7 +451,7 @@ git_implementation = "system-git"
 			config, err := manager.Load()
 			gomega.Expect(err).NotTo(gomega.HaveOccurred())
 			gomega.Expect(config.ProjectsDirectory).To(gomega.Equal("/test/projects"))
-			gomega.Expect(config.WorktreesDirectory).To(gomega.Equal("/test/workspaces"))
+			gomega.Expect(config.WorktreesDirectory).To(gomega.Equal("/test/worktrees"))
 			gomega.Expect(config.DefaultSourceBranch).To(gomega.Equal("develop"))
 			gomega.Expect(config.GitImplementation).To(gomega.Equal("system-git"))
 		})
@@ -600,7 +600,7 @@ func TestConfig_Validate(t *testing.T) {
 	t.Run("valid configuration", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:  "/valid/projects",
-			WorktreesDirectory: "/valid/workspaces",
+			WorktreesDirectory: "/valid/worktrees",
 			DefaultSourceBranch: "main",
 			GitImplementation: "go-git",
 		}
@@ -612,7 +612,7 @@ func TestConfig_Validate(t *testing.T) {
 	t.Run("invalid projects directory", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:  "relative/path",
-			WorktreesDirectory: "/valid/workspaces",
+			WorktreesDirectory: "/valid/worktrees",
 			DefaultSourceBranch: "main",
 			GitImplementation: "go-git",
 		}
@@ -638,7 +638,7 @@ func TestConfig_Validate(t *testing.T) {
 	t.Run("empty default source branch", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:  "/valid/projects",
-			WorktreesDirectory: "/valid/workspaces",
+			WorktreesDirectory: "/valid/worktrees",
 			DefaultSourceBranch: "",
 			GitImplementation: "go-git",
 		}
@@ -651,7 +651,7 @@ func TestConfig_Validate(t *testing.T) {
 	t.Run("invalid git implementation", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:  "/valid/projects",
-			WorktreesDirectory: "/valid/workspaces",
+			WorktreesDirectory: "/valid/worktrees",
 			DefaultSourceBranch: "main",
 			GitImplementation: "invalid-git",
 		}
@@ -739,7 +739,7 @@ The configuration file is located at `$HOME/.config/twiggit/config.toml` followi
 ```toml
 # Directory paths
 projects_dir = "/custom/path/to/projects"
-worktrees_dir = "/custom/path/to/workspaces"
+worktrees_dir = "/custom/path/to/worktrees"
 
 # Default behavior
 default_source_branch = "develop"

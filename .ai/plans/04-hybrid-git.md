@@ -559,7 +559,7 @@ func TestHybridClient_CreateWorktree_GoGitSuccess(t *testing.T) {
     repoPath := "/test/repo"
     branchName := "feature-branch"
     sourceBranch := "main"
-    worktreePath := "/test/workspaces/repo/feature-branch"
+    worktreePath := "/test/worktrees/repo/feature-branch"
     
     mockGoGit.On("CreateWorktree", mock.Anything, repoPath, branchName, sourceBranch, worktreePath).Return(nil)
     
@@ -585,7 +585,7 @@ func TestHybridClient_CreateWorktree_FallbackToCLI(t *testing.T) {
     repoPath := "/test/repo"
     branchName := "feature-branch"
     sourceBranch := "main"
-    worktreePath := "/test/workspaces/repo/feature-branch"
+    worktreePath := "/test/worktrees/repo/feature-branch"
     
     worktreeErr := &WorktreeNotSupportedError{Operation: "create_worktree", Path: repoPath}
     mockGoGit.On("CreateWorktree", mock.Anything, repoPath, branchName, sourceBranch, worktreePath).Return(worktreeErr)
@@ -651,7 +651,7 @@ var _ = Describe("Hybrid Git Operations", func() {
     
     Context("when creating worktrees", func() {
         It("should create worktree using go-git when possible", func() {
-            worktreePath := filepath.Join(tempDir, "workspaces", "test-repo", "feature-branch")
+            worktreePath := filepath.Join(tempDir, "worktrees", "test-repo", "feature-branch")
             
             err := client.CreateWorktree(context.Background(), repoPath, "feature-branch", "main", worktreePath)
             Expect(err).NotTo(HaveOccurred())
@@ -668,7 +668,7 @@ var _ = Describe("Hybrid Git Operations", func() {
         
         It("should fallback to CLI when go-git fails", func() {
             // Test with complex scenario that triggers fallback
-            worktreePath := filepath.Join(tempDir, "workspaces", "test-repo", "complex-branch")
+            worktreePath := filepath.Join(tempDir, "worktrees", "test-repo", "complex-branch")
             
             err := client.CreateWorktree(context.Background(), repoPath, "complex-branch", "main", worktreePath)
             Expect(err).NotTo(HaveOccurred())
@@ -682,8 +682,8 @@ var _ = Describe("Hybrid Git Operations", func() {
     Context("when listing worktrees", func() {
         It("should list all worktrees correctly", func() {
             // Create multiple worktrees
-            worktreePath1 := filepath.Join(tempDir, "workspaces", "test-repo", "feature-1")
-            worktreePath2 := filepath.Join(tempDir, "workspaces", "test-repo", "feature-2")
+            worktreePath1 := filepath.Join(tempDir, "worktrees", "test-repo", "feature-1")
+            worktreePath2 := filepath.Join(tempDir, "worktrees", "test-repo", "feature-2")
             
             err := client.CreateWorktree(context.Background(), repoPath, "feature-1", "main", worktreePath1)
             Expect(err).NotTo(HaveOccurred())
@@ -754,7 +754,7 @@ var _ = Describe("Hybrid Git Operations E2E", func() {
         Eventually(session).Should(gexec.Exit(0))
         
         // Verify worktree was created
-        worktreePath := filepath.Join(tempDir, "Workspaces", "test-repo", "feature-branch")
+        worktreePath := filepath.Join(tempDir, "Worktrees", "test-repo", "feature-branch")
         Expect(worktreePath).To(BeADirectory())
         
         // Test list command

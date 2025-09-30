@@ -290,7 +290,7 @@ func (s *worktreeService) resolveProjectForCreate(ctx context.Context, req *Crea
 }
 
 func (s *worktreeService) calculateWorktreePath(projectName, branchName string) string {
-    return filepath.Join(s.config.WorkspacesDirectory, projectName, branchName)
+    return filepath.Join(s.config.WorktreesDirectory, projectName, branchName)
 }
 ```
 
@@ -320,14 +320,14 @@ func (v *WorktreeValidator) ValidateCreateRequest(ctx context.Context, req *Crea
     }
     
     // Check if worktree already exists
-    worktreePath := filepath.Join(v.config.WorkspacesDirectory, project.Name, req.BranchName)
+    worktreePath := filepath.Join(v.config.WorktreesDirectory, project.Name, req.BranchName)
     if _, err := os.Stat(worktreePath); err == nil {
         errors = append(errors, fmt.Errorf("worktree already exists at %s", worktreePath))
     }
     
-    // Validate workspace directory exists
-    if _, err := os.Stat(v.config.WorkspacesDirectory); os.IsNotExist(err) {
-        errors = append(errors, fmt.Errorf("workspaces directory does not exist: %s", v.config.WorkspacesDirectory))
+    // Validate worktree directory exists
+    if _, err := os.Stat(v.config.WorktreesDirectory); os.IsNotExist(err) {
+        errors = append(errors, fmt.Errorf("worktrees directory does not exist: %s", v.config.WorktreesDirectory))
     }
     
     if len(errors) > 0 {
@@ -584,7 +584,7 @@ func (s *navigationService) resolveFromProjectContext(ctx context.Context, req *
     switch target.Type {
     case TargetTypeBranch:
         // Navigate to worktree of current project
-        worktreePath := filepath.Join(s.config.WorkspacesDirectory, currentProject, target.Branch)
+        worktreePath := filepath.Join(s.config.WorktreesDirectory, currentProject, target.Branch)
         return &PathResolution{
             ResolvedPath: worktreePath,
             Type:         PathTypeWorktree,
@@ -609,7 +609,7 @@ func (s *navigationService) resolveFromProjectContext(ctx context.Context, req *
         
     case TargetTypeProjectBranch:
         // Navigate to cross-project worktree
-        worktreePath := filepath.Join(s.config.WorkspacesDirectory, target.Project, target.Branch)
+        worktreePath := filepath.Join(s.config.WorktreesDirectory, target.Project, target.Branch)
         return &PathResolution{
             ResolvedPath: worktreePath,
             Type:         PathTypeWorktree,
@@ -643,7 +643,7 @@ func (s *navigationService) resolveFromWorktreeContext(ctx context.Context, req 
             }, nil
         } else {
             // Navigate to different worktree of same project
-            worktreePath := filepath.Join(s.config.WorkspacesDirectory, currentProject, target.Branch)
+            worktreePath := filepath.Join(s.config.WorktreesDirectory, currentProject, target.Branch)
             return &PathResolution{
                 ResolvedPath: worktreePath,
                 Type:         PathTypeWorktree,
@@ -669,7 +669,7 @@ func (s *navigationService) resolveFromWorktreeContext(ctx context.Context, req 
         
     case TargetTypeProjectBranch:
         // Navigate to cross-project worktree
-        worktreePath := filepath.Join(s.config.WorkspacesDirectory, target.Project, target.Branch)
+        worktreePath := filepath.Join(s.config.WorktreesDirectory, target.Project, target.Branch)
         return &PathResolution{
             ResolvedPath: worktreePath,
             Type:         PathTypeWorktree,
@@ -700,7 +700,7 @@ func (s *navigationService) resolveFromOutsideGitContext(ctx context.Context, re
         
     case TargetTypeProjectBranch:
         // Navigate to cross-project worktree
-        worktreePath := filepath.Join(s.config.WorkspacesDirectory, target.Project, target.Branch)
+        worktreePath := filepath.Join(s.config.WorktreesDirectory, target.Project, target.Branch)
         return &PathResolution{
             ResolvedPath: worktreePath,
             Type:         PathTypeWorktree,
@@ -864,7 +864,7 @@ func TestWorktreeService_CreateWorktree_Success(t *testing.T) {
     mockProjectService := &MockProjectService{}
     mockContextService := &MockContextService{}
     config := &domain.Config{
-        WorkspacesDirectory: "/test/workspaces",
+        WorktreesDirectory: "/test/worktrees",
     }
     
     service := NewWorktreeService(mockGitClient, mockProjectService, mockContextService, config)
@@ -900,7 +900,7 @@ func TestWorktreeService_CreateWorktree_ValidationError(t *testing.T) {
     mockProjectService := &MockProjectService{}
     mockContextService := &MockContextService{}
     config := &domain.Config{
-        WorkspacesDirectory: "/test/workspaces",
+        WorktreesDirectory: "/test/worktrees",
     }
     
     service := NewWorktreeService(mockGitClient, mockProjectService, mockContextService, config)
@@ -944,13 +944,13 @@ var _ = Describe("Services Integration", func() {
         // Setup real infrastructure components
         config := &domain.Config{
             ProjectsDirectory:  filepath.Join(tempDir, "Projects"),
-            WorkspacesDirectory: filepath.Join(tempDir, "Workspaces"),
+            WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
         }
         
         // Create directories
         err = os.MkdirAll(config.ProjectsDirectory, 0755)
         Expect(err).NotTo(HaveOccurred())
-        err = os.MkdirAll(config.WorkspacesDirectory, 0755)
+        err = os.MkdirAll(config.WorktreesDirectory, 0755)
         Expect(err).NotTo(HaveOccurred())
         
         // Initialize test repository

@@ -125,7 +125,7 @@ For comprehensive Go code patterns and testing structure, see code-style-guide.m
 type ProjectTestSuite struct {
     suite.Suite
     Project   *Project
-    Workspace *Workspace
+    Worktree *Worktree
 }
 
 func (s *ProjectTestSuite) SetupTest() {
@@ -133,7 +133,7 @@ func (s *ProjectTestSuite) SetupTest() {
     s.Project, err = NewProject("test-project", "/repo/path")
     s.Require().NoError(err)
     
-    s.Workspace, err = NewWorkspace("/test/workspace")
+    s.Worktree, err = NewWorktree("/test/worktree")
     s.Require().NoError(err)
 }
 

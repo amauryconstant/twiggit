@@ -197,7 +197,7 @@ func TestWorktree_NewWorktree(t *testing.T) {
     }{
         {
             name:        "valid worktree",
-            path:        "/home/user/Workspaces/project/feature",
+            path:        "/home/user/Worktrees/project/feature",
             branch:      "feature",
             expectError: false,
         },
@@ -210,7 +210,7 @@ func TestWorktree_NewWorktree(t *testing.T) {
         },
         {
             name:         "empty branch",
-            path:         "/home/user/Workspaces/project/feature",
+            path:         "/home/user/Worktrees/project/feature",
             branch:       "",
             expectError:  true,
             errorMessage: "new worktree: branch cannot be empty",
@@ -350,7 +350,7 @@ func Execute() {
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-# Go workspace file
+# Go worktree file
 go.work
 
 # IDE files

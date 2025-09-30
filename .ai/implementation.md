@@ -29,10 +29,10 @@
 ### Context Detection Testing Requirements
 - Context detection logic SHALL be tested with unit tests
 - Project folder detection SHALL be tested with mocked .git/ directories
-- Workspace folder detection SHALL be tested with pattern matching
+- Worktree folder detection SHALL be tested with pattern matching
 - Edge cases SHALL be tested: nested directories, multiple .git dirs, broken repos
 - Context detection SHALL be tested with integration tests using real git repositories
-- Context behavior SHALL be validated for all three contexts: project, workspace, outside git
+- Context behavior SHALL be validated for all three contexts: project, worktree, outside git
 
 ### Shell Integration Testing Requirements
 - Shell detection logic SHALL be tested for bash, zsh, and fish
@@ -166,14 +166,14 @@
 
 # Directory paths
 projects_dir = "/custom/path/to/projects"
-workspaces_dir = "/custom/path/to/workspaces"
+worktrees_dir = "/custom/path/to/worktrees"
 
 # Default behavior
 default_source_branch = "main"
 ```
 
 ### Settings
-- **Directory paths**: Defaults for projects and workspaces directories SHALL be overridden
+- **Directory paths**: Defaults for projects and worktrees directories SHALL be overridden
 - **Default source branch**: Default `main` branch for create command SHALL be overridden
 
 ## Dependency Management
@@ -225,7 +225,7 @@ default_source_branch = "main"
   - Directory SHALL be verified to contain valid `.git/` folder
 - **Network errors**: `error: unable to access 'https://github.com/user/repo.git': Failed to connect to github.com port 443`
   - Network connection and repository URL SHALL be checked
-- **Permission issues**: `error: permission denied: '/home/user/Workspaces/project/branch'`
+- **Permission issues**: `error: permission denied: '/home/user/Worktrees/project/branch'`
   - Directory permissions SHALL be checked or appropriate privileges SHALL be used
 - **Ambiguous contexts**: `error: ambiguous context - please specify project and worktree explicitly`
   - `twiggit --project <name> --worktree <branch>` or `--all` flag SHALL be used

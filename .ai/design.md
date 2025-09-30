@@ -8,7 +8,7 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 
 ### Default Paths
 - **Projects**: `$HOME/Projects/<project-name>/`
-- **Workspaces**: `$HOME/Workspaces/<project-name>/<worktree-branch-name>/`
+- **Worktrees**: `$HOME/Worktrees/<project-name>/<worktree-branch-name>/`
 
 ### Directory Creation
 - Default directories SHOULD exist before execution
@@ -33,7 +33,7 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 
 **Context behavior**:
 - From project folder: List worktrees for current project
-- From workspace folder: List worktrees for current project
+- From worktree folder: List worktrees for current project
 - From outside git: List all worktrees across all projects
 
 **Flags**:
@@ -49,7 +49,7 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 **Parameter Inference Rules**:
 1. **Project name** (inferred in this order):
    - From current directory if in project folder (`.git/` found)
-   - From workspace path if in workspace folder (`$HOME/Workspaces/<project>/`)
+   - From worktree path if in worktree folder (`$HOME/Worktrees/<project>/`)
    - Required as positional argument if outside git context
 
 2. **Source branch** (defaults in this order):
@@ -79,7 +79,7 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 **Usage**: `twiggit cd feature-branch` (requires shell wrapper setup)
 
 **Output Format**:
-- **Success**: Absolute path to worktree directory (e.g., `/home/user/Workspaces/project-name/feature-branch`)
+- **Success**: Absolute path to worktree directory (e.g., `/home/user/Worktrees/project-name/feature-branch`)
 - **Error**: Error message to stderr, exit with non-zero code
 
 **Shell Wrapper**:
@@ -91,23 +91,23 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 
 **Context behavior**:
 - From project folder: Change SHALL occur to specified worktree of current project
-- From workspace folder: Change SHALL occur to different worktree of current project
+- From worktree folder: Change SHALL occur to different worktree of current project
 - From outside git: Project and worktree specification SHALL be required
 
 **Identifier resolution rules**:
 
 | Context | Input Format | Interpretation | Target |
 |---------|--------------|----------------|---------|
-| **Project folder** | `<branch>` | Worktree branch name | `~/Workspaces/current-project/<branch>` |
+| **Project folder** | `<branch>` | Worktree branch name | `~/Worktrees/current-project/<branch>` |
 | **Project folder** | `<project>` | Different project name | `~/Projects/<project>` |
-| **Project folder** | `<project>/<branch>` | Cross-project worktree | `~/Workspaces/<project>/<branch>` |
-| **Workspace folder** | `<branch>` | Different worktree of same project | `~/Workspaces/current-project/<branch>` |
-| **Workspace folder** | `main` | Main project directory (special case) | `~/Projects/current-project` |
-| **Workspace folder** | `<project>` | Different project name | `~/Projects/<project>` |
-| **Workspace folder** | `<project>/<branch>` | Cross-project worktree | `~/Workspaces/<project>/<branch>` |
+| **Project folder** | `<project>/<branch>` | Cross-project worktree | `~/Worktrees/<project>/<branch>` |
+| **Worktree folder** | `<branch>` | Different worktree of same project | `~/Worktrees/current-project/<branch>` |
+| **Worktree folder** | `main` | Main project directory (special case) | `~/Projects/current-project` |
+| **Worktree folder** | `<project>` | Different project name | `~/Projects/<project>` |
+| **Worktree folder** | `<project>/<branch>` | Cross-project worktree | `~/Worktrees/<project>/<branch>` |
 | **Outside git** | `<branch>` | Invalid - requires project context | Error |
 | **Outside git** | `<project>` | Project main directory | `~/Projects/<project>` |
-| **Outside git** | `<project>/<branch>` | Cross-project worktree | `~/Workspaces/<project>/<branch>` |
+| **Outside git** | `<project>/<branch>` | Cross-project worktree | `~/Worktrees/<project>/<branch>` |
 
 #### `delete` - Delete a git worktree
 **Safety checks (always enforced)**:
@@ -215,31 +215,31 @@ The system WILL resolve target identifiers based on current context using the fo
    - Directory tree WILL be traversed up until finding `.git/` or reaching filesystem root
    - First `.git/` found WILL be used (closest to current directory)
    - Project folder SHALL be distinguished from worktree folder by path structure
-2. **Workspace folder**: Path matches `$HOME/Workspaces/<project>/<branch>/` pattern  
+2. **Worktree folder**: Path matches `$HOME/Worktrees/<project>/<branch>/` pattern  
    - Exact pattern matching SHALL be used with configurable base directories
-   - Alternative workspace detection patterns MAY be supported in future
-   - Workspace SHALL be validated to contain valid git worktree
-   - Workspace folder SHALL be distinguished from project folder by path structure
-3. **Outside git**: No `.git/` found and not in workspace pattern
+   - Alternative worktree detection patterns MAY be supported in future
+   - Worktree SHALL be validated to contain valid git worktree
+   - Worktree folder SHALL be distinguished from project folder by path structure
+3. **Outside git**: No `.git/` found and not in worktree pattern
 
 ### Context Detection Priority
 - Context detection SHALL be performed before identifier resolution
-- Workspace folder detection SHALL take precedence over project folder detection when both patterns match
+- Worktree folder detection SHALL take precedence over project folder detection when both patterns match
 - Context type SHALL be determined using the following priority:
-  1. **Workspace folder** (if path matches workspace pattern and contains valid worktree)
-  2. **Project folder** (if `.git/` found and path doesn't match workspace pattern)
+  1. **Worktree folder** (if path matches worktree pattern and contains valid worktree)
+  2. **Project folder** (if `.git/` found and path doesn't match worktree pattern)
   3. **Outside git** (neither condition met)
 - Context detection results SHALL be cached for performance during single command execution
 
 ### Edge Case Handling
 - **Nested directories**: Context SHALL be determined by closest valid parent directory
 - **Multiple `.git` directories**: First one found during upward traversal SHALL be used
-- **Invalid workspace pattern**: SHALL be treated as "outside git" context
+- **Invalid worktree pattern**: SHALL be treated as "outside git" context
 - **Broken git repositories**: SHALL be detected as invalid context, error and exit SHALL occur
 
 ### Context Behavior
 - **From project folder**: Command SHALL be applied to current project
-- **From workspace folder**: Command SHALL be applied to current worktree or encapsulating project
+- **From worktree folder**: Command SHALL be applied to current worktree or encapsulating project
 - **From outside git**: Explicit project/worktree specification SHALL be required or `--all` SHALL be used
 
 ### Cross-context Operations
@@ -277,7 +277,7 @@ The system WILL resolve target identifiers based on current context using the fo
 - Configuration validation SHALL occur during startup
 
 ### Configurable Options
-- **Directory paths**: Defaults for projects and workspaces directories SHALL be overridden
+- **Directory paths**: Defaults for projects and worktrees directories SHALL be overridden
 - **Default source branch**: Default `main` branch for create command SHALL be overridden
 - See [implementation.md](./implementation.md) for detailed configuration examples and file location
 

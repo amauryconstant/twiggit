@@ -12,20 +12,20 @@ Implement the core context detection system that automatically detects user cont
 >    - Directory tree WILL be traversed up until finding `.git/` or reaching filesystem root
 >    - First `.git/` found WILL be used (closest to current directory)
 >    - Project folder SHALL be distinguished from worktree folder by path structure
-> 2. **Workspace folder**: Path matches `$HOME/Workspaces/<project>/<branch>/` pattern  
+> 2. **Worktree folder**: Path matches `$HOME/Worktrees/<project>/<branch>/` pattern  
 >    - Exact pattern matching SHALL be used with configurable base directories
->    - Alternative workspace detection patterns MAY be supported in future
->    - Workspace SHALL be validated to contain valid git worktree
->    - Workspace folder SHALL be distinguished from project folder by path structure
-> 3. **Outside git**: No `.git/` found and not in workspace pattern
+>    - Alternative worktree detection patterns MAY be supported in future
+>    - Worktree SHALL be validated to contain valid git worktree
+>    - Worktree folder SHALL be distinguished from project folder by path structure
+> 3. **Outside git**: No `.git/` found and not in worktree pattern
 
 ### Context Detection Priority (from design.md lines 225-232)
 > **Context Detection Priority**
 > - Context detection SHALL be performed before identifier resolution
-> - Workspace folder detection SHALL take precedence over project folder detection when both patterns match
+> - Worktree folder detection SHALL take precedence over project folder detection when both patterns match
 > - Context type SHALL be determined using the following priority:
->   1. **Workspace folder** (if path matches workspace pattern and contains valid worktree)
->   2. **Project folder** (if `.git/` found and path doesn't match workspace pattern)
+>   1. **Worktree folder** (if path matches worktree pattern and contains valid worktree)
+>   2. **Project folder** (if `.git/` found and path doesn't match worktree pattern)
 >   3. **Outside git** (neither condition met)
 > - Context detection results SHALL be cached for performance during single command execution
 
@@ -98,14 +98,14 @@ type ContextDetector interface {
 // ContextDetectionConfig holds configuration for context detection
 type ContextDetectionConfig struct {
     ProjectsDir  string
-    WorkspacesDir string
+    WorktreesDir string
 }
 
 // GetContextDetectionConfig returns context detection configuration
 func (c *Config) GetContextDetectionConfig() *ContextDetectionConfig {
     return &ContextDetectionConfig{
         ProjectsDir:  c.GetString("projects_dir"),
-        WorkspacesDir: c.GetString("workspaces_dir"),
+        WorktreesDir: c.GetString("worktrees_dir"),
     }
 }
 ```
@@ -131,8 +131,8 @@ func (cd *contextDetector) DetectContext(dir string) (*Context, error) {
         return nil, fmt.Errorf("failed to get absolute path: %w", err)
     }
 
-    // Priority 1: Check workspace pattern first
-    if ctx := cd.detectWorkspaceContext(absDir); ctx != nil {
+    // Priority 1: Check worktree pattern first
+    if ctx := cd.detectWorktreeContext(absDir); ctx != nil {
         return ctx, nil
     }
 
@@ -145,23 +145,23 @@ func (cd *contextDetector) DetectContext(dir string) (*Context, error) {
     return &Context{
         Type:        ContextOutsideGit,
         Path:        absDir,
-        Explanation: "Not in a git repository or workspace",
+        Explanation: "Not in a git repository or worktree",
     }, nil
 }
 ```
 
-#### 2.2 Implement Workspace Detection
+#### 2.2 Implement Worktree Detection
 **File**: `internal/infrastructure/context_detector.go` (continued)
 
 ```go
-func (cd *contextDetector) detectWorkspaceContext(dir string) *Context {
-    // Normalize workspace directory
-    workspaceDir := filepath.Clean(cd.config.WorkspacesDir)
+func (cd *contextDetector) detectWorktreeContext(dir string) *Context {
+    // Normalize worktree directory
+    worktreeDir := filepath.Clean(cd.config.WorktreesDir)
     
-    // Check if current directory is under workspace directory
-    relPath, err := filepath.Rel(workspaceDir, dir)
+    // Check if current directory is under worktree directory
+    relPath, err := filepath.Rel(worktreeDir, dir)
     if err != nil {
-        return nil // Not under workspace directory
+        return nil // Not under worktree directory
     }
     
     // Split relative path to extract project and branch
@@ -364,9 +364,9 @@ func (cd *contextDetector) DetectContext(dir string) (*Context, error) {
 **File**: `internal/infrastructure/context_detector.go` (enhanced)
 
 ```go
-func (cd *contextDetector) detectWorkspaceContext(dir string) *Context {
-    // Quick check: if not under workspaces dir, exit early
-    if !strings.HasPrefix(dir, cd.config.WorkspacesDir+string(filepath.Separator)) {
+func (cd *contextDetector) detectWorktreeContext(dir string) *Context {
+    // Quick check: if not under worktrees dir, exit early
+    if !strings.HasPrefix(dir, cd.config.WorktreesDir+string(filepath.Separator)) {
         return nil
     }
     
@@ -400,16 +400,16 @@ func TestContextDetector_DetectContext(t *testing.T) {
             expectedProj: "temp",
         },
         {
-            name: "worktree context in workspace pattern",
+            name: "worktree context in worktree pattern",
             setupFunc: func(t *testing.T) string {
-                workspaceDir := filepath.Join(os.Getenv("HOME"), "Workspaces", "test-project", "feature-branch")
-                require.NoError(t, os.MkdirAll(workspaceDir, 0755))
+                worktreeDir := filepath.Join(os.Getenv("HOME"), "Worktrees", "test-project", "feature-branch")
+                require.NoError(t, os.MkdirAll(worktreeDir, 0755))
                 
                 // Create worktree .git file
-                gitFile := filepath.Join(workspaceDir, ".git")
+                gitFile := filepath.Join(worktreeDir, ".git")
                 require.NoError(t, os.WriteFile(gitFile, []byte("gitdir: /path/to/git/dir"), 0644))
                 
-                return workspaceDir
+                return worktreeDir
             },
             expectedType:   ContextWorktree,
             expectedProj:   "test-project",
@@ -423,7 +423,7 @@ func TestContextDetector_DetectContext(t *testing.T) {
             dir := tt.setupFunc(t)
             
             config := &config.ContextDetectionConfig{
-                WorkspacesDir: filepath.Join(os.Getenv("HOME"), "Workspaces"),
+                WorktreesDir: filepath.Join(os.Getenv("HOME"), "Worktrees"),
             }
             
             detector := NewContextDetector(config)
@@ -460,7 +460,7 @@ func TestContextDetector_Integration(t *testing.T) {
             tempDir = t.TempDir()
             config = &config.ContextDetectionConfig{
                 ProjectsDir:  filepath.Join(tempDir, "Projects"),
-                WorkspacesDir: filepath.Join(tempDir, "Workspaces"),
+                WorktreesDir: filepath.Join(tempDir, "Worktrees"),
             }
             detector = NewContextDetector(config)
         })
@@ -510,7 +510,7 @@ func TestContextDetector_Integration(t *testing.T) {
                 Expect(err).ToNot(HaveOccurred())
                 
                 // Create worktree
-                worktreeDir := filepath.Join(config.WorkspacesDir, "main-repo", "feature-branch")
+                worktreeDir := filepath.Join(config.WorktreesDir, "main-repo", "feature-branch")
                 err = os.MkdirAll(filepath.Dir(worktreeDir), 0755)
                 Expect(err).ToNot(HaveOccurred())
                 
@@ -651,7 +651,7 @@ func (cs *ContextService) DetectContextFromPath(path string) (*Context, error) {
 - [ ] Define ContextType enum and Context struct
 - [ ] Implement ContextDetector interface
 - [ ] Create contextDetector implementation
-- [ ] Implement workspace pattern detection
+- [ ] Implement worktree pattern detection
 - [ ] Implement project detection with .git traversal
 - [ ] Add path normalization utilities
 - [ ] Implement symlink handling
