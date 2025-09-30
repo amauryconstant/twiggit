@@ -1,0 +1,128 @@
+# $schema: https://golangci-lint.run/jsonschema/golangci.jsonschema.json
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+  go: "1.21"
+
+linters:
+  default: none
+  enable:
+    # Essential
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    
+    # Code quality
+    - gocyclo
+    - gocognit
+    - funlen
+    
+    # Style
+    - misspell
+    - whitespace
+    - revive
+    
+    # Error handling
+    - errorlint
+    - wrapcheck
+    - errname
+    
+    # Performance
+    - prealloc
+    - perfsprint
+    
+    # Security
+    - gosec
+    
+    # Tests
+    - testifylint
+    - tparallel
+    - thelper
+    
+    # Best practices
+    - nakedret
+    - unconvert
+    - unparam
+    - wastedassign
+
+  settings:
+    staticcheck:
+      checks: ["all,-ST1000"]  # all but style-only checks already covered by revive
+
+    testifylint:
+      enable-all: true
+      bool-compare:
+        ignore-custom-types: false
+      expected-actual:
+        pattern: "^(expected|want|exp|expectedResult|wantResult)"
+      formatter:
+        check-format-string: true
+        require-f-funcs: false
+        require-string-msg: true
+      go-require:
+        ignore-http-handlers: true
+      require-error:
+        fn-pattern: "^(Errorf?|NoErrorf?)$"
+      suite-extra-assert-call:
+        mode: "remove"
+
+    funlen:
+      lines: 150
+      statements: 100
+
+    gocyclo:
+      min-complexity: 25
+
+    gocognit:
+      min-complexity: 30
+
+    gosec:
+      excludes:
+        - G104  # unchecked errors (defer/test)
+        - G301  # dir perms
+        - G304  # file inclusion
+        - G306  # file perms
+        - G307  # defers in loops
+        - G204  # subprocess input
+        - G401  # weak crypto for compat
+        - G501  # blocklisted import
+
+  exclusions:
+    rules:
+      # Broad test exclusions (fixtures, helpers, mocks, integration, etc.)
+      - path: ".*_test\\.go|test/(fixtures|helpers|mocks|integration)/.*\\.go"
+        linters:
+          - funlen
+          - gocyclo
+          - gocognit
+          - gosec
+          - unparam
+          - wastedassign
+          - wrapcheck
+          - errcheck
+          - prealloc
+          - revive
+
+      # Generated files
+      - path: ".*_gen\\.go"
+        linters: [all]
+
+      # Main file
+      - path: "main\\.go"
+        linters: [gosec]
+
+      # Specific noisy patterns
+      - linters: [unparam]
+        text: "parameter 'cmd' seems to be unused"
+      - linters: [unparam]
+        text: "parameter 'm' seems to be unused"
+      - linters: [revive]
+        text: "type name will be used as"
+      - linters: [revive]
+        text: "should have a package comment"
+      - linters: [errcheck]
+        text: "Close.*is not checked"
