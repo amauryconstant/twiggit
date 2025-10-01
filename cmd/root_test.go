@@ -8,6 +8,6 @@ import (
 
 func TestRootCommand_BasicProperties(t *testing.T) {
 	assert.Equal(t, "twiggit", rootCmd.Use)
-	assert.Equal(t, "Pragmatic git worktree management tool", rootCmd.Short)
+	assert.Equal(t, "A pragmatic tool for managing git worktrees", rootCmd.Short)
 	assert.Contains(t, rootCmd.Long, "git worktrees")
 }
