@@ -1,7 +1,6 @@
 //go:build integration
-// +build integration
 
-package infrastructure
+package integration
 
 import (
 	"os"
@@ -12,11 +11,12 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/domain"
+	"twiggit/internal/infrastructure"
 )
 
 func TestConfigManager_Integration_ConfigFile(t *testing.T) {
 	tempDir := t.TempDir()
-	manager := NewConfigManager()
+	manager := infrastructure.NewConfigManager()
 
 	// Create config directory and file
 	configDir := filepath.Join(tempDir, "twiggit")
@@ -47,7 +47,7 @@ default_source_branch = "develop"
 
 func TestConfigManager_Integration_XDGFallback(t *testing.T) {
 	tempDir := t.TempDir()
-	manager := NewConfigManager()
+	manager := infrastructure.NewConfigManager()
 
 	// Create config file in .config structure
 	configDir := filepath.Join(tempDir, ".config", "twiggit")
@@ -79,7 +79,7 @@ default_source_branch = "main"
 
 func TestConfigManager_Integration_Validation(t *testing.T) {
 	tempDir := t.TempDir()
-	manager := NewConfigManager()
+	manager := infrastructure.NewConfigManager()
 
 	// Create config directory and invalid config file
 	configDir := filepath.Join(tempDir, "twiggit")
@@ -99,13 +99,13 @@ projects_dir = "relative/path"
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	_, err = manager.Load()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "validation failed")
 }
 
 func TestConfigManager_Integration_MalformedTOML(t *testing.T) {
 	tempDir := t.TempDir()
-	manager := NewConfigManager()
+	manager := infrastructure.NewConfigManager()
 
 	// Create config directory and malformed TOML file
 	configDir := filepath.Join(tempDir, "twiggit")
@@ -127,7 +127,7 @@ worktrees_dir = "/test/worktrees"
 	defer os.Unsetenv("XDG_CONFIG_HOME")
 
 	_, err = manager.Load()
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to parse config file")
 }
 
@@ -151,7 +151,7 @@ func TestConfigManager_Integration_NoConfigFile(t *testing.T) {
 	}()
 
 	// Create a fresh manager after setting environment variable
-	manager := NewConfigManager()
+	manager := infrastructure.NewConfigManager()
 
 	config, err := manager.Load()
 	require.NoError(t, err)

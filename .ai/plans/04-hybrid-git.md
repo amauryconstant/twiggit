@@ -1,12 +1,15 @@
-# Hybrid Git Operations Implementation Plan
+# Git-Focused Hybrid Operations & Context Integration Plan
 
 ## Overview
 
-This plan implements the sophisticated hybrid git operations system for twiggit, combining go-git's performance with CLI fallback for critical functionality gaps. The hybrid approach addresses go-git's worktree limitations while maintaining cross-platform consistency and performance.
+This plan implements git-focused hybrid operations while completing the remaining context detection integration points. The approach combines go-git's performance with CLI fallback for critical functionality gaps, and integrates git operations directly into the context detection system for intelligent completion and validation.
 
-**Context**: Foundation, configuration, and context detection layers are established. This layer provides the core git operations with intelligent fallback mechanisms.
+**Context**: Foundation, configuration, and context detection layers are 95% complete. This phase completes the remaining 5% and adds comprehensive git operations with intelligent fallback mechanisms.
 
-**Key Challenge**: "go-git limitations: worktree functionality gaps requiring hybrid approach" (technology.md:18)
+**Key Challenges**: 
+- "go-git limitations: worktree functionality gaps requiring hybrid approach" (technology.md:18)
+- Context detection TODO comments requiring git integration (context_resolver.go:97,145,170)
+- Missing git-aware caching and validation in context detection
 
 ## Architecture Overview
 
@@ -772,39 +775,259 @@ var _ = Describe("Hybrid Git Operations E2E", func() {
 })
 ```
 
-## Implementation Steps
+## Implementation Summary
 
-### Phase 1: Core Interface and Error System
-1. **Define interfaces** in `internal/infrastructure/interfaces.go`
-2. **Implement error types** in `internal/domain/errors.go`
+### Direct Implementation Items (Context Detection Completion)
+These are the remaining 5% of context detection that need immediate implementation:
+
+1. **Resolution Suggestions** (`context_resolver.go:97,145,170`)
+   - Replace TODO comments with filesystem-based discovery
+   - Scan worktrees directory for existing branches
+   - Add project discovery from ProjectsDirectory
+
+2. **Enhanced Caching** (`context_detector.go:38-66`)
+   - Add TTL-based expiration
+   - Fix cache key normalization (use normalized paths)
+   - Add cache invalidation methods
+
+3. **Error Types** (`domain/errors.go`)
+   - Add git-specific error types
+   - Implement error context preservation
+   - Add validation error types
+
+4. **Configuration** (`domain/config.go`)
+   - Add context detection configuration options
+   - Add git operation settings
+   - Add caching parameters
+
+### Git-Focused Components (Hybrid Operations)
+These are the core git operations that constitute 70% of this phase:
+
+1. **HybridGitClient Interface** - Core abstraction for git operations
+2. **GoGitClient Implementation** - 70% coverage (repository ops, branch listing)
+3. **CLIGitClient Implementation** - 30% coverage (worktree operations)
+4. **HybridClient Integration** - Intelligent fallback logic
+5. **Performance Monitoring** - Metrics and optimization
+
+## Implementation Strategy
+
+### Part A: Context Detection Completion (Week 1) - Direct Implementation
+
+#### A1. Complete Resolution Suggestions with Filesystem Discovery
+**Target**: Replace TODO comments in `context_resolver.go:97,145,170`
+
+```go
+// Add to internal/infrastructure/context_resolver.go
+func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
+    var suggestions []*domain.ResolutionSuggestion
+    
+    // Always suggest "main"
+    if strings.HasPrefix("main", partial) {
+        suggestions = append(suggestions, &domain.ResolutionSuggestion{
+            Text:        "main",
+            Description: "Project root directory",
+            Type:        domain.PathTypeProject,
+            ProjectName: ctx.ProjectName,
+        })
+    }
+    
+    // Scan worktrees directory for existing branches
+    worktreeProjectDir := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName)
+    if entries, err := os.ReadDir(worktreeProjectDir); err == nil {
+        for _, entry := range entries {
+            if entry.IsDir() && strings.HasPrefix(entry.Name(), partial) {
+                suggestions = append(suggestions, &domain.ResolutionSuggestion{
+                    Text:        entry.Name(),
+                    Description: fmt.Sprintf("Worktree for branch '%s'", entry.Name()),
+                    Type:        domain.PathTypeWorktree,
+                    ProjectName: ctx.ProjectName,
+                    BranchName:  entry.Name(),
+                })
+            }
+        }
+    }
+    
+    return suggestions
+}
+```
+
+#### A2. Enhanced Context Caching with TTL
+**Target**: Improve `context_detector.go:38-66` with TTL and normalization
+
+```go
+// Add to internal/infrastructure/context_detector.go
+type CacheEntry struct {
+    Context   *domain.Context
+    ExpiresAt time.Time
+}
+
+func (cd *contextDetector) DetectContext(dir string) (*domain.Context, error) {
+    // Normalize path first for consistent cache keys
+    normalizedDir, err := NormalizePath(dir)
+    if err != nil {
+        return nil, fmt.Errorf("failed to normalize directory: %w", err)
+    }
+    
+    // Check cache with TTL
+    cd.cacheMu.RLock()
+    if cached, exists := cd.cache[normalizedDir]; exists && time.Now().Before(cached.ExpiresAt) {
+        cd.cacheMu.RUnlock()
+        return cached.Context, nil
+    }
+    cd.cacheMu.RUnlock()
+    
+    // Continue with detection...
+}
+```
+
+#### A3. Git-Specific Error Types
+**Target**: Extend `domain/errors.go` with git operation errors
+
+```go
+// Add to internal/domain/errors.go
+type GitOperationError struct {
+    Operation string
+    Path      string
+    Cause     error
+}
+
+func (e *GitOperationError) Error() string {
+    return fmt.Sprintf("git operation '%s' failed at %s: %v", e.Operation, e.Path, e.Cause)
+}
+
+type WorktreeValidationError struct {
+    WorktreePath string
+    Reason       string
+}
+
+func (e *WorktreeValidationError) Error() string {
+    return fmt.Sprintf("worktree validation failed for %s: %s", e.WorktreePath, e.Reason)
+}
+```
+
+#### A4. Configuration Extensions
+**Target**: Add context detection configuration to `domain/config.go`
+
+```go
+// Add to internal/domain/config.go
+type ContextDetectionConfig struct {
+    CacheTTL                time.Duration `toml:"cache_ttl"`
+    MaxCacheEntries         int           `toml:"max_cache_entries"`
+    GitOperationTimeout     time.Duration `toml:"git_operation_timeout"`
+    EnableGitValidation     bool          `toml:"enable_git_validation"`
+    FallbackToFilesystem    bool          `toml:"fallback_to_filesystem"`
+}
+
+type Config struct {
+    // Existing fields...
+    ContextDetection ContextDetectionConfig `toml:"context_detection"`
+}
+```
+
+### Part B: Git Interface Foundation (Week 1-2)
+
+#### B1. Git Context Provider Interface
+**Target**: Define git integration interfaces in `domain/git_interfaces.go`
+
+```go
+// internal/domain/git_interfaces.go
+type GitContextProvider interface {
+    ListBranches(ctx context.Context, repoPath string) ([]BranchInfo, error)
+    ListWorktrees(ctx context.Context, repoPath string) ([]WorktreeInfo, error)
+    ValidateWorktree(ctx context.Context, worktreePath string) error
+    GetRepositoryStatus(ctx context.Context, repoPath string) (RepositoryStatus, error)
+}
+
+type BranchInfo struct {
+    Name   string
+    Remote string
+    Head   string
+}
+
+type WorktreeInfo struct {
+    Path     string
+    Branch   string
+    Commit   string
+    Dirty    bool
+    Detached bool
+}
+
+type RepositoryStatus struct {
+    Clean     bool
+    Staged    int
+    Modified  int
+    Untracked int
+}
+```
+
+#### B2. Extend ContextService with Git Integration
+**Target**: Add git methods to `service/context_service.go`
+
+```go
+// Add to internal/service/context_service.go
+type ContextService struct {
+    detector  domain.ContextDetector
+    resolver  domain.ContextResolver
+    config    *domain.Config
+    gitProvider GitContextProvider  // New field
+}
+
+func (cs *ContextService) GetGitProvider() GitContextProvider {
+    return cs.gitProvider
+}
+
+func (cs *ContextService) ListAvailableBranches(projectName string) ([]BranchInfo, error) {
+    projectPath := filepath.Join(cs.config.ProjectsDirectory, projectName)
+    return cs.gitProvider.ListBranches(context.Background(), projectPath)
+}
+
+func (cs *ContextService) ListExistingWorktrees(projectName string) ([]WorktreeInfo, error) {
+    projectPath := filepath.Join(cs.config.ProjectsDirectory, projectName)
+    return cs.gitProvider.ListWorktrees(context.Background(), projectPath)
+}
+```
+
+### Part C: Hybrid Git Implementation (Week 2-4)
+
+#### C1. Core Interface and Error System
+1. **Define HybridGitClient interface** in `internal/infrastructure/interfaces.go`
+2. **Implement hybrid error types** in `internal/domain/errors.go`
 3. **Create metrics system** in `internal/infrastructure/hybrid_metrics.go`
 4. **Write unit tests** for interfaces and error handling
 
-### Phase 2: GoGitClient Implementation
+#### C2. GoGitClient Implementation (70% coverage)
 1. **Implement basic repository operations** (open, list branches, status)
 2. **Implement custom worktree creation** using storage abstractions
 3. **Add caching and performance optimizations**
 4. **Write comprehensive unit tests** with mocks
 
-### Phase 3: CLIGitClient Implementation
+#### C3. CLIGitClient Implementation (30% coverage)
 1. **Implement command executor** with timeout and error handling
 2. **Implement all worktree operations** using git CLI
 3. **Add output parsing** for worktree list and status
 4. **Write unit tests** with command mocking
 
-### Phase 4: HybridClient Integration
+#### C4. HybridClient Integration
 1. **Implement fallback logic** with error detection
 2. **Add configuration options** for hybrid behavior
 3. **Integrate metrics collection**
 4. **Write integration tests** for fallback scenarios
 
-### Phase 5: Performance and Optimization
-1. **Add caching layer** for repository objects
+### Part D: Integration & Performance (Week 4-5)
+
+#### D1. Complete Context-Git Integration
+1. **Replace all TODO comments** with actual git discovery
+2. **Integrate GitContextProvider into ContextResolver**
+3. **Add git-aware validation to ContextDetector**
+4. **Implement cross-project reference validation**
+
+#### D2. Performance and Optimization
+1. **Add git-aware caching layer** with TTL
 2. **Implement concurrent operations** where safe
 3. **Add performance monitoring** and reporting
 4. **Optimize for large repositories**
 
-### Phase 6: Testing and Validation
+#### D3. Testing and Validation
 1. **Run comprehensive test suite** (unit, integration, E2E)
 2. **Test with real repositories** of various sizes
 3. **Validate fallback behavior** under error conditions
@@ -813,6 +1036,19 @@ var _ = Describe("Hybrid Git Operations E2E", func() {
 ## Configuration Options
 
 ```toml
+# config.toml additions for context detection
+[context_detection]
+cache_ttl = "5m"
+max_cache_entries = 1000
+git_operation_timeout = "30s"
+enable_git_validation = true
+fallback_to_filesystem = true
+
+[context_detection.git]
+prefer_cli_for_validation = false
+worktree_discovery_timeout = "10s"
+branch_cache_ttl = "15m"
+
 # config.toml additions for hybrid system
 [hybrid]
 prefer_cli = false
@@ -872,25 +1108,67 @@ func wrapHybridError(operation, implementation string, err error) error {
 
 ## Success Criteria
 
-1. **Functional Requirements**
-   - All worktree operations work with hybrid fallback
-   - Consistent behavior across implementations
-   - Proper error handling and recovery
+### Context Detection Completion
+- [ ] All TODO comments resolved with git integration (context_resolver.go:97,145,170)
+- [ ] TTL-based caching implemented with proper normalization
+- [ ] Git-specific error types added to domain/errors.go
+- [ ] Configuration extensions complete and validated
+- [ ] Filesystem-based discovery working as fallback
 
-2. **Performance Requirements**
-   - Operations complete within specified time limits
-   - Memory usage remains within bounds
-   - Fallback latency is acceptable
+### Git Operations Implementation
+- [ ] HybridGitClient with intelligent fallback logic working
+- [ ] 70% go-git coverage achieved (repository ops, branch listing)
+- [ ] 30% CLI fallback coverage achieved (worktree operations)
+- [ ] Performance metrics collected and reported
+- [ ] GitContextProvider interface fully implemented
 
-3. **Quality Requirements**
-   - >80% test coverage for hybrid logic
-   - All integration tests pass
-   - Performance benchmarks meet targets
+### Integration Quality
+- [ ] ContextService fully integrated with git operations
+- [ ] Resolution suggestions powered by actual git discovery
+- [ ] Cross-project reference validation implemented
+- [ ] Git-aware validation added to ContextDetector
+- [ ] Cross-platform compatibility maintained
 
-4. **Reliability Requirements**
-   - Graceful fallback on go-git failures
-   - Proper cleanup on errors
-   - Consistent error messages
+### Performance and Quality
+- [ ] >90% test coverage for context detection and git operations
+- [ ] All integration tests pass with real git repositories
+- [ ] Performance benchmarks meet targets (<50ms for context detection)
+- [ ] Memory usage remains within bounds with proper caching
+- [ ] Fallback latency is acceptable (<100ms additional overhead)
+
+### Reliability and User Experience
+- [ ] Graceful fallback on go-git failures with proper error messages
+- [ ] Proper cleanup on errors and resource management
+- [ ] Consistent error messages across all implementations
+- [ ] Completion suggestions provide real value with git discovery
+- [ ] Configuration options provide appropriate flexibility
+
+## Timeline
+
+**Total Duration**: 5 weeks
+- **Week 1**: Complete context detection + git interface foundation
+- **Week 2-3**: Hybrid git client implementation  
+- **Week 4**: Integration and performance optimization
+- **Week 5**: Testing, documentation, and validation
+
+## Dependencies
+
+### Context Detection Dependencies
+- Current context detection implementation (95% complete)
+- Configuration system (already implemented)
+- Testing framework (Testify, Ginkgo/Gomega already available)
+
+### Git Operations Dependencies
+- go-git library for core git operations
+- Git CLI availability for fallback operations
+- Command execution infrastructure
+- Performance monitoring system
+
+### Integration Dependencies
+- Completed context detection system
+- Hybrid git client implementation
+- Configuration extensions
+- Testing infrastructure
 
 ## References
 
@@ -898,5 +1176,7 @@ func wrapHybridError(operation, implementation string, err error) error {
 - **Implementation Requirements**: implementation.md lines 200-224 (error handling patterns)
 - **Testing Requirements**: implementation.md lines 1-23 (testing framework usage)
 - **Performance Requirements**: implementation.md lines 71-91 (operational performance)
+- **Context Detection**: 03-context-detection.md (TODO comments and integration points)
+- **Current Implementation**: context_resolver.go:97,145,170 (missing git integration)
 
-This implementation plan provides a comprehensive approach to building the hybrid git operations system while maintaining consistency with the established architecture and requirements.
+This amended plan focuses Phase 04 specifically on git-related components while ensuring the context detection system is completed with direct implementation of the missing pieces. The hybrid git operations remain the core focus, but now with proper integration into the existing context detection foundation.

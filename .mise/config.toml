@@ -9,7 +9,7 @@ depends = ["test:unit", "test:integration", "test:e2e", "test:race"]
 
 [tasks."test:unit"]
 description = "Run unit tests only"
-run = "go test -short ./..."
+run = "go test -short -tags=!integration ./..."
 
 [tasks."test:integration"]
 description = "Run integration tests only"
