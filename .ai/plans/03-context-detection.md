@@ -35,6 +35,12 @@ Implement the core context detection system that automatically detects user cont
 > - **ContextResolver**: WILL resolve target identifiers based on current context
 > - **Context Types**: WILL include `ContextProject`, `ContextWorktree`, `ContextOutsideGit`, `ContextUnknown`
 
+### Context-Aware Identifier Resolution (from design.md lines 179-194)
+> **Identifier Resolution Rules**
+> - **From Project Context**: `<branch>` WILL resolve to worktree of current project, `<project>` WILL resolve to different project's main directory, `main` WILL resolve to current project's main directory
+> - **From Worktree Context**: `<branch>` WILL resolve to different worktree of same project, `main` WILL resolve to main project directory, `<project>` WILL resolve to different project's main directory
+> - **From Outside Git Context**: `<project>` WILL resolve to project's main directory, `<project>/<branch>` WILL resolve to cross-project worktree
+
 ### Path Detection Requirements (from implementation.md line 247)
 > NO regex patterns for path detection - use Go's filepath package for cross-platform compatibility
 
@@ -81,7 +87,7 @@ type Context struct {
 ```
 
 #### 1.2 Define ContextDetector Interface
-**File**: `internal/infrastructure/interfaces.go`
+**File**: `internal/domain/context.go`
 
 ```go
 // ContextDetector detects the current git context
@@ -91,22 +97,44 @@ type ContextDetector interface {
 }
 ```
 
-#### 1.3 Define Configuration Integration
-**File**: `internal/domain/config.go` (extend existing)
+#### 1.3 Define ContextResolver Interface and Types
+**File**: `internal/domain/context.go`
 
 ```go
-// ContextDetectionConfig holds configuration for context detection
-type ContextDetectionConfig struct {
-    ProjectsDir  string
-    WorktreesDir string
+// PathType represents the type of resolved path
+type PathType int
+
+const (
+    PathTypeProject PathType = iota
+    PathTypeWorktree
+    PathTypeInvalid
+)
+
+// ResolutionResult represents the result of identifier resolution
+type ResolutionResult struct {
+    ResolvedPath   string
+    Type           PathType
+    ProjectName    string
+    BranchName     string
+    Explanation    string
 }
 
-// GetContextDetectionConfig returns context detection configuration
-func (c *Config) GetContextDetectionConfig() *ContextDetectionConfig {
-    return &ContextDetectionConfig{
-        ProjectsDir:  c.GetString("projects_dir"),
-        WorktreesDir: c.GetString("worktrees_dir"),
-    }
+// ResolutionSuggestion represents a completion suggestion
+type ResolutionSuggestion struct {
+    Text           string
+    Description    string
+    Type           PathType
+    ProjectName    string
+    BranchName     string
+}
+
+// ContextResolver resolves target identifiers based on current context
+type ContextResolver interface {
+    // ResolveIdentifier resolves target identifier based on context
+    ResolveIdentifier(ctx *Context, identifier string) (*ResolutionResult, error)
+    
+    // GetResolutionSuggestions provides completion suggestions
+    GetResolutionSuggestions(ctx *Context, partial string) ([]*ResolutionSuggestion, error)
 }
 ```
 
@@ -116,11 +144,20 @@ func (c *Config) GetContextDetectionConfig() *ContextDetectionConfig {
 **File**: `internal/infrastructure/context_detector.go`
 
 ```go
+import (
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
+    
+    "twiggit/internal/domain"
+)
+
 type contextDetector struct {
-    config *config.ContextDetectionConfig
+    config *domain.Config
 }
 
-func NewContextDetector(cfg *config.ContextDetectionConfig) ContextDetector {
+func NewContextDetector(cfg *domain.Config) ContextDetector {
     return &contextDetector{config: cfg}
 }
 
@@ -156,7 +193,7 @@ func (cd *contextDetector) DetectContext(dir string) (*Context, error) {
 ```go
 func (cd *contextDetector) detectWorktreeContext(dir string) *Context {
     // Normalize worktree directory
-    worktreeDir := filepath.Clean(cd.config.WorktreesDir)
+    worktreeDir := filepath.Clean(cd.config.WorktreesDirectory)
     
     // Check if current directory is under worktree directory
     relPath, err := filepath.Rel(worktreeDir, dir)
@@ -264,12 +301,242 @@ func (cd *contextDetector) extractProjectName(dir string) string {
 }
 ```
 
-### Phase 3: Cross-Platform Compatibility
+### Phase 3: ContextResolver Implementation
 
-#### 3.1 Path Normalization Utilities
-**File**: `internal/infrastructure/path_utils.go`
+#### 3.1 Implement ContextResolver
+**File**: `internal/infrastructure/context_resolver.go`
 
 ```go
+import (
+    "fmt"
+    "path/filepath"
+    "strings"
+    
+    "twiggit/internal/domain"
+)
+
+type contextResolver struct {
+    config *domain.Config
+}
+
+func NewContextResolver(cfg *domain.Config) domain.ContextResolver {
+    return &contextResolver{config: cfg}
+}
+
+func (cr *contextResolver) ResolveIdentifier(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+    // Handle empty identifier
+    if identifier == "" {
+        return nil, domain.NewContextDetectionError("", "empty identifier", nil)
+    }
+    
+    switch ctx.Type {
+    case domain.ContextProject:
+        return cr.resolveFromProjectContext(ctx, identifier)
+    case domain.ContextWorktree:
+        return cr.resolveFromWorktreeContext(ctx, identifier)
+    case domain.ContextOutsideGit:
+        return cr.resolveFromOutsideGitContext(ctx, identifier)
+    default:
+        return &domain.ResolutionResult{
+            Type:        domain.PathTypeInvalid,
+            Explanation: fmt.Sprintf("Cannot resolve identifier '%s' from unknown context", identifier),
+        }, nil
+    }
+}
+
+func (cr *contextResolver) GetResolutionSuggestions(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+    var suggestions []*domain.ResolutionSuggestion
+    
+    switch ctx.Type {
+    case domain.ContextProject:
+        suggestions = append(suggestions, cr.getProjectContextSuggestions(ctx, partial)...)
+    case domain.ContextWorktree:
+        suggestions = append(suggestions, cr.getWorktreeContextSuggestions(ctx, partial)...)
+    case domain.ContextOutsideGit:
+        suggestions = append(suggestions, cr.getOutsideGitContextSuggestions(ctx, partial)...)
+    }
+    
+    return suggestions, nil
+}
+```
+
+#### 3.2 Project Context Resolution
+**File**: `internal/infrastructure/context_resolver.go` (continued)
+
+```go
+func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+    // Handle special case: "main" resolves to project root
+    if identifier == "main" {
+        return &domain.ResolutionResult{
+            ResolvedPath: ctx.Path,
+            Type:         domain.PathTypeProject,
+            ProjectName:  ctx.ProjectName,
+            Explanation:  fmt.Sprintf("Resolved 'main' to project root '%s'", ctx.ProjectName),
+        }, nil
+    }
+    
+    // Check if identifier contains "/" (cross-project reference)
+    if strings.Contains(identifier, "/") {
+        return cr.resolveCrossProjectReference(identifier)
+    }
+    
+    // Resolve as branch name (worktree of current project)
+    worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
+    
+    return &domain.ResolutionResult{
+        ResolvedPath: worktreePath,
+        Type:         domain.PathTypeWorktree,
+        ProjectName:  ctx.ProjectName,
+        BranchName:   identifier,
+        Explanation:  fmt.Sprintf("Resolved '%s' to worktree of project '%s'", identifier, ctx.ProjectName),
+    }, nil
+}
+
+func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
+    var suggestions []*domain.ResolutionSuggestion
+    
+    // Always suggest "main" for project context
+    if strings.HasPrefix("main", partial) {
+        suggestions = append(suggestions, &domain.ResolutionSuggestion{
+            Text:        "main",
+            Description: "Project root directory",
+            Type:        domain.PathTypeProject,
+            ProjectName: ctx.ProjectName,
+        })
+    }
+    
+    // TODO: Add actual worktree discovery when git operations are available
+    // For now, provide basic branch name suggestions
+    
+    return suggestions
+}
+```
+
+#### 3.3 Worktree Context Resolution
+**File**: `internal/infrastructure/context_resolver.go` (continued)
+
+```go
+func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+    // Handle special case: "main" resolves to project root
+    if identifier == "main" {
+        projectPath := filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
+        return &domain.ResolutionResult{
+            ResolvedPath: projectPath,
+            Type:         domain.PathTypeProject,
+            ProjectName:  ctx.ProjectName,
+            Explanation:  fmt.Sprintf("Resolved 'main' to project root '%s'", ctx.ProjectName),
+        }, nil
+    }
+    
+    // Check if identifier contains "/" (cross-project reference)
+    if strings.Contains(identifier, "/") {
+        return cr.resolveCrossProjectReference(identifier)
+    }
+    
+    // Resolve as different worktree of same project
+    worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
+    
+    return &domain.ResolutionResult{
+        ResolvedPath: worktreePath,
+        Type:         domain.PathTypeWorktree,
+        ProjectName:  ctx.ProjectName,
+        BranchName:   identifier,
+        Explanation:  fmt.Sprintf("Resolved '%s' to worktree of project '%s'", identifier, ctx.ProjectName),
+    }, nil
+}
+
+func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
+    var suggestions []*domain.ResolutionSuggestion
+    
+    // Always suggest "main" for worktree context
+    if strings.HasPrefix("main", partial) {
+        suggestions = append(suggestions, &domain.ResolutionSuggestion{
+            Text:        "main",
+            Description: "Project root directory",
+            Type:        domain.PathTypeProject,
+            ProjectName: ctx.ProjectName,
+        })
+    }
+    
+    // TODO: Add actual worktree discovery when git operations are available
+    
+    return suggestions
+}
+```
+
+#### 3.4 Outside Git Context Resolution
+**File**: `internal/infrastructure/context_resolver.go` (continued)
+
+```go
+func (cr *contextResolver) resolveFromOutsideGitContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+    // Check if identifier contains "/" (project/branch format)
+    if strings.Contains(identifier, "/") {
+        return cr.resolveCrossProjectReference(identifier)
+    }
+    
+    // Resolve as project name
+    projectPath := filepath.Join(cr.config.ProjectsDirectory, identifier)
+    
+    return &domain.ResolutionResult{
+        ResolvedPath: projectPath,
+        Type:         domain.PathTypeProject,
+        ProjectName:  identifier,
+        Explanation:  fmt.Sprintf("Resolved '%s' to project directory", identifier),
+    }, nil
+}
+
+func (cr *contextResolver) getOutsideGitContextSuggestions(ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
+    var suggestions []*domain.ResolutionSuggestion
+    
+    // TODO: Add actual project discovery when git operations are available
+    // For now, provide basic suggestions
+    
+    return suggestions
+}
+```
+
+#### 3.5 Cross-Project Reference Resolution
+**File**: `internal/infrastructure/context_resolver.go` (continued)
+
+```go
+func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*domain.ResolutionResult, error) {
+    parts := strings.Split(identifier, "/")
+    if len(parts) != 2 {
+        return &domain.ResolutionResult{
+            Type:        domain.PathTypeInvalid,
+            Explanation: fmt.Sprintf("Invalid cross-project reference format: '%s'. Expected: project/branch", identifier),
+        }, nil
+    }
+    
+    projectName := parts[0]
+    branchName := parts[1]
+    
+    // Resolve to worktree of specified project
+    worktreePath := filepath.Join(cr.config.WorktreesDirectory, projectName, branchName)
+    
+    return &domain.ResolutionResult{
+        ResolvedPath: worktreePath,
+        Type:         domain.PathTypeWorktree,
+        ProjectName:  projectName,
+        BranchName:   branchName,
+        Explanation:  fmt.Sprintf("Resolved '%s' to worktree of project '%s'", identifier, projectName),
+    }, nil
+}
+```
+
+### Phase 4: Cross-Platform Compatibility
+
+#### 4.1 Path Normalization Utilities
+**File**: `internal/infrastructure/pathutils.go`
+
+```go
+import (
+    "fmt"
+    "os"
+    "path/filepath"
+    "strings"
+)
+
 // NormalizePath normalizes a path for cross-platform compatibility
 func NormalizePath(path string) (string, error) {
     // Clean the path
@@ -291,8 +558,8 @@ func NormalizePath(path string) (string, error) {
     return resolved, nil
 }
 
-// IsPathUnder checks if target is under base directory
-func IsPathUnder(base, target string) (bool, error) {
+// isPathUnder checks if target is under base directory
+func isPathUnder(base, target string) (bool, error) {
     rel, err := filepath.Rel(base, target)
     if err != nil {
         return false, err
@@ -303,32 +570,35 @@ func IsPathUnder(base, target string) (bool, error) {
 }
 ```
 
-#### 3.2 Symlink Handling
+#### 4.2 Symlink Handling
 **File**: `internal/infrastructure/context_detector.go` (enhanced)
 
 ```go
 func (cd *contextDetector) DetectContext(dir string) (*Context, error) {
     // Normalize path and resolve symlinks
-    normalizedDir, err := path_utils.NormalizePath(dir)
+    normalizedDir, err := pathutils.NormalizePath(dir)
     if err != nil {
         return nil, fmt.Errorf("failed to normalize directory: %w", err)
     }
 
-    // Cache the normalized path for performance
-    cd.cachedPath = normalizedDir
-    
     // Continue with detection logic...
 }
 ```
 
-### Phase 4: Performance Optimization
+### Phase 5: Performance Optimization
 
-#### 4.1 Context Caching
+#### 5.1 Context Caching
 **File**: `internal/infrastructure/context_detector.go` (enhanced)
 
 ```go
+import (
+    "sync"
+    
+    "twiggit/internal/domain"
+)
+
 type contextDetector struct {
-    config    *config.ContextDetectionConfig
+    config    *domain.Config
     cache     map[string]*Context
     cacheMu   sync.RWMutex
 }
@@ -360,13 +630,13 @@ func (cd *contextDetector) DetectContext(dir string) (*Context, error) {
 }
 ```
 
-#### 4.2 Early Exit Optimizations
+#### 5.2 Early Exit Optimizations
 **File**: `internal/infrastructure/context_detector.go` (enhanced)
 
 ```go
 func (cd *contextDetector) detectWorktreeContext(dir string) *Context {
     // Quick check: if not under worktrees dir, exit early
-    if !strings.HasPrefix(dir, cd.config.WorktreesDir+string(filepath.Separator)) {
+    if !strings.HasPrefix(dir, cd.config.WorktreesDirectory+string(filepath.Separator)) {
         return nil
     }
     
@@ -374,12 +644,24 @@ func (cd *contextDetector) detectWorktreeContext(dir string) *Context {
 }
 ```
 
-### Phase 5: Comprehensive Testing
+### Phase 6: Comprehensive Testing
 
-#### 5.1 Unit Tests Structure
+#### 6.1 Unit Tests Structure
 **File**: `internal/domain/context_test.go`
 
 ```go
+import (
+    "os"
+    "path/filepath"
+    "runtime"
+    "testing"
+    
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    
+    "twiggit/internal/domain"
+)
+
 func TestContextDetector_DetectContext(t *testing.T) {
     tests := []struct {
         name           string
@@ -422,9 +704,9 @@ func TestContextDetector_DetectContext(t *testing.T) {
         t.Run(tt.name, func(t *testing.T) {
             dir := tt.setupFunc(t)
             
-            config := &config.ContextDetectionConfig{
-                WorktreesDir: filepath.Join(os.Getenv("HOME"), "Worktrees"),
-            }
+config := &domain.Config{
+    WorktreesDirectory: filepath.Join(os.Getenv("HOME"), "Worktrees"),
+}
             
             detector := NewContextDetector(config)
             ctx, err := detector.DetectContext(dir)
@@ -443,97 +725,124 @@ func TestContextDetector_DetectContext(t *testing.T) {
 }
 ```
 
-#### 5.2 Integration Tests with Real Git
+#### 6.2 Integration Tests with Real Git
 **File**: `internal/infrastructure/context_detector_integration_test.go`
 
 ```go
+import (
+    "os"
+    "os/exec"
+    "path/filepath"
+    "testing"
+    
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    
+    "twiggit/internal/domain"
+)
+
 func TestContextDetector_Integration(t *testing.T) {
-    // Use Ginkgo/Gomega for BDD-style integration tests
-    Describe("Context Detection with Real Git", func() {
-        var (
-            tempDir    string
-            detector   ContextDetector
-            config     *config.ContextDetectionConfig
-        )
-        
-        BeforeEach(func() {
-            tempDir = t.TempDir()
-            config = &config.ContextDetectionConfig{
-                ProjectsDir:  filepath.Join(tempDir, "Projects"),
-                WorktreesDir: filepath.Join(tempDir, "Worktrees"),
-            }
-            detector = NewContextDetector(config)
-        })
-        
-        Context("when in a real git repository", func() {
-            It("should detect project context", func() {
-                // Initialize real git repository
-                repoDir := filepath.Join(config.ProjectsDir, "test-repo")
-                err := os.MkdirAll(repoDir, 0755)
-                Expect(err).ToNot(HaveOccurred())
+    tests := []struct {
+        name        string
+        setupFunc   func(*testing.T, *domain.Config) string
+        expectedType ContextType
+        expectedProj string
+        expectedBranch string
+    }{
+        {
+            name: "real git repository detection",
+            setupFunc: func(t *testing.T, config *domain.Config) string {
+                repoDir := filepath.Join(config.ProjectsDirectory, "test-repo")
+                require.NoError(t, os.MkdirAll(repoDir, 0755))
                 
                 // Use git to initialize repository
                 cmd := exec.Command("git", "init")
                 cmd.Dir = repoDir
-                err = cmd.Run()
-                Expect(err).ToNot(HaveOccurred())
+                require.NoError(t, cmd.Run())
                 
-                ctx, err := detector.DetectContext(repoDir)
-                Expect(err).ToNot(HaveOccurred())
-                Expect(ctx.Type).To(Equal(ContextProject))
-                Expect(ctx.ProjectName).To(Equal("test-repo"))
-            })
-        })
-        
-        Context("when in a git worktree", func() {
-            It("should detect worktree context", func() {
+                return repoDir
+            },
+            expectedType: ContextProject,
+            expectedProj: "test-repo",
+        },
+        {
+            name: "real git worktree detection",
+            setupFunc: func(t *testing.T, config *domain.Config) string {
                 // Setup main repository
-                mainRepo := filepath.Join(config.ProjectsDir, "main-repo")
-                err := os.MkdirAll(mainRepo, 0755)
-                Expect(err).ToNot(HaveOccurred())
+                mainRepo := filepath.Join(config.ProjectsDirectory, "main-repo")
+                require.NoError(t, os.MkdirAll(mainRepo, 0755))
                 
                 // Initialize main repo
                 cmd := exec.Command("git", "init")
                 cmd.Dir = mainRepo
-                err = cmd.Run()
-                Expect(err).ToNot(HaveOccurred())
+                require.NoError(t, cmd.Run())
                 
-                // Create initial commit
+                // Configure git user
                 cmd = exec.Command("git", "config", "user.email", "test@example.com")
                 cmd.Dir = mainRepo
-                err = cmd.Run()
-                Expect(err).ToNot(HaveOccurred())
+                require.NoError(t, cmd.Run())
                 
                 cmd = exec.Command("git", "config", "user.name", "Test User")
                 cmd.Dir = mainRepo
-                err = cmd.Run()
-                Expect(err).ToNot(HaveOccurred())
+                require.NoError(t, cmd.Run())
+                
+                // Create initial commit
+                cmd = exec.Command("git", "commit", "--allow-empty", "-m", "Initial commit")
+                cmd.Dir = mainRepo
+                require.NoError(t, cmd.Run())
                 
                 // Create worktree
-                worktreeDir := filepath.Join(config.WorktreesDir, "main-repo", "feature-branch")
-                err = os.MkdirAll(filepath.Dir(worktreeDir), 0755)
-                Expect(err).ToNot(HaveOccurred())
+                worktreeDir := filepath.Join(config.WorktreesDirectory, "main-repo", "feature-branch")
+                require.NoError(t, os.MkdirAll(filepath.Dir(worktreeDir), 0755))
                 
                 cmd = exec.Command("git", "worktree", "add", worktreeDir, "-b", "feature-branch")
                 cmd.Dir = mainRepo
-                err = cmd.Run()
-                Expect(err).ToNot(HaveOccurred())
+                require.NoError(t, cmd.Run())
                 
-                ctx, err := detector.DetectContext(worktreeDir)
-                Expect(err).ToNot(HaveOccurred())
-                Expect(ctx.Type).To(Equal(ContextWorktree))
-                Expect(ctx.ProjectName).To(Equal("main-repo"))
-                Expect(ctx.BranchName).To(Equal("feature-branch"))
-            })
+                return worktreeDir
+            },
+            expectedType:   ContextWorktree,
+            expectedProj:   "main-repo",
+            expectedBranch: "feature-branch",
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            tempDir := t.TempDir()
+            config := &domain.Config{
+                ProjectsDirectory:  filepath.Join(tempDir, "Projects"),
+                WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
+            }
+            
+            detector := NewContextDetector(config)
+            testDir := tt.setupFunc(t, config)
+            
+            ctx, err := detector.DetectContext(testDir)
+            require.NoError(t, err)
+            assert.Equal(t, tt.expectedType, ctx.Type)
+            assert.Equal(t, tt.expectedProj, ctx.ProjectName)
+            if tt.expectedBranch != "" {
+                assert.Equal(t, tt.expectedBranch, ctx.BranchName)
+            }
         })
-    })
+    }
 }
 ```
 
-#### 5.3 Cross-Platform Tests
+#### 6.3 Cross-Platform Tests
 **File**: `internal/infrastructure/context_detector_platform_test.go`
 
 ```go
+import (
+    "runtime"
+    "testing"
+    
+    "github.com/stretchr/testify/require"
+    
+    "twiggit/internal/domain"
+)
+
 func TestContextDetector_CrossPlatform(t *testing.T) {
     if runtime.GOOS == "windows" {
         t.Run("windows paths", func(t *testing.T) {
@@ -550,19 +859,223 @@ func TestContextDetector_CrossPlatform(t *testing.T) {
 
 func testWindowsPaths(t *testing.T) {
     // Test Windows path separators, drive letters, etc.
+    config := &domain.Config{
+        ProjectsDirectory:  `C:\Users\Test\Projects`,
+        WorktreesDirectory: `C:\Users\Test\Worktrees`,
+    }
+    
+    detector := NewContextDetector(config)
+    require.NotNil(t, detector)
+    
+    // Add Windows-specific path tests here
 }
 
 func testUnixPaths(t *testing.T) {
     // Test Unix path handling, symlinks, etc.
+    config := &domain.Config{
+        ProjectsDirectory:  "/home/test/Projects",
+        WorktreesDirectory: "/home/test/Worktrees",
+    }
+    
+    detector := NewContextDetector(config)
+    require.NotNil(t, detector)
+    
+    // Add Unix-specific path tests here
 }
 ```
 
-### Phase 6: Error Handling and Edge Cases
+#### 6.4 ContextResolver Tests
+**File**: `internal/domain/context_resolver_test.go`
 
-#### 6.1 Error Types
+```go
+import (
+    "path/filepath"
+    "testing"
+    
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    
+    "twiggit/internal/domain"
+)
+
+func TestContextResolver_ResolveIdentifier(t *testing.T) {
+    tests := []struct {
+        name           string
+        context        *domain.Context
+        identifier     string
+        expectedType   domain.PathType
+        expectedProj   string
+        expectedBranch string
+        expectedPath   string
+        expectError    bool
+    }{
+        {
+            name: "project context - main to project root",
+            context: &domain.Context{
+                Type:        domain.ContextProject,
+                ProjectName: "test-project",
+                Path:        "/home/user/Projects/test-project",
+            },
+            identifier:     "main",
+            expectedType:   domain.PathTypeProject,
+            expectedProj:   "test-project",
+            expectedPath:   "/home/user/Projects/test-project",
+        },
+        {
+            name: "project context - branch to worktree",
+            context: &domain.Context{
+                Type:        domain.ContextProject,
+                ProjectName: "test-project",
+                Path:        "/home/user/Projects/test-project",
+            },
+            identifier:     "feature-branch",
+            expectedType:   domain.PathTypeWorktree,
+            expectedProj:   "test-project",
+            expectedBranch: "feature-branch",
+            expectedPath:   "/home/user/Worktrees/test-project/feature-branch",
+        },
+        {
+            name: "worktree context - main to project root",
+            context: &domain.Context{
+                Type:        domain.ContextWorktree,
+                ProjectName: "test-project",
+                BranchName:  "current-branch",
+                Path:        "/home/user/Worktrees/test-project/current-branch",
+            },
+            identifier:     "main",
+            expectedType:   domain.PathTypeProject,
+            expectedProj:   "test-project",
+            expectedPath:   "/home/user/Projects/test-project",
+        },
+        {
+            name: "outside git context - project to project directory",
+            context: &domain.Context{
+                Type: domain.ContextOutsideGit,
+                Path: "/home/user",
+            },
+            identifier:     "test-project",
+            expectedType:   domain.PathTypeProject,
+            expectedProj:   "test-project",
+            expectedPath:   "/home/user/Projects/test-project",
+        },
+        {
+            name: "cross-project reference",
+            context: &domain.Context{
+                Type: domain.ContextOutsideGit,
+                Path: "/home/user",
+            },
+            identifier:     "other-project/feature-branch",
+            expectedType:   domain.PathTypeWorktree,
+            expectedProj:   "other-project",
+            expectedBranch: "feature-branch",
+            expectedPath:   "/home/user/Worktrees/other-project/feature-branch",
+        },
+        {
+            name: "empty identifier",
+            context: &domain.Context{
+                Type: domain.ContextOutsideGit,
+                Path: "/home/user",
+            },
+            identifier:  "",
+            expectError: true,
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            config := &domain.Config{
+                ProjectsDirectory:  "/home/user/Projects",
+                WorktreesDirectory: "/home/user/Worktrees",
+            }
+            
+            resolver := NewContextResolver(config)
+            result, err := resolver.ResolveIdentifier(tt.context, tt.identifier)
+            
+            if tt.expectError {
+                assert.Error(t, err)
+                return
+            }
+            
+            require.NoError(t, err)
+            assert.Equal(t, tt.expectedType, result.Type)
+            assert.Equal(t, tt.expectedProj, result.ProjectName)
+            if tt.expectedBranch != "" {
+                assert.Equal(t, tt.expectedBranch, result.BranchName)
+            }
+            assert.Equal(t, tt.expectedPath, result.ResolvedPath)
+            assert.NotEmpty(t, result.Explanation)
+        })
+    }
+}
+
+func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
+    tests := []struct {
+        name           string
+        context        *domain.Context
+        partial        string
+        expectedCount  int
+        expectedTexts  []string
+    }{
+        {
+            name: "project context - partial 'm'",
+            context: &domain.Context{
+                Type:        domain.ContextProject,
+                ProjectName: "test-project",
+                Path:        "/home/user/Projects/test-project",
+            },
+            partial:       "m",
+            expectedCount: 1,
+            expectedTexts: []string{"main"},
+        },
+        {
+            name: "worktree context - partial 'main'",
+            context: &domain.Context{
+                Type:        domain.ContextWorktree,
+                ProjectName: "test-project",
+                BranchName:  "current-branch",
+                Path:        "/home/user/Worktrees/test-project/current-branch",
+            },
+            partial:       "main",
+            expectedCount: 1,
+            expectedTexts: []string{"main"},
+        },
+    }
+    
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            config := &domain.Config{
+                ProjectsDirectory:  "/home/user/Projects",
+                WorktreesDirectory: "/home/user/Worktrees",
+            }
+            
+            resolver := NewContextResolver(config)
+            suggestions, err := resolver.GetResolutionSuggestions(tt.context, tt.partial)
+            
+            require.NoError(t, err)
+            assert.Len(t, suggestions, tt.expectedCount)
+            
+            if len(tt.expectedTexts) > 0 {
+                suggestionTexts := make([]string, len(suggestions))
+                for i, suggestion := range suggestions {
+                    suggestionTexts[i] = suggestion.Text
+                }
+                assert.Equal(t, tt.expectedTexts, suggestionTexts)
+            }
+        })
+    }
+}
+```
+
+### Phase 7: Error Handling and Edge Cases
+
+#### 7.1 Error Types
 **File**: `internal/domain/errors.go`
 
 ```go
+import (
+    "fmt"
+)
+
 // ContextDetectionError represents context detection errors
 type ContextDetectionError struct {
     Path    string
@@ -588,43 +1101,58 @@ func NewContextDetectionError(path, message string, cause error) *ContextDetecti
 }
 ```
 
-#### 6.2 Edge Case Handling
+#### 7.2 Edge Case Handling
 **File**: `internal/infrastructure/context_detector.go` (enhanced)
 
 ```go
+import (
+    "os"
+    
+    "twiggit/internal/domain"
+)
+
 func (cd *contextDetector) DetectContext(dir string) (*Context, error) {
     // Validate input directory
     if dir == "" {
-        return nil, NewContextDetectionError("", "empty directory path", nil)
+        return nil, domain.NewContextDetectionError("", "empty directory path", nil)
     }
     
     // Check if directory exists
     if _, err := os.Stat(dir); err != nil {
         if os.IsNotExist(err) {
-            return nil, NewContextDetectionError(dir, "directory does not exist", err)
+            return nil, domain.NewContextDetectionError(dir, "directory does not exist", err)
         }
-        return nil, NewContextDetectionError(dir, "cannot access directory", err)
+        return nil, domain.NewContextDetectionError(dir, "cannot access directory", err)
     }
     
     // Continue with detection...
 }
 ```
 
-### Phase 7: Integration with Commands
+### Phase 8: Integration with Commands
 
-#### 7.1 Context Service
+#### 8.1 Context Service
 **File**: `internal/domain/context_service.go`
 
 ```go
+import (
+    "fmt"
+    "os"
+    
+    "twiggit/internal/domain"
+)
+
 // ContextService provides context-aware operations
 type ContextService struct {
-    detector ContextDetector
-    config   *config.Config
+    detector  ContextDetector
+    resolver  ContextResolver
+    config    *domain.Config
 }
 
-func NewContextService(detector ContextDetector, cfg *config.Config) *ContextService {
+func NewContextService(detector ContextDetector, resolver ContextResolver, cfg *domain.Config) *ContextService {
     return &ContextService{
         detector: detector,
+        resolver: resolver,
         config:   cfg,
     }
 }
@@ -643,19 +1171,46 @@ func (cs *ContextService) GetCurrentContext() (*Context, error) {
 func (cs *ContextService) DetectContextFromPath(path string) (*Context, error) {
     return cs.detector.DetectContext(path)
 }
+
+// ResolveIdentifier resolves identifier based on current context
+func (cs *ContextService) ResolveIdentifier(identifier string) (*domain.ResolutionResult, error) {
+    ctx, err := cs.GetCurrentContext()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get current context: %w", err)
+    }
+    
+    return cs.resolver.ResolveIdentifier(ctx, identifier)
+}
+
+// ResolveIdentifierFromContext resolves identifier based on specified context
+func (cs *ContextService) ResolveIdentifierFromContext(ctx *Context, identifier string) (*domain.ResolutionResult, error) {
+    return cs.resolver.ResolveIdentifier(ctx, identifier)
+}
+
+// GetCompletionSuggestions provides completion suggestions based on current context
+func (cs *ContextService) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
+    ctx, err := cs.GetCurrentContext()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get current context: %w", err)
+    }
+    
+    return cs.resolver.GetResolutionSuggestions(ctx, partial)
+}
 ```
 
 ## Implementation Checklist
 
 ### Core Implementation
 - [ ] Define ContextType enum and Context struct
-- [ ] Implement ContextDetector interface
-- [ ] Create contextDetector implementation
-- [ ] Implement worktree pattern detection
+- [ ] Implement ContextDetector interface in domain
+- [ ] Define ContextResolver interface and supporting types
+- [ ] Create contextDetector implementation with *domain.Config
+- [ ] Create contextResolver implementation with context-aware resolution
+- [ ] Implement worktree pattern detection using WorktreesDirectory
 - [ ] Implement project detection with .git traversal
-- [ ] Add path normalization utilities
+- [ ] Add path normalization utilities in pathutils package
 - [ ] Implement symlink handling
-- [ ] Add context caching for performance
+- [ ] Add context caching for performance (Phase 5)
 
 ### Cross-Platform Support
 - [ ] Use filepath package for all path operations
@@ -664,44 +1219,54 @@ func (cs *ContextService) DetectContextFromPath(path string) (*Context, error) {
 - [ ] Implement proper path separator handling
 
 ### Testing
-- [ ] Unit tests for all detection methods
-- [ ] Integration tests with real git repositories
+- [ ] Unit tests for all detection methods using Testify
+- [ ] Unit tests for ContextResolver identifier resolution
+- [ ] Integration tests with real git repositories using Testify
 - [ ] Cross-platform compatibility tests
+- [ ] Context-aware resolution tests for all context types
 - [ ] Edge case and error handling tests
 - [ ] Performance benchmarks
+- [ ] Add import sections to all test files
 
 ### Error Handling
-- [ ] Define context-specific error types
+- [ ] Define context-specific error types in domain/errors.go
 - [ ] Handle permission errors gracefully
 - [ ] Provide actionable error messages
 - [ ] Handle broken git repositories
 
 ### Integration
 - [ ] Create ContextService for command integration
-- [ ] Integrate with configuration system
+- [ ] Integrate ContextResolver with ContextService
+- [ ] Integrate with existing configuration system
 - [ ] Add context detection to CLI commands
+- [ ] Add identifier resolution to CLI commands
 - [ ] Update command behavior based on context
 
 ## Success Criteria
 
 1. **Correct Context Detection**: System correctly identifies all three context types in various scenarios
-2. **Cross-Platform Compatibility**: Works consistently on Windows, macOS, and Linux
-3. **Performance**: Context detection completes in <50ms for typical scenarios
-4. **Test Coverage**: >90% test coverage for context detection logic
-5. **Error Handling**: Graceful handling of edge cases with clear error messages
-6. **Integration**: Seamless integration with existing command structure
+2. **Identifier Resolution**: Correctly resolves all identifier formats from all contexts
+3. **Context-Aware Suggestions**: Provides appropriate completion suggestions based on context
+4. **Cross-Platform Compatibility**: Works consistently on Windows, macOS, and Linux
+5. **Performance**: Context detection and resolution completes in <50ms for typical scenarios
+6. **Test Coverage**: >90% test coverage for context detection and resolution logic
+7. **Error Handling**: Graceful handling of edge cases with clear error messages
+8. **Integration**: Seamless integration with existing command structure
 
 ## Dependencies
 
-- Go standard library: `path/filepath`, `os`, `strings`
+- Go standard library: `path/filepath`, `os`, `strings`, `fmt`
 - Configuration system (already implemented)
-- Testing framework: Testify for unit tests, Ginkgo/Gomega for integration tests
+- Testing framework: Testify for unit and integration tests, Ginkgo/Gomega for E2E tests
 
 ## Timeline
 
 - **Phase 1-2**: Core interface and detection implementation (2-3 days)
-- **Phase 3-4**: Cross-platform support and optimization (1-2 days)
-- **Phase 5**: Comprehensive testing (2-3 days)
-- **Phase 6-7**: Error handling and integration (1-2 days)
+- **Phase 3**: ContextResolver implementation (2-3 days)
+- **Phase 4**: Cross-platform support and optimization (1-2 days)
+- **Phase 5**: Performance optimization (1-2 days)
+- **Phase 6**: Comprehensive testing (2-3 days)
+- **Phase 7**: Error handling and edge cases (1-2 days)
+- **Phase 8**: Integration with commands (1-2 days)
 
-**Total Estimated Time**: 6-10 days
+**Total Estimated Time**: 10-17 days

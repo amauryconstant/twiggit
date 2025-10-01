@@ -254,10 +254,16 @@ var cdCmd = &cobra.Command{
             target = ctx.DefaultWorktree
         }
         
-        // Resolve target worktree
-        worktree, err := worktreeService.ResolveWorktree(ctx, target)
+        // Resolve target identifier using context service
+        resolution, err := contextService.ResolveIdentifier(ctx, target)
         if err != nil {
-            return fmt.Errorf("failed to resolve worktree: %w", err)
+            return fmt.Errorf("failed to resolve target: %w", err)
+        }
+        
+        // Get worktree from resolution
+        worktree, err := worktreeService.GetWorktree(resolution.WorktreePath)
+        if err != nil {
+            return fmt.Errorf("failed to get worktree: %w", err)
         }
         
         // Change directory with shell integration
@@ -311,10 +317,16 @@ var deleteCmd = &cobra.Command{
             return fmt.Errorf("context detection failed: %w", err)
         }
         
-        // Resolve target worktree
-        worktree, err := worktreeService.ResolveWorktree(ctx, args[0])
+        // Resolve target identifier using context service
+        resolution, err := contextService.ResolveIdentifier(ctx, args[0])
         if err != nil {
-            return fmt.Errorf("failed to resolve worktree: %w", err)
+            return fmt.Errorf("failed to resolve target: %w", err)
+        }
+        
+        // Get worktree from resolution
+        worktree, err := worktreeService.GetWorktree(resolution.WorktreePath)
+        if err != nil {
+            return fmt.Errorf("failed to get worktree: %w", err)
         }
         
         // Safety checks
@@ -544,6 +556,12 @@ func executeWithContext(cmdFunc func(Context) error) error {
     
     return cmdFunc(ctx)
 }
+
+// Common pattern for identifier resolution
+func resolveIdentifier(ctx Context, target string) (*domain.Resolution, error) {
+    contextService := services.GetContextService()
+    return contextService.ResolveIdentifier(ctx, target)
+}
 ```
 
 ## Testing Strategy
@@ -610,7 +628,7 @@ import (
 
 ### Service Dependencies
 - WorktreeService for worktree operations
-- ContextService for context detection
+- ContextService for context detection and identifier resolution
 - ShellService for shell integration
 - ConfigurationService for config management
 

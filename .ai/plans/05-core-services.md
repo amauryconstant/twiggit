@@ -123,13 +123,15 @@ type ProjectInfo struct {
 ```go
 type NavigationService interface {
     // ResolvePath resolves target path based on context and input
-    ResolvePath(ctx context.Context, req *ResolvePathRequest) (*PathResolution, error)
+    // Uses ContextResolver for identifier resolution
+    ResolvePath(ctx context.Context, req *ResolvePathRequest) (*domain.ResolutionResult, error)
     
     // ValidatePath checks if path is accessible and valid
     ValidatePath(ctx context.Context, path string) error
     
     // GetNavigationSuggestions provides completion suggestions
-    GetNavigationSuggestions(ctx context.Context, context *domain.Context, partial string) ([]*PathSuggestion, error)
+    // Uses ContextResolver for suggestion generation
+    GetNavigationSuggestions(ctx context.Context, context *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error)
 }
 
 type ResolvePathRequest struct {
@@ -138,29 +140,8 @@ type ResolvePathRequest struct {
     CurrentPath    string
 }
 
-type PathResolution struct {
-    ResolvedPath   string
-    Type           PathType
-    ProjectName    string
-    BranchName     string
-    Explanation    string
-}
-
-type PathType int
-
-const (
-    PathTypeProject PathType = iota
-    PathTypeWorktree
-    PathTypeInvalid
-)
-
-type PathSuggestion struct {
-    Text           string
-    Description    string
-    Type           PathType
-    ProjectName    string
-    BranchName     string
-}
+// Note: PathResolution, PathType, and PathSuggestion are now used from domain.ContextResolver
+// This avoids duplication and leverages the context resolution system from Phase 3
 ```
 
 ## Implementation Components
@@ -545,9 +526,9 @@ func (s *projectService) ListProjects(ctx context.Context) ([]*ProjectInfo, erro
 ```go
 // internal/services/navigation_service.go
 type navigationService struct {
-    projectService ProjectService
-    contextService *domain.ContextService
-    config         *domain.Config
+    projectService  ProjectService
+    contextService  *domain.ContextService
+    config          *domain.Config
 }
 
 func NewNavigationService(
@@ -562,43 +543,32 @@ func NewNavigationService(
     }
 }
 
-func (s *navigationService) ResolvePath(ctx context.Context, req *ResolvePathRequest) (*PathResolution, error) {
-    // Parse target to determine type
-    targetInfo := s.parseTarget(req.Target)
-    
-    switch req.Context.Type {
-    case domain.ContextProject:
-        return s.resolveFromProjectContext(ctx, req, targetInfo)
-    case domain.ContextWorktree:
-        return s.resolveFromWorktreeContext(ctx, req, targetInfo)
-    case domain.ContextOutsideGit:
-        return s.resolveFromOutsideGitContext(ctx, req, targetInfo)
-    default:
-        return nil, fmt.Errorf("unknown context type: %v", req.Context.Type)
-    }
+func (s *navigationService) ResolvePath(ctx context.Context, req *ResolvePathRequest) (*domain.ResolutionResult, error) {
+    // Use ContextResolver for identifier resolution
+    // This leverages the context-aware resolution logic from Phase 3
+    return s.contextService.ResolveIdentifierFromContext(req.Context, req.Target)
 }
 
-func (s *navigationService) resolveFromProjectContext(ctx context.Context, req *ResolvePathRequest, target *TargetInfo) (*PathResolution, error) {
-    currentProject := req.Context.ProjectName
-    
-    switch target.Type {
-    case TargetTypeBranch:
-        // Navigate to worktree of current project
-        worktreePath := filepath.Join(s.config.WorktreesDirectory, currentProject, target.Branch)
-        return &PathResolution{
-            ResolvedPath: worktreePath,
-            Type:         PathTypeWorktree,
-            ProjectName:  currentProject,
-            BranchName:   target.Branch,
-            Explanation:  fmt.Sprintf("Navigate to worktree '%s' of project '%s'", target.Branch, currentProject),
-        }, nil
-        
-    case TargetTypeProject:
-        // Navigate to different project
-        project, err := s.projectService.DiscoverProject(ctx, target.Project, req.Context)
-        if err != nil {
-            return nil, fmt.Errorf("project not found: %s", target.Project)
+// Note: All context-specific resolution logic has been moved to ContextResolver in Phase 3
+// NavigationService now delegates to ContextResolver to avoid duplication and maintain consistency
+
+func (s *navigationService) ValidatePath(ctx context.Context, path string) error {
+    // Check if path exists and is accessible
+    if _, err := os.Stat(path); err != nil {
+        if os.IsNotExist(err) {
+            return fmt.Errorf("path does not exist: %s", path)
         }
+        return fmt.Errorf("cannot access path: %s: %w", path, err)
+    }
+    
+    return nil
+}
+
+func (s *navigationService) GetNavigationSuggestions(ctx context.Context, context *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+    // Use ContextResolver for suggestion generation
+    // This leverages the context-aware suggestion logic from Phase 3
+    return s.contextService.GetCompletionSuggestions(partial)
+}
         
         return &PathResolution{
             ResolvedPath: project.Path,

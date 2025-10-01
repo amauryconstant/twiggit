@@ -6,7 +6,7 @@ This directory contains 10 sequential implementation phases for building the twi
 
 1. **Foundation** - Project structure, domain entities, and basic testing setup
 2. **Configuration** - Koanf-based TOML configuration with priority loading
-3. **Context Detection** - Core differentiator: intelligent project/worktree detection
+3. **Context Detection** - Core differentiator: intelligent project/worktree detection with identifier resolution
 4. **Hybrid Git Operations** - go-git primary with CLI fallback for complete functionality
 5. **Core Services** - Business logic orchestration (WorktreeService, ProjectService, NavigationService)
 6. **CLI Commands** - Cobra-based user interface with context-aware behavior
