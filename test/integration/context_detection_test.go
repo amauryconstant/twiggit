@@ -7,10 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
@@ -154,7 +154,8 @@ func TestContextResolver_Integration(t *testing.T) {
 
 	// Test resolver from project context
 	detector := infrastructure.NewContextDetector(config)
-	resolver := infrastructure.NewContextResolver(config)
+	gitService := service.NewGitService(nil, nil, nil) // Mock service for integration test
+	resolver := infrastructure.NewContextResolver(config, gitService)
 
 	projectCtx, err := detector.DetectContext(mainRepo)
 	require.NoError(t, err)
@@ -276,8 +277,15 @@ func TestContextService_Integration(t *testing.T) {
 
 	// Create context service
 	detector := infrastructure.NewContextDetector(config)
-	resolver := infrastructure.NewContextResolver(config)
-	service := service.NewContextService(detector, resolver, config)
+
+	// Create real git service for integration testing
+	executor := infrastructure.NewDefaultCommandExecutor(30 * time.Second)
+	goGitClient := infrastructure.NewGoGitClient(true)
+	cliClient := infrastructure.NewCLIClient(executor, 30)
+	gitService := service.NewGitService(goGitClient, cliClient, nil)
+
+	resolver := infrastructure.NewContextResolver(config, gitService)
+	contextService := service.NewContextService(detector, resolver, config)
 
 	// Change to the repository directory
 	originalWd, err := os.Getwd()
@@ -288,21 +296,29 @@ func TestContextService_Integration(t *testing.T) {
 	require.NoError(t, os.Chdir(repoDir))
 
 	// Test getting current context
-	ctx, err := service.GetCurrentContext()
+	ctx, err := contextService.GetCurrentContext()
 	require.NoError(t, err)
 	assert.Equal(t, domain.ContextProject, ctx.Type)
 	assert.Equal(t, "service-test", ctx.ProjectName)
 
 	// Test resolving identifier from current context
-	result, err := service.ResolveIdentifier("main")
+	result, err := contextService.ResolveIdentifier("main")
 	require.NoError(t, err)
 	assert.Equal(t, domain.PathTypeProject, result.Type)
 	assert.Equal(t, "service-test", result.ProjectName)
 	assert.Equal(t, repoDir, result.ResolvedPath)
 
 	// Test getting completion suggestions
-	suggestions, err := service.GetCompletionSuggestions("m")
+	suggestions, err := contextService.GetCompletionSuggestions("m")
 	require.NoError(t, err)
-	assert.Len(t, suggestions, 1)
-	assert.Equal(t, "main", suggestions[0].Text)
+	assert.NotEmpty(t, suggestions)
+	// Check that "main" is among the suggestions
+	foundMain := false
+	for _, suggestion := range suggestions {
+		if suggestion.Text == "main" {
+			foundMain = true
+			break
+		}
+	}
+	assert.True(t, foundMain, "Expected 'main' to be among completion suggestions")
 }

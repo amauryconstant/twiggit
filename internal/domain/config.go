@@ -6,6 +6,27 @@ import (
 	"path/filepath"
 )
 
+// ContextDetectionConfig represents context detection specific configuration
+type ContextDetectionConfig struct {
+	// Cache TTL for context detection results
+	CacheTTL string `toml:"cache_ttl" koanf:"cache_ttl"`
+
+	// Timeout for git operations during context detection
+	GitOperationTimeout string `toml:"git_operation_timeout" koanf:"git_operation_timeout"`
+
+	// Enable git repository validation during context detection
+	EnableGitValidation bool `toml:"enable_git_validation" koanf:"enable_git_validation"`
+}
+
+// GitConfig represents git operations specific configuration
+type GitConfig struct {
+	// Timeout for CLI git operations in seconds
+	CLITimeout int `toml:"cli_timeout" koanf:"cli_timeout"`
+
+	// Enable caching for git operations
+	CacheEnabled bool `toml:"cache_enabled" koanf:"cache_enabled"`
+}
+
 // Config represents the complete application configuration
 type Config struct {
 	// Directory paths
@@ -14,6 +35,12 @@ type Config struct {
 
 	// Default principal branch
 	DefaultSourceBranch string `toml:"default_source_branch" koanf:"default_source_branch"`
+
+	// Context detection settings
+	ContextDetection ContextDetectionConfig `toml:"context_detection"`
+
+	// Git operations settings
+	Git GitConfig `toml:"git"`
 }
 
 // DefaultConfig returns the default configuration values
@@ -32,6 +59,15 @@ func DefaultConfig() *Config {
 		ProjectsDirectory:   filepath.Join(home, "Projects"),
 		WorktreesDirectory:  filepath.Join(home, "Worktrees"),
 		DefaultSourceBranch: "main",
+		ContextDetection: ContextDetectionConfig{
+			CacheTTL:            "5m",
+			GitOperationTimeout: "30s",
+			EnableGitValidation: true,
+		},
+		Git: GitConfig{
+			CLITimeout:   30,
+			CacheEnabled: true,
+		},
 	}
 }
 

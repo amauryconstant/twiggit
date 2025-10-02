@@ -1,8 +1,9 @@
 package mocks
 
 import (
-	"github.com/stretchr/testify/mock"
 	"twiggit/internal/domain"
+
+	"github.com/stretchr/testify/mock"
 )
 
 // ContextDetectorMock is a mock implementation of domain.ContextDetector

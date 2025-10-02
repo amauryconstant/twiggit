@@ -12,6 +12,52 @@ import (
 	"twiggit/internal/domain"
 )
 
+// Pure functions extracted from ConfigManager
+
+// resolveConfigPath returns the path to the configuration file following XDG Base Directory specification
+func resolveConfigPath(xdgConfigHome, homeDir string) string {
+	// Check XDG_CONFIG_HOME first
+	if xdgConfigHome != "" {
+		return filepath.Join(xdgConfigHome, "twiggit", "config.toml")
+	}
+
+	// Fallback to $HOME/.config
+	if homeDir != "" {
+		return filepath.Join(homeDir, ".config", "twiggit", "config.toml")
+	}
+
+	// Fallback to current directory if home directory can't be determined
+	return "config.toml"
+}
+
+// buildDefaultConfig creates a new default configuration
+func buildDefaultConfig() *domain.Config {
+	return domain.DefaultConfig()
+}
+
+// configFileExists checks if a file exists at the given path
+func configFileExists(path string) bool {
+	_, err := os.Stat(path)
+	return !os.IsNotExist(err)
+}
+
+// validateConfig validates a configuration object
+func validateConfig(config *domain.Config) error {
+	if err := config.Validate(); err != nil {
+		return fmt.Errorf("config validation failed: %w", err)
+	}
+	return nil
+}
+
+// copyConfig creates a deep copy of a configuration object
+func copyConfig(config *domain.Config) *domain.Config {
+	return &domain.Config{
+		ProjectsDirectory:   config.ProjectsDirectory,
+		WorktreesDirectory:  config.WorktreesDirectory,
+		DefaultSourceBranch: config.DefaultSourceBranch,
+	}
+}
+
 type koanfConfigManager struct {
 	ko     *koanf.Koanf
 	config *domain.Config
@@ -29,9 +75,13 @@ func (m *koanfConfigManager) Load() (*domain.Config, error) {
 	// 1. Load defaults
 	m.loadDefaults()
 
-	// 2. Load config file
-	if err := m.loadConfigFile(); err != nil {
-		return nil, fmt.Errorf("load config: failed to load config file: %w", err)
+	// 2. Load config file using pure function for existence check
+	configPath := m.getConfigFilePath()
+	if configFileExists(configPath) {
+		// Load TOML file
+		if err := m.ko.Load(file.Provider(configPath), toml.Parser()); err != nil {
+			return nil, fmt.Errorf("load config: failed to parse config file %s: %w", configPath, err)
+		}
 	}
 
 	// 3. Unmarshal to config object
@@ -40,20 +90,16 @@ func (m *koanfConfigManager) Load() (*domain.Config, error) {
 		return nil, fmt.Errorf("load config: failed to unmarshal configuration: %w", err)
 	}
 
-	// 4. Validate configuration
-	if err := config.Validate(); err != nil {
+	// 4. Validate configuration using pure function
+	if err := validateConfig(config); err != nil {
 		return nil, fmt.Errorf("load config: validation failed: %w", err)
 	}
 
 	// 5. Store immutable config
 	m.config = config
 
-	// 6. Return a copy to maintain immutability
-	return &domain.Config{
-		ProjectsDirectory:   config.ProjectsDirectory,
-		WorktreesDirectory:  config.WorktreesDirectory,
-		DefaultSourceBranch: config.DefaultSourceBranch,
-	}, nil
+	// 6. Return a copy using pure function to maintain immutability
+	return copyConfig(config), nil
 }
 
 // GetConfig returns the loaded configuration (immutable copy)
@@ -61,17 +107,13 @@ func (m *koanfConfigManager) GetConfig() *domain.Config {
 	if m.config == nil {
 		return nil
 	}
-	// Return a deep copy to maintain immutability
-	return &domain.Config{
-		ProjectsDirectory:   m.config.ProjectsDirectory,
-		WorktreesDirectory:  m.config.WorktreesDirectory,
-		DefaultSourceBranch: m.config.DefaultSourceBranch,
-	}
+	// Return a deep copy using pure function to maintain immutability
+	return copyConfig(m.config)
 }
 
 // loadDefaults loads default configuration values
 func (m *koanfConfigManager) loadDefaults() {
-	defaults := domain.DefaultConfig()
+	defaults := buildDefaultConfig()
 
 	// Set defaults using koanf (matching the struct tags)
 	if err := m.ko.Set("projects_dir", defaults.ProjectsDirectory); err != nil {
@@ -86,37 +128,9 @@ func (m *koanfConfigManager) loadDefaults() {
 	}
 }
 
-// loadConfigFile loads configuration from TOML file
-func (m *koanfConfigManager) loadConfigFile() error {
-	configPath := m.getConfigFilePath()
-
-	// Check if config file exists
-	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		// Config file doesn't exist, that's okay
-		return nil
-	}
-
-	// Load TOML file
-	if err := m.ko.Load(file.Provider(configPath), toml.Parser()); err != nil {
-		return fmt.Errorf("load config: failed to parse config file %s: %w", configPath, err)
-	}
-
-	return nil
-}
-
 // getConfigFilePath returns the path to the configuration file following XDG Base Directory specification
 func (m *koanfConfigManager) getConfigFilePath() string {
-	// Check XDG_CONFIG_HOME first
-	if xdgHome := os.Getenv("XDG_CONFIG_HOME"); xdgHome != "" {
-		return filepath.Join(xdgHome, "twiggit", "config.toml")
-	}
-
-	// Fallback to $HOME/.config
-	home, err := os.UserHomeDir()
-	if err != nil {
-		// Fallback to current directory if home directory can't be determined
-		return "config.toml"
-	}
-
-	return filepath.Join(home, ".config", "twiggit", "config.toml")
+	xdgHome := os.Getenv("XDG_CONFIG_HOME")
+	home, _ := os.UserHomeDir()
+	return resolveConfigPath(xdgHome, home)
 }

@@ -1,8 +1,9 @@
 package mocks
 
 import (
-	"github.com/stretchr/testify/mock"
 	"twiggit/internal/domain"
+
+	"github.com/stretchr/testify/mock"
 )
 
 // ContextResolverMock is a mock implementation of domain.ContextResolver
