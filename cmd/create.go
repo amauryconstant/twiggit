@@ -1,0 +1,107 @@
+package cmd
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"strings"
+
+	"github.com/spf13/cobra"
+	"twiggit/internal/domain"
+)
+
+// NewCreateCommand creates a new create command
+func NewCreateCommand(config *CommandConfig) *cobra.Command {
+	var source, cdFlag string
+
+	cmd := &cobra.Command{
+		Use:   "create <project>/<branch> | <branch>",
+		Short: "Create a new worktree",
+		Long: `Create a new worktree for the specified project and branch.
+If only a branch name is provided, the project is inferred from the current context.
+The source branch defaults to 'main' unless specified with --source.`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return executeCreate(cmd, config, args[0], source, cdFlag)
+		},
+	}
+
+	cmd.Flags().StringVar(&source, "source", "main", "Source branch to create from")
+	cmd.Flags().StringVar(&cdFlag, "cd", "", "Change directory after creation (optional)")
+
+	return cmd
+}
+
+// executeCreate executes the create command with the given configuration
+func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source, _ string) error {
+	ctx := context.Background()
+
+	// Detect current context
+	currentCtx, err := config.Services.ContextService.GetCurrentContext()
+	if err != nil {
+		return fmt.Errorf("context detection failed: %w", err)
+	}
+
+	// Parse project and branch from spec
+	projectName, branchName, err := parseProjectBranch(spec, currentCtx)
+	if err != nil {
+		return err
+	}
+
+	// Discover project
+	project, err := config.Services.ProjectService.DiscoverProject(ctx, projectName, currentCtx)
+	if err != nil {
+		return fmt.Errorf("failed to discover project %s: %w", projectName, err)
+	}
+
+	// Create worktree request
+	req := &domain.CreateWorktreeRequest{
+		ProjectName:  project.Name,
+		BranchName:   branchName,
+		SourceBranch: source,
+		Context:      currentCtx,
+		Force:        false,
+	}
+
+	// Create worktree
+	worktree, err := config.Services.WorktreeService.CreateWorktree(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to create worktree: %w", err)
+	}
+
+	// Display success message
+	if err := displayCreateSuccess(cmd.OutOrStdout(), worktree); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// parseProjectBranch parses the project/branch specification
+func parseProjectBranch(spec string, ctx *domain.Context) (string, string, error) {
+	// Check if spec contains a slash (project/branch format)
+	if strings.Contains(spec, "/") {
+		parts := strings.SplitN(spec, "/", 2)
+		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+			return "", "", errors.New("invalid format: expected <project>/<branch>")
+		}
+		return parts[0], parts[1], nil
+	}
+
+	// If no slash, infer project from context
+	if ctx.ProjectName != "" {
+		return ctx.ProjectName, spec, nil
+	}
+
+	return "", "", errors.New("cannot infer project: not in a project context and no project specified")
+}
+
+// displayCreateSuccess displays the success message for worktree creation
+func displayCreateSuccess(out io.Writer, worktree *domain.WorktreeInfo) error {
+	_, err := fmt.Fprintf(out, "Created worktree: %s -> %s\n", worktree.Branch, worktree.Path)
+	if err != nil {
+		return fmt.Errorf("failed to display success message: %w", err)
+	}
+	return nil
+}
