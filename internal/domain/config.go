@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // ContextDetectionConfig represents context detection specific configuration
@@ -27,6 +28,28 @@ type GitConfig struct {
 	CacheEnabled bool `toml:"cache_enabled" koanf:"cache_enabled"`
 }
 
+// ServiceConfig holds service-specific configuration
+type ServiceConfig struct {
+	CacheEnabled  bool          `toml:"cache_enabled" koanf:"cache_enabled"`
+	CacheTTL      time.Duration `toml:"cache_ttl" koanf:"cache_ttl"`
+	ConcurrentOps bool          `toml:"concurrent_operations" koanf:"concurrent_operations"`
+	MaxConcurrent int           `toml:"max_concurrent" koanf:"max_concurrent"`
+}
+
+// ValidationConfig holds validation-specific configuration
+type ValidationConfig struct {
+	StrictBranchNames    bool `toml:"strict_branch_names" koanf:"strict_branch_names"`
+	RequireCleanWorktree bool `toml:"require_clean_worktree" koanf:"require_clean_worktree"`
+	AllowForceDelete     bool `toml:"allow_force_delete" koanf:"allow_force_delete"`
+}
+
+// NavigationConfig holds navigation-specific configuration
+type NavigationConfig struct {
+	EnableSuggestions bool `toml:"enable_suggestions" koanf:"enable_suggestions"`
+	MaxSuggestions    int  `toml:"max_suggestions" koanf:"max_suggestions"`
+	FuzzyMatching     bool `toml:"fuzzy_matching" koanf:"fuzzy_matching"`
+}
+
 // Config represents the complete application configuration
 type Config struct {
 	// Directory paths
@@ -41,6 +64,15 @@ type Config struct {
 
 	// Git operations settings
 	Git GitConfig `toml:"git"`
+
+	// Service settings
+	Services ServiceConfig `toml:"services"`
+
+	// Validation settings
+	Validation ValidationConfig `toml:"validation"`
+
+	// Navigation settings
+	Navigation NavigationConfig `toml:"navigation"`
 }
 
 // DefaultConfig returns the default configuration values
@@ -67,6 +99,22 @@ func DefaultConfig() *Config {
 		Git: GitConfig{
 			CLITimeout:   30,
 			CacheEnabled: true,
+		},
+		Services: ServiceConfig{
+			CacheEnabled:  true,
+			CacheTTL:      5 * time.Minute,
+			ConcurrentOps: true,
+			MaxConcurrent: 4,
+		},
+		Validation: ValidationConfig{
+			StrictBranchNames:    true,
+			RequireCleanWorktree: true,
+			AllowForceDelete:     false,
+		},
+		Navigation: NavigationConfig{
+			EnableSuggestions: true,
+			MaxSuggestions:    10,
+			FuzzyMatching:     false,
 		},
 	}
 }
@@ -130,5 +178,10 @@ func GetGlobalConfig() *Config {
 		ProjectsDirectory:   globalConfig.ProjectsDirectory,
 		WorktreesDirectory:  globalConfig.WorktreesDirectory,
 		DefaultSourceBranch: globalConfig.DefaultSourceBranch,
+		ContextDetection:    globalConfig.ContextDetection,
+		Git:                 globalConfig.Git,
+		Services:            globalConfig.Services,
+		Validation:          globalConfig.Validation,
+		Navigation:          globalConfig.Navigation,
 	}
 }
