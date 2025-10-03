@@ -36,8 +36,8 @@
 - Context behavior SHALL be validated for all three contexts: project, worktree, outside git
 
 ### Shell Integration Testing Requirements
-- Shell detection logic SHALL be tested for bash, zsh, and fish
-- Shell wrapper function generation SHALL be tested with mock shell configurations
+- Shell type validation SHALL be tested for bash, zsh, and fish
+- Shell wrapper function generation SHALL be tested with explicit shell types
 - Escape hatch behavior SHALL be tested with builtin cd functionality
 - Shell configuration file modification SHALL be tested with temporary files
 - Directory navigation output SHALL be tested for correct path format

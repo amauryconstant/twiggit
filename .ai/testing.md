@@ -162,10 +162,11 @@ Shell integration tests WILL validate that the context-aware navigation system w
 - Tests SHALL validate cross-project navigation scenarios
 
 #### Shell Compatibility Testing
-- Tests SHALL verify bash shell integration with proper `builtin cd` usage
-- Tests SHALL validate zsh shell integration with completion support
-- Tests SHALL confirm fish shell integration with completion support
+- Tests SHALL verify bash shell wrapper generation with proper `builtin cd` usage
+- Tests SHALL validate zsh shell wrapper generation with completion support
+- Tests SHALL confirm fish shell wrapper generation with completion support
 - Tests SHALL ensure escape hatch functionality works in all supported shells
+- Tests SHALL validate error handling for unsupported shell types
 
 #### Error Handling Testing
 - Tests SHALL validate context-aware error messages

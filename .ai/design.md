@@ -106,11 +106,14 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 
 #### `setup-shell` - Install shell wrapper
 **Behavior**:
-- Current shell (bash, zsh, fish) SHALL be detected
+- Shell type SHALL be specified via --shell flag (bash|zsh|fish)
 - Appropriate wrapper function with `builtin cd` escape hatch SHALL be generated
 - Wrapper SHALL be added to correct shell configuration file
 - Warning SHALL be provided about overriding shell built-in `cd` command
 - User SHALL be instructed to restart shell or source configuration
+- Error SHALL occur if --shell flag not provided or invalid shell specified
+
+**Usage**: `twiggit setup-shell --shell=bash`
 
 ### Help Command
 

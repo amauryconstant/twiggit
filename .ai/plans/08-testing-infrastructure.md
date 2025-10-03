@@ -1368,4 +1368,528 @@ func (m *MockWorktreeService) SetupCreateWorktreeError(projectName, branchName, 
 4. **Hybrid Testing**: Both git implementations produce identical results
 5. **CI Integration**: All tests pass in CI environment
 
+## Shell Integration Testing (Deferred from Phase 7)
+
+### Integration Tests for Shell Integration
+
+#### 4.1 Shell Detection Integration Tests
+
+**File**: `test/integration/shell_detection_test.go`
+
+```go
+//go:build integration
+// +build integration
+
+package integration
+
+import (
+    "os"
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "github.com/twiggit/twiggit/internal/infrastructure/shell"
+    "github.com/twiggit/twiggit/test/helpers"
+)
+
+func TestShellDetection_Integration(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration test")
+    }
+
+    testCases := []struct {
+        name         string
+        shellEnv     string
+        expectType   shell.ShellType
+        expectError  bool
+    }{
+        {
+            name:       "detect bash in real environment",
+            shellEnv:   "/bin/bash",
+            expectType: shell.ShellBash,
+        },
+        {
+            name:       "detect zsh in real environment",
+            shellEnv:   "/usr/bin/zsh",
+            expectType: shell.ShellZsh,
+        },
+        {
+            name:        "invalid shell path",
+            shellEnv:    "/nonexistent/shell",
+            expectError: true,
+        },
+    }
+
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            helper := helpers.NewShellTestHelper(t)
+            helper.SetupShellEnvironment()
+
+            // Set environment variable
+            oldShell := os.Getenv("SHELL")
+            defer os.Setenv("SHELL", oldShell)
+            os.Setenv("SHELL", tc.shellEnv)
+
+            detector := shell.NewShellDetector()
+            detectedShell, err := detector.DetectCurrentShell()
+
+            if tc.expectError {
+                assert.Error(t, err)
+            } else {
+                require.NoError(t, err)
+                assert.Equal(t, tc.expectType, detectedShell.Type())
+                assert.Equal(t, tc.shellEnv, detectedShell.Path())
+            }
+        })
+    }
+}
+```
+
+#### 4.2 Shell Wrapper Installation Tests
+
+**File**: `test/integration/shell_wrapper_test.go`
+
+```go
+//go:build integration
+// +build integration
+
+package integration
+
+import (
+    "os"
+    "path/filepath"
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "github.com/twiggit/twiggit/internal/infrastructure/shell"
+    "github.com/twiggit/twiggit/test/helpers"
+)
+
+func TestShellWrapperInstallation_Integration(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration test")
+    }
+
+    testCases := []struct {
+        name      string
+        shellType shell.ShellType
+        configExt string
+    }{
+        {
+            name:      "bash wrapper installation",
+            shellType: shell.ShellBash,
+            configExt: "bashrc",
+        },
+        {
+            name:      "zsh wrapper installation",
+            shellType: shell.ShellZsh,
+            configExt: "zshrc",
+        },
+        {
+            name:      "fish wrapper installation",
+            shellType: shell.ShellFish,
+            configExt: "config.fish",
+        },
+    }
+
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            helper := helpers.NewShellTestHelper(t)
+            tempDir := t.TempDir()
+            
+            // Create temporary config file
+            configPath := filepath.Join(tempDir, tc.configExt)
+            initialContent := "# Initial shell configuration\n"
+            require.NoError(t, os.WriteFile(configPath, []byte(initialContent), 0644))
+
+            // Create mock shell with temporary config
+            mockShell := &mockShell{
+                shellType:   tc.shellType,
+                configFiles: []string{configPath},
+            }
+
+            detector := shell.NewShellDetector()
+            integration := shell.NewShellIntegrationService(detector)
+
+            // Generate wrapper
+            wrapper, err := integration.GenerateWrapper(mockShell)
+            require.NoError(t, err)
+            assert.NotEmpty(t, wrapper)
+
+            // Validate wrapper syntax
+            err = helper.ValidateShellScript(string(tc.shellType), wrapper)
+            assert.NoError(t, err)
+
+            // Install wrapper
+            err = integration.InstallWrapper(mockShell, wrapper)
+            require.NoError(t, err)
+
+            // Verify installation
+            content, err := os.ReadFile(configPath)
+            require.NoError(t, err)
+            
+            contentStr := string(content)
+            assert.Contains(t, contentStr, "# Twiggit shell wrapper")
+            assert.Contains(t, contentStr, "twiggit()")
+            assert.Contains(t, contentStr, initialContent) // Original content preserved
+
+            // Test duplicate installation prevention
+            err = integration.InstallWrapper(mockShell, wrapper)
+            assert.Error(t, err)
+            assert.Contains(t, err.Error(), "already installed")
+        })
+    }
+}
+```
+
+#### 4.3 Shell Configuration File Detection Tests
+
+**File**: `test/integration/shell_config_test.go`
+
+```go
+//go:build integration
+// +build integration
+
+package integration
+
+import (
+    "os"
+    "path/filepath"
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "github.com/twiggit/twiggit/internal/infrastructure/shell"
+)
+
+func TestShellConfigDetection_Integration(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration test")
+    }
+
+    testCases := []struct {
+        name          string
+        shellType     shell.ShellType
+        createFiles   []string
+        expectedFile  string
+    }{
+        {
+            name:      "bash prefers .bashrc over .profile",
+            shellType: shell.ShellBash,
+            createFiles: []string{
+                ".profile",
+                ".bashrc",
+            },
+            expectedFile: ".bashrc",
+        },
+        {
+            name:      "zsh prefers .zshrc over .zprofile",
+            shellType: shell.ShellZsh,
+            createFiles: []string{
+                ".zprofile",
+                ".zshrc",
+            },
+            expectedFile: ".zshrc",
+        },
+        {
+            name:      "fish uses config.fish in .config/fish",
+            shellType: shell.ShellFish,
+            createFiles: []string{
+                ".config/fish/config.fish",
+            },
+            expectedFile: ".config/fish/config.fish",
+        },
+        {
+            name:         "bash falls back to .profile when .bashrc missing",
+            shellType:    shell.ShellBash,
+            createFiles:  []string{".profile"},
+            expectedFile: ".profile",
+        },
+    }
+
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            tempDir := t.TempDir()
+            
+            // Create test files
+            for _, file := range tc.createFiles {
+                fullPath := filepath.Join(tempDir, file)
+                dir := filepath.Dir(fullPath)
+                require.NoError(t, os.MkdirAll(dir, 0755))
+                require.NoError(t, os.WriteFile(fullPath, []byte("# test config"), 0644))
+            }
+
+            // Create mock shell
+            mockShell := &mockShell{
+                shellType:   tc.shellType,
+                configFiles: tc.createFiles,
+            }
+
+            detector := shell.NewShellDetector()
+            integration := shell.NewShellIntegrationService(detector)
+
+            // Detect config file
+            detectedPath, err := integration.DetectConfigFile(mockShell)
+            require.NoError(t, err)
+
+            expectedPath := filepath.Join(tempDir, tc.expectedFile)
+            assert.Equal(t, expectedPath, detectedPath)
+        })
+    }
+}
+```
+
+### E2E Tests for Shell Integration
+
+#### 4.4 Setup-Shell Command E2E Tests
+
+**File**: `test/e2e/shell_setup_test.go`
+
+```go
+//go:build e2e
+// +build e2e
+
+package e2e
+
+import (
+    "os"
+    "path/filepath"
+    "testing"
+    "github.com/onsi/ginkgo/v2"
+    "github.com/onsi/gomega"
+    "github.com/onsi/gomega/gexec"
+)
+
+var _ = ginkgo.Describe("Setup-Shell Command", func() {
+    var (
+        binPath    string
+        tempDir    string
+        configPath string
+    )
+
+    ginkgo.BeforeEach(func() {
+        var err error
+        tempDir = ginkgo.GinkgoT().TempDir()
+        
+        // Build test binary
+        binPath, err = gexec.Build("github.com/twiggit/twiggit")
+        gomega.Expect(err).NotTo(gomega.HaveOccurred())
+        
+        // Create test config file
+        configPath = filepath.Join(tempDir, ".bashrc")
+        err = os.WriteFile(configPath, []byte("# Initial config\n"), 0644)
+        gomega.Expect(err).NotTo(gomega.HaveOccurred())
+    })
+
+    ginkgo.AfterEach(func() {
+        gexec.CleanupBuildArtifacts()
+    })
+
+    ginkgo.Context("when setting up bash shell", func() {
+        ginkgo.It("should install wrapper successfully", func() {
+            session := gexec.Start(gexec.Command(binPath, "setup-shell", "--dry-run"), 
+                gexec.NewBuffer(), gexec.NewBuffer())
+            gomega.Eventually(session).Should(gexec.Exit(0))
+            
+            output := string(session.Out.Contents())
+            gomega.Expect(output).To(gomega.ContainSubstring("Dry run completed"))
+            gomega.Expect(output).To(gomega.ContainSubstring("twiggit() {"))
+        })
+
+        ginkgo.It("should detect current shell", func() {
+            env := []string{"SHELL=/bin/bash"}
+            session := gexec.Start(gexec.Command(binPath, "setup-shell", "--dry-run"), 
+                gexec.NewBuffer(), gexec.NewBuffer(), env...)
+            gomega.Eventually(session).Should(gexec.Exit(0))
+            
+            output := string(session.Out.Contents())
+            gomega.Expect(output).To(gomega.ContainSubstring("bash"))
+        })
+
+        ginkgo.It("should handle unsupported shell", func() {
+            env := []string{"SHELL=/bin/sh"}
+            session := gexec.Start(gexec.Command(binPath, "setup-shell"), 
+                gexec.NewBuffer(), gexec.NewBuffer(), env...)
+            gomega.Eventually(session).ShouldNot(gexec.Exit(0))
+            
+            output := string(session.Err.Contents())
+            gomega.Expect(output).To(gomega.ContainSubstring("unsupported shell"))
+        })
+    })
+
+    ginkgo.Context("when using force flag", func() {
+        ginkgo.It("should reinstall wrapper", func() {
+            // First installation
+            env := []string{"SHELL=/bin/bash", "HOME=" + tempDir}
+            session := gexec.Start(gexec.Command(binPath, "setup-shell"), 
+                gexec.NewBuffer(), gexec.NewBuffer(), env...)
+            gomega.Eventually(session).Should(gexec.Exit(0))
+
+            // Force reinstall
+            session = gexec.Start(gexec.Command(binPath, "setup-shell", "--force"), 
+                gexec.NewBuffer(), gexec.NewBuffer(), env...)
+            gomega.Eventually(session).Should(gexec.Exit(0))
+            
+            output := string(session.Out.Contents())
+            gomega.Expect(output).To(gomega.ContainSubstring("installed successfully"))
+        })
+    })
+})
+```
+
+#### 4.5 Shell Wrapper Functionality Tests
+
+**File**: `test/e2e/shell_wrapper_test.go`
+
+```go
+//go:build e2e
+// +build e2e
+
+package e2e
+
+import (
+    "os"
+    "path/filepath"
+    "testing"
+    "github.com/onsi/ginkgo/v2"
+    "github.com/onsi/gomega"
+    "github.com/onsi/gomega/gexec"
+)
+
+var _ = ginkgo.Describe("Shell Wrapper Functionality", func() {
+    var (
+        binPath    string
+        tempDir    string
+        worktreeDir string
+    )
+
+    ginkgo.BeforeEach(func() {
+        var err error
+        tempDir = ginkgo.GinkgoT().TempDir()
+        worktreeDir = filepath.Join(tempDir, "worktrees", "test-project", "feature-branch")
+        
+        // Create test worktree directory
+        err = os.MkdirAll(worktreeDir, 0755)
+        gomega.Expect(err).NotTo(gomega.HaveOccurred())
+        
+        // Build test binary
+        binPath, err = gexec.Build("github.com/twiggit/twiggit")
+        gomega.Expect(err).NotTo(gomega.HaveOccurred())
+    })
+
+    ginkgo.AfterEach(func() {
+        gexec.CleanupBuildArtifacts()
+    })
+
+    ginkgo.Context("when using twiggit cd command", func() {
+        ginkgo.It("should output worktree path", func() {
+            session := gexec.Start(gexec.Command(binPath, "cd", "feature-branch"), 
+                gexec.NewBuffer(), gexec.NewBuffer())
+            gomega.Eventually(session).Should(gexec.Exit(0))
+            
+            output := string(session.Out.Contents())
+            gomega.Expect(output).To(gomega.ContainSubstring(worktreeDir))
+        })
+
+        ginkgo.It("should handle non-existent worktree", func() {
+            session := gexec.Start(gexec.Command(binPath, "cd", "nonexistent"), 
+                gexec.NewBuffer(), gexec.NewBuffer())
+            gomega.Eventually(session).ShouldNot(gexec.Exit(0))
+            
+            output := string(session.Err.Contents())
+            gomega.Expect(output).To(gomega.ContainSubstring("worktree not found"))
+        })
+    })
+
+    ginkgo.Context("when using shell wrapper", func() {
+        ginkgo.It("should intercept cd commands", func() {
+            // Create a test script that simulates the wrapper
+            wrapperScript := filepath.Join(tempDir, "wrapper_test.sh")
+            scriptContent := `#!/bin/bash
+twiggit() {
+    if [[ "$1" == "cd" ]]; then
+        local target_dir
+        target_dir=$(command ` + binPath + ` "${@:2}")
+        if [[ $? -eq 0 && -n "$target_dir" ]]; then
+            echo "Would change to: $target_dir"
+        else
+            return $?
+        fi
+    else
+        command ` + binPath + ` "$@"
+    fi
+}
+
+# Test the wrapper
+twiggit cd feature-branch
+`
+            
+            err := os.WriteFile(wrapperScript, []byte(scriptContent), 0755)
+            gomega.Expect(err).NotTo(gomega.HaveOccurred())
+
+            session := gexec.Start(gexec.Command("bash", wrapperScript), 
+                gexec.NewBuffer(), gexec.NewBuffer())
+            gomega.Eventually(session).Should(gexec.Exit(0))
+            
+            output := string(session.Out.Contents())
+            gomega.Expect(output).To(gomega.ContainSubstring("Would change to:"))
+            gomega.Expect(output).To(gomega.ContainSubstring(worktreeDir))
+        })
+    })
+})
+```
+
+### Shell Integration Test Fixtures
+
+#### 4.6 Shell Test Fixtures
+
+**File**: `test/fixtures/shell/`
+
+```
+test/fixtures/shell/
+├── configs/
+│   ├── bashrc.example          # Example bash configuration
+│   ├── zshrc.example           # Example zsh configuration
+│   └── fish.config.example     # Example fish configuration
+├── scripts/
+│   ├── wrapper_bash.sh         # Bash wrapper template
+│   ├── wrapper_zsh.sh          # Zsh wrapper template
+│   └── wrapper_fish.sh         # Fish wrapper template
+└── environments/
+    ├── bash_env.sh             # Bash test environment
+    ├── zsh_env.sh              # Zsh test environment
+    └── fish_env.sh             # Fish test environment
+```
+
+**Example fixture content**:
+
+```bash
+# test/fixtures/shell/configs/bashrc.example
+# Example bash configuration for testing
+export PS1="\u@\h:\w$ "
+alias ll="ls -la"
+
+# Space for twiggit wrapper installation
+```
+
+```bash
+# test/fixtures/shell/scripts/wrapper_bash.sh
+# Twiggit bash wrapper template for testing
+twiggit() {
+    if [[ "$1" == "cd" ]]; then
+        local target_dir
+        target_dir=$(command twiggit "${@:2}")
+        if [[ $? -eq 0 && -n "$target_dir" ]]; then
+            builtin cd "$target_dir"
+        else
+            return $?
+        fi
+    elif [[ "$1" == "cd" && "$2" == "--help" ]]; then
+        command twiggit "$@"
+    else
+        command twiggit "$@"
+    fi
+}
+```
+
+This comprehensive shell integration testing infrastructure ensures that the shell wrapper functionality works correctly across all supported shells and integrates seamlessly with the existing twiggit workflow.
+
 This comprehensive testing infrastructure ensures twiggit meets the highest quality standards while maintaining the pragmatic TDD approach outlined in the testing philosophy.

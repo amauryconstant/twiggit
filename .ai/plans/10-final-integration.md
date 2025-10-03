@@ -468,4 +468,542 @@ jobs:
 
 ---
 
-*This plan ensures twiggit is production-ready with comprehensive testing, performance validation, and complete documentation for a successful initial release.*
+## Advanced Shell Integration Features (Deferred from Phase 7)
+
+### Phase 7: Advanced Shell Customization
+
+#### 7.1 Custom Wrapper Templates
+
+**File**: `internal/domain/shell_templates.go`
+
+```go
+package domain
+
+import (
+    "fmt"
+    "text/template"
+)
+
+type CustomTemplate struct {
+    Name        string            `toml:"name"`
+    ShellType   ShellType         `toml:"shell_type"`
+    Template    string            `toml:"template"`
+    Variables   map[string]string `toml:"variables"`
+    Description string            `toml:"description"`
+}
+
+type TemplateManager interface {
+    LoadCustomTemplates(configPath string) error
+    GetCustomTemplate(name string, shellType ShellType) (*CustomTemplate, error)
+    RenderTemplate(template *CustomTemplate, data map[string]interface{}) (string, error)
+    ValidateTemplate(template string) error
+}
+
+type templateManager struct {
+    templates map[string]map[ShellType]*CustomTemplate // name -> shell_type -> template
+}
+
+func NewTemplateManager() TemplateManager {
+    return &templateManager{
+        templates: make(map[string]map[ShellType]*CustomTemplate),
+    }
+}
+
+func (tm *templateManager) LoadCustomTemplates(configPath string) error {
+    // Load custom templates from user configuration
+    // Implementation would read from ~/.twiggit/templates.toml or similar
+    return nil
+}
+
+func (tm *templateManager) GetCustomTemplate(name string, shellType ShellType) (*CustomTemplate, error) {
+    if shellTemplates, exists := tm.templates[name]; exists {
+        if template, exists := shellTemplates[shellType]; exists {
+            return template, nil
+        }
+    }
+    return nil, fmt.Errorf("template '%s' not found for shell type '%s'", name, shellType)
+}
+
+func (tm *templateManager) RenderTemplate(template *CustomTemplate, data map[string]interface{}) (string, error) {
+    tmpl, err := template.New(template.Name).Parse(template.Template)
+    if err != nil {
+        return "", fmt.Errorf("failed to parse template: %w", err)
+    }
+    
+    // Merge template variables with provided data
+    mergedData := make(map[string]interface{})
+    for k, v := range template.Variables {
+        mergedData[k] = v
+    }
+    for k, v := range data {
+        mergedData[k] = v
+    }
+    
+    var buf strings.Builder
+    if err := tmpl.Execute(&buf, mergedData); err != nil {
+        return "", fmt.Errorf("failed to execute template: %w", err)
+    }
+    
+    return buf.String(), nil
+}
+
+func (tm *templateManager) ValidateTemplate(templateStr string) error {
+    _, err := template.New("validation").Parse(templateStr)
+    return err
+}
+```
+
+#### 7.2 Multi-Shell Completion Integration
+
+**File**: `internal/infrastructure/shell/completion.go`
+
+```go
+package shell
+
+import (
+    "context"
+    "fmt"
+    "strings"
+)
+
+type CompletionGenerator interface {
+    GenerateCompletion(shell Shell) (string, error)
+    InstallCompletion(shell Shell, completion string) error
+    SupportedShells() []ShellType
+}
+
+type carapaceCompletionGenerator struct {
+    binPath string
+}
+
+func NewCarapaceCompletionGenerator(binPath string) CompletionGenerator {
+    return &carapaceCompletionGenerator{
+        binPath: binPath,
+    }
+}
+
+func (c *carapaceCompletionGenerator) GenerateCompletion(shell Shell) (string, error) {
+    var args []string
+    
+    switch shell.Type() {
+    case ShellBash:
+        args = []string{"_carapace", "bash"}
+    case ShellZsh:
+        args = []string{"_carapace", "zsh"}
+    case ShellFish:
+        args = []string{"_carapace", "fish"}
+    default:
+        return "", fmt.Errorf("unsupported shell type for completion: %s", shell.Type())
+    }
+    
+    // Execute carapace completion generation
+    ctx := context.Background()
+    completion, err := c.executeCompletionCommand(ctx, args)
+    if err != nil {
+        return "", fmt.Errorf("failed to generate completion: %w", err)
+    }
+    
+    return c.postProcessCompletion(completion, shell.Type()), nil
+}
+
+func (c *carapaceCompletionGenerator) InstallCompletion(shell Shell, completion string) error {
+    configPath, err := c.detectCompletionConfigFile(shell)
+    if err != nil {
+        return fmt.Errorf("failed to detect completion config file: %w", err)
+    }
+    
+    return c.appendCompletionToConfig(configPath, completion, shell.Type())
+}
+
+func (c *carapaceCompletionGenerator) SupportedShells() []ShellType {
+    return []ShellType{ShellBash, ShellZsh, ShellFish}
+}
+
+func (c *carapaceCompletionGenerator) executeCompletionCommand(ctx context.Context, args []string) (string, error) {
+    // Implementation would execute the binary with carapace completion args
+    return "", nil
+}
+
+func (c *carapaceCompletionGenerator) postProcessCompletion(completion string, shellType ShellType) string {
+    // Add twiggit-specific completion enhancements
+    switch shellType {
+    case ShellBash:
+        return c.enhanceBashCompletion(completion)
+    case ShellZsh:
+        return c.enhanceZshCompletion(completion)
+    case ShellFish:
+        return c.enhanceFishCompletion(completion)
+    }
+    return completion
+}
+
+func (c *carapaceCompletionGenerator) enhanceBashCompletion(completion string) string {
+    // Add bash-specific enhancements
+    enhancements := `
+# Twiggit bash completion enhancements
+_twiggit_cd_completion() {
+    local cur prev words cword
+    _init_completion || return
+    
+    # Complete branch names and project names
+    if [[ ${cword} -eq 2 ]]; then
+        local branches
+        branches=$(twiggit list --format=short 2>/dev/null | awk '{print $1}')
+        COMPREPLY=($(compgen -W "$branches" -- "$cur"))
+    fi
+}
+
+complete -F _twiggit_cd_completion twiggit
+`
+    
+    return completion + enhancements
+}
+
+func (c *carapaceCompletionGenerator) enhanceZshCompletion(completion string) string {
+    // Add zsh-specific enhancements
+    enhancements := `
+# Twiggit zsh completion enhancements
+_twiggit_cd() {
+    local -a branches
+    branches=($(twiggit list --format=short 2>/dev/null | awk '{print $1}'))
+    _describe 'branches' branches
+}
+
+compdef _twiggit_cd twiggit
+`
+    
+    return completion + enhancements
+}
+
+func (c *carapaceCompletionGenerator) enhanceFishCompletion(completion string) string {
+    // Add fish-specific enhancements
+    enhancements := `
+# Twiggit fish completion enhancements
+complete -c twiggit -n '__fish_use_subcommand' -a cd -d 'Change to worktree directory'
+complete -c twiggit -n '__fish_seen_subcommand_from cd' -f -a '(twiggit list --format=short | awk \'{print $1}\')' -d 'Branch name'
+`
+    
+    return completion + enhancements
+}
+```
+
+#### 7.3 Advanced Shell Configuration
+
+**File**: `internal/domain/shell_config.go`
+
+```go
+package domain
+
+type AdvancedShellConfig struct {
+    CustomTemplates    map[string]*CustomTemplateConfig `toml:"custom_templates"`
+    Completion         *CompletionConfig                `toml:"completion"`
+    AdvancedWrappers   *AdvancedWrapperConfig           `toml:"advanced_wrappers"`
+    ShellIntegration   *ShellIntegrationConfig          `toml:"shell_integration"`
+}
+
+type CustomTemplateConfig struct {
+    Name        string            `toml:"name"`
+    ShellType   ShellType         `toml:"shell_type"`
+    Template    string            `toml:"template"`
+    Variables   map[string]string `toml:"variables"`
+    Description string            `toml:"description"`
+    Enabled     bool              `toml:"enabled"`
+}
+
+type CompletionConfig struct {
+    Enabled     bool     `toml:"enabled"`
+    AutoInstall bool     `toml:"auto_install"`
+    Shells      []string `toml:"shells"`
+    CustomHooks []string `toml:"custom_hooks"`
+}
+
+type AdvancedWrapperConfig struct {
+    EnableAliases      bool              `toml:"enable_aliases"`
+    CustomAliases      map[string]string `toml:"custom_aliases"`
+    EnableHooks        bool              `toml:"enable_hooks"`
+    PreCommandHooks    []string          `toml:"pre_command_hooks"`
+    PostCommandHooks   []string          `toml:"post_command_hooks"`
+    EnableTelemetry    bool              `toml:"enable_telemetry"`
+    TelemetryEndpoint  string            `toml:"telemetry_endpoint"`
+}
+
+type ShellIntegrationConfig struct {
+    AutoUpdate         bool          `toml:"auto_update"`
+    UpdateInterval     time.Duration `toml:"update_interval"`
+    BackupConfig       bool          `toml:"backup_config"`
+    BackupLocation     string        `toml:"backup_location"`
+    EnableValidation   bool          `toml:"enable_validation"`
+    ValidationLevel    string        `toml:"validation_level"` // strict, lenient, disabled
+}
+```
+
+#### 7.4 Enhanced Setup-Shell Command
+
+**File**: `cmd/setup-shell-advanced.go`
+
+```go
+package cmd
+
+import (
+    "fmt"
+    "os"
+    
+    "github.com/spf13/cobra"
+    "github.com/twiggit/twiggit/internal/services"
+)
+
+func NewSetupShellAdvancedCmd(config *CommandConfig) *cobra.Command {
+    cmd := &cobra.Command{
+        Use:   "setup-shell-advanced",
+        Short: "Advanced shell integration setup with customization options",
+        Long: `Advanced shell integration setup with support for custom templates,
+completion integration, and enhanced wrapper functionality.
+
+This command provides:
+- Custom wrapper template installation
+- Shell completion setup
+- Advanced configuration options
+- Multi-shell support with customization`,
+        RunE: func(cmd *cobra.Command, args []string) error {
+            return runSetupShellAdvanced(cmd, config)
+        },
+    }
+
+    cmd.Flags().String("template", "", "custom template name to use")
+    cmd.Flags().Bool("completion", false, "install shell completion")
+    cmd.Flags().Bool("advanced-wrapper", false, "install advanced wrapper with hooks")
+    cmd.Flags().String("config-file", "", "path to custom configuration file")
+    cmd.Flags().Bool("backup", true, "backup existing configuration")
+    cmd.Flags().String("validation-level", "strict", "validation level (strict, lenient, disabled)")
+
+    return cmd
+}
+
+func runSetupShellAdvanced(cmd *cobra.Command, config *CommandConfig) error {
+    templateName, _ := cmd.Flags().GetString("template")
+    installCompletion, _ := cmd.Flags().GetBool("completion")
+    advancedWrapper, _ := cmd.Flags().GetBool("advanced-wrapper")
+    configFile, _ := cmd.Flags().GetString("config-file")
+    backup, _ := cmd.Flags().GetBool("backup")
+    validationLevel, _ := cmd.Flags().GetString("validation-level")
+
+    // Create advanced setup request
+    request := &AdvancedSetupShellRequest{
+        TemplateName:     templateName,
+        InstallCompletion: installCompletion,
+        AdvancedWrapper:  advancedWrapper,
+        ConfigFile:       configFile,
+        Backup:           backup,
+        ValidationLevel:  validationLevel,
+    }
+
+    // Execute advanced setup
+    result, err := config.ShellService.SetupShellAdvanced(context.Background(), request)
+    if err != nil {
+        return fmt.Errorf("advanced setup failed: %w", err)
+    }
+
+    // Display comprehensive results
+    return displayAdvancedSetupResults(result)
+}
+
+func displayAdvancedSetupResults(result *AdvancedSetupShellResult) error {
+    fmt.Printf("✓ Advanced shell integration completed\n")
+    fmt.Printf("✓ Shell type: %s\n", result.ShellType)
+    
+    if result.TemplateInstalled {
+        fmt.Printf("✓ Custom template '%s' installed\n", result.TemplateName)
+    }
+    
+    if result.CompletionInstalled {
+        fmt.Printf("✓ Shell completion installed\n")
+    }
+    
+    if result.AdvancedWrapperInstalled {
+        fmt.Printf("✓ Advanced wrapper with hooks installed\n")
+    }
+    
+    if result.BackupCreated {
+        fmt.Printf("✓ Configuration backed up to: %s\n", result.BackupPath)
+    }
+    
+    if len(result.Warnings) > 0 {
+        fmt.Printf("\nWarnings:\n")
+        for _, warning := range result.Warnings {
+            fmt.Printf("  ⚠️  %s\n", warning)
+        }
+    }
+    
+    if len(result.NextSteps) > 0 {
+        fmt.Printf("\nNext steps:\n")
+        for _, step := range result.NextSteps {
+            fmt.Printf("  → %s\n", step)
+        }
+    }
+    
+    return nil
+}
+```
+
+### Phase 8: Shell Integration Testing Extensions
+
+#### 8.1 Advanced Shell Integration Tests
+
+**File**: `test/integration/advanced_shell_test.go`
+
+```go
+//go:build integration
+// +build integration
+
+package integration
+
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "github.com/twiggit/twiggit/internal/domain"
+    "github.com/twiggit/twiggit/internal/infrastructure/shell"
+)
+
+func TestAdvancedShellIntegration_Integration(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration test")
+    }
+
+    testCases := []struct {
+        name         string
+        templateName string
+        shellType    domain.ShellType
+        expectError  bool
+    }{
+        {
+            name:         "custom bash template",
+            templateName: "enhanced-bash",
+            shellType:    domain.ShellBash,
+            expectError:  false,
+        },
+        {
+            name:         "custom zsh template",
+            templateName: "enhanced-zsh",
+            shellType:    domain.ShellZsh,
+            expectError:  false,
+        },
+        {
+            name:         "non-existent template",
+            templateName: "non-existent",
+            shellType:    domain.ShellBash,
+            expectError:  true,
+        },
+    }
+
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            templateManager := shell.NewTemplateManager()
+            
+            // Load custom templates
+            err := templateManager.LoadCustomTemplates("test/fixtures/templates.toml")
+            require.NoError(t, err)
+            
+            // Get custom template
+            template, err := templateManager.GetCustomTemplate(tc.templateName, tc.shellType)
+            
+            if tc.expectError {
+                assert.Error(t, err)
+            } else {
+                require.NoError(t, err)
+                assert.NotNil(t, template)
+                assert.Equal(t, tc.templateName, template.Name)
+                assert.Equal(t, tc.shellType, template.ShellType)
+                
+                // Test template rendering
+                data := map[string]interface{}{
+                    "ShellType": string(tc.shellType),
+                    "Timestamp":  "2024-01-01 12:00:00",
+                }
+                
+                rendered, err := templateManager.RenderTemplate(template, data)
+                require.NoError(t, err)
+                assert.NotEmpty(t, rendered)
+                assert.Contains(t, rendered, "twiggit()")
+            }
+        })
+    }
+}
+```
+
+#### 8.2 Completion Integration Tests
+
+**File**: `test/integration/completion_test.go`
+
+```go
+//go:build integration
+// +build integration
+
+package integration
+
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "github.com/twiggit/twiggit/internal/infrastructure/shell"
+)
+
+func TestCompletionIntegration_Integration(t *testing.T) {
+    if testing.Short() {
+        t.Skip("Skipping integration test")
+    }
+
+    testCases := []struct {
+        name      string
+        shellType domain.ShellType
+        expectError bool
+    }{
+        {
+            name:      "bash completion generation",
+            shellType: domain.ShellBash,
+            expectError: false,
+        },
+        {
+            name:      "zsh completion generation",
+            shellType: domain.ShellZsh,
+            expectError: false,
+        },
+        {
+            name:      "fish completion generation",
+            shellType: domain.ShellFish,
+            expectError: false,
+        },
+    }
+
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            generator := shell.NewCarapaceCompletionGenerator("/usr/local/bin/twiggit")
+            
+            mockShell := &mockShell{shellType: tc.shellType}
+            
+            completion, err := generator.GenerateCompletion(mockShell)
+            
+            if tc.expectError {
+                assert.Error(t, err)
+            } else {
+                require.NoError(t, err)
+                assert.NotEmpty(t, completion)
+                
+                // Verify shell-specific completion features
+                switch tc.shellType {
+                case domain.ShellBash:
+                    assert.Contains(t, completion, "_twiggit_cd_completion")
+                case domain.ShellZsh:
+                    assert.Contains(t, completion, "_twiggit_cd")
+                case domain.ShellFish:
+                    assert.Contains(t, completion, "complete -c twiggit")
+                }
+            }
+        })
+    }
+}
+```
+
+These advanced shell integration features provide extensive customization options, enhanced completion support, and sophisticated configuration management while maintaining compatibility with the existing shell integration system.
+
+*This plan ensures twiggit is production-ready with comprehensive testing, performance validation, complete documentation, and advanced shell integration features for a successful initial release.*
