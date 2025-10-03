@@ -6,244 +6,139 @@ This plan establishes the comprehensive testing infrastructure for twiggit, impl
 
 > "Testing philosophy: Pragmatic TDD, 80%+ coverage, three-tier approach" - testing.md:3
 
-## Architecture
+**Context**: Foundation, configuration, context detection, hybrid git, core services, CLI commands, and shell integration layers are established. This phase provides the comprehensive testing infrastructure that ensures quality across all layers.
 
-### Testing Tiers
+## Foundation Principles
 
-1. **Unit Tests** - Testify suites, fast, isolated
-2. **Integration Tests** - Real git operations, temporary repos
-3. **E2E Tests** - Ginkgo/Gomega, built CLI binaries
+### TDD Approach
+- **Test First**: Write failing tests, then implement minimal infrastructure to pass
+- **Red-Green-Refactor**: Follow strict TDD cycle for each testing component
+- **Minimal Implementation**: Implement only what's needed to pass current tests
+- **Infrastructure Contracts**: Test testing interfaces before implementation
 
-### Directory Structure
+### Functional Programming Principles
+- **Pure Test Functions**: Test helpers SHALL be pure functions without side effects
+- **Immutable Test Data**: Test fixtures and data SHALL be immutable
+- **Function Composition**: Complex test scenarios SHALL be composed from smaller test functions
+- **Error Handling**: SHALL use Result/Either patterns for test error handling
+
+### Clean Testing Architecture
+- **Three-Tier Testing**: Unit, Integration, E2E with clear boundaries
+- **Test Isolation**: Each test SHALL be independent and deterministic
+- **Dependency Injection**: All test dependencies SHALL be injected via interfaces
+- **Interface Segregation**: Test utilities SHALL have focused, single-purpose interfaces
+
+## Phase Boundaries
+
+### Phase 8 Scope
+- Test helpers and utilities with functional composition
+- Mock infrastructure with interface-based design
+- Integration test framework with real git operations
+- E2E test framework with CLI binary testing
+- Coverage enforcement and quality gates
+
+### Deferred to Later Phases
+- Performance optimization and benchmarking (Phase 9)
+- Advanced test orchestration patterns (Phase 9)
+- Production monitoring integration (Phase 10)
+
+## Project Structure
+
+Phase 8 minimal structure following Go standards and existing patterns:
 
 ```
 test/
-├── unit/                    # Unit tests with Testify
-│   ├── config/
-│   ├── git/
-│   ├── cli/
-│   └── services/
-├── integration/             # Integration tests with real git
-│   ├── git/
-│   ├── hybrid/
-│   └── performance/
-├── e2e/                     # E2E tests with Ginkgo
-│   ├── commands/
-│   ├── shell/
-│   └── workflows/
-├── mocks/                   # Centralized mock implementations
-│   ├── git/
-│   ├── config/
-│   └── services/
-├── fixtures/                # Test data and repositories
-│   ├── repos/
-│   ├── configs/
-│   └── scripts/
-└── helpers/                 # Testing utilities and helpers
-    ├── git.go
-    ├── repo.go
-    ├── shell.go
-    └── performance.go
+├── helpers/                   # Pure functional test utilities
+│   ├── git.go                # Git repository helper
+│   ├── repo.go               # Repository management helper
+│   ├── shell.go              # Shell integration helper
+│   └── performance.go        # Performance testing helper
+├── mocks/                     # Enhanced mock infrastructure
+│   ├── services/             # Service mock implementations
+│   ├── infrastructure/       # Infrastructure mock implementations
+│   └── domain/               # Domain mock implementations
+├── integration/               # Integration test framework
+│   ├── integration_test.go   # Base integration test suite
+│   ├── git/                  # Git integration tests
+│   ├── services/             # Service integration tests
+│   └── shell/                # Shell integration tests
+├── e2e/                       # E2E test framework
+│   ├── e2e_test.go          # Base E2E test suite
+│   ├── commands/             # CLI command tests
+│   ├── workflows/            # User workflow tests
+│   └── shell/                # Shell integration E2E tests
+└── coverage.go                # Coverage management utilities
 ```
+
+**Building on existing structure** (already exists):
+- `test/fixtures/` - Domain-focused fixtures (well-structured)
+- `test/integration/` - Basic integration tests (needs enhancement)
+- `test/mocks/` - Basic mock infrastructure (needs expansion)
 
 ## Implementation Steps
 
-### Phase 1: Foundation Setup
+### Step 1: Test Helper Infrastructure
 
-#### 1.1 Testing Framework Configuration
+**Files to create:**
+- `test/helpers/git.go`
+- `test/helpers/repo.go` 
+- `test/helpers/shell.go`
+- `test/helpers/performance.go`
 
-**File**: `test/framework_test.go`
+**Tests first:** `test/helpers/helpers_test.go`
+
 ```go
-//go:build !integration && !e2e
-
-package test
-
-import (
-    "testing"
-    "github.com/stretchr/testify/suite"
-)
-
-// BaseTestSuite provides common functionality for all unit tests
-type BaseTestSuite struct {
-    suite.Suite
-    TempDir string
-    Cleanup func()
-}
-
-func (s *BaseTestSuite) SetupTest() {
-    s.TempDir = s.T().TempDir()
-    s.Cleanup = func() {}
-}
-
-func (s *BaseTestSuite) TearDownTest() {
-    s.Cleanup()
-}
-```
-
-#### 1.2 Build Tags Configuration
-
-**File**: `test/build_tags.go`
-```go
-//go:build integration
-
-package test
-
-const IntegrationBuild = true
-
-//go:build e2e
-
-package test
-
-const E2EBuild = true
-```
-
-#### 1.3 Test Registry
-
-**File**: `test/registry.go`
-```go
-package test
-
-import (
-    "testing"
-    "github.com/stretchr/testify/suite"
-)
-
-// TestRegistry manages test suite registration
-type TestRegistry struct {
-    suites map[string]func(t *testing.T)
-}
-
-func NewTestRegistry() *TestRegistry {
-    return &TestRegistry{
-        suites: make(map[string]func(t *testing.T)),
+func TestGitTestHelper_CreateRepoWithCommits(t *testing.T) {
+    testCases := []struct {
+        name         string
+        commitCount  int
+        expectError  bool
+        errorMessage string
+    }{
+        {
+            name:        "valid repository with commits",
+            commitCount: 3,
+            expectError: false,
+        },
+        {
+            name:        "zero commits",
+            commitCount: 0,
+            expectError: false,
+        },
+        {
+            name:        "negative commits",
+            commitCount: -1,
+            expectError: true,
+            errorMessage: "commit count cannot be negative",
+        },
     }
-}
-
-func (r *TestRegistry) RegisterSuite(name string, suiteFunc func(t *testing.T)) {
-    r.suites[name] = suiteFunc
-}
-
-func (r *TestRegistry) RunAll(t *testing.T) {
-    for name, suiteFunc := range r.suites {
-        t.Run(name, suiteFunc)
+    
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            helper := NewGitTestHelper(t)
+            
+            if tc.expectError {
+                assert.Panics(t, func() {
+                    helper.CreateRepoWithCommits(tc.commitCount)
+                })
+            } else {
+                repoPath := helper.CreateRepoWithCommits(tc.commitCount)
+                assert.NotEmpty(t, repoPath)
+                assert.DirExists(t, repoPath)
+                
+                // Verify git repository
+                gitRepo, err := git.PlainOpen(repoPath)
+                assert.NoError(t, err)
+                assert.NotNil(t, gitRepo)
+            }
+        })
     }
 }
 ```
 
-### Phase 2: Mock Infrastructure
-
-#### 2.1 Centralized Git Mock
-
-**File**: `test/mocks/git/mock_repository.go`
+**Functional helper implementation:**
 ```go
-package mocks
-
-import (
-    "github.com/stretchr/testify/mock"
-    "github.com/go-git/go-git/v5"
-    "github.com/go-git/go-git/v5/plumbing"
-)
-
-type MockRepository struct {
-    mock.Mock
-}
-
-func (m *MockRepository) Worktrees() (*git.WorktreeContext, error) {
-    args := m.Called()
-    return args.Get(0).(*git.WorktreeContext), args.Error(1)
-}
-
-func (m *MockRepository) Worktree() (*git.Worktree, error) {
-    args := m.Called()
-    return args.Get(0).(*git.Worktree), args.Error(1)
-}
-
-func (m *MockRepository) Branch(name string) (*plumbing.Reference, error) {
-    args := m.Called(name)
-    return args.Get(0).(*plumbing.Reference), args.Error(1)
-}
-
-// Add more methods as needed...
-```
-
-#### 2.2 Config Mock
-
-**File**: `test/mocks/config/mock_config.go`
-```go
-package mocks
-
-import (
-    "github.com/stretchr/testify/mock"
-    "github.com/twiggit/twiggit/internal/config"
-)
-
-type MockConfig struct {
-    mock.Mock
-}
-
-func (m *MockConfig) Get(key string) interface{} {
-    args := m.Called(key)
-    return args.Get(0)
-}
-
-func (m *MockConfig) Set(key string, value interface{}) error {
-    args := m.Called(key, value)
-    return args.Error(0)
-}
-
-func (m *MockConfig) GetString(key string) string {
-    args := m.Called(key)
-    return args.String(0)
-}
-
-// Add more methods as needed...
-```
-
-#### 2.3 Service Mocks
-
-**File**: `test/mocks/services/mock_worktree_service.go`
-```go
-package mocks
-
-import (
-    "github.com/stretchr/testify/mock"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-type MockWorktreeService struct {
-    mock.Mock
-}
-
-func (m *MockWorktreeService) List() ([]*services.WorktreeInfo, error) {
-    args := m.Called()
-    return args.Get(0).([]*services.WorktreeInfo), args.Error(1)
-}
-
-func (m *MockWorktreeService) Create(name, branch string) (*services.WorktreeInfo, error) {
-    args := m.Called(name, branch)
-    return args.Get(0).(*services.WorktreeInfo), args.Error(1)
-}
-
-// Add more methods as needed...
-```
-
-### Phase 3: Test Helpers and Utilities
-
-#### 3.1 Git Repository Helper
-
-**File**: `test/helpers/git.go`
-```go
-package helpers
-
-import (
-    "os"
-    "path/filepath"
-    "testing"
-    "github.com/go-git/go-git/v5"
-    "github.com/go-git/go-git/v5/plumbing/object"
-)
-
-// GitTestHelper provides utilities for git testing
+// test/helpers/git.go
 type GitTestHelper struct {
     t       *testing.T
     baseDir string
@@ -256,1640 +151,717 @@ func NewGitTestHelper(t *testing.T) *GitTestHelper {
     }
 }
 
-// CreateBareRepo creates a bare repository for testing
-func (h *GitTestHelper) CreateBareRepo() string {
-    repoPath := filepath.Join(h.baseDir, "bare.git")
-    _, err := git.PlainInit(repoPath, true)
-    if err != nil {
-        h.t.Fatalf("Failed to create bare repo: %v", err)
-    }
-    return repoPath
+// Functional composition methods
+func (h *GitTestHelper) WithCommits(count int) *GitTestHelper {
+    h.commitCount = count
+    return h
 }
 
-// CreateRepoWithCommits creates a repository with initial commits
-func (h *GitTestHelper) CreateRepoWithCommits(commits int) string {
+func (h *GitTestHelper) WithBranch(branch string) *GitTestHelper {
+    h.branch = branch
+    return h
+}
+
+func (h *GitTestHelper) CreateRepoWithCommits(commitCount int) string {
+    if commitCount < 0 {
+        panic("commit count cannot be negative")
+    }
+    
     repoPath := filepath.Join(h.baseDir, "repo")
     repo, err := git.PlainInit(repoPath, false)
     if err != nil {
         h.t.Fatalf("Failed to create repo: %v", err)
     }
-
-    wt, err := repo.Worktree()
-    if err != nil {
-        h.t.Fatalf("Failed to get worktree: %v", err)
-    }
-
-    // Create initial commits
-    for i := 0; i < commits; i++ {
-        filename := filepath.Join(repoPath, "file.txt")
-        content := []byte(fmt.Sprintf("Content %d\n", i))
+    
+    // Pure function to create commits
+    createCommits := func(repo *git.Repository, count int) error {
+        wt, err := repo.Worktree()
+        if err != nil {
+            return err
+        }
         
-        if err := os.WriteFile(filename, content, 0644); err != nil {
-            h.t.Fatalf("Failed to write file: %v", err)
+        for i := 0; i < count; i++ {
+            filename := filepath.Join(repoPath, "file.txt")
+            content := []byte(fmt.Sprintf("Content %d\n", i))
+            
+            if err := os.WriteFile(filename, content, 0644); err != nil {
+                return err
+            }
+            
+            _, err = wt.Add("file.txt")
+            if err != nil {
+                return err
+            }
+            
+            commit := &object.Commit{
+                Message: fmt.Sprintf("Commit %d", i),
+                Author: object.Signature{
+                    Name:  "Test User",
+                    Email: "test@example.com",
+                },
+            }
+            
+            _, err = wt.Commit(commit.Message, &git.CommitOptions{
+                Author: &commit.Author,
+            })
+            if err != nil {
+                return err
+            }
         }
+        
+        return nil
+    }
+    
+    if err := createCommits(repo, commitCount); err != nil {
+        h.t.Fatalf("Failed to create commits: %v", err)
+    }
+    
+    return repoPath
+}
+```
 
-        _, err = wt.Add("file.txt")
-        if err != nil {
-            h.t.Fatalf("Failed to add file: %v", err)
-        }
+### Step 2: Enhanced Mock Infrastructure
 
-        commit := &object.Commit{
-            Message: fmt.Sprintf("Commit %d", i),
-            Author: object.Signature{
-                Name:  "Test User",
-                Email: "test@example.com",
+**Tests first:** `test/mocks/services_test.go`
+
+```go
+func TestMockWorktreeService_FunctionalBehavior(t *testing.T) {
+    testCases := []struct {
+        name         string
+        setupFunc    func(*MockWorktreeService)
+        request      *CreateWorktreeRequest
+        expectError  bool
+        errorMessage string
+    }{
+        {
+            name: "successful worktree creation with functional setup",
+            setupFunc: func(m *MockWorktreeService) {
+                m.SetupCreateWorktreeSuccess("test-project", "feature-branch").
+                    WithPath("/test/worktrees/test-project/feature-branch").
+                    WithBranch("feature-branch")
             },
-        }
-
-        _, err = wt.Commit(commit.Message, &git.CommitOptions{
-            Author: &commit.Author,
+            request: &CreateWorktreeRequest{
+                ProjectName: "test-project",
+                BranchName:  "feature-branch",
+            },
+            expectError: false,
+        },
+        {
+            name: "failed worktree creation with functional setup",
+            setupFunc: func(m *MockWorktreeService) {
+                m.SetupCreateWorktreeError("test-project", "feature-branch", "worktree already exists")
+            },
+            request: &CreateWorktreeRequest{
+                ProjectName: "test-project",
+                BranchName:  "feature-branch",
+            },
+            expectError:  true,
+            errorMessage: "worktree already exists",
+        },
+    }
+    
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            mock := NewMockWorktreeService()
+            tc.setupFunc(mock)
+            
+            result, err := mock.CreateWorktree(context.Background(), tc.request)
+            
+            if tc.expectError {
+                assert.Error(t, err)
+                assert.Contains(t, err.Error(), tc.errorMessage)
+                assert.Nil(t, result)
+            } else {
+                assert.NoError(t, err)
+                assert.NotNil(t, result)
+            }
+            
+            mock.AssertExpectations(t)
         })
-        if err != nil {
-            h.t.Fatalf("Failed to commit: %v", err)
-        }
-    }
-
-    return repoPath
-}
-
-// CreateBranch creates a new branch in the repository
-func (h *GitTestHelper) CreateBranch(repoPath, branchName string) {
-    repo, err := git.PlainOpen(repoPath)
-    if err != nil {
-        h.t.Fatalf("Failed to open repo: %v", err)
-    }
-
-    head, err := repo.Head()
-    if err != nil {
-        h.t.Fatalf("Failed to get HEAD: %v", err)
-    }
-
-    ref := plumbing.NewBranchReferenceName(branchName)
-    err = repo.Storer.SetReference(plumbing.NewHashReference(ref, head.Hash()))
-    if err != nil {
-        h.t.Fatalf("Failed to create branch: %v", err)
     }
 }
 ```
 
-#### 3.2 Repository Management Helper
-
-**File**: `test/helpers/repo.go`
+**Functional mock implementation:**
 ```go
-package helpers
-
-import (
-    "os"
-    "path/filepath"
-    "testing"
-    "github.com/twiggit/twiggit/internal/config"
-)
-
-// RepoTestHelper manages test repositories
-type RepoTestHelper struct {
-    t       *testing.T
-    tempDir string
-    repos   map[string]string
+// test/mocks/services/worktree_service_mock.go
+type MockWorktreeService struct {
+    mock.Mock
 }
 
-func NewRepoTestHelper(t *testing.T) *RepoTestHelper {
-    return &RepoTestHelper{
-        t:       t,
-        tempDir: t.TempDir(),
-        repos:   make(map[string]string),
-    }
+func NewMockWorktreeService() *MockWorktreeService {
+    return &MockWorktreeService{}
 }
 
-// SetupTestRepo creates a test repository with configuration
-func (h *RepoTestHelper) SetupTestRepo(name string) string {
-    repoPath := filepath.Join(h.tempDir, name)
-    err := os.MkdirAll(repoPath, 0755)
-    if err != nil {
-        h.t.Fatalf("Failed to create repo dir: %v", err)
-    }
-
-    // Initialize git repo
-    gitHelper := NewGitTestHelper(h.t)
-    repoPath = gitHelper.CreateRepoWithCommits(3)
-
-    // Create twiggit config
-    configPath := filepath.Join(repoPath, ".twiggit.yml")
-    configContent := `
-default_branch: main
-worktree_prefix: "wt-"
-git:
-  implementation: "go-git"
-  timeout: "30s"
-`
-    err = os.WriteFile(configPath, []byte(configContent), 0644)
-    if err != nil {
-        h.t.Fatalf("Failed to write config: %v", err)
-    }
-
-    h.repos[name] = repoPath
-    return repoPath
+// Functional setup methods for fluent interface
+func (m *MockWorktreeService) SetupCreateWorktreeSuccess(projectName, branchName string) *MockWorktreeSetup {
+    setup := &MockWorktreeSetup{mock: m}
+    return setup.ForCreateWorktree(projectName, branchName).WillSucceed()
 }
 
-// Cleanup removes all test repositories
-func (h *RepoTestHelper) Cleanup() {
-    for _, path := range h.repos {
-        os.RemoveAll(path)
+func (m *MockWorktreeService) SetupCreateWorktreeError(projectName, branchName, errorMsg string) *MockWorktreeSetup {
+    setup := &MockWorktreeSetup{mock: m}
+    return setup.ForCreateWorktree(projectName, branchName).WillFail(errorMsg)
+}
+
+// Functional setup builder
+type MockWorktreeSetup struct {
+    mock      *MockWorktreeService
+    operation string
+    params    map[string]interface{}
+}
+
+func (s *MockWorktreeSetup) ForCreateWorktree(projectName, branchName string) *MockWorktreeSetup {
+    s.operation = "CreateWorktree"
+    s.params = map[string]interface{}{
+        "projectName": projectName,
+        "branchName":  branchName,
     }
-    h.repos = make(map[string]string)
+    return s
+}
+
+func (s *MockWorktreeSetup) WithPath(path string) *MockWorktreeSetup {
+    s.params["path"] = path
+    return s
+}
+
+func (s *MockWorktreeSetup) WithBranch(branch string) *MockWorktreeSetup {
+    s.params["branch"] = branch
+    return s
+}
+
+func (s *MockWorktreeSetup) WillSucceed() *MockWorktreeSetup {
+    worktree := &WorktreeInfo{
+        Path:   s.params["path"].(string),
+        Branch: s.params["branch"].(string),
+    }
+    
+    s.mock.On("CreateWorktree", mock.Anything, mock.MatchedBy(func(req *CreateWorktreeRequest) bool {
+        return req.ProjectName == s.params["projectName"] && req.BranchName == s.params["branchName"]
+    })).Return(worktree, nil)
+    
+    return s
+}
+
+func (s *MockWorktreeSetup) WillFail(errorMsg string) *MockWorktreeSetup {
+    s.mock.On("CreateWorktree", mock.Anything, mock.MatchedBy(func(req *CreateWorktreeRequest) bool {
+        return req.ProjectName == s.params["projectName"] && req.BranchName == s.params["branchName"]
+    })).Return(nil, fmt.Errorf(errorMsg))
+    
+    return s
 }
 ```
 
-#### 3.3 Shell Integration Helper
+### Step 3: Integration Test Framework
 
-**File**: `test/helpers/shell.go`
+**Tests first:** `test/integration/integration_test.go`
+
 ```go
-package helpers
-
-import (
-    "os"
-    "os/exec"
-    "strings"
-    "testing"
-)
-
-// ShellTestHelper provides shell testing utilities
-type ShellTestHelper struct {
-    t *testing.T
-}
-
-func NewShellTestHelper(t *testing.T) *ShellTestHelper {
-    return &ShellTestHelper{t: t}
-}
-
-// RunShellCommand executes a command in the specified shell
-func (h *ShellTestHelper) RunShellCommand(shell, command string) (string, error) {
-    var cmd *exec.Cmd
-    
-    switch shell {
-    case "bash":
-        cmd = exec.Command("bash", "-c", command)
-    case "zsh":
-        cmd = exec.Command("zsh", "-c", command)
-    case "fish":
-        cmd = exec.Command("fish", "-c", command)
-    default:
-        cmd = exec.Command("sh", "-c", command)
+func TestIntegrationTestSuite_FunctionalComposition(t *testing.T) {
+    testCases := []struct {
+        name         string
+        setupFunc    func(*IntegrationTestSuite)
+        testFunc     func(*IntegrationTestSuite)
+        expectError  bool
+        errorMessage string
+    }{
+        {
+            name: "service coordination with functional setup",
+            setupFunc: func(s *IntegrationTestSuite) {
+                s.WithProject("test-project").
+                    WithWorktrees([]string{"main", "feature-a", "feature-b"}).
+                    WithGitImplementation("go-git")
+            },
+            testFunc: func(s *IntegrationTestSuite) {
+                // Test complete workflow
+                worktrees, err := s.worktreeService.ListWorktrees(context.Background(), &ListWorktreesRequest{
+                    ProjectName: "test-project",
+                })
+                
+                assert.NoError(t, err)
+                assert.Len(t, worktrees, 3)
+            },
+            expectError: false,
+        },
     }
-
-    output, err := cmd.CombinedOutput()
-    return string(output), err
-}
-
-// SetupShellEnvironment prepares shell environment for testing
-func (h *ShellTestHelper) SetupShellEnvironment() {
-    // Set up environment variables for testing
-    os.Setenv("TWIGGIT_TEST_MODE", "1")
-    os.Setenv("TWIGGIT_CONFIG_DIR", h.t.TempDir())
-}
-
-// ValidateShellScript checks if a shell script is valid
-func (h *ShellTestHelper) ValidateShellScript(shell, script string) error {
-    var cmd *exec.Cmd
     
-    switch shell {
-    case "bash":
-        cmd = exec.Command("bash", "-n", script)
-    case "zsh":
-        cmd = exec.Command("zsh", "-n", script)
-    case "fish":
-        cmd = exec.Command("fish", "-n", script)
-    default:
-        cmd = exec.Command("sh", "-n", script)
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            suite := &IntegrationTestSuite{}
+            suite.SetupSuite()
+            defer suite.TearDownSuite()
+            
+            tc.setupFunc(suite)
+            tc.testFunc(suite)
+        })
     }
-
-    return cmd.Run()
 }
 ```
 
-#### 3.4 Performance Testing Helper
-
-**File**: `test/helpers/performance.go`
+**Functional integration framework:**
 ```go
-package helpers
-
-import (
-    "testing"
-    "time"
-    "github.com/stretchr/testify/require"
-)
-
-// PerformanceTestHelper provides performance testing utilities
-type PerformanceTestHelper struct {
-    t *testing.T
-}
-
-func NewPerformanceTestHelper(t *testing.T) *PerformanceTestHelper {
-    return &PerformanceTestHelper{t: t}
-}
-
-// BenchmarkOperation measures operation performance
-func (h *PerformanceTestHelper) BenchmarkOperation(name string, operation func() error) time.Duration {
-    start := time.Now()
-    err := operation()
-    duration := time.Since(start)
-    
-    require.NoError(h.t, err, "Operation %s failed", name)
-    h.t.Logf("Operation %s took %v", name, duration)
-    
-    return duration
-}
-
-// CreateLargeRepo creates a repository with many worktrees for performance testing
-func (h *PerformanceTestHelper) CreateLargeRepo(worktreeCount int) string {
-    gitHelper := NewGitTestHelper(h.t)
-    repoPath := gitHelper.CreateRepoWithCommits(10)
-    
-    // Create multiple branches
-    for i := 0; i < worktreeCount; i++ {
-        branchName := fmt.Sprintf("feature-%d", i)
-        gitHelper.CreateBranch(repoPath, branchName)
-    }
-    
-    return repoPath
-}
-
-// AssertPerformance asserts that an operation meets performance requirements
-func (h *PerformanceTestHelper) AssertPerformance(operation func() error, maxDuration time.Duration) {
-    duration := h.BenchmarkOperation("performance_test", operation)
-    require.Less(h.t, duration, maxDuration, 
-        "Operation took %v, expected less than %v", duration, maxDuration)
-}
-```
-
-### Phase 4: Integration Test Framework
-
-#### 4.1 Integration Test Base
-
-**File**: `test/integration/integration_test.go`
-```go
-//go:build integration
-
-package integration
-
-import (
-    "testing"
-    "github.com/stretchr/testify/suite"
-    "github.com/twiggit/twiggit/test/helpers"
-)
-
+// test/integration/integration_test.go
 type IntegrationTestSuite struct {
     suite.Suite
-    gitHelper *helpers.GitTestHelper
-    repoHelper *helpers.RepoTestHelper
+    tempDir        string
+    gitHelper      *helpers.GitTestHelper
+    repoHelper     *helpers.RepoTestHelper
+    worktreeService services.WorktreeService
+    projectService  services.ProjectService
+    navService      services.NavigationService
+    
+    // Functional composition state
+    currentProject string
+    worktrees      []string
+    gitImpl        string
 }
 
 func (s *IntegrationTestSuite) SetupSuite() {
+    s.tempDir = s.T().TempDir()
     s.gitHelper = helpers.NewGitTestHelper(s.T())
     s.repoHelper = helpers.NewRepoTestHelper(s.T())
 }
 
-func (s *IntegrationTestSuite) TearDownSuite() {
-    s.repoHelper.Cleanup()
-}
-
-func TestIntegrationSuite(t *testing.T) {
-    suite.Run(t, new(IntegrationTestSuite))
-}
-```
-
-#### 4.2 Hybrid Git Integration Tests
-
-**File**: `test/integration/hybrid/hybrid_test.go`
-```go
-//go:build integration
-
-package hybrid
-
-import (
-    "testing"
-    "github.com/stretchr/testify/suite"
-    "github.com/twiggit/twiggit/test/integration"
-)
-
-> "Hybrid git testing: validate both implementations work identically" - testing.md:89
-
-type HybridGitTestSuite struct {
-    integration.IntegrationTestSuite
-}
-
-func (s *HybridGitTestSuite) TestBothImplementationsIdentical() {
-    // Test with go-git implementation
-    s.testWithImplementation("go-git")
-    
-    // Test with libgit2 implementation  
-    s.testWithImplementation("libgit2")
-    
-    // Compare results
-    s.compareResults()
-}
-
-func (s *HybridGitTestSuite) testWithImplementation(impl string) {
-    repoPath := s.repoHelper.SetupTestRepo("hybrid-" + impl)
-    
-    // Configure implementation
-    config := config.New()
-    config.Set("git.implementation", impl)
-    
-    // Test operations
-    s.testListWorktrees(repoPath)
-    s.testCreateWorktree(repoPath)
-    s.testDeleteWorktree(repoPath)
-}
-
-func (s *HybridGitTestSuite) compareResults() {
-    // Compare results from both implementations
-    // Ensure they work identically
-}
-
-func TestHybridGitSuite(t *testing.T) {
-    suite.Run(t, new(HybridGitTestSuite))
-}
-```
-
-#### 4.3 Performance Integration Tests
-
-**File**: `test/integration/performance/performance_test.go`
-```go
-//go:build integration
-
-package performance
-
-import (
-    "testing"
-    "time"
-    "github.com/stretchr/testify/suite"
-    "github.com/twiggit/twiggit/test/integration"
-    "github.com/twiggit/twiggit/test/helpers"
-)
-
-> "Performance testing: large repositories with 100+ worktrees" - testing.md:95
-
-type PerformanceTestSuite struct {
-    integration.IntegrationTestSuite
-    perfHelper *helpers.PerformanceTestHelper
-}
-
-func (s *PerformanceTestSuite) SetupSuite() {
-    s.IntegrationTestSuite.SetupSuite()
-    s.perfHelper = helpers.NewPerformanceTestHelper(s.T())
-}
-
-func (s *PerformanceTestSuite) TestLargeRepositoryPerformance() {
-    // Create repository with 100+ worktrees
-    repoPath := s.perfHelper.CreateLargeRepo(100)
-    
-    // Test list performance
-    s.perfHelper.AssertPerformance(func() error {
-        return s.listWorktrees(repoPath)
-    }, 5*time.Second)
-    
-    // Test create performance
-    s.perfHelper.AssertPerformance(func() error {
-        return s.createWorktree(repoPath, "perf-test")
-    }, 10*time.Second)
-}
-
-func (s *PerformanceTestSuite) TestMemoryUsage() {
-    // Test memory usage with large repositories
-    // Ensure no memory leaks
-}
-
-func TestPerformanceSuite(t *testing.T) {
-    suite.Run(t, new(PerformanceTestSuite))
-}
-```
-
-### Phase 5: E2E Test Framework
-
-#### 5.1 E2E Test Base
-
-**File**: `test/e2e/e2e_test.go`
-```go
-//go:build e2e
-
-package e2e
-
-import (
-    "os"
-    "os/exec"
-    "path/filepath"
-    "testing"
-    "github.com/onsi/ginkgo/v2"
-    "github.com/onsi/gomega"
-)
-
-var (
-    binaryPath string
-    tempDir    string
-)
-
-func TestE2E(t *testing.T) {
-    gomega.RegisterFailHandler(ginkgo.Fail)
-    ginkgo.RunSpecs(t, "E2E Suite")
-}
-
-var _ = ginkgo.BeforeSuite(func() {
-    // Build the CLI binary for testing
-    buildBinary()
-    
-    // Set up temporary directory
-    tempDir = ginkgo.GinkgoT().TempDir()
-})
-
-var _ = ginkgo.AfterSuite(func() {
-    // Clean up
-    if binaryPath != "" {
-        os.Remove(binaryPath)
-    }
-})
-
-func buildBinary() {
-    cmd := exec.Command("go", "build", "-o", "twiggit-test", "./cmd/twiggit")
-    err := cmd.Run()
-    gomega.Expect(err).NotTo(gomega.HaveOccurred())
-    
-    binaryPath, err = filepath.Abs("twiggit-test")
-    gomega.Expect(err).NotTo(gomega.HaveOccurred())
-}
-
-func runTwiggitCommand(args ...string) *exec.Cmd {
-    cmd := exec.Command(binaryPath, args...)
-    cmd.Dir = tempDir
-    return cmd
-}
-```
-
-#### 5.2 Command E2E Tests
-
-**File**: `test/e2e/commands/commands_test.go`
-```go
-//go:build e2e
-
-package commands
-
-import (
-    "github.com/onsi/ginkgo/v2"
-    "github.com/onsi/gomega"
-    "github.com/twiggit/twiggit/test/e2e"
-)
-
-var _ = ginkgo.Describe("CLI Commands", func() {
-    ginkgo.Context("list command", func() {
-        ginkgo.It("should list worktrees", func() {
-            cmd := e2e.runTwiggitCommand("list")
-            output, err := cmd.CombinedOutput()
-            
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-            gomega.Expect(string(output)).To(gomega.ContainSubstring("worktrees"))
-        })
-    })
-    
-    ginkgo.Context("create command", func() {
-        ginkgo.It("should create a new worktree", func() {
-            cmd := e2e.runTwiggitCommand("create", "test-feature", "-b", "feature/test")
-            output, err := cmd.CombinedOutput()
-            
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-            gomega.Expect(string(output)).To(gomega.ContainSubstring("Created"))
-        })
-    })
-    
-    ginkgo.Context("delete command", func() {
-        ginkgo.It("should delete a worktree", func() {
-            // First create a worktree
-            createCmd := e2e.runTwiggitCommand("create", "temp-feature")
-            _, err := createCmd.CombinedOutput()
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-            
-            // Then delete it
-            deleteCmd := e2e.runTwiggitCommand("delete", "temp-feature")
-            output, err := deleteCmd.CombinedOutput()
-            
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-            gomega.Expect(string(output)).To(gomega.ContainSubstring("Deleted"))
-        })
-    })
-})
-```
-
-#### 5.3 Shell Integration E2E Tests
-
-**File**: `test/e2e/shell/shell_test.go`
-```go
-//go:build e2e
-
-package shell
-
-import (
-    "github.com/onsi/ginkgo/v2"
-    "github.com/onsi/gomega"
-    "github.com/twiggit/twiggit/test/e2e"
-    "github.com/twiggit/twiggit/test/helpers"
-)
-
-> "Shell integration testing: bash, zsh, fish compatibility" - testing.md:98
-
-var _ = ginkgo.Describe("Shell Integration", func() {
-    var shellHelper *helpers.ShellTestHelper
-    
-    ginkgo.BeforeEach(func() {
-        shellHelper = helpers.NewShellTestHelper(ginkgo.GinkgoT())
-        shellHelper.SetupShellEnvironment()
-    })
-    
-    ginkgo.Context("bash integration", func() {
-        ginkgo.It("should work with bash completion", func() {
-            output, err := shellHelper.RunShellCommand("bash", 
-                "source <(twiggit setup-shell bash) && compgen -W 'list create delete' twiggit")
-            
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-            gomega.Expect(output).To(gomega.ContainSubstring("list"))
-            gomega.Expect(output).To(gomega.ContainSubstring("create"))
-            gomega.Expect(output).To(gomega.ContainSubstring("delete"))
-        })
-    })
-    
-    ginkgo.Context("zsh integration", func() {
-        ginkgo.It("should work with zsh completion", func() {
-            output, err := shellHelper.RunShellCommand("zsh", 
-                "source <(twiggit setup-shell zsh) && compadd -W 'list create delete' -- twiggit")
-            
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-        })
-    })
-    
-    ginkgo.Context("fish integration", func() {
-        ginkgo.It("should work with fish completion", func() {
-            output, err := shellHelper.RunShellCommand("fish", 
-                "twiggit setup-shell fish | source && complete -C'twiggit '")
-            
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-        })
-    })
-})
-```
-
-### Phase 6: Coverage and CI Integration
-
-#### 6.1 Coverage Configuration
-
-**File**: `test/coverage.go`
-```go
-package test
-
-import (
-    "os"
-    "os/exec"
-    "path/filepath"
-)
-
-// CoverageHelper manages test coverage
-type CoverageHelper struct {
-    coverageDir string
-    profileFile string
-}
-
-func NewCoverageHelper() *CoverageHelper {
-    return &CoverageHelper{
-        coverageDir: "coverage",
-        profileFile: "coverage.out",
-    }
-}
-
-// RunCoverage runs tests with coverage
-func (c *CoverageHelper) RunCoverage() error {
-    // Create coverage directory
-    os.MkdirAll(c.coverageDir, 0755)
-    
-    // Run tests with coverage
-    cmd := exec.Command("go", "test", "-v", "-coverprofile="+c.profileFile, "./...")
-    return cmd.Run()
-}
-
-// GenerateHTMLReport generates HTML coverage report
-func (c *CoverageHelper) GenerateHTMLReport() error {
-    cmd := exec.Command("go", "tool", "cover", "-html="+c.profileFile, "-o", filepath.Join(c.coverageDir, "coverage.html"))
-    return cmd.Run()
-}
-
-// CheckCoverageThreshold checks if coverage meets threshold
-func (c *CoverageHelper) CheckCoverageThreshold(threshold float64) (float64, error) {
-    cmd := exec.Command("go", "tool", "cover", "-func="+c.profileFile)
-    output, err := cmd.CombinedOutput()
-    if err != nil {
-        return 0, err
-    }
-    
-    // Parse coverage percentage from output
-    // Implementation depends on go tool cover output format
-    // Return actual coverage percentage
-    
-    return 85.0, nil // Example value
-}
-```
-
-#### 6.2 CI Integration Script
-
-**File**: `.mise/tasks/ci/test.sh`
-```bash
-#!/bin/bash
-
-set -e
-
-echo "Running comprehensive test suite..."
-
-# Unit tests
-echo "Running unit tests..."
-go test -v -race ./test/unit/...
-
-# Integration tests
-echo "Running integration tests..."
-go test -v -tags=integration ./test/integration/...
-
-# E2E tests
-echo "Running E2E tests..."
-go test -v -tags=e2e ./test/e2e/...
-
-# Coverage
-echo "Generating coverage report..."
-go test -v -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out -o coverage.html
-
-# Check coverage threshold
-COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-echo "Coverage: ${COVERAGE}%"
-
-if (( $(echo "$COVERAGE < 80" | bc -l) )); then
-    echo "Coverage below 80% threshold"
-    exit 1
-fi
-
-echo "All tests passed!"
-```
-
-## Testing Patterns
-
-### Unit Test Pattern
-
-```go
-func TestWorktreeService_Create(t *testing.T) {
-    suite.Run(t, new(WorktreeServiceTestSuite))
-}
-
-type WorktreeServiceTestSuite struct {
-    suite.Suite
-    service *services.WorktreeService
-    mockRepo *mocks.MockRepository
-}
-
-func (s *WorktreeServiceTestSuite) SetupTest() {
-    s.mockRepo = new(mocks.MockRepository)
-    s.service = services.NewWorktreeService(s.mockRepo)
-}
-
-func (s *WorktreeServiceTestSuite) TestCreate_Success() {
-    tests := []struct {
-        name     string
-        branch   string
-        setup    func()
-        expected *services.WorktreeInfo
-        err      error
-    }{
-        {
-            name:   "valid worktree creation",
-            branch: "feature/test",
-            setup: func() {
-                s.mockRepo.On("Worktree").Return(nil, nil)
-            },
-            expected: &services.WorktreeInfo{Name: "test", Branch: "feature/test"},
-            err: nil,
-        },
-    }
-    
-    for _, tt := range tests {
-        s.Run(tt.name, func() {
-            tt.setup()
-            
-            result, err := s.service.Create("test", tt.branch)
-            
-            if tt.err != nil {
-                s.Error(err)
-                s.Equal(tt.err, err)
-            } else {
-                s.NoError(err)
-                s.Equal(tt.expected, result)
-            }
-            
-            s.mockRepo.AssertExpectations(s.T())
-        })
-    }
-}
-```
-
-### Integration Test Pattern
-
-```go
-func (s *GitIntegrationTestSuite) TestRealGitOperations() {
-    repoPath := s.repoHelper.SetupTestRepo("real-git-test")
-    
-    // Test actual git operations
-    worktrees, err := s.service.List()
-    s.NoError(err)
-    s.Empty(worktrees) // Initially empty
-    
-    // Create worktree
-    info, err := s.service.Create("feature-branch", "feature/test")
-    s.NoError(err)
-    s.NotNil(info)
-    
-    // Verify worktree exists
-    worktrees, err = s.service.List()
-    s.NoError(err)
-    s.Len(worktrees, 1)
-    s.Equal("feature-branch", worktrees[0].Name)
-}
-```
-
-### E2E Test Pattern
-
-```go
-var _ = ginkgo.Describe("Worktree Management", func() {
-    ginkgo.Context("when creating worktrees", func() {
-        ginkgo.BeforeEach(func() {
-            // Set up test repository
-            cmd := e2e.runTwiggitCommand("setup", "--test")
-            _, err := cmd.CombinedOutput()
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-        })
-        
-        ginkgo.It("should create worktree with correct branch", func() {
-            cmd := e2e.runTwiggitCommand("create", "test-feature", "-b", "feature/test")
-            output, err := cmd.CombinedOutput()
-            
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-            gomega.Expect(string(output)).To(gomega.ContainSubstring("Created worktree"))
-            gomega.Expect(string(output)).To(gomega.ContainSubstring("test-feature"))
-        })
-    })
-})
-```
-
-## Implementation Checklist
-
-### Phase 1: Foundation Setup
-- [ ] Testing framework configuration
-- [ ] Build tags setup
-- [ ] Test registry implementation
-
-### Phase 2: Mock Infrastructure
-- [ ] Git repository mocks
-- [ ] Configuration mocks
-- [ ] Service mocks
-
-### Phase 3: Test Helpers
-- [ ] Git repository helper
-- [ ] Repository management helper
-- [ ] Shell integration helper
-- [ ] Performance testing helper
-
-### Phase 4: Integration Tests
-- [ ] Integration test base
-- [ ] Hybrid git tests
-- [ ] Performance integration tests
-
-### Phase 5: E2E Tests
-- [ ] E2E test framework
-- [ ] Command E2E tests
-- [ ] Shell integration E2E tests
-
-### Phase 6: Coverage and CI
-- [ ] Coverage helper
-- [ ] CI integration script
-- [ ] Coverage threshold enforcement
-
-## Service Layer Testing
-
-### Integration Testing Patterns
-
-Service layer integration tests SHALL verify coordination between services:
-
-```go
-// test/integration/services_test.go
-package integration
-
-import (
-    "context"
-    "testing"
-    "github.com/stretchr/testify/suite"
-    "github.com/twiggit/twiggit/internal/services"
-    "github.com/twiggit/twiggit/test/helpers"
-)
-
-type ServiceIntegrationSuite struct {
-    suite.Suite
-    tempDir        string
-    gitHelper      *helpers.GitTestHelper
-    worktreeService services.WorktreeService
-    projectService  services.ProjectService
-    navService      services.NavigationService
-}
-
-func (s *ServiceIntegrationSuite) SetupSuite() {
-    var err error
-    s.tempDir = s.T().TempDir()
-    s.gitHelper = helpers.NewGitTestHelper(s.T())
-    
-    // Setup test repository
-    repoPath := s.gitHelper.CreateTestRepository("test-project")
+// Functional composition methods
+func (s *IntegrationTestSuite) WithProject(name string) *IntegrationTestSuite {
+    s.currentProject = name
+    repoPath := s.repoHelper.SetupTestRepo(name)
     
     // Initialize services with real dependencies
     s.worktreeService = setupWorktreeService(repoPath)
     s.projectService = setupProjectService(repoPath)
     s.navService = setupNavigationService(repoPath)
+    
+    return s
 }
 
-func (s *ServiceIntegrationSuite) TestWorktreeCreationFlow() {
-    // Test complete worktree creation flow
+func (s *IntegrationTestSuite) WithWorktrees(branches []string) *IntegrationTestSuite {
+    s.worktrees = branches
+    
+    for _, branch := range branches {
+        if branch != "main" {
+            s.gitHelper.CreateBranch(s.getRepoPath(), branch)
+        }
+    }
+    
+    return s
+}
+
+func (s *IntegrationTestSuite) WithGitImplementation(impl string) *IntegrationTestSuite {
+    s.gitImpl = impl
+    // Configure implementation
+    config := config.New()
+    config.Set("git.implementation", impl)
+    
+    return s
+}
+
+// Pure helper functions
+func (s *IntegrationTestSuite) getRepoPath() string {
+    return s.repoHelper.repos[s.currentProject]
+}
+
+func (s *IntegrationTestSuite) createWorktreeFlow(branch string) error {
     req := &CreateWorktreeRequest{
-        ProjectName:  "test-project",
-        BranchName:   "feature-branch",
+        ProjectName:  s.currentProject,
+        BranchName:   branch,
         SourceBranch: "main",
         Context: &domain.Context{
-            Type:       domain.ContextOutsideGit,
-            ProjectName: "test-project",
+            Type:       domain.ContextProject,
+            ProjectName: s.currentProject,
         },
     }
     
-    // Create worktree
-    worktree, err := s.worktreeService.CreateWorktree(context.Background(), req)
-    s.Require().NoError(err)
-    s.Equal("feature-branch", worktree.Branch)
-    
-    // Verify worktree exists
-    status, err := s.worktreeService.GetWorktreeStatus(context.Background(), worktree.Path)
-    s.Require().NoError(err)
-    s.Equal("feature-branch", status.Branch)
-    
-    // Test navigation to worktree
-    navReq := &ResolvePathRequest{
-        Target:  "feature-branch",
-        Context: req.Context,
-    }
-    
-    resolution, err := s.navService.ResolvePath(context.Background(), navReq)
-    s.Require().NoError(err)
-    s.Equal(worktree.Path, resolution.ResolvedPath)
+    _, err := s.worktreeService.CreateWorktree(context.Background(), req)
+    return err
 }
 ```
 
-### Error Scenario Testing
+### Step 4: E2E Test Framework
 
-Service layer SHALL include comprehensive error scenario testing:
+**Tests first:** `test/e2e/e2e_test.go`
 
 ```go
-// test/integration/service_errors_test.go
-package integration
-
-func (s *ServiceIntegrationSuite) TestWorktreeCreationErrors() {
+func TestE2ETestSuite_FunctionalWorkflows(t *testing.T) {
     testCases := []struct {
         name         string
-        request      *CreateWorktreeRequest
-        expectError  string
-        errorType    error
+        setupFunc    func(*E2ETestSuite)
+        workflowFunc func(*E2ETestSuite)
+        expectError  bool
+        errorMessage string
     }{
         {
-            name: "duplicate worktree",
-            request: &CreateWorktreeRequest{
-                ProjectName: "test-project",
-                BranchName:  "main", // Already exists
-                Context: &domain.Context{
-                    Type: domain.ContextOutsideGit,
-                },
+            name: "complete worktree management workflow",
+            setupFunc: func(s *E2ETestSuite) {
+                s.WithCLI().
+                    WithProject("test-project").
+                    WithWorktrees([]string{"main", "feature-test"})
             },
-            expectError: "worktree already exists",
-            errorType:   &domain.WorktreeExistsError{},
-        },
-        {
-            name: "invalid project",
-            request: &CreateWorktreeRequest{
-                ProjectName: "nonexistent-project",
-                BranchName:  "feature",
-                Context: &domain.Context{
-                    Type: domain.ContextOutsideGit,
-                },
+            workflowFunc: func(s *E2ETestSuite) {
+                // Test complete CLI workflow
+                s.RunCommand("list").ExpectSuccess().ExpectOutput("worktrees")
+                s.RunCommand("create", "feature-new", "-b", "feature/new").ExpectSuccess()
+                s.RunCommand("delete", "feature-test").ExpectSuccess()
             },
-            expectError: "project not found",
-            errorType:   &domain.ProjectNotFoundError{},
-        },
-        {
-            name: "unsafe operation - dirty worktree",
-            request: &DeleteWorktreeRequest{
-                ProjectName:  "test-project",
-                BranchName:   "feature-branch",
-                WorktreePath: s.tempDir + "/worktrees/feature-branch",
-                Force:        false,
-                Context: &domain.Context{
-                    Type: domain.ContextWorktree,
-                },
-            },
-            expectError: "worktree has uncommitted changes",
-            errorType:   &domain.UnsafeOperationError{},
+            expectError: false,
         },
     }
     
     for _, tc := range testCases {
-        s.Run(tc.name, func() {
-            // Setup dirty worktree for delete test
-            if tc.request.WorktreePath != "" {
-                s.gitHelper.CreateDirtyWorktree(tc.request.WorktreePath)
-            }
+        t.Run(tc.name, func(t *testing.T) {
+            suite := &E2ETestSuite{}
+            suite.SetupSuite()
+            defer suite.TearDownSuite()
             
-            var err error
-            switch req := tc.request.(type) {
-            case *CreateWorktreeRequest:
-                _, err = s.worktreeService.CreateWorktree(context.Background(), req)
-            case *DeleteWorktreeRequest:
-                err = s.worktreeService.DeleteWorktree(context.Background(), req)
-            }
-            
-            s.Error(err)
-            s.Contains(err.Error(), tc.expectError)
-            
-            // Check error type
-            s.IsType(tc.errorType, err)
+            tc.setupFunc(suite)
+            tc.workflowFunc(suite)
         })
     }
 }
 ```
 
-### Service Coordination Tests
-
-Tests SHALL verify services work together correctly:
-
+**Functional E2E framework:**
 ```go
-// test/integration/service_coordination_test.go
-package integration
-
-func (s *ServiceIntegrationSuite) TestProjectWorktreeCoordination() {
-    // Create project with multiple worktrees
-    project, err := s.projectService.DiscoverProject(
-        context.Background(), 
-        "test-project", 
-        &domain.Context{Type: domain.ContextOutsideGit},
-    )
-    s.Require().NoError(err)
+// test/e2e/e2e_test.go
+type E2ETestSuite struct {
+    suite.Suite
+    binaryPath string
+    tempDir    string
+    env        []string
     
-    // Create multiple worktrees
-    branches := []string{"feature-a", "feature-b", "feature-c"}
-    for _, branch := range branches {
-        req := &CreateWorktreeRequest{
-            ProjectName:  project.Name,
-            BranchName:   branch,
-            SourceBranch: "main",
-            Context: &domain.Context{
-                Type:       domain.ContextProject,
-                ProjectName: project.Name,
-            },
-        }
-        
-        _, err := s.worktreeService.CreateWorktree(context.Background(), req)
-        s.Require().NoError(err)
+    // Functional composition state
+    currentProject string
+    worktrees      []string
+}
+
+func (s *E2ETestSuite) SetupSuite() {
+    var err error
+    s.tempDir = s.T().TempDir()
+    s.binaryPath, err = gexec.Build("github.com/twiggit/twiggit")
+    s.Require().NoError(err)
+}
+
+// Functional composition methods
+func (s *E2ETestSuite) WithCLI() *E2ETestSuite {
+    s.env = append(s.env, "TWIGGIT_TEST_MODE=1")
+    return s
+}
+
+func (s *E2ETestSuite) WithProject(name string) *E2ETestSuite {
+    s.currentProject = name
+    s.env = append(s.env, fmt.Sprintf("TWIGGIT_PROJECT=%s", name))
+    return s
+}
+
+func (s *E2ETestSuite) WithWorktrees(branches []string) *E2ETestSuite {
+    s.worktrees = branches
+    return s
+}
+
+// Functional command builder
+type CommandBuilder struct {
+    suite    *E2ETestSuite
+    args     []string
+    env      []string
+    expected *CommandExpectations
+}
+
+type CommandExpectations struct {
+    exitCode int
+    output   string
+    error    string
+}
+
+func (s *E2ETestSuite) RunCommand(args ...string) *CommandBuilder {
+    return &CommandBuilder{
+        suite:    s,
+        args:     args,
+        env:      s.env,
+        expected: &CommandExpectations{exitCode: 0},
+    }
+}
+
+func (c *CommandBuilder) ExpectSuccess() *CommandBuilder {
+    c.expected.exitCode = 0
+    return c
+}
+
+func (c *CommandBuilder) ExpectFailure() *CommandBuilder {
+    c.expected.exitCode = 1
+    return c
+}
+
+func (c *CommandBuilder) ExpectOutput(output string) *CommandBuilder {
+    c.expected.output = output
+    return c
+}
+
+func (c *CommandBuilder) ExpectError(error string) *CommandBuilder {
+    c.expected.error = error
+    return c
+}
+
+func (c *CommandBuilder) Execute() {
+    cmd := exec.Command(c.suite.binaryPath, c.args...)
+    cmd.Dir = c.suite.tempDir
+    cmd.Env = append(os.Environ(), c.env...)
+    
+    session := gexec.Start(cmd, gexec.NewBuffer(), gexec.NewBuffer())
+    gomega.Eventually(session).Should(gexec.Exit(c.expected.exitCode))
+    
+    if c.expected.output != "" {
+        output := string(session.Out.Contents())
+        gomega.Expect(output).To(gomega.ContainSubstring(c.expected.output))
     }
     
-    // List all worktrees for project
-    listReq := &ListWorktreesRequest{
-        ProjectName: project.Name,
-        AllProjects: false,
-        Context: &domain.Context{
-            Type:       domain.ContextProject,
-            ProjectName: project.Name,
+    if c.expected.error != "" {
+        errOutput := string(session.Err.Contents())
+        gomega.Expect(errOutput).To(gomega.ContainSubstring(c.expected.error))
+    }
+}
+```
+
+### Step 5: Coverage and Quality Gates
+
+**Tests first:** `test/coverage_test.go`
+
+```go
+func TestCoverageHelper_FunctionalCoverage(t *testing.T) {
+    testCases := []struct {
+        name         string
+        threshold    float64
+        setupFunc    func(*CoverageHelper)
+        expectError  bool
+        errorMessage string
+    }{
+        {
+            name:      "coverage above threshold",
+            threshold: 80.0,
+            setupFunc: func(c *CoverageHelper) {
+                c.WithPackages("./...").
+                    WithProfile("coverage.out").
+                    WithThreshold(80.0)
+            },
+            expectError: false,
+        },
+        {
+            name:      "coverage below threshold",
+            threshold: 90.0,
+            setupFunc: func(c *CoverageHelper) {
+                c.WithPackages("./...").
+                    WithProfile("coverage.out").
+                    WithThreshold(90.0)
+            },
+            expectError:  true,
+            errorMessage: "coverage 85.0% is below threshold 90.0%",
         },
     }
     
-    worktrees, err := s.worktreeService.ListWorktrees(context.Background(), listReq)
-    s.Require().NoError(err)
-    s.Len(worktrees, len(branches)+1) // +1 for main branch
-    
-    // Test navigation to each worktree
-    for _, worktree := range worktrees {
-        navReq := &ResolvePathRequest{
-            Target:  worktree.Branch,
-            Context: &domain.Context{
-                Type:       domain.ContextProject,
-                ProjectName: project.Name,
-            },
-        }
-        
-        resolution, err := s.navService.ResolvePath(context.Background(), navReq)
-        s.Require().NoError(err)
-        s.Equal(worktree.Path, resolution.ResolvedPath)
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            helper := NewCoverageHelper()
+            tc.setupFunc(helper)
+            
+            coverage, err := helper.RunCoverage()
+            
+            if tc.expectError {
+                assert.Error(t, err)
+                assert.Contains(t, err.Error(), tc.errorMessage)
+            } else {
+                assert.NoError(t, err)
+                assert.GreaterOrEqual(t, coverage, tc.threshold)
+            }
+        })
     }
 }
 ```
 
-### Mock Service Implementations
-
-Mock services SHALL be provided for unit testing:
-
+**Functional coverage implementation:**
 ```go
-// test/mocks/services/worktree_service_mock.go
-package mocks
-
-import (
-    "context"
-    "github.com/stretchr/testify/mock"
-    "github.com/twiggit/twiggit/internal/domain"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-type MockWorktreeService struct {
-    mock.Mock
+// test/coverage.go
+type CoverageHelper struct {
+    packages   []string
+    profile    string
+    threshold  float64
+    htmlReport bool
 }
 
-func (m *MockWorktreeService) CreateWorktree(ctx context.Context, req *CreateWorktreeRequest) (*WorktreeInfo, error) {
-    args := m.Called(ctx, req)
-    return args.Get(0).(*WorktreeInfo), args.Error(1)
+func NewCoverageHelper() *CoverageHelper {
+    return &CoverageHelper{
+        packages:  []string{"./..."},
+        profile:   "coverage.out",
+        threshold: 80.0,
+    }
 }
 
-func (m *MockWorktreeService) DeleteWorktree(ctx context.Context, req *DeleteWorktreeRequest) error {
-    args := m.Called(ctx, req)
-    return args.Error(0)
+// Functional composition methods
+func (c *CoverageHelper) WithPackages(packages ...string) *CoverageHelper {
+    c.packages = packages
+    return c
 }
 
-func (m *MockWorktreeService) ListWorktrees(ctx context.Context, req *ListWorktreesRequest) ([]*WorktreeInfo, error) {
-    args := m.Called(ctx, req)
-    return args.Get(0).([]*WorktreeInfo), args.Error(1)
+func (c *CoverageHelper) WithProfile(profile string) *CoverageHelper {
+    c.profile = profile
+    return c
 }
 
-func (m *MockWorktreeService) GetWorktreeStatus(ctx context.Context, worktreePath string) (*WorktreeStatus, error) {
-    args := m.Called(ctx, worktreePath)
-    return args.Get(0).(*WorktreeStatus), args.Error(1)
+func (c *CoverageHelper) WithThreshold(threshold float64) *CoverageHelper {
+    c.threshold = threshold
+    return c
 }
 
-func (m *MockWorktreeService) ValidateWorktree(ctx context.Context, worktreePath string) error {
-    args := m.Called(ctx, worktreePath)
-    return args.Error(0)
+func (c *CoverageHelper) WithHTMLReport() *CoverageHelper {
+    c.htmlReport = true
+    return c
 }
 
-// Mock setup helpers
-func (m *MockWorktreeService) SetupCreateWorktreeSuccess(projectName, branchName string) {
-    worktree := &WorktreeInfo{
-        Path:   "/test/worktrees/" + projectName + "/" + branchName,
-        Branch: branchName,
+// Pure functions for coverage operations
+func (c *CoverageHelper) RunCoverage() (float64, error) {
+    // Run tests with coverage
+    args := []string{"test", "-v", "-coverprofile=" + c.profile}
+    args = append(args, c.packages...)
+    
+    cmd := exec.Command("go", args...)
+    if err := cmd.Run(); err != nil {
+        return 0, fmt.Errorf("failed to run coverage tests: %w", err)
     }
     
-    m.On("CreateWorktree", mock.Anything, mock.MatchedBy(func(req *CreateWorktreeRequest) bool {
-        return req.ProjectName == projectName && req.BranchName == branchName
-    })).Return(worktree, nil)
+    // Parse coverage
+    coverage, err := c.parseCoverage()
+    if err != nil {
+        return 0, err
+    }
+    
+    // Check threshold
+    if coverage < c.threshold {
+        return coverage, fmt.Errorf("coverage %.1f%% is below threshold %.1f%%", coverage, c.threshold)
+    }
+    
+    // Generate HTML report if requested
+    if c.htmlReport {
+        if err := c.generateHTMLReport(); err != nil {
+            return coverage, fmt.Errorf("failed to generate HTML report: %w", err)
+        }
+    }
+    
+    return coverage, nil
 }
 
-func (m *MockWorktreeService) SetupCreateWorktreeError(projectName, branchName, errorMsg string) {
-    m.On("CreateWorktree", mock.Anything, mock.MatchedBy(func(req *CreateWorktreeRequest) bool {
-        return req.ProjectName == projectName && req.BranchName == branchName
-    })).Return(nil, fmt.Errorf(errorMsg))
+func (c *CoverageHelper) parseCoverage() (float64, error) {
+    cmd := exec.Command("go", "tool", "cover", "-func="+c.profile)
+    output, err := cmd.CombinedOutput()
+    if err != nil {
+        return 0, fmt.Errorf("failed to parse coverage: %w", err)
+    }
+    
+    // Parse coverage percentage from output
+    lines := strings.Split(string(output), "\n")
+    for _, line := range lines {
+        if strings.Contains(line, "total:") {
+            fields := strings.Fields(line)
+            if len(fields) >= 3 {
+                coverageStr := strings.TrimSuffix(fields[2], "%")
+                coverage, err := strconv.ParseFloat(coverageStr, 64)
+                if err != nil {
+                    return 0, fmt.Errorf("failed to parse coverage percentage: %w", err)
+                }
+                return coverage, nil
+            }
+        }
+    }
+    
+    return 0, fmt.Errorf("coverage total not found in output")
+}
+
+func (c *CoverageHelper) generateHTMLReport() error {
+    htmlPath := strings.TrimSuffix(c.profile, ".out") + ".html"
+    cmd := exec.Command("go", "tool", "cover", "-html="+c.profile, "-o", htmlPath)
+    return cmd.Run()
 }
 ```
+
+## Testing Strategy
+
+Phase 8 focuses on comprehensive testing infrastructure with functional programming patterns.
+
+### Three-Tier Testing
+- **Unit Tests**: Testify with functional composition patterns
+- **Integration Tests**: Real git operations with functional setup
+- **E2E Tests**: Ginkgo/Gomega with functional workflow builders
+
+### Test Organization
+- **Helper Tests**: Test all helper functions before implementation
+- **Mock Tests**: Test mock behavior with functional setup builders
+- **Framework Tests**: Test integration and E2E frameworks
+- **Coverage Tests**: Test coverage enforcement and quality gates
+
+### Functional Programming Patterns
+- **Pure Functions**: All test helpers are pure functions
+- **Immutable Data**: Test fixtures and data are immutable
+- **Function Composition**: Complex test scenarios built from smaller functions
+- **Error Handling**: Result/Either patterns for predictable test flow
 
 ## Quality Gates
 
-> ">80% coverage enforced in CI" - testing.md:85
-
-1. **Coverage**: Minimum 80% code coverage
-2. **Performance**: Operations complete within specified time limits
-3. **Service Integration**: All service coordination tests pass
-4. **Error Scenarios**: Comprehensive error scenario coverage
-5. **Mock Coverage**: All service interfaces have mock implementations
-3. **Compatibility**: All supported shells work correctly
-4. **Hybrid Testing**: Both git implementations produce identical results
-5. **CI Integration**: All tests pass in CI environment
-
-## Shell Integration Testing (Deferred from Phase 7)
-
-### Integration Tests for Shell Integration
-
-#### 4.1 Shell Detection Integration Tests
-
-**File**: `test/integration/shell_detection_test.go`
-
-```go
-//go:build integration
-// +build integration
-
-package integration
-
-import (
-    "os"
-    "testing"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
-    "github.com/twiggit/twiggit/internal/infrastructure/shell"
-    "github.com/twiggit/twiggit/test/helpers"
-)
-
-func TestShellDetection_Integration(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration test")
-    }
-
-    testCases := []struct {
-        name         string
-        shellEnv     string
-        expectType   shell.ShellType
-        expectError  bool
-    }{
-        {
-            name:       "detect bash in real environment",
-            shellEnv:   "/bin/bash",
-            expectType: shell.ShellBash,
-        },
-        {
-            name:       "detect zsh in real environment",
-            shellEnv:   "/usr/bin/zsh",
-            expectType: shell.ShellZsh,
-        },
-        {
-            name:        "invalid shell path",
-            shellEnv:    "/nonexistent/shell",
-            expectError: true,
-        },
-    }
-
-    for _, tc := range testCases {
-        t.Run(tc.name, func(t *testing.T) {
-            helper := helpers.NewShellTestHelper(t)
-            helper.SetupShellEnvironment()
-
-            // Set environment variable
-            oldShell := os.Getenv("SHELL")
-            defer os.Setenv("SHELL", oldShell)
-            os.Setenv("SHELL", tc.shellEnv)
-
-            detector := shell.NewShellDetector()
-            detectedShell, err := detector.DetectCurrentShell()
-
-            if tc.expectError {
-                assert.Error(t, err)
-            } else {
-                require.NoError(t, err)
-                assert.Equal(t, tc.expectType, detectedShell.Type())
-                assert.Equal(t, tc.shellEnv, detectedShell.Path())
-            }
-        })
-    }
-}
-```
-
-#### 4.2 Shell Wrapper Installation Tests
-
-**File**: `test/integration/shell_wrapper_test.go`
-
-```go
-//go:build integration
-// +build integration
-
-package integration
-
-import (
-    "os"
-    "path/filepath"
-    "testing"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
-    "github.com/twiggit/twiggit/internal/infrastructure/shell"
-    "github.com/twiggit/twiggit/test/helpers"
-)
-
-func TestShellWrapperInstallation_Integration(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration test")
-    }
-
-    testCases := []struct {
-        name      string
-        shellType shell.ShellType
-        configExt string
-    }{
-        {
-            name:      "bash wrapper installation",
-            shellType: shell.ShellBash,
-            configExt: "bashrc",
-        },
-        {
-            name:      "zsh wrapper installation",
-            shellType: shell.ShellZsh,
-            configExt: "zshrc",
-        },
-        {
-            name:      "fish wrapper installation",
-            shellType: shell.ShellFish,
-            configExt: "config.fish",
-        },
-    }
-
-    for _, tc := range testCases {
-        t.Run(tc.name, func(t *testing.T) {
-            helper := helpers.NewShellTestHelper(t)
-            tempDir := t.TempDir()
-            
-            // Create temporary config file
-            configPath := filepath.Join(tempDir, tc.configExt)
-            initialContent := "# Initial shell configuration\n"
-            require.NoError(t, os.WriteFile(configPath, []byte(initialContent), 0644))
-
-            // Create mock shell with temporary config
-            mockShell := &mockShell{
-                shellType:   tc.shellType,
-                configFiles: []string{configPath},
-            }
-
-            detector := shell.NewShellDetector()
-            integration := shell.NewShellIntegrationService(detector)
-
-            // Generate wrapper
-            wrapper, err := integration.GenerateWrapper(mockShell)
-            require.NoError(t, err)
-            assert.NotEmpty(t, wrapper)
-
-            // Validate wrapper syntax
-            err = helper.ValidateShellScript(string(tc.shellType), wrapper)
-            assert.NoError(t, err)
-
-            // Install wrapper
-            err = integration.InstallWrapper(mockShell, wrapper)
-            require.NoError(t, err)
-
-            // Verify installation
-            content, err := os.ReadFile(configPath)
-            require.NoError(t, err)
-            
-            contentStr := string(content)
-            assert.Contains(t, contentStr, "# Twiggit shell wrapper")
-            assert.Contains(t, contentStr, "twiggit()")
-            assert.Contains(t, contentStr, initialContent) // Original content preserved
-
-            // Test duplicate installation prevention
-            err = integration.InstallWrapper(mockShell, wrapper)
-            assert.Error(t, err)
-            assert.Contains(t, err.Error(), "already installed")
-        })
-    }
-}
-```
-
-#### 4.3 Shell Configuration File Detection Tests
-
-**File**: `test/integration/shell_config_test.go`
-
-```go
-//go:build integration
-// +build integration
-
-package integration
-
-import (
-    "os"
-    "path/filepath"
-    "testing"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
-    "github.com/twiggit/twiggit/internal/infrastructure/shell"
-)
-
-func TestShellConfigDetection_Integration(t *testing.T) {
-    if testing.Short() {
-        t.Skip("Skipping integration test")
-    }
-
-    testCases := []struct {
-        name          string
-        shellType     shell.ShellType
-        createFiles   []string
-        expectedFile  string
-    }{
-        {
-            name:      "bash prefers .bashrc over .profile",
-            shellType: shell.ShellBash,
-            createFiles: []string{
-                ".profile",
-                ".bashrc",
-            },
-            expectedFile: ".bashrc",
-        },
-        {
-            name:      "zsh prefers .zshrc over .zprofile",
-            shellType: shell.ShellZsh,
-            createFiles: []string{
-                ".zprofile",
-                ".zshrc",
-            },
-            expectedFile: ".zshrc",
-        },
-        {
-            name:      "fish uses config.fish in .config/fish",
-            shellType: shell.ShellFish,
-            createFiles: []string{
-                ".config/fish/config.fish",
-            },
-            expectedFile: ".config/fish/config.fish",
-        },
-        {
-            name:         "bash falls back to .profile when .bashrc missing",
-            shellType:    shell.ShellBash,
-            createFiles:  []string{".profile"},
-            expectedFile: ".profile",
-        },
-    }
-
-    for _, tc := range testCases {
-        t.Run(tc.name, func(t *testing.T) {
-            tempDir := t.TempDir()
-            
-            // Create test files
-            for _, file := range tc.createFiles {
-                fullPath := filepath.Join(tempDir, file)
-                dir := filepath.Dir(fullPath)
-                require.NoError(t, os.MkdirAll(dir, 0755))
-                require.NoError(t, os.WriteFile(fullPath, []byte("# test config"), 0644))
-            }
-
-            // Create mock shell
-            mockShell := &mockShell{
-                shellType:   tc.shellType,
-                configFiles: tc.createFiles,
-            }
-
-            detector := shell.NewShellDetector()
-            integration := shell.NewShellIntegrationService(detector)
-
-            // Detect config file
-            detectedPath, err := integration.DetectConfigFile(mockShell)
-            require.NoError(t, err)
-
-            expectedPath := filepath.Join(tempDir, tc.expectedFile)
-            assert.Equal(t, expectedPath, detectedPath)
-        })
-    }
-}
-```
-
-### E2E Tests for Shell Integration
-
-#### 4.4 Setup-Shell Command E2E Tests
-
-**File**: `test/e2e/shell_setup_test.go`
-
-```go
-//go:build e2e
-// +build e2e
-
-package e2e
-
-import (
-    "os"
-    "path/filepath"
-    "testing"
-    "github.com/onsi/ginkgo/v2"
-    "github.com/onsi/gomega"
-    "github.com/onsi/gomega/gexec"
-)
-
-var _ = ginkgo.Describe("Setup-Shell Command", func() {
-    var (
-        binPath    string
-        tempDir    string
-        configPath string
-    )
-
-    ginkgo.BeforeEach(func() {
-        var err error
-        tempDir = ginkgo.GinkgoT().TempDir()
-        
-        // Build test binary
-        binPath, err = gexec.Build("github.com/twiggit/twiggit")
-        gomega.Expect(err).NotTo(gomega.HaveOccurred())
-        
-        // Create test config file
-        configPath = filepath.Join(tempDir, ".bashrc")
-        err = os.WriteFile(configPath, []byte("# Initial config\n"), 0644)
-        gomega.Expect(err).NotTo(gomega.HaveOccurred())
-    })
-
-    ginkgo.AfterEach(func() {
-        gexec.CleanupBuildArtifacts()
-    })
-
-    ginkgo.Context("when setting up bash shell", func() {
-        ginkgo.It("should install wrapper successfully", func() {
-            session := gexec.Start(gexec.Command(binPath, "setup-shell", "--dry-run"), 
-                gexec.NewBuffer(), gexec.NewBuffer())
-            gomega.Eventually(session).Should(gexec.Exit(0))
-            
-            output := string(session.Out.Contents())
-            gomega.Expect(output).To(gomega.ContainSubstring("Dry run completed"))
-            gomega.Expect(output).To(gomega.ContainSubstring("twiggit() {"))
-        })
-
-        ginkgo.It("should detect current shell", func() {
-            env := []string{"SHELL=/bin/bash"}
-            session := gexec.Start(gexec.Command(binPath, "setup-shell", "--dry-run"), 
-                gexec.NewBuffer(), gexec.NewBuffer(), env...)
-            gomega.Eventually(session).Should(gexec.Exit(0))
-            
-            output := string(session.Out.Contents())
-            gomega.Expect(output).To(gomega.ContainSubstring("bash"))
-        })
-
-        ginkgo.It("should handle unsupported shell", func() {
-            env := []string{"SHELL=/bin/sh"}
-            session := gexec.Start(gexec.Command(binPath, "setup-shell"), 
-                gexec.NewBuffer(), gexec.NewBuffer(), env...)
-            gomega.Eventually(session).ShouldNot(gexec.Exit(0))
-            
-            output := string(session.Err.Contents())
-            gomega.Expect(output).To(gomega.ContainSubstring("unsupported shell"))
-        })
-    })
-
-    ginkgo.Context("when using force flag", func() {
-        ginkgo.It("should reinstall wrapper", func() {
-            // First installation
-            env := []string{"SHELL=/bin/bash", "HOME=" + tempDir}
-            session := gexec.Start(gexec.Command(binPath, "setup-shell"), 
-                gexec.NewBuffer(), gexec.NewBuffer(), env...)
-            gomega.Eventually(session).Should(gexec.Exit(0))
-
-            // Force reinstall
-            session = gexec.Start(gexec.Command(binPath, "setup-shell", "--force"), 
-                gexec.NewBuffer(), gexec.NewBuffer(), env...)
-            gomega.Eventually(session).Should(gexec.Exit(0))
-            
-            output := string(session.Out.Contents())
-            gomega.Expect(output).To(gomega.ContainSubstring("installed successfully"))
-        })
-    })
-})
-```
-
-#### 4.5 Shell Wrapper Functionality Tests
-
-**File**: `test/e2e/shell_wrapper_test.go`
-
-```go
-//go:build e2e
-// +build e2e
-
-package e2e
-
-import (
-    "os"
-    "path/filepath"
-    "testing"
-    "github.com/onsi/ginkgo/v2"
-    "github.com/onsi/gomega"
-    "github.com/onsi/gomega/gexec"
-)
-
-var _ = ginkgo.Describe("Shell Wrapper Functionality", func() {
-    var (
-        binPath    string
-        tempDir    string
-        worktreeDir string
-    )
-
-    ginkgo.BeforeEach(func() {
-        var err error
-        tempDir = ginkgo.GinkgoT().TempDir()
-        worktreeDir = filepath.Join(tempDir, "worktrees", "test-project", "feature-branch")
-        
-        // Create test worktree directory
-        err = os.MkdirAll(worktreeDir, 0755)
-        gomega.Expect(err).NotTo(gomega.HaveOccurred())
-        
-        // Build test binary
-        binPath, err = gexec.Build("github.com/twiggit/twiggit")
-        gomega.Expect(err).NotTo(gomega.HaveOccurred())
-    })
-
-    ginkgo.AfterEach(func() {
-        gexec.CleanupBuildArtifacts()
-    })
-
-    ginkgo.Context("when using twiggit cd command", func() {
-        ginkgo.It("should output worktree path", func() {
-            session := gexec.Start(gexec.Command(binPath, "cd", "feature-branch"), 
-                gexec.NewBuffer(), gexec.NewBuffer())
-            gomega.Eventually(session).Should(gexec.Exit(0))
-            
-            output := string(session.Out.Contents())
-            gomega.Expect(output).To(gomega.ContainSubstring(worktreeDir))
-        })
-
-        ginkgo.It("should handle non-existent worktree", func() {
-            session := gexec.Start(gexec.Command(binPath, "cd", "nonexistent"), 
-                gexec.NewBuffer(), gexec.NewBuffer())
-            gomega.Eventually(session).ShouldNot(gexec.Exit(0))
-            
-            output := string(session.Err.Contents())
-            gomega.Expect(output).To(gomega.ContainSubstring("worktree not found"))
-        })
-    })
-
-    ginkgo.Context("when using shell wrapper", func() {
-        ginkgo.It("should intercept cd commands", func() {
-            // Create a test script that simulates the wrapper
-            wrapperScript := filepath.Join(tempDir, "wrapper_test.sh")
-            scriptContent := `#!/bin/bash
-twiggit() {
-    if [[ "$1" == "cd" ]]; then
-        local target_dir
-        target_dir=$(command ` + binPath + ` "${@:2}")
-        if [[ $? -eq 0 && -n "$target_dir" ]]; then
-            echo "Would change to: $target_dir"
-        else
-            return $?
-        fi
-    else
-        command ` + binPath + ` "$@"
-    fi
-}
-
-# Test the wrapper
-twiggit cd feature-branch
-`
-            
-            err := os.WriteFile(wrapperScript, []byte(scriptContent), 0755)
-            gomega.Expect(err).NotTo(gomega.HaveOccurred())
-
-            session := gexec.Start(gexec.Command("bash", wrapperScript), 
-                gexec.NewBuffer(), gexec.NewBuffer())
-            gomega.Eventually(session).Should(gexec.Exit(0))
-            
-            output := string(session.Out.Contents())
-            gomega.Expect(output).To(gomega.ContainSubstring("Would change to:"))
-            gomega.Expect(output).To(gomega.ContainSubstring(worktreeDir))
-        })
-    })
-})
-```
-
-### Shell Integration Test Fixtures
-
-#### 4.6 Shell Test Fixtures
-
-**File**: `test/fixtures/shell/`
-
-```
-test/fixtures/shell/
-├── configs/
-│   ├── bashrc.example          # Example bash configuration
-│   ├── zshrc.example           # Example zsh configuration
-│   └── fish.config.example     # Example fish configuration
-├── scripts/
-│   ├── wrapper_bash.sh         # Bash wrapper template
-│   ├── wrapper_zsh.sh          # Zsh wrapper template
-│   └── wrapper_fish.sh         # Fish wrapper template
-└── environments/
-    ├── bash_env.sh             # Bash test environment
-    ├── zsh_env.sh              # Zsh test environment
-    └── fish_env.sh             # Fish test environment
-```
-
-**Example fixture content**:
-
-```bash
-# test/fixtures/shell/configs/bashrc.example
-# Example bash configuration for testing
-export PS1="\u@\h:\w$ "
-alias ll="ls -la"
-
-# Space for twiggit wrapper installation
-```
-
-```bash
-# test/fixtures/shell/scripts/wrapper_bash.sh
-# Twiggit bash wrapper template for testing
-twiggit() {
-    if [[ "$1" == "cd" ]]; then
-        local target_dir
-        target_dir=$(command twiggit "${@:2}")
-        if [[ $? -eq 0 && -n "$target_dir" ]]; then
-            builtin cd "$target_dir"
-        else
-            return $?
-        fi
-    elif [[ "$1" == "cd" && "$2" == "--help" ]]; then
-        command twiggit "$@"
-    else
-        command twiggit "$@"
-    fi
-}
-```
-
-This comprehensive shell integration testing infrastructure ensures that the shell wrapper functionality works correctly across all supported shells and integrates seamlessly with the existing twiggit workflow.
-
-This comprehensive testing infrastructure ensures twiggit meets the highest quality standards while maintaining the pragmatic TDD approach outlined in the testing philosophy.
+### Pre-commit Requirements
+- All tests pass: `mise run test`
+- Coverage >80%: `mise run test:coverage`
+- Linting passes: `mise run lint:fix`
+- Functional programming principles verified
+
+### CI Requirements
+- Unit tests pass: `mise run test:unit`
+- Integration tests pass: `mise run test:integration`
+- E2E tests pass: `mise run test:e2e`
+- Coverage threshold enforced: `mise run ci:coverage`
+
+## Key Principles
+
+### TDD Approach
+- **Write failing test first**
+- **Implement minimal infrastructure to pass**
+- **Refactor while keeping tests green**
+- **Repeat for next component**
+
+### Functional Programming
+- **Pure test helpers**: No side effects in test utilities
+- **Immutable test data**: Test fixtures never modified
+- **Composition**: Build complex scenarios from simple functions
+- **Error handling**: Use Result patterns for predictable test flow
+
+### Clean Testing
+- **Interface segregation**: Small, focused test utilities
+- **Dependency injection**: All test dependencies injected
+- **Single responsibility**: Each helper has one clear purpose
+- **Consistent patterns**: Same functional approach throughout
+
+## Success Criteria
+
+1. ✅ Test helpers with functional composition patterns
+2. ✅ Enhanced mock infrastructure with fluent interfaces
+3. ✅ Integration test framework with real git operations
+4. ✅ E2E test framework with CLI binary testing
+5. ✅ Coverage enforcement with quality gates
+6. ✅ All tests pass with >80% coverage
+7. ✅ Functional programming principles applied throughout
+
+## Incremental Development Strategy
+
+Phase 8 follows strict incremental development:
+
+1. **Write Test**: Create failing test for helper/mock/framework
+2. **Define Interface**: Add interface with functional methods
+3. **Implement**: Add minimal code to make test pass
+4. **Refactor**: Apply functional programming patterns while keeping tests green
+5. **Repeat**: Move to next testing component
+
+**No detailed implementation, no premature optimization, no future-proofing.** Each component builds only what's needed for that phase.
+
+## Next Phases
+
+Phase 8 provides the comprehensive testing infrastructure needed for production readiness:
+
+1. **Phase 9**: Performance optimization and advanced caching
+2. **Phase 10**: Final integration and validation
+
+This testing infrastructure provides the essential quality foundation for ensuring twiggit meets the highest standards while following true TDD principles, functional programming patterns, and maintaining clean phase boundaries.
