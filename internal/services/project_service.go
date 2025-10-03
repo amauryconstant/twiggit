@@ -6,23 +6,24 @@ import (
 	"path/filepath"
 	"strings"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
-	"twiggit/internal/service"
+	"twiggit/internal/infrastructure"
 )
 
 // projectService implements ProjectService interface
 type projectService struct {
-	gitService     service.GitService
-	contextService domain.ContextServiceInterface
+	gitService     infrastructure.GitClient
+	contextService domain.ContextService
 	config         *domain.Config
 }
 
 // NewProjectService creates a new ProjectService instance
 func NewProjectService(
-	gitService service.GitService,
-	contextService domain.ContextServiceInterface,
+	gitService infrastructure.GitClient,
+	contextService domain.ContextService,
 	config *domain.Config,
-) ProjectService {
+) application.ProjectService {
 	return &projectService{
 		gitService:     gitService,
 		contextService: contextService,

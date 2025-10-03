@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
 )
@@ -172,7 +173,7 @@ func TestProjectService_GetProjectInfo_Success(t *testing.T) {
 }
 
 // setupTestProjectService creates a test instance of ProjectService
-func setupTestProjectService() ProjectService {
+func setupTestProjectService() application.ProjectService {
 	gitService := mocks.NewMockGitService()
 	contextService := &mockContextService{}
 	config := domain.DefaultConfig()

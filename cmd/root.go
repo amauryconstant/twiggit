@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
-	"twiggit/internal/services"
 )
 
 var (
@@ -23,11 +23,11 @@ type CommandConfig struct {
 
 // ServiceContainer holds all service dependencies for commands
 type ServiceContainer struct {
-	WorktreeService   services.WorktreeService
-	ProjectService    services.ProjectService
-	NavigationService services.NavigationService
-	ContextService    domain.ContextServiceInterface
-	ShellService      services.ShellService
+	WorktreeService   application.WorktreeService
+	ProjectService    application.ProjectService
+	NavigationService application.NavigationService
+	ContextService    domain.ContextService
+	ShellService      application.ShellService
 }
 
 // rootCmd represents the base command when called without any subcommands

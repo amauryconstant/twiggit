@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"twiggit/internal/domain"
+	"twiggit/internal/infrastructure"
 )
 
 type shellService struct{}
 
 // NewShellService creates a new shell service instance
-func NewShellService() ShellService {
+func NewShellService() infrastructure.ShellInfrastructure {
 	return &shellService{}
 }
 

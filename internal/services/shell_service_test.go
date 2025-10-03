@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure/shell"
 )
@@ -344,7 +345,7 @@ func TestShellService_GenerateWrapper_Validation(t *testing.T) {
 }
 
 // setupTestShellService creates a test instance of ShellService
-func setupTestShellService() ShellService {
+func setupTestShellService() application.ShellService {
 	// Create a mock shell integration service
 	shellIntegration := &mockShellIntegration{}
 	config := domain.DefaultConfig()

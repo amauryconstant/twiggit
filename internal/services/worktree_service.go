@@ -6,23 +6,24 @@ import (
 	"path/filepath"
 	"time"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
-	"twiggit/internal/service"
+	"twiggit/internal/infrastructure"
 )
 
 // worktreeService implements WorktreeService interface
 type worktreeService struct {
-	gitService     service.GitService
-	projectService ProjectService
+	gitService     infrastructure.GitClient
+	projectService application.ProjectService
 	config         *domain.Config
 }
 
 // NewWorktreeService creates a new WorktreeService instance
 func NewWorktreeService(
-	gitService service.GitService,
-	projectService ProjectService,
+	gitService infrastructure.GitClient,
+	projectService application.ProjectService,
 	config *domain.Config,
-) WorktreeService {
+) application.WorktreeService {
 	return &worktreeService{
 		gitService:     gitService,
 		projectService: projectService,

@@ -8,7 +8,7 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
-// MockGoGitClient implements service.GoGitClient for testing
+// MockGoGitClient implements infrastructure.GoGitClient for testing
 type MockGoGitClient struct {
 	// Mock functions
 	OpenRepositoryFunc      func(path string) (*git.Repository, error)
@@ -90,7 +90,7 @@ func (m *MockGoGitClient) GetCommitInfo(ctx context.Context, repoPath, commitHas
 	return &domain.CommitInfo{}, nil
 }
 
-// MockCLIClient implements service.CLIClient for testing
+// MockCLIClient implements infrastructure.CLIClient for testing
 type MockCLIClient struct {
 	// Mock functions
 	CreateWorktreeFunc func(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error
@@ -136,7 +136,7 @@ func (m *MockCLIClient) PruneWorktrees(ctx context.Context, repoPath string) err
 	return nil
 }
 
-// MockGitService implements service.GitService for testing
+// MockGitService implements infrastructure.GitClient for testing
 type MockGitService struct {
 	*MockGoGitClient
 	*MockCLIClient

@@ -5,20 +5,22 @@ import (
 	"errors"
 	"fmt"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
+	"twiggit/internal/infrastructure"
 )
 
 // shellService implements the ShellService interface
 type shellService struct {
-	integration ShellIntegration
+	integration infrastructure.ShellInfrastructure
 	config      *domain.Config
 }
 
 // NewShellService creates a new ShellService instance
 func NewShellService(
-	integration ShellIntegration,
+	integration infrastructure.ShellInfrastructure,
 	config *domain.Config,
-) ShellService {
+) application.ShellService {
 	return &shellService{
 		integration: integration,
 		config:      config,

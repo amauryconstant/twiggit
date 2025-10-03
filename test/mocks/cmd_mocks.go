@@ -6,7 +6,7 @@ import (
 	"twiggit/internal/domain"
 )
 
-// MockWorktreeService is a mock implementation of services.WorktreeService
+// MockWorktreeService is a mock implementation of application.WorktreeService
 type MockWorktreeService struct {
 	// Configurable functions for testing
 	CreateWorktreeFunc    func(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error)
@@ -61,7 +61,7 @@ func (m *MockWorktreeService) ValidateWorktree(ctx context.Context, worktreePath
 	return nil
 }
 
-// MockProjectService is a mock implementation of services.ProjectService
+// MockProjectService is a mock implementation of application.ProjectService
 type MockProjectService struct {
 	// Configurable functions for testing
 	DiscoverProjectFunc func(ctx context.Context, projectName string, context *domain.Context) (*domain.ProjectInfo, error)
@@ -107,7 +107,7 @@ func (m *MockProjectService) GetProjectInfo(ctx context.Context, projectPath str
 	return nil, nil
 }
 
-// MockNavigationService is a mock implementation of services.NavigationService
+// MockNavigationService is a mock implementation of application.NavigationService
 type MockNavigationService struct {
 	// Configurable functions for testing
 	ResolvePathFunc              func(ctx context.Context, req *domain.ResolvePathRequest) (*domain.ResolutionResult, error)
@@ -144,9 +144,9 @@ func (m *MockNavigationService) GetNavigationSuggestions(ctx context.Context, co
 	return nil, nil
 }
 
-// MockContextService is a mock implementation of domain.ContextServiceInterface
+// MockContextService is a mock implementation of domain.ContextService
 type MockContextService struct {
-	domain.ContextServiceInterface
+	domain.ContextService
 
 	// Configurable functions for testing
 	GetCurrentContextFunc            func() (*domain.Context, error)
@@ -201,7 +201,7 @@ func (m *MockContextService) GetCompletionSuggestions(partial string) ([]*domain
 	return nil, nil
 }
 
-// MockShellService is a mock implementation of services.ShellService
+// MockShellService is a mock implementation of application.ShellService
 type MockShellService struct {
 	// Configurable functions for testing
 	SetupShellFunc           func(ctx context.Context, req *domain.SetupShellRequest) (*domain.SetupShellResult, error)

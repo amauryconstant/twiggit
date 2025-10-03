@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
@@ -136,7 +137,7 @@ func TestNavigationService_GetNavigationSuggestions_Success(t *testing.T) {
 }
 
 // setupTestNavigationService creates a test instance of NavigationService
-func setupTestNavigationService() NavigationService {
+func setupTestNavigationService() application.NavigationService {
 	projectService := &mockProjectService{}
 	contextService := &mockContextService{}
 	config := domain.DefaultConfig()

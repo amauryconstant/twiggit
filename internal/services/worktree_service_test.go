@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
 )
@@ -246,7 +247,7 @@ func TestWorktreeService_ValidateWorktree_Success(t *testing.T) {
 }
 
 // setupTestWorktreeService creates a test instance of WorktreeService
-func setupTestWorktreeService() WorktreeService {
+func setupTestWorktreeService() application.WorktreeService {
 	gitService := mocks.NewMockGitService()
 	projectService := &mockProjectService{}
 	config := domain.DefaultConfig()

@@ -7,22 +7,23 @@ import (
 	"os"
 	"path/filepath"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
 // navigationService implements NavigationService interface
 type navigationService struct {
-	projectService ProjectService
-	contextService domain.ContextServiceInterface
+	projectService application.ProjectService
+	contextService domain.ContextService
 	config         *domain.Config
 }
 
 // NewNavigationService creates a new NavigationService instance
 func NewNavigationService(
-	projectService ProjectService,
-	contextService domain.ContextServiceInterface,
+	projectService application.ProjectService,
+	contextService domain.ContextService,
 	config *domain.Config,
-) NavigationService {
+) application.NavigationService {
 	return &navigationService{
 		projectService: projectService,
 		contextService: contextService,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
@@ -15,17 +16,17 @@ func TestServiceInterfaces_ContractCompliance(t *testing.T) {
 	}{
 		{
 			name:        "WorktreeService interface compliance",
-			serviceType: (*WorktreeService)(nil),
+			serviceType: (*application.WorktreeService)(nil),
 			expectError: false,
 		},
 		{
 			name:        "ProjectService interface compliance",
-			serviceType: (*ProjectService)(nil),
+			serviceType: (*application.ProjectService)(nil),
 			expectError: false,
 		},
 		{
 			name:        "NavigationService interface compliance",
-			serviceType: (*NavigationService)(nil),
+			serviceType: (*application.NavigationService)(nil),
 			expectError: false,
 		},
 	}
@@ -43,17 +44,17 @@ func TestServiceInterfaces_ContractCompliance(t *testing.T) {
 
 func TestWorktreeService_InterfaceMethods(t *testing.T) {
 	// This test will fail until WorktreeService interface is properly defined
-	var _ WorktreeService = (*mockWorktreeService)(nil)
+	var _ application.WorktreeService = (*mockWorktreeService)(nil)
 }
 
 func TestProjectService_InterfaceMethods(t *testing.T) {
 	// This test will fail until ProjectService interface is properly defined
-	var _ ProjectService = (*mockProjectService)(nil)
+	var _ application.ProjectService = (*mockProjectService)(nil)
 }
 
 func TestNavigationService_InterfaceMethods(t *testing.T) {
 	// This test will fail until NavigationService interface is properly defined
-	var _ NavigationService = (*mockNavigationService)(nil)
+	var _ application.NavigationService = (*mockNavigationService)(nil)
 }
 
 // Mock implementations that will fail to compile until interfaces are defined
