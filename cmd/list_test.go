@@ -10,69 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/domain"
-	"twiggit/internal/services"
+	"twiggit/test/mocks"
 )
-
-// mockWorktreeService for testing
-type mockWorktreeService struct {
-	listWorktreesFunc func(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error)
-}
-
-func (m *mockWorktreeService) CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error) {
-	return nil, nil
-}
-
-func (m *mockWorktreeService) DeleteWorktree(ctx context.Context, req *domain.DeleteWorktreeRequest) error {
-	return nil
-}
-
-func (m *mockWorktreeService) ListWorktrees(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
-	if m.listWorktreesFunc != nil {
-		return m.listWorktreesFunc(ctx, req)
-	}
-	return nil, nil
-}
-
-func (m *mockWorktreeService) GetWorktreeStatus(ctx context.Context, worktreePath string) (*domain.WorktreeStatus, error) {
-	return nil, nil
-}
-
-func (m *mockWorktreeService) ValidateWorktree(ctx context.Context, worktreePath string) error {
-	return nil
-}
-
-// mockContextService for testing - we need to import the services package for the interface
-type mockContextService struct {
-	getCurrentContextFunc func() (*domain.Context, error)
-}
-
-func (m *mockContextService) GetCurrentContext() (*domain.Context, error) {
-	if m.getCurrentContextFunc != nil {
-		return m.getCurrentContextFunc()
-	}
-	return &domain.Context{Type: domain.ContextOutsideGit}, nil
-}
-
-func (m *mockContextService) DetectContextFromPath(path string) (*domain.Context, error) {
-	return &domain.Context{Type: domain.ContextOutsideGit}, nil
-}
-
-func (m *mockContextService) ResolveIdentifier(identifier string) (*domain.ResolutionResult, error) {
-	return nil, nil
-}
-
-func (m *mockContextService) ResolveIdentifierFromContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
-	return nil, nil
-}
-
-func (m *mockContextService) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
-	return nil, nil
-}
 
 func TestListCommand_MockInterfaces(t *testing.T) {
 	// Interface compliance checks
-	var _ services.WorktreeService = (*mockWorktreeService)(nil)
-	var _ services.ContextServiceInterface = (*mockContextService)(nil)
+	var _ interface{} = mocks.NewMockWorktreeService()
+	var _ interface{} = mocks.NewMockContextService()
 }
 
 func TestListCommand_Execute(t *testing.T) {
@@ -80,7 +24,7 @@ func TestListCommand_Execute(t *testing.T) {
 		name         string
 		args         []string
 		flags        map[string]string
-		setupMocks   func(*mockWorktreeService, *mockContextService)
+		setupMocks   func(*mocks.MockWorktreeService, *mocks.MockContextService)
 		expectError  bool
 		errorMessage string
 		validateOut  func(string) bool
@@ -88,14 +32,14 @@ func TestListCommand_Execute(t *testing.T) {
 		{
 			name: "list worktrees in project context",
 			args: []string{},
-			setupMocks: func(mockWS *mockWorktreeService, mockCS *mockContextService) {
-				mockCS.getCurrentContextFunc = func() (*domain.Context, error) {
+			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
+				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
 					return &domain.Context{
 						Type:        domain.ContextProject,
 						ProjectName: "test-project",
 					}, nil
 				}
-				mockWS.listWorktreesFunc = func(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
+				mockWS.ListWorktreesFunc = func(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
 					return []*domain.WorktreeInfo{
 						{Path: "/home/user/Worktrees/test-project/main", Branch: "main"},
 						{Path: "/home/user/Worktrees/test-project/feature", Branch: "feature"},
@@ -110,13 +54,11 @@ func TestListCommand_Execute(t *testing.T) {
 		{
 			name: "list all worktrees with --all flag",
 			args: []string{"--all"},
-			setupMocks: func(mockWS *mockWorktreeService, mockCS *mockContextService) {
-				mockCS.getCurrentContextFunc = func() (*domain.Context, error) {
-					return &domain.Context{
-						Type: domain.ContextOutsideGit,
-					}, nil
+			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
+				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
+					return &domain.Context{Type: domain.ContextOutsideGit}, nil
 				}
-				mockWS.listWorktreesFunc = func(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
+				mockWS.ListWorktreesFunc = func(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
 					return []*domain.WorktreeInfo{}, nil
 				}
 			},
@@ -125,8 +67,8 @@ func TestListCommand_Execute(t *testing.T) {
 		{
 			name: "context detection failure",
 			args: []string{},
-			setupMocks: func(mockWS *mockWorktreeService, mockCS *mockContextService) {
-				mockCS.getCurrentContextFunc = func() (*domain.Context, error) {
+			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
+				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
 					return nil, errors.New("detection failed")
 				}
 			},
@@ -138,8 +80,8 @@ func TestListCommand_Execute(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup mocks
-			mockWS := &mockWorktreeService{}
-			mockCS := &mockContextService{}
+			mockWS := mocks.NewMockWorktreeService()
+			mockCS := mocks.NewMockContextService()
 
 			tc.setupMocks(mockWS, mockCS)
 

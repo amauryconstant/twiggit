@@ -7,77 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/domain"
-	"twiggit/internal/services"
+	"twiggit/test/mocks"
 )
-
-// mockWorktreeService for testing
-type mockWorktreeServiceForDelete struct {
-	deleteWorktreeFunc    func(ctx context.Context, req *domain.DeleteWorktreeRequest) error
-	getWorktreeStatusFunc func(ctx context.Context, worktreePath string) (*domain.WorktreeStatus, error)
-}
-
-func (m *mockWorktreeServiceForDelete) CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error) {
-	return nil, nil
-}
-
-func (m *mockWorktreeServiceForDelete) DeleteWorktree(ctx context.Context, req *domain.DeleteWorktreeRequest) error {
-	if m.deleteWorktreeFunc != nil {
-		return m.deleteWorktreeFunc(ctx, req)
-	}
-	return nil
-}
-
-func (m *mockWorktreeServiceForDelete) ListWorktrees(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
-	return nil, nil
-}
-
-func (m *mockWorktreeServiceForDelete) GetWorktreeStatus(ctx context.Context, worktreePath string) (*domain.WorktreeStatus, error) {
-	if m.getWorktreeStatusFunc != nil {
-		return m.getWorktreeStatusFunc(ctx, worktreePath)
-	}
-	return nil, nil
-}
-
-func (m *mockWorktreeServiceForDelete) ValidateWorktree(ctx context.Context, worktreePath string) error {
-	return nil
-}
-
-// mockContextService for testing
-type mockContextServiceForDelete struct {
-	getCurrentContextFunc func() (*domain.Context, error)
-	resolveIdentifierFunc func(identifier string) (*domain.ResolutionResult, error)
-}
-
-func (m *mockContextServiceForDelete) GetCurrentContext() (*domain.Context, error) {
-	if m.getCurrentContextFunc != nil {
-		return m.getCurrentContextFunc()
-	}
-	return &domain.Context{Type: domain.ContextOutsideGit}, nil
-}
-
-func (m *mockContextServiceForDelete) DetectContextFromPath(path string) (*domain.Context, error) {
-	return &domain.Context{Type: domain.ContextOutsideGit}, nil
-}
-
-func (m *mockContextServiceForDelete) ResolveIdentifier(identifier string) (*domain.ResolutionResult, error) {
-	if m.resolveIdentifierFunc != nil {
-		return m.resolveIdentifierFunc(identifier)
-	}
-	return nil, nil
-}
-
-func (m *mockContextServiceForDelete) ResolveIdentifierFromContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
-	return nil, nil
-}
-
-func (m *mockContextServiceForDelete) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
-	return nil, nil
-}
 
 func TestDeleteCommand_MockInterfaces(t *testing.T) {
 	// Interface compliance checks
-	var _ services.WorktreeService = (*mockWorktreeServiceForDelete)(nil)
-	var _ services.ContextServiceInterface = (*mockContextServiceForDelete)(nil)
+	var _ interface{} = mocks.NewMockWorktreeService()
+	var _ interface{} = mocks.NewMockContextService()
 }
 
 func TestDeleteCommand_Execute(t *testing.T) {
@@ -85,28 +21,29 @@ func TestDeleteCommand_Execute(t *testing.T) {
 		name         string
 		args         []string
 		flags        map[string]string
-		setupMocks   func(*mockWorktreeServiceForDelete, *mockContextServiceForDelete)
+		setupMocks   func(*mocks.MockWorktreeService, *mocks.MockContextService)
 		expectError  bool
 		errorMessage string
 	}{
 		{
 			name: "delete worktree with safety checks",
 			args: []string{"test-project/feature-branch"},
-			setupMocks: func(mockWS *mockWorktreeServiceForDelete, mockCS *mockContextServiceForDelete) {
-				mockCS.getCurrentContextFunc = func() (*domain.Context, error) {
+			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
+				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
 					return &domain.Context{}, nil
 				}
-				mockCS.resolveIdentifierFunc = func(identifier string) (*domain.ResolutionResult, error) {
+				mockCS.ResolveIdentifierFunc = func(identifier string) (*domain.ResolutionResult, error) {
 					return &domain.ResolutionResult{
 						ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
 					}, nil
 				}
-				mockWS.getWorktreeStatusFunc = func(ctx context.Context, worktreePath string) (*domain.WorktreeStatus, error) {
+				mockWS.GetWorktreeStatusFunc = func(ctx context.Context, worktreePath string) (*domain.WorktreeStatus, error) {
 					return &domain.WorktreeStatus{
-						IsClean: true,
+						IsClean:               true,
+						HasUncommittedChanges: false,
 					}, nil
 				}
-				mockWS.deleteWorktreeFunc = func(ctx context.Context, req *domain.DeleteWorktreeRequest) error {
+				mockWS.DeleteWorktreeFunc = func(ctx context.Context, req *domain.DeleteWorktreeRequest) error {
 					return nil
 				}
 			},
@@ -115,16 +52,17 @@ func TestDeleteCommand_Execute(t *testing.T) {
 		{
 			name: "abort on dirty worktree",
 			args: []string{"test-project/feature-branch"},
-			setupMocks: func(mockWS *mockWorktreeServiceForDelete, mockCS *mockContextServiceForDelete) {
-				mockCS.getCurrentContextFunc = func() (*domain.Context, error) {
+			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
+				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
 					return &domain.Context{}, nil
 				}
-				mockCS.resolveIdentifierFunc = func(identifier string) (*domain.ResolutionResult, error) {
+				mockCS.ResolveIdentifierFunc = func(identifier string) (*domain.ResolutionResult, error) {
 					return &domain.ResolutionResult{}, nil
 				}
-				mockWS.getWorktreeStatusFunc = func(ctx context.Context, worktreePath string) (*domain.WorktreeStatus, error) {
+				mockWS.GetWorktreeStatusFunc = func(ctx context.Context, worktreePath string) (*domain.WorktreeStatus, error) {
 					return &domain.WorktreeStatus{
-						IsClean: false,
+						IsClean:               false,
+						HasUncommittedChanges: true,
 					}, nil
 				}
 			},
@@ -134,14 +72,14 @@ func TestDeleteCommand_Execute(t *testing.T) {
 		{
 			name: "force delete dirty worktree",
 			args: []string{"--force", "test-project/feature-branch"},
-			setupMocks: func(mockWS *mockWorktreeServiceForDelete, mockCS *mockContextServiceForDelete) {
-				mockCS.getCurrentContextFunc = func() (*domain.Context, error) {
+			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
+				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
 					return &domain.Context{}, nil
 				}
-				mockCS.resolveIdentifierFunc = func(identifier string) (*domain.ResolutionResult, error) {
+				mockCS.ResolveIdentifierFunc = func(identifier string) (*domain.ResolutionResult, error) {
 					return &domain.ResolutionResult{}, nil
 				}
-				mockWS.deleteWorktreeFunc = func(ctx context.Context, req *domain.DeleteWorktreeRequest) error {
+				mockWS.DeleteWorktreeFunc = func(ctx context.Context, req *domain.DeleteWorktreeRequest) error {
 					return nil
 				}
 			},
@@ -152,8 +90,8 @@ func TestDeleteCommand_Execute(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Setup mocks
-			mockWS := &mockWorktreeServiceForDelete{}
-			mockCS := &mockContextServiceForDelete{}
+			mockWS := mocks.NewMockWorktreeService()
+			mockCS := mocks.NewMockContextService()
 
 			tc.setupMocks(mockWS, mockCS)
 

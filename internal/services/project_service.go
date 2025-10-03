@@ -10,26 +10,17 @@ import (
 	"twiggit/internal/service"
 )
 
-// ContextServiceInterface defines the context service operations we need
-type ContextServiceInterface interface {
-	GetCurrentContext() (*domain.Context, error)
-	DetectContextFromPath(path string) (*domain.Context, error)
-	ResolveIdentifier(identifier string) (*domain.ResolutionResult, error)
-	ResolveIdentifierFromContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error)
-	GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error)
-}
-
 // projectService implements ProjectService interface
 type projectService struct {
 	gitService     service.GitService
-	contextService ContextServiceInterface
+	contextService domain.ContextServiceInterface
 	config         *domain.Config
 }
 
 // NewProjectService creates a new ProjectService instance
 func NewProjectService(
 	gitService service.GitService,
-	contextService ContextServiceInterface,
+	contextService domain.ContextServiceInterface,
 	config *domain.Config,
 ) ProjectService {
 	return &projectService{

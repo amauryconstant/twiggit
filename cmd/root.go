@@ -26,7 +26,7 @@ type ServiceContainer struct {
 	WorktreeService   services.WorktreeService
 	ProjectService    services.ProjectService
 	NavigationService services.NavigationService
-	ContextService    services.ContextServiceInterface
+	ContextService    domain.ContextServiceInterface
 }
 
 // rootCmd represents the base command when called without any subcommands
