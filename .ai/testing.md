@@ -4,7 +4,7 @@
 
 ### Pragmatic Test-Driven Development (TDD)
 
-- **Write tests BEFORE implementation**: Tests WILL serve as safety net for refactoring, not as bureaucracy
+Pragmatic TDD approach: Tests SHALL be written before implementation as safety net for refactoring, not as bureaucracy.
 - **Focus on integration tests that verify user workflows**: Tests WILL verify how components work together
 - **Unit tests for complex algorithms, not simple getters/setters**: Tests WILL focus on business logic that matters
 - **E2E tests for CLI commands**: Tests WILL ensure user-facing functionality works correctly
@@ -35,14 +35,12 @@
 - **WILL Provide**: Slowest but most realistic execution, complete user experience testing
 - **When to use**: For complete CLI workflows, user interaction testing, error scenarios
 
-
-
 ## Quality Standards
 
 ### Coverage Requirements
 
 - **Overall test coverage**: SHOULD exceed 80%
-- **CI Pipeline Enforcement**: Coverage threshold is automatically enforced in CI pipeline - builds WILL fail if coverage drops below 80%
+- **CI Pipeline Enforcement**: Coverage threshold is automatically enforced in CI pipeline - builds fail if coverage drops below 80%
 - **Happy path coverage**: SHALL have 100% coverage for expected behavior and critical business logic
 - **Error handling coverage**: SHOULD test error paths but 100% coverage not required for all scenarios
 - **Package-specific strategies**:
@@ -120,120 +118,6 @@ As of the latest implementation (September 26, 2025), the following packages mee
 
 For comprehensive Go code patterns and testing structure, see code-style-guide.md. This section provides concrete examples aligned with the testing philosophy.
 
-### Unit Test Example (Testify Suite)
-```go
-type ProjectTestSuite struct {
-    suite.Suite
-    Project   *Project
-    Worktree *Worktree
-}
-
-func (s *ProjectTestSuite) SetupTest() {
-    var err error
-    s.Project, err = NewProject("test-project", "/repo/path")
-    s.Require().NoError(err)
-    
-    s.Worktree, err = NewWorktree("/test/worktree")
-    s.Require().NoError(err)
-}
-
-func TestProjectSuite(t *testing.T) {
-    suite.Run(t, new(ProjectTestSuite))
-}
-
-func (s *ProjectTestSuite) TestProject_NewProject() {
-    testCases := []struct {
-        name         string
-        projectName  string
-        gitRepo      string
-        expectError  bool
-        errorMessage string
-    }{
-        {
-            name:        "valid project",
-            projectName: "my-project",
-            gitRepo:     "/path/to/repo",
-            expectError: false,
-        },
-        {
-            name:         "empty project name",
-            projectName:  "",
-            gitRepo:      "/path/to/repo",
-            expectError:  true,
-            errorMessage: "project name cannot be empty",
-        },
-    }
-    
-    for _, tt := range testCases {
-        s.Run(tt.name, func() {
-            project, err := NewProject(tt.projectName, tt.gitRepo)
-            
-            if tt.expectError {
-                s.Assert().Error(err)
-                s.Assert().Contains(err.Error(), tt.errorMessage)
-            } else {
-                s.Assert().NoError(err)
-                s.Assert().Equal(tt.projectName, project.Name())
-                s.Assert().Equal(tt.gitRepo, project.GitRepoPath())
-            }
-        })
-    }
-}
-```
-
-### Integration Test Example (Testify Suite)
-```go
-//go:build integration
-// +build integration
-
-package integration
-
-import (
-    "testing"
-    "github.com/stretchr/testify/suite"
-)
-
-type WorktreeIntegrationTestSuite struct {
-    suite.Suite
-    testRepo        *IntegrationTestRepo
-    worktreeCreator *services.WorktreeCreator
-}
-
-func (s *WorktreeIntegrationTestSuite) SetupSuite() {
-    // Skip if not in integration test mode
-    if testing.Short() {
-        s.T().Skip("Skipping integration test")
-    }
-    
-    // Create test git repository
-    s.testRepo = NewTestGitRepo(s.T())
-    
-    // Initialize services with real dependencies
-    s.worktreeCreator = services.NewWorktreeCreator(/* real dependencies */)
-}
-
-func (s *WorktreeIntegrationTestSuite) TearDownSuite() {
-    if s.testRepo != nil {
-        s.testRepo.Cleanup()
-    }
-}
-
-func TestWorktreeIntegrationSuite(t *testing.T) {
-    suite.Run(t, new(WorktreeIntegrationTestSuite))
-}
-
-func (s *WorktreeIntegrationTestSuite) TestCreateWorktreeFromExistingBranch() {
-    worktreePath := filepath.Join(filepath.Dir(s.testRepo.RepoDir()), "feature-worktree")
-    
-    err := s.worktreeCreator.Create(context.Background(), s.testRepo.RepoDir(), "feature-1", worktreePath)
-    s.Assert().NoError(err)
-    
-    // Verify worktree was created
-    _, err = os.Stat(worktreePath)
-    s.Assert().NoError(err, "Worktree directory should exist")
-}
-```
-
 ## Testing Anti-Patterns
 
 ### Common Testing Mistakes
@@ -257,18 +141,12 @@ func (s *WorktreeIntegrationTestSuite) TestCreateWorktreeFromExistingBranch() {
 ### Testing Philosophy Anti-Patterns
 
 1. **Testing for coverage percentage**: Testing SHOULD NOT focus on coverage percentage; focus on meaningful tests instead
-2. **Writing tests after implementation**: Tests SHOULD NOT be written after implementation; tests should drive design, not just verify
+2. **Writing tests after implementation**: Tests SHALL NOT be written after implementation; tests should drive design, not just verify
 3. **Skipping integration tests**: Testing SHOULD NOT skip integration tests; don't rely only on unit tests; test real interactions
 4. **Ignoring E2E tests**: Testing SHOULD NOT ignore E2E tests; don't skip user-facing tests; they catch real-world issues
 5. **Treating tests as second-class code**: Tests SHOULD NOT be treated as second-class code; tests should be as clean as production code
 6. **One-size-fits-all testing**: Testing SHOULD NOT use the same approach for all packages; match test strategy to package responsibility and dependencies
 7. **Inconsistent framework usage**: Tests SHALL NOT mix testing frameworks within the same test type; use the designated framework for each test type
-
-### Optional Testing Restrictions
-- **Parallel Test Execution**: Tests MAY NOT be executed in parallel if they interfere with each other
-- **Test Timeout Configuration**: Individual tests MAY NOT have custom timeout configurations
-- **Test Data Management**: External test data MAY NOT be used; all test data SHOULD be generated within tests
-- **Test Environment Variables**: Tests MAY NOT rely on specific environment variable configurations
 
 ## Shell Integration Testing
 

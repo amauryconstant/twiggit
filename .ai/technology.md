@@ -46,38 +46,19 @@
 **WILL Enable**: Multi-shell support, dynamic completions, rich actions
 **Constrains**: Carapace-specific completion patterns, shell detection requirements
 
-### Standard Go os/filepath
-**Rationale**: Built-in cross-platform path handling
-**WILL Enable**: Platform-agnostic path operations, safety
-**Constrains**: Standard library limitations, no advanced path features
+### Standard Go Libraries
+- **os/filepath**: Built-in cross-platform path handling
+- **os**: Direct file system operations
+- **fmt**: Simple, reliable text formatting
 
-### Standard Go os package
-**Rationale**: Direct file system operations
-**WILL Enable**: Directory creation, removal, permission handling
-**Constrains**: Platform-specific behavior, manual error handling
+### Development Tools
+- **Mise (github.com/jdx/mise)**: Modern task runner with environment management
+- **golangci-lint**: Comprehensive Go linting and formatting
 
-### Standard Go fmt package
-**Rationale**: Simple, reliable text formatting
-**WILL Enable**: String formatting, tabular output
-**Constrains**: Basic formatting only, no advanced templating
-
-### Mise (github.com/jdx/mise)
-**Rationale**: Modern task runner with environment management
-**WILL Enable**: Task definitions, environment variables, version management
-**Constrains**: Mise-specific configuration, additional tool dependency
-
-### golangci-lint
-**Rationale**: Comprehensive Go linting and formatting
-**WILL Enable**: Code quality, consistency, best practices
-**Constrains**: Configuration complexity, potential false positives
-
-## Technology Integration Patterns
+## Integration Patterns
 
 ### Git Operations Integration
-go-git storage and filesystem abstractions SHALL be used for custom worktree implementation. Shell commands SHALL NOT be used for git operations.
-
-### Configuration Loading Pattern
-Koanf SHALL load configuration in priority order: defaults → config file → environment variables → command flags.
+go-git storage and filesystem abstractions SHALL be used for custom worktree implementation. Shell commands SHALL NOT be used for git operations EXCEPT for worktree-specific operations where go-git support is incomplete, in which case CLI fallback MAY be used.
 
 ### Shell Integration Strategy
 Carapace SHALL generate completion scripts. Directory navigation SHALL use shell wrapper functions that intercept command output.

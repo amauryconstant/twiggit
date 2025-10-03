@@ -609,6 +609,355 @@ twiggit --cache-disable list        # Disable caching
 twiggit --concurrency-disable list  # Disable concurrent operations
 ```
 
+## Service Layer Optimization
+
+### Caching Strategies for Services
+
+Service layer caching SHALL provide performance improvements for repeated operations:
+
+```go
+// internal/infrastructure/cache/service_cache.go
+package cache
+
+import (
+    "context"
+    "time"
+    "github.com/twiggit/twiggit/internal/services"
+)
+
+type CachedWorktreeService struct {
+    services.WorktreeService
+    cache    Cache
+    metrics  Metrics
+    config   ServiceCacheConfig
+}
+
+func NewCachedWorktreeService(
+    base services.WorktreeService,
+    cache Cache,
+    metrics Metrics,
+    config ServiceCacheConfig,
+) services.WorktreeService {
+    return &CachedWorktreeService{
+        WorktreeService: base,
+        cache:          cache,
+        metrics:        metrics,
+        config:         config,
+    }
+}
+
+func (c *CachedWorktreeService) ListWorktrees(ctx context.Context, req *ListWorktreesRequest) ([]*WorktreeInfo, error) {
+    // Generate cache key
+    key := c.generateListKey(req)
+    
+    // Check cache
+    if cached, found := c.cache.Get(key); found {
+        c.metrics.CacheHit("worktree_list")
+        return cached.([]*WorktreeInfo), nil
+    }
+    
+    // Cache miss - call underlying service
+    worktrees, err := c.WorktreeService.ListWorktrees(ctx, req)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Cache result
+    c.cache.Set(key, worktrees, c.config.WorktreeListTTL)
+    c.metrics.CacheMiss("worktree_list")
+    
+    return worktrees, nil
+}
+
+func (c *CachedWorktreeService) CreateWorktree(ctx context.Context, req *CreateWorktreeRequest) (*WorktreeInfo, error) {
+    // Create worktree through underlying service
+    worktree, err := c.WorktreeService.CreateWorktree(ctx, req)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Invalidate relevant caches
+    c.invalidateProjectCaches(req.ProjectName)
+    
+    return worktree, nil
+}
+
+func (c *CachedWorktreeService) generateListKey(req *ListWorktreesRequest) string {
+    if req.AllProjects {
+        return "worktrees:all"
+    }
+    return fmt.Sprintf("worktrees:project:%s", req.ProjectName)
+}
+
+func (c *CachedWorktreeService) invalidateProjectCaches(projectName string) {
+    patterns := []string{
+        fmt.Sprintf("worktrees:project:%s", projectName),
+        "worktrees:all",
+        fmt.Sprintf("project:%s", projectName),
+    }
+    
+    for _, pattern := range patterns {
+        c.cache.InvalidatePattern(pattern)
+    }
+}
+```
+
+### Concurrent Service Operations
+
+Service operations SHALL support concurrent execution where safe:
+
+```go
+// internal/services/concurrent_service.go
+package services
+
+import (
+    "context"
+    "sync"
+    "golang.org/x/sync/semaphore"
+)
+
+type ConcurrentWorktreeService struct {
+    services.WorktreeService
+    semaphore *semaphore.Weighted
+    config    ConcurrentConfig
+}
+
+func NewConcurrentWorktreeService(
+    base services.WorktreeService,
+    config ConcurrentConfig,
+) services.WorktreeService {
+    return &ConcurrentWorktreeService{
+        WorktreeService: base,
+        semaphore:       semaphore.NewWeighted(int64(config.MaxConcurrent)),
+        config:          config,
+    }
+}
+
+func (c *ConcurrentWorktreeService) ListAllProjectsConcurrently(
+    ctx context.Context,
+    projects []string,
+) ([]*ProjectInfo, error) {
+    if !c.config.Enabled {
+        // Fallback to sequential execution
+        return c.listProjectsSequential(ctx, projects)
+    }
+    
+    var (
+        wg     sync.WaitGroup
+        mu     sync.Mutex
+        results []*ProjectInfo
+        errors  []error
+    )
+    
+    // Limit concurrent operations
+    for _, projectName := range projects {
+        if err := c.semaphore.Acquire(ctx, 1); err != nil {
+            return nil, fmt.Errorf("failed to acquire semaphore: %w", err)
+        }
+        
+        wg.Add(1)
+        go func(name string) {
+            defer wg.Done()
+            defer c.semaphore.Release(1)
+            
+            project, err := c.WorktreeService.GetProjectInfo(ctx, name)
+            if err != nil {
+                mu.Lock()
+                errors = append(errors, fmt.Errorf("project %s: %w", name, err))
+                mu.Unlock()
+                return
+            }
+            
+            mu.Lock()
+            results = append(results, project)
+            mu.Unlock()
+        }(projectName)
+    }
+    
+    wg.Wait()
+    
+    if len(errors) > 0 {
+        return nil, fmt.Errorf("errors occurred: %v", errors)
+    }
+    
+    return results, nil
+}
+```
+
+### Service Performance Monitoring
+
+Service operations SHALL include performance monitoring:
+
+```go
+// internal/infrastructure/monitoring/service_monitor.go
+package monitoring
+
+import (
+    "context"
+    "time"
+    "github.com/twiggit/twiggit/internal/services"
+)
+
+type MonitoredWorktreeService struct {
+    services.WorktreeService
+    monitor PerformanceMonitor
+}
+
+func NewMonitoredWorktreeService(
+    base services.WorktreeService,
+    monitor PerformanceMonitor,
+) services.WorktreeService {
+    return &MonitoredWorktreeService{
+        WorktreeService: base,
+        monitor:         monitor,
+    }
+}
+
+func (m *MonitoredWorktreeService) CreateWorktree(ctx context.Context, req *CreateWorktreeRequest) (*WorktreeInfo, error) {
+    start := time.Now()
+    operation := "create_worktree"
+    
+    // Record operation start
+    m.monitor.OperationStarted(operation, map[string]interface{}{
+        "project": req.ProjectName,
+        "branch":  req.BranchName,
+    })
+    
+    // Execute operation
+    result, err := m.WorktreeService.CreateWorktree(ctx, req)
+    
+    // Record completion
+    duration := time.Since(start)
+    if err != nil {
+        m.monitor.OperationFailed(operation, duration, err, map[string]interface{}{
+            "project": req.ProjectName,
+            "branch":  req.BranchName,
+        })
+    } else {
+        m.monitor.OperationSucceeded(operation, duration, map[string]interface{}{
+            "project": req.ProjectName,
+            "branch":  req.BranchName,
+            "path":    result.Path,
+        })
+    }
+    
+    return result, err
+}
+
+func (m *MonitoredWorktreeService) ListWorktrees(ctx context.Context, req *ListWorktreesRequest) ([]*WorktreeInfo, error) {
+    start := time.Now()
+    operation := "list_worktrees"
+    
+    m.monitor.OperationStarted(operation, map[string]interface{}{
+        "all_projects": req.AllProjects,
+        "project":      req.ProjectName,
+    })
+    
+    result, err := m.WorktreeService.ListWorktrees(ctx, req)
+    
+    duration := time.Since(start)
+    if err != nil {
+        m.monitor.OperationFailed(operation, duration, err, map[string]interface{}{
+            "all_projects": req.AllProjects,
+            "project":      req.ProjectName,
+        })
+    } else {
+        m.monitor.OperationSucceeded(operation, duration, map[string]interface{}{
+            "all_projects": req.AllProjects,
+            "project":      req.ProjectName,
+            "count":        len(result),
+        })
+    }
+    
+    return result, err
+}
+```
+
+### Memory-Efficient Service Data Structures
+
+Services SHALL use memory-efficient data structures:
+
+```go
+// internal/services/memory_efficient_service.go
+package services
+
+import (
+    "sync"
+)
+
+type MemoryEfficientProjectService struct {
+    services.ProjectService
+    cache *ProjectCache
+    mu    sync.RWMutex
+}
+
+type ProjectCache struct {
+    projects map[string]*CachedProject
+    mu       sync.RWMutex
+}
+
+type CachedProject struct {
+    *ProjectInfo
+    lastAccess time.Time
+    accessCount int64
+}
+
+func NewMemoryEfficientProjectService(base services.ProjectService) services.ProjectService {
+    return &MemoryEfficientProjectService{
+        WorktreeService: base,
+        cache: &ProjectCache{
+            projects: make(map[string]*CachedProject),
+        },
+    }
+}
+
+func (m *MemoryEfficientProjectService) GetProjectInfo(ctx context.Context, projectPath string) (*ProjectInfo, error) {
+    // Check cache first
+    m.cache.mu.RLock()
+    if cached, found := m.cache.projects[projectPath]; found {
+        cached.lastAccess = time.Now()
+        cached.accessCount++
+        m.cache.mu.RUnlock()
+        return cached.ProjectInfo, nil
+    }
+    m.cache.mu.RUnlock()
+    
+    // Cache miss - fetch from underlying service
+    project, err := m.WorktreeService.GetProjectInfo(ctx, projectPath)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Cache with limited memory footprint
+    m.cache.mu.Lock()
+    m.cache.projects[projectPath] = &CachedProject{
+        ProjectInfo:  project,
+        lastAccess:   time.Now(),
+        accessCount:  1,
+    }
+    m.cache.mu.Unlock()
+    
+    // Periodic cleanup of unused entries
+    m.cleanupCache()
+    
+    return project, nil
+}
+
+func (m *MemoryEfficientProjectService) cleanupCache() {
+    // Simple LRU cleanup - remove entries not accessed in 10 minutes
+    cutoff := time.Now().Add(-10 * time.Minute)
+    
+    m.cache.mu.Lock()
+    defer m.cache.mu.Unlock()
+    
+    for path, cached := range m.cache.projects {
+        if cached.lastAccess.Before(cutoff) && cached.accessCount < 3 {
+            delete(m.cache.projects, path)
+        }
+    }
+}
+```
+
 ## Migration Strategy
 
 ### Phase 1: Infrastructure (Week 1)

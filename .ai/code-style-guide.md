@@ -240,6 +240,163 @@ import "github.com/yourorg/twiggit/internal/infrastructure"
 
 For comprehensive testing philosophy, framework usage, and command reference, see [testing.md](./testing.md). This section focuses on concrete Go code patterns for implementing tests.
 
+### Unit Test Example (Testify Suite)
+```go
+type ProjectTestSuite struct {
+    suite.Suite
+    Project   *Project
+    Worktree *Worktree
+}
+
+func (s *ProjectTestSuite) SetupTest() {
+    var err error
+    s.Project, err = NewProject("test-project", "/repo/path")
+    s.Require().NoError(err)
+    
+    s.Worktree, err = NewWorktree("/test/worktree")
+    s.Require().NoError(err)
+}
+
+func TestProjectSuite(t *testing.T) {
+    suite.Run(t, new(ProjectTestSuite))
+}
+
+func (s *ProjectTestSuite) TestProject_NewProject() {
+    testCases := []struct {
+        name         string
+        projectName  string
+        gitRepo      string
+        expectError  bool
+        errorMessage string
+    }{
+        {
+            name:        "valid project",
+            projectName: "my-project",
+            gitRepo:     "/path/to/repo",
+            expectError: false,
+        },
+        {
+            name:         "empty project name",
+            projectName:  "",
+            gitRepo:      "/path/to/repo",
+            expectError:  true,
+            errorMessage: "project name cannot be empty",
+        },
+    }
+    
+    for _, tt := range testCases {
+        s.Run(tt.name, func() {
+            project, err := NewProject(tt.projectName, tt.gitRepo)
+            
+            if tt.expectError {
+                s.Assert().Error(err)
+                s.Assert().Contains(err.Error(), tt.errorMessage)
+            } else {
+                s.Assert().NoError(err)
+                s.Assert().Equal(tt.projectName, project.Name())
+                s.Assert().Equal(tt.gitRepo, project.GitRepoPath())
+            }
+        })
+    }
+}
+```
+
+### Integration Test Example (Testify Suite)
+```go
+//go:build integration
+// +build integration
+
+package integration
+
+import (
+    "testing"
+    "github.com/stretchr/testify/suite"
+)
+
+type WorktreeIntegrationTestSuite struct {
+    suite.Suite
+    testRepo        *IntegrationTestRepo
+    worktreeCreator *services.WorktreeCreator
+}
+
+func (s *WorktreeIntegrationTestSuite) SetupSuite() {
+    // Skip if not in integration test mode
+    if testing.Short() {
+        s.T().Skip("Skipping integration test")
+    }
+    
+    // Create test git repository
+    s.testRepo = NewTestGitRepo(s.T())
+    
+    // Initialize services with real dependencies
+    s.worktreeCreator = services.NewWorktreeCreator(/* real dependencies */)
+}
+
+func (s *WorktreeIntegrationTestSuite) TearDownSuite() {
+    if s.testRepo != nil {
+        s.testRepo.Cleanup()
+    }
+}
+
+func TestWorktreeIntegrationSuite(t *testing.T) {
+    suite.Run(t, new(WorktreeIntegrationTestSuite))
+}
+
+func (s *WorktreeIntegrationTestSuite) TestCreateWorktreeFromExistingBranch() {
+    worktreePath := filepath.Join(filepath.Dir(s.testRepo.RepoDir()), "feature-worktree")
+    
+    err := s.worktreeCreator.Create(context.Background(), s.testRepo.RepoDir(), "feature-1", worktreePath)
+    s.Assert().NoError(err)
+    
+    // Verify worktree was created
+    _, err = os.Stat(worktreePath)
+    s.Assert().NoError(err, "Worktree directory should exist")
+}
+```
+
+### E2E Test Example (Ginkgo/Gomega)
+```go
+//go:build e2e
+
+package e2e
+
+import (
+    "github.com/onsi/ginkgo/v2"
+    "github.com/onsi/gomega"
+    "github.com/onsi/gomega/gexec"
+)
+
+var _ = ginkgo.Describe("CLI Commands", func() {
+    var cliPath string
+
+    ginkgo.BeforeEach(func() {
+        cliPath = buildCLI()
+    })
+
+    ginkgo.Context("list command", func() {
+        ginkgo.It("should list worktrees in tabular format", func() {
+            session := gexec.Start(cliPath+" list", nil, nil)
+            gomega.Eventually(session).Should(gexec.Exit(0))
+            gomega.Expect(string(session.Out.Contents())).To(gomega.ContainSubstring("BRANCH"))
+        })
+    })
+
+    ginkgo.Context("create command", func() {
+        ginkgo.It("should create new worktree", func() {
+            session := gexec.Start(cliPath+" create feature-branch", nil, nil)
+            gomega.Eventually(session).Should(gexec.Exit(0))
+            gomega.Expect(string(session.Out.Contents())).To(gomega.ContainSubstring("Created worktree"))
+        })
+    })
+})
+
+func buildCLI() string {
+    // Build CLI binary for E2E testing
+    // Implementation details omitted for brevity
+    return "/path/to/built/cli"
+}
+```
+
 ### Unit Test Structure
 
 ```go

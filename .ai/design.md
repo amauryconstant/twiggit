@@ -2,7 +2,7 @@
 
 ## Purpose
 
-A pragmatic tool for managing git worktrees with a focus on rebase workflows. Context-aware operations SHALL be provided for creating, listing, navigating, and deleting worktrees across multiple projects.
+A pragmatic tool for managing git worktrees with a focus on rebase workflows. Context-aware operations WILL be provided for creating, listing, navigating, and deleting worktrees across multiple projects.
 
 ## Directory Structure & Defaults
 
@@ -26,10 +26,7 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 ### Core Commands
 
 #### `list` - List git worktrees
-**Output format**: Simple text list with:
-- Branch name
-- Last commit information  
-- Working directory status (clean/dirty)
+**Output format**: Tabular format with columns for branch name, last commit information, and working directory status (clean/dirty)
 
 **Context behavior**:
 - From project folder: List worktrees for current project
@@ -38,7 +35,7 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 
 **Flags**:
 - `--all`: Show worktrees from all projects (overrides context)
-- **Note**: `-C / --change-dir` flag SHOULD NOT be supported for list command
+- Note: `-C / --change-dir` flag SHOULD NOT be supported for list command
 
 #### `create` - Create a new git worktree
 **Required parameters**:
@@ -89,26 +86,6 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 - SHALL pass through all other commands unchanged
 - SHALL be automatically installed via `twiggit setup-shell` command
 
-**Context behavior**:
-- From project folder: Change SHALL occur to specified worktree of current project
-- From worktree folder: Change SHALL occur to different worktree of current project
-- From outside git: Project and worktree specification SHALL be required
-
-**Identifier resolution rules**:
-
-| Context | Input Format | Interpretation | Target |
-|---------|--------------|----------------|---------|
-| **Project folder** | `<branch>` | Worktree branch name | `~/Worktrees/current-project/<branch>` |
-| **Project folder** | `<project>` | Different project name | `~/Projects/<project>` |
-| **Project folder** | `<project>/<branch>` | Cross-project worktree | `~/Worktrees/<project>/<branch>` |
-| **Worktree folder** | `<branch>` | Different worktree of same project | `~/Worktrees/current-project/<branch>` |
-| **Worktree folder** | `main` | Main project directory (special case) | `~/Projects/current-project` |
-| **Worktree folder** | `<project>` | Different project name | `~/Projects/<project>` |
-| **Worktree folder** | `<project>/<branch>` | Cross-project worktree | `~/Worktrees/<project>/<branch>` |
-| **Outside git** | `<branch>` | Invalid - requires project context | Error |
-| **Outside git** | `<project>` | Project main directory | `~/Projects/<project>` |
-| **Outside git** | `<project>/<branch>` | Cross-project worktree | `~/Worktrees/<project>/<branch>` |
-
 #### `delete` - Delete a git worktree
 **Safety checks (always enforced)**:
 - Uncommitted changes SHALL be checked - abort SHALL occur if found
@@ -135,35 +112,11 @@ A pragmatic tool for managing git worktrees with a focus on rebase workflows. Co
 - Warning SHALL be provided about overriding shell built-in `cd` command
 - User SHALL be instructed to restart shell or source configuration
 
-**Output Format**:
-- **Success**: Installation instructions, escape hatch usage, and next steps
-- **Error**: Specific error message about detection or installation failure
-
-**Shell Wrapper Features**:
-- SHALL intercept `twiggit cd` calls and change shell directory
-- SHALL provide `builtin cd` for shell built-in access
-- SHALL warn when overriding shell built-in `cd`
-- SHALL pass through all other commands unchanged
-
 ### Help Command
 
 #### `help` - Display help text
 - Basic help text SHALL be returned
 - Usage patterns and available commands SHALL be shown
-
-## Command Structure
-
-The command structure SHALL be organized as follows:
-
-```go
-cmd/
-├── create.go          // Create command implementation
-├── delete.go          // Delete command implementation  
-├── list.go            // List command implementation
-├── cd.go              // CD (change directory) command implementation
-├── setup-shell.go     // Shell setup command implementation
-└── root.go            // Root command and CLI setup
-```
 
 ## Context Detection & Behavior
 
@@ -174,52 +127,24 @@ cmd/
 - **Worktree Context**: `cd main` SHALL navigate to main project, `cd <branch>` SHALL navigate to different worktree, `cd <project>` SHALL navigate to different project
 - **Outside Git Context**: `cd <project>` SHALL navigate to project main, `cd <project>/<branch>` SHALL navigate to cross-project worktree
 
-### Context-Aware Identifier Resolution
+### Identifier Resolution
 
-The system WILL resolve target identifiers based on current context using the following rules:
-
-#### From Project Context
-- `<branch>` WILL resolve to worktree of current project
-- `<project>` WILL resolve to different project's main directory  
-- `main` WILL resolve to current project's main directory
-
-#### From Worktree Context  
-- `<branch>` WILL resolve to different worktree of same project
-- `main` WILL resolve to main project directory
-- `<project>` WILL resolve to different project's main directory
-
-#### From Outside Git Context
-- `<project>` WILL resolve to project's main directory
-- `<project>/<branch>` WILL resolve to cross-project worktree
-
-### Navigation Requirements
-
-#### Core Functionality
-- The system SHALL provide context-aware navigation for all supported contexts
-- Context detection SHALL distinguish between project, worktree, and outside git contexts
-- Identifier resolution SHALL handle `<project>`, `<branch>`, and `<project>/<branch>` formats
-- Navigation SHALL validate target existence before changing directories
-
-#### Error Handling
-- Error messages SHALL be context-aware and provide actionable guidance
-- The system SHALL NOT proceed with navigation if target doesn't exist
-- Invalid targets SHALL result in clear error messages with suggestions
-
-#### User Experience
-- Navigation behaviors SHOULD match developer expectations based on context
-- Completion SHOULD provide appropriate suggestions based on current context
-- Error messages SHOULD include suggested actions for resolution
+| Context | Input | Target |
+|---------|-------|--------|
+| Project | `<branch>` | Current project worktree |
+| Project | `<project>` | Different project main |
+| Project | `<project>/<branch>` | Cross-project worktree |
+| Worktree | `<branch>` | Different worktree same project |
+| Worktree | `main` | Current project main |
+| Worktree | `<project>` | Different project main |
+| Worktree | `<project>/<branch>` | Cross-project worktree |
+| Outside | `<branch>` | Invalid - requires project context |
+| Outside | `<project>` | Project main directory |
+| Outside | `<project>/<branch>` | Cross-project worktree |
 
 ### Context Detection Rules
 1. **Project folder**: `.git/` directory found in current or parent directories
-   - Directory tree WILL be traversed up until finding `.git/` or reaching filesystem root
-   - First `.git/` found WILL be used (closest to current directory)
-   - Project folder SHALL be distinguished from worktree folder by path structure
 2. **Worktree folder**: Path matches `$HOME/Worktrees/<project>/<branch>/` pattern  
-   - Exact pattern matching SHALL be used with configurable base directories
-   - Alternative worktree detection patterns MAY be supported in future
-   - Worktree SHALL be validated to contain valid git worktree
-   - Worktree folder SHALL be distinguished from project folder by path structure
 3. **Outside git**: No `.git/` found and not in worktree pattern
 
 ### Context Detection Priority
@@ -229,76 +154,11 @@ The system WILL resolve target identifiers based on current context using the fo
   1. **Worktree folder** (if path matches worktree pattern and contains valid worktree)
   2. **Project folder** (if `.git/` found and path doesn't match worktree pattern)
   3. **Outside git** (neither condition met)
-- Context detection results SHALL be cached for performance during single command execution
-
-### Edge Case Handling
-- **Nested directories**: Context SHALL be determined by closest valid parent directory
-- **Multiple `.git` directories**: First one found during upward traversal SHALL be used
-- **Invalid worktree pattern**: SHALL be treated as "outside git" context
-- **Broken git repositories**: SHALL be detected as invalid context, error and exit SHALL occur
 
 ### Context Behavior
 - **From project folder**: Command SHALL be applied to current project
 - **From worktree folder**: Command SHALL be applied to current worktree or encapsulating project
 - **From outside git**: Explicit project/worktree specification SHALL be required or `--all` SHALL be used
-
-### Cross-context Operations
-- Positional arguments SHALL be used for project and worktree specification
-- `--all` flag SHALL be used for operations across all projects
-- Git CLI patterns SHALL be followed for argument handling
-
-## Error Handling
-
-### Error Philosophy
-- The system WILL fail fast when conflicts cannot be resolved
-- Specific, actionable error messages SHALL be provided for debugging
-- Interactive processes SHALL NOT be used - all information SHALL be available or failure SHALL occur
-
-### Error Scenarios
-- Invalid git repository SHALL be detected and reported with actionable error message
-- Network errors SHALL be caught and reported with connection details
-- Permission issues SHALL be detected and reported with specific path information
-- Ambiguous contexts SHALL be identified and resolved with explicit user guidance
-- Missing directories SHALL be detected and reported with path details
-
-### Return Codes
-- The system WILL use standard POSIX return codes
-- `0`: Success
-- `1`: General error
-- `2`: Misuse/invalid arguments
-- Other codes SHALL be used as appropriate for specific error conditions
-
-## Configuration
-
-### Configuration System
-- The system WILL use XDG Base Directory specification for config file location
-- TOML format SHALL be supported exclusively
-- Configuration SHALL be applied in priority order: defaults → config file → environment variables → command flags
-- Configuration validation SHALL occur during startup
-
-### Configurable Options
-- **Directory paths**: Defaults for projects and worktrees directories SHALL be overridden
-- **Default source branch**: Default `main` branch for create command SHALL be overridden
-- See [implementation.md](./implementation.md) for detailed configuration examples and file location
-
-## CLI Features
-
-### Help System
-- Basic help text format SHALL be provided for all commands
-- Usage examples and flag descriptions SHALL be included
-- Context-aware help SHALL be provided when possible
-
-### Version Information
-- `--version` flag SHALL display version information
-- Semantic versioning SHALL be followed
-
-### Shell Completion
-- Support for bash, zsh, and fish shell completion MAY be provided
-- Completion scripts MAY be generated for common shells
-
-### Verbosity
-- Default POSIX output behavior SHALL be used
-- Additional logging or verbosity controls MAY NOT be provided in first iteration
 
 ## Future Features
 
@@ -309,52 +169,6 @@ The system WILL resolve target identifiers based on current context using the fo
 - Post-creation command execution MAY be supported
 - Git hooks integration MAY be provided
 - Advanced configuration options MAY be available
-
-## Command Requirements
-
-### List Command Requirements
-- Worktrees SHALL be displayed in tabular format with branch, commit, and status columns
-- Project context SHALL be inferred from current directory when possible
-- --all flag SHALL override context detection
-- -C/--change-dir flag SHALL NOT be supported for list operations
-
-### Create Command Requirements
-- New branch name SHALL be required as positional argument
-- Project name SHALL be inferred using the specified priority order
-- Source branch SHALL default to 'main' unless overridden
-- Worktree creation SHALL NOT proceed if target directory already exists
-
-### Delete Command Requirements
-- Safety checks SHALL be performed before deletion
-- Uncommitted changes SHALL prevent deletion unless --force flag is used
-- Current worktree SHALL NOT be deletable
-- Branch deletion SHALL occur by default unless --keep-branch flag is used
-
-### Setup-Shell Command Requirements
-- Current shell detection SHALL be performed automatically
-- Wrapper function SHALL be generated for detected shell
-- Shell configuration file SHALL be modified appropriately
-- User SHALL be instructed to restart shell or source configuration
-
-## Error Handling Requirements
-- Non-zero exit codes SHALL be used for all error conditions
-- Specific, actionable error messages SHALL be provided
-- Interactive error recovery SHALL NOT be implemented
-- All inputs SHALL be validated before execution
-- POSIX-compliant exit codes SHALL be used (0=success, 1=general error, 2=misuse)
-
-## Configuration Requirements
-- TOML configuration format SHALL be supported exclusively
-- Config file SHALL be located using XDG Base Directory specification
-- Configuration SHALL be applied in priority order: defaults → config file → environment variables → command flags
-- All configuration values SHALL be validated during startup
-
-## Validation Requirements
-- Project names SHALL follow GitHub repository naming rules
-- Branch names SHALL follow git branch naming rules
-- Directory paths SHALL be validated to exist and be accessible
-- Source branches SHALL be validated to exist in repository
-- All user inputs SHALL be sanitized and validated
 
 ## Summary
 

@@ -17,19 +17,20 @@ This directory contains 10 sequential implementation phases for building the twi
 
 ## Key Principles
 
-- **TDD Approach**: Tests written before implementation (RED-GREEN-REFACTOR)
-- **80%+ Test Coverage**: Enforced through CI pipeline
-- **Context-Aware**: Commands adapt based on detected user context
+- **TDD Approach**: Tests SHALL be written before implementation (RED-GREEN-REFACTOR)
+- **80%+ Test Coverage**: Enforced through CI pipeline (see implementation.md)
+- **Context-Aware**: Commands adapt based on detected user context (see design.md)
 - **Hybrid Git**: Balances performance (go-git) with completeness (CLI fallback)
 - **Cross-Platform**: Works on Linux, macOS, and Windows
+- **Keyword Consistency**: All requirements SHALL use formal specification keywords per documentation-design.md
 
 ## Usage
 
 Each plan provides detailed implementation guidance including:
-- Interface definitions and code examples
-- Architectural decisions and rationale
+- Interface definitions and code examples (see code-style-guide.md)
+- Architectural decisions and rationale (see technology.md)
 - Integration points with previous layers
-- Testing strategies and validation criteria
+- Testing strategies and validation criteria (see testing.md)
 - Relevant documentation quotes for consistency
 
 Execute plans sequentially to build a production-ready CLI tool that meets all requirements from the design specification.

@@ -3,7 +3,7 @@
 ## Testing Requirements
 
 ### Test Coverage
-- >80% test coverage SHALL be achieved for business logic
+- >80% test coverage SHOULD be achieved for business logic
 - Happy paths and critical business logic SHALL have 100% coverage
 - Unit, integration, and E2E tests SHALL be included
 - External dependencies SHALL be mocked in unit tests OR tested via integration tests
@@ -13,7 +13,8 @@
 
 ### Testing Framework Usage
 - Testify SHALL be used for unit testing with mock generation
-- Ginkgo/Gomega SHALL be used for integration testing with BDD patterns
+- Testify SHALL be used for integration testing with structured test organization
+- Ginkgo/Gomega SHALL be used for E2E testing with BDD patterns and CLI interaction testing
 - Gexec SHALL be used for E2E testing with real binary execution
 - Test organization SHALL follow Go testing best practices
 - All tests SHALL be runnable with standard Go test commands
@@ -148,16 +149,13 @@
 - Error messages SHALL be consistent and actionable
 - Error handling SHALL follow Go best practices
 
-### Configuration Management
-- Configuration SHALL be loaded using Koanf with TOML support
-- Environment variables SHALL override config file values
-- Command flags SHALL override all other configuration sources
-- Configuration validation SHALL occur during startup
+## Configuration Management
 
 ### Configuration Implementation
 - **Location**: XDG Base Directory specification SHALL be followed for config folders (`$HOME/.config/twiggit/config.toml`)
 - **Format**: TOML format SHALL be supported exclusively
 - **Purpose**: Default settings SHALL be overridden
+- **Priority**: defaults → config file → environment variables → command flags
 
 ### Configuration Options
 ```toml
@@ -176,28 +174,32 @@ default_source_branch = "main"
 - **Directory paths**: Defaults for projects and worktrees directories SHALL be overridden
 - **Default source branch**: Default `main` branch for create command SHALL be overridden
 
-## Dependency Management
+## Command Structure
 
-### Dependency Selection
-- Dependencies SHALL NOT be added without explicit approval
-- Exact versions specified in go.mod SHALL be used
-- Standard library SHALL be preferred over third-party packages
-- Dependencies SHALL be regularly updated for security patches
-- go.mod SHALL be kept tidy and versioned appropriately
+The command structure SHALL be organized as follows:
 
-### Version Management
-- Go modules SHALL be used for dependency management
-- Semantic versioning SHALL be followed for dependencies
-- Breaking changes SHALL be carefully evaluated before adoption
-- Dependency updates SHALL be tested thoroughly
+```go
+cmd/
+├── create.go          // Create command implementation
+├── delete.go          // Delete command implementation  
+├── list.go            // List command implementation
+├── cd.go              // CD (change directory) command implementation
+├── setup-shell.go     // Shell setup command implementation
+└── root.go            // Root command and CLI setup
+```
 
-### Security Updates
-- Dependencies SHALL be regularly scanned for vulnerabilities
-- Security patches SHALL be applied promptly
-- Deprecated dependencies SHALL be replaced with alternatives
-- Dependency licenses SHALL be compatible with project requirements
+## CLI Implementation
 
-## Error Handling Requirements
+### CLI Features
+- Commands SHALL follow Cobra's command/flag pattern
+- Help generation SHALL use Cobra's built-in system
+- Shell completion SHALL integrate with Cobra's completion framework
+- --version flag SHALL display version information
+- Semantic versioning SHALL be followed
+- Shell completion support MAY be provided for bash, zsh, and fish
+- Default POSIX output behavior SHALL be used
+
+## Error Handling Standards
 
 ### Error Categories
 - Configuration errors SHALL be clearly identified and explained
@@ -222,15 +224,31 @@ default_source_branch = "main"
 
 ### Specific Error Messages
 - **Invalid git repository**: `error: not a git repository (or any parent up to mount point /)`
-  - Directory SHALL be verified to contain valid `.git/` folder
 - **Network errors**: `error: unable to access 'https://github.com/user/repo.git': Failed to connect to github.com port 443`
-  - Network connection and repository URL SHALL be checked
 - **Permission issues**: `error: permission denied: '/home/user/Worktrees/project/branch'`
-  - Directory permissions SHALL be checked or appropriate privileges SHALL be used
 - **Ambiguous contexts**: `error: ambiguous context - please specify project and worktree explicitly`
-  - `twiggit --project <name> --worktree <branch>` or `--all` flag SHALL be used
 - **Missing directories**: `error: projects directory does not exist: /home/user/Projects`
-  - Directory SHALL be created manually or config path SHALL be updated
+
+## Dependency Management
+
+### Dependency Selection
+- Dependencies SHALL NOT be added without explicit approval
+- Exact versions specified in go.mod SHALL be used
+- Standard library SHALL be preferred over third-party packages
+- Dependencies SHALL be regularly updated for security patches
+- go.mod SHALL be kept tidy and versioned appropriately
+
+### Version Management
+- Go modules SHALL be used for dependency management
+- Semantic versioning SHALL be followed for dependencies
+- Breaking changes SHALL be carefully evaluated before adoption
+- Dependency updates SHALL be tested thoroughly
+
+### Security Updates
+- Dependencies SHALL be regularly scanned for vulnerabilities
+- Security patches SHALL be applied promptly
+- Deprecated dependencies SHALL be replaced with alternatives
+- Dependency licenses SHALL be compatible with project requirements
 
 ## Build and Deployment Requirements
 

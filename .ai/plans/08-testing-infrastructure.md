@@ -1072,12 +1072,298 @@ var _ = ginkgo.Describe("Worktree Management", func() {
 - [ ] CI integration script
 - [ ] Coverage threshold enforcement
 
+## Service Layer Testing
+
+### Integration Testing Patterns
+
+Service layer integration tests SHALL verify coordination between services:
+
+```go
+// test/integration/services_test.go
+package integration
+
+import (
+    "context"
+    "testing"
+    "github.com/stretchr/testify/suite"
+    "github.com/twiggit/twiggit/internal/services"
+    "github.com/twiggit/twiggit/test/helpers"
+)
+
+type ServiceIntegrationSuite struct {
+    suite.Suite
+    tempDir        string
+    gitHelper      *helpers.GitTestHelper
+    worktreeService services.WorktreeService
+    projectService  services.ProjectService
+    navService      services.NavigationService
+}
+
+func (s *ServiceIntegrationSuite) SetupSuite() {
+    var err error
+    s.tempDir = s.T().TempDir()
+    s.gitHelper = helpers.NewGitTestHelper(s.T())
+    
+    // Setup test repository
+    repoPath := s.gitHelper.CreateTestRepository("test-project")
+    
+    // Initialize services with real dependencies
+    s.worktreeService = setupWorktreeService(repoPath)
+    s.projectService = setupProjectService(repoPath)
+    s.navService = setupNavigationService(repoPath)
+}
+
+func (s *ServiceIntegrationSuite) TestWorktreeCreationFlow() {
+    // Test complete worktree creation flow
+    req := &CreateWorktreeRequest{
+        ProjectName:  "test-project",
+        BranchName:   "feature-branch",
+        SourceBranch: "main",
+        Context: &domain.Context{
+            Type:       domain.ContextOutsideGit,
+            ProjectName: "test-project",
+        },
+    }
+    
+    // Create worktree
+    worktree, err := s.worktreeService.CreateWorktree(context.Background(), req)
+    s.Require().NoError(err)
+    s.Equal("feature-branch", worktree.Branch)
+    
+    // Verify worktree exists
+    status, err := s.worktreeService.GetWorktreeStatus(context.Background(), worktree.Path)
+    s.Require().NoError(err)
+    s.Equal("feature-branch", status.Branch)
+    
+    // Test navigation to worktree
+    navReq := &ResolvePathRequest{
+        Target:  "feature-branch",
+        Context: req.Context,
+    }
+    
+    resolution, err := s.navService.ResolvePath(context.Background(), navReq)
+    s.Require().NoError(err)
+    s.Equal(worktree.Path, resolution.ResolvedPath)
+}
+```
+
+### Error Scenario Testing
+
+Service layer SHALL include comprehensive error scenario testing:
+
+```go
+// test/integration/service_errors_test.go
+package integration
+
+func (s *ServiceIntegrationSuite) TestWorktreeCreationErrors() {
+    testCases := []struct {
+        name         string
+        request      *CreateWorktreeRequest
+        expectError  string
+        errorType    error
+    }{
+        {
+            name: "duplicate worktree",
+            request: &CreateWorktreeRequest{
+                ProjectName: "test-project",
+                BranchName:  "main", // Already exists
+                Context: &domain.Context{
+                    Type: domain.ContextOutsideGit,
+                },
+            },
+            expectError: "worktree already exists",
+            errorType:   &domain.WorktreeExistsError{},
+        },
+        {
+            name: "invalid project",
+            request: &CreateWorktreeRequest{
+                ProjectName: "nonexistent-project",
+                BranchName:  "feature",
+                Context: &domain.Context{
+                    Type: domain.ContextOutsideGit,
+                },
+            },
+            expectError: "project not found",
+            errorType:   &domain.ProjectNotFoundError{},
+        },
+        {
+            name: "unsafe operation - dirty worktree",
+            request: &DeleteWorktreeRequest{
+                ProjectName:  "test-project",
+                BranchName:   "feature-branch",
+                WorktreePath: s.tempDir + "/worktrees/feature-branch",
+                Force:        false,
+                Context: &domain.Context{
+                    Type: domain.ContextWorktree,
+                },
+            },
+            expectError: "worktree has uncommitted changes",
+            errorType:   &domain.UnsafeOperationError{},
+        },
+    }
+    
+    for _, tc := range testCases {
+        s.Run(tc.name, func() {
+            // Setup dirty worktree for delete test
+            if tc.request.WorktreePath != "" {
+                s.gitHelper.CreateDirtyWorktree(tc.request.WorktreePath)
+            }
+            
+            var err error
+            switch req := tc.request.(type) {
+            case *CreateWorktreeRequest:
+                _, err = s.worktreeService.CreateWorktree(context.Background(), req)
+            case *DeleteWorktreeRequest:
+                err = s.worktreeService.DeleteWorktree(context.Background(), req)
+            }
+            
+            s.Error(err)
+            s.Contains(err.Error(), tc.expectError)
+            
+            // Check error type
+            s.IsType(tc.errorType, err)
+        })
+    }
+}
+```
+
+### Service Coordination Tests
+
+Tests SHALL verify services work together correctly:
+
+```go
+// test/integration/service_coordination_test.go
+package integration
+
+func (s *ServiceIntegrationSuite) TestProjectWorktreeCoordination() {
+    // Create project with multiple worktrees
+    project, err := s.projectService.DiscoverProject(
+        context.Background(), 
+        "test-project", 
+        &domain.Context{Type: domain.ContextOutsideGit},
+    )
+    s.Require().NoError(err)
+    
+    // Create multiple worktrees
+    branches := []string{"feature-a", "feature-b", "feature-c"}
+    for _, branch := range branches {
+        req := &CreateWorktreeRequest{
+            ProjectName:  project.Name,
+            BranchName:   branch,
+            SourceBranch: "main",
+            Context: &domain.Context{
+                Type:       domain.ContextProject,
+                ProjectName: project.Name,
+            },
+        }
+        
+        _, err := s.worktreeService.CreateWorktree(context.Background(), req)
+        s.Require().NoError(err)
+    }
+    
+    // List all worktrees for project
+    listReq := &ListWorktreesRequest{
+        ProjectName: project.Name,
+        AllProjects: false,
+        Context: &domain.Context{
+            Type:       domain.ContextProject,
+            ProjectName: project.Name,
+        },
+    }
+    
+    worktrees, err := s.worktreeService.ListWorktrees(context.Background(), listReq)
+    s.Require().NoError(err)
+    s.Len(worktrees, len(branches)+1) // +1 for main branch
+    
+    // Test navigation to each worktree
+    for _, worktree := range worktrees {
+        navReq := &ResolvePathRequest{
+            Target:  worktree.Branch,
+            Context: &domain.Context{
+                Type:       domain.ContextProject,
+                ProjectName: project.Name,
+            },
+        }
+        
+        resolution, err := s.navService.ResolvePath(context.Background(), navReq)
+        s.Require().NoError(err)
+        s.Equal(worktree.Path, resolution.ResolvedPath)
+    }
+}
+```
+
+### Mock Service Implementations
+
+Mock services SHALL be provided for unit testing:
+
+```go
+// test/mocks/services/worktree_service_mock.go
+package mocks
+
+import (
+    "context"
+    "github.com/stretchr/testify/mock"
+    "github.com/twiggit/twiggit/internal/domain"
+    "github.com/twiggit/twiggit/internal/services"
+)
+
+type MockWorktreeService struct {
+    mock.Mock
+}
+
+func (m *MockWorktreeService) CreateWorktree(ctx context.Context, req *CreateWorktreeRequest) (*WorktreeInfo, error) {
+    args := m.Called(ctx, req)
+    return args.Get(0).(*WorktreeInfo), args.Error(1)
+}
+
+func (m *MockWorktreeService) DeleteWorktree(ctx context.Context, req *DeleteWorktreeRequest) error {
+    args := m.Called(ctx, req)
+    return args.Error(0)
+}
+
+func (m *MockWorktreeService) ListWorktrees(ctx context.Context, req *ListWorktreesRequest) ([]*WorktreeInfo, error) {
+    args := m.Called(ctx, req)
+    return args.Get(0).([]*WorktreeInfo), args.Error(1)
+}
+
+func (m *MockWorktreeService) GetWorktreeStatus(ctx context.Context, worktreePath string) (*WorktreeStatus, error) {
+    args := m.Called(ctx, worktreePath)
+    return args.Get(0).(*WorktreeStatus), args.Error(1)
+}
+
+func (m *MockWorktreeService) ValidateWorktree(ctx context.Context, worktreePath string) error {
+    args := m.Called(ctx, worktreePath)
+    return args.Error(0)
+}
+
+// Mock setup helpers
+func (m *MockWorktreeService) SetupCreateWorktreeSuccess(projectName, branchName string) {
+    worktree := &WorktreeInfo{
+        Path:   "/test/worktrees/" + projectName + "/" + branchName,
+        Branch: branchName,
+    }
+    
+    m.On("CreateWorktree", mock.Anything, mock.MatchedBy(func(req *CreateWorktreeRequest) bool {
+        return req.ProjectName == projectName && req.BranchName == branchName
+    })).Return(worktree, nil)
+}
+
+func (m *MockWorktreeService) SetupCreateWorktreeError(projectName, branchName, errorMsg string) {
+    m.On("CreateWorktree", mock.Anything, mock.MatchedBy(func(req *CreateWorktreeRequest) bool {
+        return req.ProjectName == projectName && req.BranchName == branchName
+    })).Return(nil, fmt.Errorf(errorMsg))
+}
+```
+
 ## Quality Gates
 
 > ">80% coverage enforced in CI" - testing.md:85
 
 1. **Coverage**: Minimum 80% code coverage
 2. **Performance**: Operations complete within specified time limits
+3. **Service Integration**: All service coordination tests pass
+4. **Error Scenarios**: Comprehensive error scenario coverage
+5. **Mock Coverage**: All service interfaces have mock implementations
 3. **Compatibility**: All supported shells work correctly
 4. **Hybrid Testing**: Both git implementations produce identical results
 5. **CI Integration**: All tests pass in CI environment

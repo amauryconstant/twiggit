@@ -195,11 +195,9 @@ var createCmd = &cobra.Command{
             return fmt.Errorf("failed to create worktree: %w", err)
         }
         
-        // Handle --cd flag
+        // Handle --cd flag - output path for shell wrapper (Phase 07)
         if createCd {
-            if err := changeToWorktree(worktree.Path); err != nil {
-                return fmt.Errorf("failed to change directory: %w", err)
-            }
+            fmt.Println(worktree.Path)
         }
         
         fmt.Printf("Created worktree: %s\n", worktree.Path)
@@ -266,10 +264,8 @@ var cdCmd = &cobra.Command{
             return fmt.Errorf("failed to get worktree: %w", err)
         }
         
-        // Change directory with shell integration
-        if err := changeToWorktree(worktree.Path); err != nil {
-            return fmt.Errorf("failed to change directory: %w", err)
-        }
+        // Output target path for shell wrapper consumption (Phase 07)
+        fmt.Println(worktree.Path)
         
         return nil
     },
@@ -641,6 +637,221 @@ import (
 5. Integration with services layer
 6. Comprehensive test coverage
 7. Documentation and help text complete
+
+## Service Integration Patterns
+
+### WorktreeService Integration
+
+The WorktreeService provides the core worktree operations that CLI commands SHALL use:
+
+```go
+// Service integration pattern for worktree operations
+type WorktreeService interface {
+    CreateWorktree(ctx context.Context, req *CreateWorktreeRequest) (*WorktreeInfo, error)
+    DeleteWorktree(ctx context.Context, req *DeleteWorktreeRequest) error
+    ListWorktrees(ctx context.Context, req *ListWorktreesRequest) ([]*WorktreeInfo, error)
+    GetWorktreeStatus(ctx context.Context, worktreePath string) (*WorktreeStatus, error)
+    ValidateWorktree(ctx context.Context, worktreePath string) error
+}
+
+// CLI command integration example
+func (cmd *createCmd) runWorktreeCreation(args []string) error {
+    // Build request from CLI arguments and flags
+    req := &CreateWorktreeRequest{
+        ProjectName:  cmd.parseProject(args[0]),
+        BranchName:   cmd.parseBranch(args[0]),
+        SourceBranch: cmd.sourceFlag,
+        ChangeDir:    cmd.cdFlag,
+        Force:        cmd.forceFlag,
+        Context:      cmd.detectContext(),
+    }
+    
+    // Call service
+    result, err := cmd.worktreeService.CreateWorktree(context.Background(), req)
+    if err != nil {
+        return fmt.Errorf("create worktree failed: %w", err)
+    }
+    
+    // Handle --cd flag output
+    if req.ChangeDir {
+        fmt.Println(result.Path)
+    }
+    
+    return nil
+}
+```
+
+### ProjectService Integration
+
+The ProjectService provides project discovery and validation:
+
+```go
+// Service integration pattern for project operations
+type ProjectService interface {
+    DiscoverProject(ctx context.Context, projectName string, context *domain.Context) (*ProjectInfo, error)
+    ValidateProject(ctx context.Context, projectPath string) error
+    ListProjects(ctx context.Context) ([]*ProjectInfo, error)
+    GetProjectInfo(ctx context.Context, projectPath string) (*ProjectInfo, error)
+}
+
+// CLI command integration example
+func (cmd *listCmd) resolveProjectScope() (*ProjectInfo, error) {
+    if cmd.allFlag {
+        return nil, nil // List all projects
+    }
+    
+    if cmd.projectFlag != "" {
+        return cmd.projectService.DiscoverProject(
+            context.Background(), 
+            cmd.projectFlag, 
+            cmd.currentContext,
+        )
+    }
+    
+    // Use context to infer project
+    return cmd.projectService.DiscoverProject(
+        context.Background(), 
+        "", 
+        cmd.currentContext,
+    )
+}
+```
+
+### NavigationService Integration
+
+The NavigationService provides path resolution for the `cd` command:
+
+```go
+// Service integration pattern for navigation operations
+type NavigationService interface {
+    ResolvePath(ctx context.Context, req *ResolvePathRequest) (*domain.ResolutionResult, error)
+    ValidatePath(ctx context.Context, path string) error
+    GetNavigationSuggestions(ctx context.Context, context *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error)
+}
+
+// CLI command integration example
+func (cmd *cdCmd) resolveTarget(target string) (string, error) {
+    req := &ResolvePathRequest{
+        Target:      target,
+        Context:     cmd.currentContext,
+        CurrentPath: cmd.originalPath,
+    }
+    
+    result, err := cmd.navigationService.ResolvePath(context.Background(), req)
+    if err != nil {
+        return "", fmt.Errorf("path resolution failed: %w", err)
+    }
+    
+    return result.ResolvedPath, nil
+}
+```
+
+## Context-Aware Command Behavior
+
+### Context Detection Integration
+
+All CLI commands SHALL detect context before execution:
+
+```go
+// Context detection pattern for CLI commands
+func (cmd *BaseCommand) detectContext() (*domain.Context, error) {
+    context, err := cmd.contextService.GetCurrentContext()
+    if err != nil {
+        return nil, fmt.Errorf("context detection failed: %w", err)
+    }
+    
+    // Store for command use
+    cmd.currentContext = context
+    return context, nil
+}
+
+// Context-aware help adaptation
+func (cmd *BaseCommand) adaptHelpText() {
+    switch cmd.currentContext.Type {
+    case domain.ContextProject:
+        cmd.Short = fmt.Sprintf("%s (project: %s)", cmd.baseShort, cmd.currentContext.ProjectName)
+    case domain.ContextWorktree:
+        cmd.Short = fmt.Sprintf("%s (worktree: %s/%s)", cmd.baseShort, cmd.currentContext.ProjectName, cmd.currentContext.BranchName)
+    case domain.ContextOutsideGit:
+        cmd.Short = fmt.Sprintf("%s (outside git)", cmd.baseShort)
+    }
+}
+```
+
+### Request Adaptation Patterns
+
+Commands SHALL adapt their requests based on detected context:
+
+```go
+// Context-aware request adaptation
+func (cmd *createCmd) adaptRequest(req *CreateWorktreeRequest) *CreateWorktreeRequest {
+    switch cmd.currentContext.Type {
+    case domain.ContextProject:
+        // Infer project from context if not specified
+        if req.ProjectName == "" {
+            req.ProjectName = cmd.currentContext.ProjectName
+        }
+    case domain.ContextWorktree:
+        // Infer project from current worktree
+        if req.ProjectName == "" {
+            req.ProjectName = cmd.currentContext.ProjectName
+        }
+        // Default source to current branch if not specified
+        if req.SourceBranch == "" {
+            req.SourceBranch = cmd.currentContext.BranchName
+        }
+    }
+    
+    return req
+}
+```
+
+## Validation and Error Handling
+
+### Command-Level Validation
+
+CLI commands SHALL perform validation before calling services:
+
+```go
+// Command validation pattern
+func (cmd *createCmd) validateArgs(args []string) error {
+    if len(args) != 1 {
+        return fmt.Errorf("create requires exactly one argument: <project>/<branch>")
+    }
+    
+    parts := strings.Split(args[0], "/")
+    if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+        return fmt.Errorf("invalid format: expected <project>/<branch>, got %s", args[0])
+    }
+    
+    // Validate branch name
+    if strings.HasPrefix(parts[1], "-") {
+        return fmt.Errorf("branch name cannot start with '-'")
+    }
+    
+    return nil
+}
+```
+
+### Error Response Formatting
+
+Commands SHALL format service errors for CLI display:
+
+```go
+// Error formatting for CLI
+func (cmd *BaseCommand) formatServiceError(err error) error {
+    switch e := err.(type) {
+    case *domain.WorktreeExistsError:
+        return fmt.Errorf("worktree already exists at %s. Use --force to override", e.Path)
+    case *domain.ProjectNotFoundError:
+        return fmt.Errorf("project '%s' not found. Check project name or context", e.Name)
+    case *domain.UnsafeOperationError:
+        return fmt.Errorf("unsafe operation: %s. Use --force to override", e.Reason)
+    default:
+        return fmt.Errorf("operation failed: %w", err)
+    }
+}
+```
 
 ## Next Steps
 
