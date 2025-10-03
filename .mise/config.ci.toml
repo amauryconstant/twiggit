@@ -1,5 +1,5 @@
 [tools]
-ginkgo="2.25.0"
+ginkgo="2.26.0"
 "go:github.com/boumenot/gocover-cobertura"="1.4.0"
 "go:github.com/cybusio/gocovmerge"="1.0.1"
 

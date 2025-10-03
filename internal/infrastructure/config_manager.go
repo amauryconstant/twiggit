@@ -55,6 +55,12 @@ func copyConfig(config *domain.Config) *domain.Config {
 		ProjectsDirectory:   config.ProjectsDirectory,
 		WorktreesDirectory:  config.WorktreesDirectory,
 		DefaultSourceBranch: config.DefaultSourceBranch,
+		ContextDetection:    config.ContextDetection,
+		Git:                 config.Git,
+		Services:            config.Services,
+		Validation:          config.Validation,
+		Navigation:          config.Navigation,
+		Shell:               config.Shell,
 	}
 }
 
@@ -125,6 +131,24 @@ func (m *koanfConfigManager) loadDefaults() {
 	}
 	if err := m.ko.Set("default_source_branch", defaults.DefaultSourceBranch); err != nil {
 		panic(fmt.Errorf("failed to set default_source_branch default: %w", err))
+	}
+
+	// Set nested structure defaults
+	if err := m.ko.Set("context_detection.cache_ttl", defaults.ContextDetection.CacheTTL); err != nil {
+		panic(fmt.Errorf("failed to set context_detection.cache_ttl default: %w", err))
+	}
+	if err := m.ko.Set("context_detection.git_operation_timeout", defaults.ContextDetection.GitOperationTimeout); err != nil {
+		panic(fmt.Errorf("failed to set context_detection.git_operation_timeout default: %w", err))
+	}
+	if err := m.ko.Set("context_detection.enable_git_validation", defaults.ContextDetection.EnableGitValidation); err != nil {
+		panic(fmt.Errorf("failed to set context_detection.enable_git_validation default: %w", err))
+	}
+
+	if err := m.ko.Set("git.cli_timeout", defaults.Git.CLITimeout); err != nil {
+		panic(fmt.Errorf("failed to set git.cli_timeout default: %w", err))
+	}
+	if err := m.ko.Set("git.cache_enabled", defaults.Git.CacheEnabled); err != nil {
+		panic(fmt.Errorf("failed to set git.cache_enabled default: %w", err))
 	}
 }
 

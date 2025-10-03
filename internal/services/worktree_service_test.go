@@ -298,3 +298,23 @@ func setupTestWorktreeService() application.WorktreeService {
 
 	return NewWorktreeService(gitService, projectService, config)
 }
+
+func TestWorktreeService_DeleteWorktree_Idempotent(t *testing.T) {
+	// Test that deleting a non-existent worktree succeeds (idempotent behavior)
+	t.Run("non-existent worktree should succeed", func(t *testing.T) {
+		service := setupTestWorktreeService()
+
+		request := &domain.DeleteWorktreeRequest{
+			WorktreePath: "/non/existent/worktree",
+			Force:        false,
+			Context: &domain.Context{
+				Type: domain.ContextOutsideGit,
+			},
+		}
+
+		err := service.DeleteWorktree(context.Background(), request)
+
+		// Desired behavior: Deleting a non-existent worktree should succeed (idempotent)
+		require.NoError(t, err, "DeleteWorktree should be idempotent and succeed for non-existent worktrees")
+	})
+}

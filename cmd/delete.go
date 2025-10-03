@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"twiggit/internal/domain"
@@ -53,11 +54,23 @@ func executeDelete(config *CommandConfig, target string, force, _ bool) error {
 	if !force {
 		status, err := config.Services.WorktreeService.GetWorktreeStatus(ctx, worktreePath)
 		if err != nil {
-			return fmt.Errorf("failed to get worktree status: %w", err)
-		}
-
-		if !status.IsClean {
-			return errors.New("worktree has uncommitted changes (use --force to override)")
+			// If worktree doesn't exist, we can proceed with deletion (idempotent)
+			// Be more specific about what constitutes "doesn't exist"
+			errStr := err.Error()
+			if strings.Contains(errStr, "worktree not found") ||
+				strings.Contains(errStr, "invalid git repository") ||
+				strings.Contains(errStr, "repository does not exist") ||
+				strings.Contains(errStr, "no such file or directory") {
+				// Worktree doesn't exist, proceed to deletion
+				return nil
+			}
+			// For other errors (like HEAD reference issues), we should try to delete anyway
+			// since the worktree might exist but be in a broken state
+		} else {
+			// Worktree exists, check if it's clean
+			if !status.IsClean {
+				return errors.New("worktree has uncommitted changes (use --force to override)")
+			}
 		}
 	}
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"twiggit/internal/application"
@@ -70,6 +71,10 @@ func (s *worktreeService) DeleteWorktree(ctx context.Context, req *domain.Delete
 	// Find the project that contains this worktree
 	project, err := s.findProjectByWorktree(ctx, req.WorktreePath)
 	if err != nil {
+		// If worktree is not found in any project, consider it already deleted (idempotent)
+		if strings.Contains(err.Error(), "worktree not found in any project") {
+			return nil
+		}
 		return fmt.Errorf("failed to find project for worktree: %w", err)
 	}
 

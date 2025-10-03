@@ -1,7 +1,7 @@
 [tools]
 go = "1.25.1"
 golangci-lint = "latest"
-ginkgo="latest"
+"go:github.com/onsi/ginkgo/v2/ginkgo" = "latest"
 
 [tasks."test"]
 description = "Run all tests"
