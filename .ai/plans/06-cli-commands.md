@@ -2,862 +2,710 @@
 
 ## Overview
 
-This plan implements the user-facing CLI commands layer using the Cobra framework, providing a clean interface to the underlying services while maintaining context awareness and consistent user experience.
+This plan implements the user-facing CLI commands layer using the Cobra framework with strict TDD principles and functional programming patterns. The commands layer provides pure function wrappers around existing services while maintaining context awareness and consistent user experience.
 
-## Context from Previous Layers
+**Context**: Foundation, configuration, context detection, hybrid git, and core services layers are established. This layer provides the thin orchestration that connects user input to service operations.
 
-> From technology.md: "Cobra for CLI structure - provides consistent command structure, flag handling, and help generation"
+## Foundation Principles
 
-> From design.md: "Core commands: list, create, cd, delete, setup-shell, context, help. Context-aware command behavior based on detected context"
+### TDD Approach
+- **Test First**: Write failing tests, then implement minimal code to pass
+- **Red-Green-Refactor**: Follow strict TDD cycle for each command
+- **Minimal Implementation**: Implement only what's needed to pass current tests
+- **Command Contracts**: Test command interfaces before implementation
 
-> From implementation.md: "Error handling with POSIX exit codes. Commands should be thin wrappers around services"
+### Functional Programming Principles
+- **Pure Functions**: Command operations SHALL be pure functions without side effects
+- **Immutability**: Command configuration SHALL be immutable
+- **Function Composition**: Complex commands SHALL be composed from smaller functions
+- **Error Handling**: SHALL use explicit error returns for predictable flow
 
-## Architecture
+### Clean Architecture
+- **Thin Wrappers**: Commands delegate to services, don't contain business logic
+- **Dependency Injection**: All services SHALL be injected via interfaces
+- **Context-Aware**: Behavior SHALL adapt based on detected context
+- **Command Segregation**: Each command SHALL have a single, focused responsibility
 
-### Directory Structure
+## Phase Boundaries
+
+### Phase 6 Scope
+- Command interfaces with Cobra integration
+- Basic command implementations with service injection
+- Unit testing for command contracts
+- Quality assurance configuration
+- Functional programming patterns
+
+### Deferred to Later Phases
+- Shell integration commands (Phase 7)
+- Performance optimization and caching (Phase 9)
+- Advanced error recovery patterns (Phase 9)
+- Integration/E2E testing (Phase 8)
+
+## Project Structure
+
+Phase 6 minimal structure following Go standards:
+
 ```
 cmd/
-├── root.go              # Root command and global flags
+├── root.go              # Root command and global configuration
 ├── list.go              # list command implementation
 ├── create.go            # create command implementation
-├── cd.go                # cd command implementation
 ├── delete.go            # delete command implementation
-├── setup_shell.go       # setup-shell command implementation
-└── context.go           # context command implementation
+├── cd.go                # cd command implementation
+└── command_test.go      # Command contract tests
 ```
 
-### Command Design Principles
-1. **Thin wrappers**: Commands delegate to services layer
-2. **Context awareness**: Detect context before execution
-3. **Consistent flags**: Standard flag set across commands
-4. **Error handling**: POSIX exit codes with clear messages
-5. **Help adaptation**: Context-sensitive help text
+**Removed from Phase 6** (deferred to later phases):
+- Shell integration commands → Phase 7
+- Auto-completion with Carapace → Phase 7
+- Advanced help customization → Phase 9
+- Integration test fixtures → Phase 8
 
 ## Implementation Steps
 
-### Step 1: Root Command and Global Configuration
+### Step 1: Command Interfaces and Contracts
 
-**File**: `cmd/root.go`
+**Files to create:**
+- `cmd/root.go` (extend existing)
+- `cmd/command_test.go`
 
-**Requirements**:
-- Global flags: --dry-run, --explain, --verbose, --config
-- Version information
-- Context detection integration
-- Dependency injection setup
+**Tests first:** `cmd/command_test.go`
 
-**Code Structure**:
 ```go
-package cmd
-
-import (
-    "fmt"
-    "os"
+func TestCommandInterfaces_ContractCompliance(t *testing.T) {
+    testCases := []struct {
+        name        string
+        command     *cobra.Command
+        expectError bool
+        setupFunc   func() *cobra.Command
+    }{
+        {
+            name:      "list command interface compliance",
+            setupFunc: setupListCommand,
+            expectError: false,
+        },
+        {
+            name:      "create command interface compliance", 
+            setupFunc: setupCreateCommand,
+            expectError: false,
+        },
+        {
+            name:      "delete command interface compliance",
+            setupFunc: setupDeleteCommand,
+            expectError: false,
+        },
+        {
+            name:      "cd command interface compliance",
+            setupFunc: setupCDCommand,
+            expectError: false,
+        },
+    }
     
-    "github.com/spf13/cobra"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-type GlobalOptions struct {
-    DryRun  bool
-    Explain bool
-    Verbose bool
-    Config  string
-}
-
-var globalOpts = &GlobalOptions{}
-
-var rootCmd = &cobra.Command{
-    Use:   "twiggit",
-    Short: "Pragmatic git worktree management tool",
-    Long:  `Twiggit manages git worktrees with focus on rebase workflows.`,
-    Version: "v1.0.0",
-    PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-        // Context detection before any command
-        // Service initialization
-        // Configuration loading
-        return nil
-    },
-}
-
-func Execute() {
-    if err := rootCmd.Execute(); err != nil {
-        os.Exit(1)
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            cmd := tc.setupFunc()
+            assert.NotNil(t, cmd)
+            assert.NotEmpty(t, cmd.Use)
+            assert.NotEmpty(t, cmd.Short)
+            assert.NotNil(t, cmd.RunE)
+        })
     }
 }
+```
 
-func init() {
-    // Global flags
-    rootCmd.PersistentFlags().BoolVar(&globalOpts.DryRun, "dry-run", false, "Show what would be done without executing")
-    rootCmd.PersistentFlags().BoolVar(&globalOpts.Explain, "explain", false, "Explain the reasoning behind decisions")
-    rootCmd.PersistentFlags().BoolVar(&globalOpts.Verbose, "verbose", false, "Enable verbose output")
-    rootCmd.PersistentFlags().StringVar(&globalOpts.Config, "config", "", "Path to configuration file")
+**Interface definitions:**
+```go
+// cmd/root.go (extend existing)
+type CommandConfig struct {
+    Services *ServiceContainer
+    Config   *domain.Config
 }
+
+type ServiceContainer struct {
+    WorktreeService  services.WorktreeService
+    ProjectService   services.ProjectService
+    NavigationService services.NavigationService
+    ContextService   services.ContextService
+}
+
+func NewRootCommand(config *CommandConfig) *cobra.Command
+func initializeContext(cmd *cobra.Command, config *CommandConfig) error
 ```
 
 ### Step 2: List Command Implementation
 
-**File**: `cmd/list.go`
+**Tests first:** `cmd/list_test.go`
 
-**Requirements from design.md**:
-- "tabular format, context-aware scope, --all flag for unlimited display"
-
-**Code Structure**:
 ```go
-package cmd
-
-import (
-    "fmt"
-    "github.com/spf13/cobra"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-var listAll bool
-
-var listCmd = &cobra.Command{
-    Use:   "list",
-    Short: "List worktrees",
-    Long:  `List worktrees in tabular format with context-aware scope.`,
-    RunE: func(cmd *cobra.Command, args []string) error {
-        // Get services from dependency injection
-        worktreeService := services.GetWorktreeService()
-        contextService := services.GetContextService()
-        
-        // Detect current context
-        ctx, err := contextService.DetectContext()
-        if err != nil {
-            return fmt.Errorf("context detection failed: %w", err)
-        }
-        
-        // List worktrees with context awareness
-        worktrees, err := worktreeService.ListWorktrees(ctx, listAll)
-        if err != nil {
-            return fmt.Errorf("failed to list worktrees: %w", err)
-        }
-        
-        // Display in tabular format
-        displayWorktrees(worktrees, globalOpts.Verbose)
-        return nil
-    },
+func TestListCommand_Execute(t *testing.T) {
+    testCases := []struct {
+        name         string
+        args         []string
+        flags        map[string]string
+        setupContext func(*services.MockWorktreeService, *services.MockContextService)
+        expectError  bool
+        errorMessage string
+        validateOut  func(string) bool
+    }{
+        {
+            name: "list worktrees in project context",
+            args: []string{},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{
+                    Type:       domain.ContextProject,
+                    ProjectName: "test-project",
+                }, nil)
+                mockWS.EXPECT().ListWorktrees(gomock.Any(), &services.ListWorktreesRequest{
+                    ProjectName: "test-project",
+                    All:         false,
+                }).Return([]*domain.WorktreeInfo{
+                    {Path: "/home/user/Worktrees/test-project/main", Branch: "main"},
+                    {Path: "/home/user/Worktrees/test-project/feature", Branch: "feature"},
+                }, nil)
+            },
+            expectError: false,
+            validateOut: func(output string) bool {
+                return strings.Contains(output, "main") && strings.Contains(output, "feature")
+            },
+        },
+        {
+            name: "list all worktrees with --all flag",
+            args: []string{"--all"},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{
+                    Type: domain.ContextOutsideGit,
+                }, nil)
+                mockWS.EXPECT().ListWorktrees(gomock.Any(), &services.ListWorktreesRequest{
+                    All: true,
+                }).Return([]*domain.WorktreeInfo{}, nil)
+            },
+            expectError: false,
+        },
+        {
+            name: "context detection failure",
+            args: []string{},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(nil, fmt.Errorf("detection failed"))
+            },
+            expectError:  true,
+            errorMessage: "context detection failed",
+        },
+    }
+    
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            // Setup mocks and execute command
+            ctrl := gomock.NewController(t)
+            defer ctrl.Finish()
+            
+            mockWS := services.NewMockWorktreeService(ctrl)
+            mockCS := services.NewMockContextService(ctrl)
+            
+            tc.setupContext(mockWS, mockCS)
+            
+            config := &CommandConfig{
+                Services: &ServiceContainer{
+                    WorktreeService: mockWS,
+                    ContextService:  mockCS,
+                },
+            }
+            
+            cmd := NewListCommand(config)
+            cmd.SetArgs(tc.args)
+            
+            var buf bytes.Buffer
+            cmd.SetOut(&buf)
+            err := cmd.Execute()
+            
+            // Validate results
+            if tc.expectError {
+                assert.Error(t, err)
+                if tc.errorMessage != "" {
+                    assert.Contains(t, err.Error(), tc.errorMessage)
+                }
+            } else {
+                assert.NoError(t, err)
+                if tc.validateOut != nil {
+                    assert.True(t, tc.validateOut(buf.String()))
+                }
+            }
+        })
+    }
 }
+```
 
-func init() {
-    rootCmd.AddCommand(listCmd)
-    listCmd.Flags().BoolVar(&listAll, "all", false, "Show unlimited worktrees without pagination")
-}
+**Implementation sketch:**
+```go
+// cmd/list.go
+func NewListCommand(config *CommandConfig) *cobra.Command
+func executeList(config *CommandConfig, all bool) error
+func displayWorktrees(worktrees []*domain.WorktreeInfo)
 ```
 
 ### Step 3: Create Command Implementation
 
-**File**: `cmd/create.go`
+**Tests first:** `cmd/create_test.go`
 
-**Requirements from design.md**:
-- "<project>/<branch> format, --source flag, --cd flag, context-aware project inference"
-
-**Code Structure**:
 ```go
-package cmd
-
-import (
-    "fmt"
-    "github.com/spf13/cobra"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-var (
-    createSource string
-    createCd     bool
-)
-
-var createCmd = &cobra.Command{
-    Use:   "create <project>/<branch>",
-    Short: "Create a new worktree",
-    Long:  `Create a new worktree with project/branch format and context-aware project inference.`,
-    Args:  cobra.ExactArgs(1),
-    RunE: func(cmd *cobra.Command, args []string) error {
-        worktreeService := services.GetWorktreeService()
-        contextService := services.GetContextService()
-        
-        // Detect context for project inference
-        ctx, err := contextService.DetectContext()
-        if err != nil {
-            return fmt.Errorf("context detection failed: %w", err)
-        }
-        
-        // Parse project/branch specification
-        project, branch, err := parseProjectBranch(args[0], ctx)
-        if err != nil {
-            return fmt.Errorf("invalid project/branch format: %w", err)
-        }
-        
-        // Create worktree
-        worktree, err := worktreeService.CreateWorktree(ctx, project, branch, createSource)
-        if err != nil {
-            return fmt.Errorf("failed to create worktree: %w", err)
-        }
-        
-        // Handle --cd flag - output path for shell wrapper (Phase 07)
-        if createCd {
-            fmt.Println(worktree.Path)
-        }
-        
-        fmt.Printf("Created worktree: %s\n", worktree.Path)
-        return nil
-    },
-}
-
-func init() {
-    rootCmd.AddCommand(createCmd)
-    createCmd.Flags().StringVar(&createSource, "source", "", "Source branch or commit")
-    createCmd.Flags().BoolVar(&createCd, "cd", false, "Change to worktree directory after creation")
-}
-```
-
-### Step 4: CD Command Implementation
-
-**File**: `cmd/cd.go`
-
-**Requirements from design.md**:
-- "target resolution with context awareness, shell integration support"
-
-**Code Structure**:
-```go
-package cmd
-
-import (
-    "fmt"
-    "github.com/spf13/cobra"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-var cdCmd = &cobra.Command{
-    Use:   "cd [target]",
-    Short: "Change to worktree directory",
-    Long:  `Change to worktree directory with context-aware target resolution.`,
-    Args:  cobra.MaximumNArgs(1),
-    RunE: func(cmd *cobra.Command, args []string) error {
-        worktreeService := services.GetWorktreeService()
-        contextService := services.GetContextService()
-        
-        // Detect context for target resolution
-        ctx, err := contextService.DetectContext()
-        if err != nil {
-            return fmt.Errorf("context detection failed: %w", err)
-        }
-        
-        var target string
-        if len(args) > 0 {
-            target = args[0]
-        } else {
-            // Use context-aware default
-            target = ctx.DefaultWorktree
-        }
-        
-        // Resolve target identifier using context service
-        resolution, err := contextService.ResolveIdentifier(ctx, target)
-        if err != nil {
-            return fmt.Errorf("failed to resolve target: %w", err)
-        }
-        
-        // Get worktree from resolution
-        worktree, err := worktreeService.GetWorktree(resolution.WorktreePath)
-        if err != nil {
-            return fmt.Errorf("failed to get worktree: %w", err)
-        }
-        
-        // Output target path for shell wrapper consumption (Phase 07)
-        fmt.Println(worktree.Path)
-        
-        return nil
-    },
-}
-
-func init() {
-    rootCmd.AddCommand(cdCmd)
-}
-```
-
-### Step 5: Delete Command Implementation
-
-**File**: `cmd/delete.go`
-
-**Requirements from design.md**:
-- "safety checks, --force flag, --keep-branch option"
-
-**Code Structure**:
-```go
-package cmd
-
-import (
-    "fmt"
-    "github.com/spf13/cobra"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-var (
-    deleteForce     bool
-    deleteKeepBranch bool
-)
-
-var deleteCmd = &cobra.Command{
-    Use:   "delete <worktree>",
-    Short: "Delete a worktree",
-    Long:  `Delete a worktree with safety checks and branch preservation options.`,
-    Args:  cobra.ExactArgs(1),
-    RunE: func(cmd *cobra.Command, args []string) error {
-        worktreeService := services.GetWorktreeService()
-        contextService := services.GetContextService()
-        
-        // Detect context
-        ctx, err := contextService.DetectContext()
-        if err != nil {
-            return fmt.Errorf("context detection failed: %w", err)
-        }
-        
-        // Resolve target identifier using context service
-        resolution, err := contextService.ResolveIdentifier(ctx, args[0])
-        if err != nil {
-            return fmt.Errorf("failed to resolve target: %w", err)
-        }
-        
-        // Get worktree from resolution
-        worktree, err := worktreeService.GetWorktree(resolution.WorktreePath)
-        if err != nil {
-            return fmt.Errorf("failed to get worktree: %w", err)
-        }
-        
-        // Safety checks
-        if !deleteForce {
-            if err := confirmDeletion(worktree); err != nil {
-                return err
+func TestCreateCommand_Execute(t *testing.T) {
+    testCases := []struct {
+        name         string
+        args         []string
+        flags        map[string]string
+        setupContext func(*services.MockWorktreeService, *services.MockContextService, *services.MockProjectService)
+        expectError  bool
+        errorMessage string
+        validateOut  func(string) bool
+    }{
+        {
+            name: "create worktree with project/branch",
+            args: []string{"test-project/feature-branch"},
+            flags: map[string]string{"source": "main"},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService, mockPS *services.MockProjectService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{
+                    Type: domain.ContextOutsideGit,
+                }, nil)
+                mockPS.EXPECT().DiscoverProject(gomock.Any(), "test-project", gomock.Any()).Return(&domain.ProjectInfo{
+                    Name:        "test-project",
+                    GitRepoPath: "/home/user/Projects/test-project",
+                }, nil)
+                mockWS.EXPECT().CreateWorktree(gomock.Any(), &services.CreateWorktreeRequest{
+                    ProjectName:  "test-project",
+                    BranchName:   "feature-branch",
+                    SourceBranch: "main",
+                    Context:      gomock.Any(),
+                }).Return(&domain.WorktreeInfo{
+                    Path:   "/home/user/Worktrees/test-project/feature-branch",
+                    Branch: "feature-branch",
+                }, nil)
+            },
+            expectError: false,
+            validateOut: func(output string) bool {
+                return strings.Contains(output, "Created worktree")
+            },
+        },
+        {
+            name: "infer project from context",
+            args: []string{"feature-branch"},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService, mockPS *services.MockProjectService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{
+                    Type:       domain.ContextProject,
+                    ProjectName: "current-project",
+                }, nil)
+                mockPS.EXPECT().DiscoverProject(gomock.Any(), "current-project", gomock.Any()).Return(&domain.ProjectInfo{
+                    Name:        "current-project",
+                    GitRepoPath: "/home/user/Projects/current-project",
+                }, nil)
+                mockWS.EXPECT().CreateWorktree(gomock.Any(), &services.CreateWorktreeRequest{
+                    ProjectName:  "current-project",
+                    BranchName:   "feature-branch",
+                    SourceBranch: "main", // default
+                    Context:      gomock.Any(),
+                }).Return(&domain.WorktreeInfo{}, nil)
+            },
+            expectError: false,
+        },
+        {
+            name: "invalid project/branch format",
+            args: []string{"invalid-format"},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService, mockPS *services.MockProjectService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{
+                    Type: domain.ContextOutsideGit,
+                }, nil)
+            },
+            expectError:  true,
+            errorMessage: "invalid format: expected <project>/<branch>",
+        },
+    }
+    
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            // Setup mocks and execute command
+            ctrl := gomock.NewController(t)
+            defer ctrl.Finish()
+            
+            mockWS := services.NewMockWorktreeService(ctrl)
+            mockCS := services.NewMockContextService(ctrl)
+            mockPS := services.NewMockProjectService(ctrl)
+            
+            tc.setupContext(mockWS, mockCS, mockPS)
+            
+            config := &CommandConfig{
+                Services: &ServiceContainer{
+                    WorktreeService: mockWS,
+                    ContextService:  mockCS,
+                    ProjectService:  mockPS,
+                },
             }
-        }
-        
-        // Delete worktree
-        if err := worktreeService.DeleteWorktree(ctx, worktree, deleteKeepBranch); err != nil {
-            return fmt.Errorf("failed to delete worktree: %w", err)
-        }
-        
-        fmt.Printf("Deleted worktree: %s\n", worktree.Path)
-        return nil
-    },
-}
-
-func init() {
-    rootCmd.AddCommand(deleteCmd)
-    deleteCmd.Flags().BoolVar(&deleteForce, "force", false, "Skip safety checks")
-    deleteCmd.Flags().BoolVar(&deleteKeepBranch, "keep-branch", false, "Keep the branch after deletion")
-}
-```
-
-### Step 6: Setup-Shell Command Implementation
-
-**File**: `cmd/setup_shell.go`
-
-**Requirements from design.md**:
-- "alias generation, shell detection, configuration file modification"
-
-**Code Structure**:
-```go
-package cmd
-
-import (
-    "fmt"
-    "github.com/spf13/cobra"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-var setupShellCmd = &cobra.Command{
-    Use:   "setup-shell",
-    Short: "Setup shell integration",
-    Long:  `Setup shell integration with alias generation and configuration file modification.`,
-    RunE: func(cmd *cobra.Command, args []string) error {
-        shellService := services.GetShellService()
-        
-        // Detect current shell
-        shell, err := shellService.DetectShell()
-        if err != nil {
-            return fmt.Errorf("failed to detect shell: %w", err)
-        }
-        
-        // Generate aliases
-        aliases, err := shellService.GenerateAliases(shell)
-        if err != nil {
-            return fmt.Errorf("failed to generate aliases: %w", err)
-        }
-        
-        // Modify configuration file
-        if err := shellService.SetupShellIntegration(shell, aliases); err != nil {
-            return fmt.Errorf("failed to setup shell integration: %w", err)
-        }
-        
-        fmt.Printf("Shell integration setup complete for %s\n", shell)
-        fmt.Println("Restart your shell or run: source ~/.bashrc")
-        return nil
-    },
-}
-
-func init() {
-    rootCmd.AddCommand(setupShellCmd)
-}
-```
-
-### Step 7: Context Command Implementation
-
-**File**: `cmd/context.go`
-
-**Requirements from design.md**:
-- "context command for context inspection and --explain functionality"
-
-**Code Structure**:
-```go
-package cmd
-
-import (
-    "fmt"
-    "github.com/spf13/cobra"
-    "github.com/twiggit/twiggit/internal/services"
-)
-
-var contextCmd = &cobra.Command{
-    Use:   "context",
-    Short: "Show current context",
-    Long:  `Show current context and explain reasoning behind context detection.`,
-    RunE: func(cmd *cobra.Command, args []string) error {
-        contextService := services.GetContextService()
-        
-        // Detect context
-        ctx, err := contextService.DetectContext()
-        if err != nil {
-            return fmt.Errorf("context detection failed: %w", err)
-        }
-        
-        // Display context
-        displayContext(ctx, globalOpts.Explain, globalOpts.Verbose)
-        return nil
-    },
-}
-
-func init() {
-    rootCmd.AddCommand(contextCmd)
-}
-```
-
-## Common Utilities
-
-### Error Handling
-```go
-package cmd
-
-import (
-    "fmt"
-    "os"
-)
-
-// Exit codes following POSIX conventions
-const (
-    ExitSuccess = 0
-    ExitGeneral = 1
-    ExitUsage   = 2
-    ExitNoInput = 3
-)
-
-func handleError(err error, message string) {
-    if err != nil {
-        fmt.Fprintf(os.Stderr, "Error: %s: %v\n", message, err)
-        os.Exit(ExitGeneral)
-    }
-}
-
-func handleUsageError(message string) {
-    fmt.Fprintf(os.Stderr, "Usage Error: %s\n", message)
-    os.Exit(ExitUsage)
-}
-```
-
-### Display Utilities
-```go
-package cmd
-
-import (
-    "fmt"
-    "text/tabwriter"
-    "os"
-)
-
-func displayWorktrees(worktrees []Worktree, verbose bool) {
-    w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-    fmt.Fprintln(w, "PATH\tBRANCH\tPROJECT\tSTATUS")
-    
-    for _, wt := range worktrees {
-        status := "clean"
-        if wt.Dirty {
-            status = "dirty"
-        }
-        
-        fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", wt.Path, wt.Branch, wt.Project, status)
-    }
-    
-    w.Flush()
-}
-
-func displayContext(ctx Context, explain bool, verbose bool) {
-    fmt.Printf("Current Context:\n")
-    fmt.Printf("  Project: %s\n", ctx.Project)
-    fmt.Printf("  Branch: %s\n", ctx.Branch)
-    fmt.Printf("  Worktree: %s\n", ctx.Worktree)
-    
-    if explain {
-        fmt.Printf("\nExplanation:\n")
-        fmt.Printf("  %s\n", ctx.Explanation)
-    }
-    
-    if verbose {
-        fmt.Printf("\nVerbose Information:\n")
-        fmt.Printf("  Detection Method: %s\n", ctx.DetectionMethod)
-        fmt.Printf("  Confidence: %d\n", ctx.Confidence)
+            
+            cmd := NewCreateCommand(config)
+            cmd.SetArgs(tc.args)
+            
+            // Set flags
+            for flag, value := range tc.flags {
+                cmd.Flags().Set(flag, value)
+            }
+            
+            var buf bytes.Buffer
+            cmd.SetOut(&buf)
+            err := cmd.Execute()
+            
+            // Validate results
+            if tc.expectError {
+                assert.Error(t, err)
+                if tc.errorMessage != "" {
+                    assert.Contains(t, err.Error(), tc.errorMessage)
+                }
+            } else {
+                assert.NoError(t, err)
+                if tc.validateOut != nil {
+                    assert.True(t, tc.validateOut(buf.String()))
+                }
+            }
+        })
     }
 }
 ```
 
-## Integration Points
-
-### Services Integration
+**Implementation sketch:**
 ```go
-// In cmd/root.go PersistentPreRunE
-func initializeServices() error {
-    // Initialize all services with proper configuration
-    config := loadConfiguration(globalOpts.Config)
+// cmd/create.go
+func NewCreateCommand(config *CommandConfig) *cobra.Command
+func executeCreate(config *CommandConfig, spec, source, cdFlag string) error
+func parseProjectBranch(spec string, ctx *domain.Context) (string, string, error)
+```
+
+### Step 4: Delete Command Implementation
+
+**Tests first:** `cmd/delete_test.go`
+
+```go
+func TestDeleteCommand_Execute(t *testing.T) {
+    testCases := []struct {
+        name         string
+        args         []string
+        flags        map[string]string
+        setupContext func(*services.MockWorktreeService, *services.MockContextService)
+        expectError  bool
+        errorMessage string
+    }{
+        {
+            name: "delete worktree with safety checks",
+            args: []string{"test-project/feature-branch"},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{}, nil)
+                mockCS.EXPECT().ResolveIdentifier(gomock.Any(), "test-project/feature-branch").Return(&domain.Resolution{
+                    WorktreePath: "/home/user/Worktrees/test-project/feature-branch",
+                }, nil)
+                mockWS.EXPECT().GetWorktreeStatus(gomock.Any(), "/home/user/Worktrees/test-project/feature-branch").Return(&domain.WorktreeStatus{
+                    Clean:   true,
+                    Current: false,
+                }, nil)
+                mockWS.EXPECT().DeleteWorktree(gomock.Any(), &services.DeleteWorktreeRequest{
+                    WorktreePath: "/home/user/Worktrees/test-project/feature-branch",
+                    KeepBranch:   false,
+                    Force:        false,
+                }).Return(nil)
+            },
+            expectError: false,
+        },
+        {
+            name: "abort on dirty worktree",
+            args: []string{"test-project/feature-branch"},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{}, nil)
+                mockCS.EXPECT().ResolveIdentifier(gomock.Any(), "test-project/feature-branch").Return(&domain.Resolution{}, nil)
+                mockWS.EXPECT().GetWorktreeStatus(gomock.Any(), gomock.Any()).Return(&domain.WorktreeStatus{
+                    Clean: false,
+                }, nil)
+            },
+            expectError:  true,
+            errorMessage: "worktree has uncommitted changes",
+        },
+        {
+            name: "force delete dirty worktree",
+            args: []string{"--force", "test-project/feature-branch"},
+            setupContext: func(mockWS *services.MockWorktreeService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{}, nil)
+                mockCS.EXPECT().ResolveIdentifier(gomock.Any(), "test-project/feature-branch").Return(&domain.Resolution{}, nil)
+                mockWS.EXPECT().DeleteWorktree(gomock.Any(), &services.DeleteWorktreeRequest{
+                    WorktreePath: gomock.Any(),
+                    KeepBranch:   false,
+                    Force:        true,
+                }).Return(nil)
+            },
+            expectError: false,
+        },
+    }
     
-    services.InitializeWorktreeService(config.Worktree)
-    services.InitializeContextService(config.Context)
-    services.InitializeShellService(config.Shell)
-    
-    return nil
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            // Setup mocks and execute command
+            ctrl := gomock.NewController(t)
+            defer ctrl.Finish()
+            
+            mockWS := services.NewMockWorktreeService(ctrl)
+            mockCS := services.NewMockContextService(ctrl)
+            
+            tc.setupContext(mockWS, mockCS)
+            
+            config := &CommandConfig{
+                Services: &ServiceContainer{
+                    WorktreeService: mockWS,
+                    ContextService:  mockCS,
+                },
+            }
+            
+            cmd := NewDeleteCommand(config)
+            cmd.SetArgs(tc.args)
+            
+            // Set flags
+            for flag, value := range tc.flags {
+                cmd.Flags().Set(flag, value)
+            }
+            
+            err := cmd.Execute()
+            
+            // Validate results
+            if tc.expectError {
+                assert.Error(t, err)
+                if tc.errorMessage != "" {
+                    assert.Contains(t, err.Error(), tc.errorMessage)
+                }
+            } else {
+                assert.NoError(t, err)
+            }
+        })
+    }
 }
 ```
 
-### Context Detection Integration
+**Implementation sketch:**
 ```go
-// Common pattern for all commands
-func executeWithContext(cmdFunc func(Context) error) error {
-    contextService := services.GetContextService()
-    ctx, err := contextService.DetectContext()
-    if err != nil {
-        return fmt.Errorf("context detection failed: %w", err)
-    }
-    
-    if globalOpts.Explain {
-        fmt.Printf("Context: %s\n", ctx.Explanation)
-    }
-    
-    return cmdFunc(ctx)
-}
+// cmd/delete.go
+func NewDeleteCommand(config *CommandConfig) *cobra.Command
+func executeDelete(config *CommandConfig, target string, force, keepBranch bool) error
+```
 
-// Common pattern for identifier resolution
-func resolveIdentifier(ctx Context, target string) (*domain.Resolution, error) {
-    contextService := services.GetContextService()
-    return contextService.ResolveIdentifier(ctx, target)
+### Step 5: CD Command Implementation
+
+**Tests first:** `cmd/cd_test.go`
+
+```go
+func TestCDCommand_Execute(t *testing.T) {
+    testCases := []struct {
+        name         string
+        args         []string
+        setupContext func(*services.MockNavigationService, *services.MockContextService)
+        expectError  bool
+        errorMessage string
+        expectedPath string
+    }{
+        {
+            name: "cd to worktree with branch name",
+            args: []string{"feature-branch"},
+            setupContext: func(mockNS *services.MockNavigationService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{
+                    Type:       domain.ContextProject,
+                    ProjectName: "test-project",
+                }, nil)
+                mockNS.EXPECT().ResolvePath(gomock.Any(), &services.ResolvePathRequest{
+                    Target:  "feature-branch",
+                    Context: gomock.Any(),
+                }).Return(&domain.ResolutionResult{
+                    ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
+                }, nil)
+            },
+            expectError:  false,
+            expectedPath: "/home/user/Worktrees/test-project/feature-branch",
+        },
+        {
+            name: "cd to default worktree",
+            args: []string{},
+            setupContext: func(mockNS *services.MockNavigationService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{
+                    Type:            domain.ContextWorktree,
+                    ProjectName:     "test-project",
+                    DefaultWorktree: "main",
+                }, nil)
+                mockNS.EXPECT().ResolvePath(gomock.Any(), &services.ResolvePathRequest{
+                    Target:  "main",
+                    Context: gomock.Any(),
+                }).Return(&domain.ResolutionResult{
+                    ResolvedPath: "/home/user/Worktrees/test-project/main",
+                }, nil)
+            },
+            expectError:  false,
+            expectedPath: "/home/user/Worktrees/test-project/main",
+        },
+        {
+            name: "no target and no default",
+            args: []string{},
+            setupContext: func(mockNS *services.MockNavigationService, mockCS *services.MockContextService) {
+                mockCS.EXPECT().DetectContext().Return(&domain.Context{
+                    Type: domain.ContextOutsideGit,
+                }, nil)
+            },
+            expectError:  true,
+            errorMessage: "no target specified and no default worktree in context",
+        },
+    }
+    
+    for _, tc := range testCases {
+        t.Run(tc.name, func(t *testing.T) {
+            // Setup mocks and execute command
+            ctrl := gomock.NewController(t)
+            defer ctrl.Finish()
+            
+            mockNS := services.NewMockNavigationService(ctrl)
+            mockCS := services.NewMockContextService(ctrl)
+            
+            tc.setupContext(mockNS, mockCS)
+            
+            config := &CommandConfig{
+                Services: &ServiceContainer{
+                    NavigationService: mockNS,
+                    ContextService:    mockCS,
+                },
+            }
+            
+            cmd := NewCDCommand(config)
+            cmd.SetArgs(tc.args)
+            
+            var buf bytes.Buffer
+            cmd.SetOut(&buf)
+            err := cmd.Execute()
+            
+            // Validate results
+            if tc.expectError {
+                assert.Error(t, err)
+                if tc.errorMessage != "" {
+                    assert.Contains(t, err.Error(), tc.errorMessage)
+                }
+            } else {
+                assert.NoError(t, err)
+                if tc.expectedPath != "" {
+                    assert.Equal(t, tc.expectedPath, strings.TrimSpace(buf.String()))
+                }
+            }
+        })
+    }
 }
+```
+
+**Implementation sketch:**
+```go
+// cmd/cd.go
+func NewCDCommand(config *CommandConfig) *cobra.Command
+func executeCD(config *CommandConfig, target string) error
 ```
 
 ## Testing Strategy
 
-### Unit Tests
-- Test each command in isolation
-- Mock services for predictable behavior
-- Test flag parsing and validation
-- Test error handling and exit codes
+Phase 6 focuses exclusively on unit testing for command contracts.
 
-### Integration Tests
-- Test command execution with real services
-- Test context detection integration
-- Test shell integration functionality
-- Test configuration loading
+### Unit Tests Only
+- **Framework**: Testify with table-driven tests and gomock for service mocking
+- **Coverage**: >80% for command logic (realistic for thin wrapper layer)
+- **Location**: `*_test.go` files alongside implementation
+- **Focus**: Command contracts, flag parsing, error handling, service integration
 
-### Example Test Structure
-```go
-// cmd/list_test.go
-package cmd
+### Test Organization
+- **Interface Tests**: Test all command interfaces before implementation
+- **Contract Tests**: Test command behavior with various inputs and contexts
+- **Error Path Tests**: Test all error scenarios and service failure modes
+- **Context Tests**: Test context-aware behavior and parameter inference
 
-import (
-    "testing"
-    "github.com/stretchr/testify/assert"
-)
+### Deferred Testing Types
+- **Integration Tests**: Phase 8 (when real CLI execution exists)
+- **E2E Tests**: Phase 8 (when binary is built)
+- **Shell Integration Tests**: Phase 7
 
-func TestListCommand(t *testing.T) {
-    // Setup mocks
-    // Execute command
-    // Verify output
-    // Verify service calls
-}
-```
+## Quality Gates
 
-## Quality Assurance
+### Pre-commit Requirements
+- All tests pass: `go test ./cmd/...`
+- Linting passes: `golangci-lint run ./cmd/`
+- Coverage >80%: `go test -cover ./cmd/...`
+- Command contract tests pass
 
-### Code Review Checklist
-- [ ] Consistent flag usage across commands
-- [ ] Proper error handling with exit codes
-- [ ] Context detection before execution
-- [ ] Help text is clear and accurate
-- [ ] Integration with services layer
-- [ ] POSIX compliance
+### CI Requirements
+- Unit tests pass
+- Linting passes
+- Build succeeds on target platforms
+- Functional programming principles verified
 
-### Linting and Formatting
-- Use `gofmt` for code formatting
-- Use `golint` for style checking
-- Use `go vet` for static analysis
-- Ensure all tests pass
+## Key Principles
 
-## Dependencies
+### TDD Approach
+- **Write failing test first**
+- **Implement minimal code to pass**
+- **Refactor while keeping tests green**
+- **Repeat for next command**
 
-### Required Imports
-```go
-import (
-    "fmt"
-    "os"
-    "text/tabwriter"
-    
-    "github.com/spf13/cobra"
-    "github.com/twiggit/twiggit/internal/services"
-)
-```
+### Functional Programming
+- **Pure functions**: No side effects in command operations
+- **Immutability**: Immutable command configuration
+- **Composition**: Build complex commands from simple functions
+- **Error handling**: Use explicit error returns for predictable flow
 
-### Service Dependencies
-- WorktreeService for worktree operations
-- ContextService for context detection and identifier resolution
-- ShellService for shell integration
-- ConfigurationService for config management
-
-## Success Criteria
-
-1. All core commands implemented with Cobra
-2. Context awareness integrated into all commands
-3. Consistent flag usage and help text
-4. Proper error handling with POSIX exit codes
-5. Integration with services layer
-6. Comprehensive test coverage
-7. Documentation and help text complete
+### Clean Code
+- **Command segregation**: Each command has one clear purpose
+- **Dependency injection**: All services injected via interfaces
+- **Single responsibility**: Commands coordinate, don't contain logic
+- **Consistent error handling**: Same error pattern throughout
 
 ## Service Integration Patterns
 
-### WorktreeService Integration
-
-The WorktreeService provides the core worktree operations that CLI commands SHALL use:
-
+### Dependency Injection Pattern
 ```go
-// Service integration pattern for worktree operations
-type WorktreeService interface {
-    CreateWorktree(ctx context.Context, req *CreateWorktreeRequest) (*WorktreeInfo, error)
-    DeleteWorktree(ctx context.Context, req *DeleteWorktreeRequest) error
-    ListWorktrees(ctx context.Context, req *ListWorktreesRequest) ([]*WorktreeInfo, error)
-    GetWorktreeStatus(ctx context.Context, worktreePath string) (*WorktreeStatus, error)
-    ValidateWorktree(ctx context.Context, worktreePath string) error
+type CommandConfig struct {
+    Services *ServiceContainer
+    Config   *domain.Config
 }
 
-// CLI command integration example
-func (cmd *createCmd) runWorktreeCreation(args []string) error {
-    // Build request from CLI arguments and flags
-    req := &CreateWorktreeRequest{
-        ProjectName:  cmd.parseProject(args[0]),
-        BranchName:   cmd.parseBranch(args[0]),
-        SourceBranch: cmd.sourceFlag,
-        ChangeDir:    cmd.cdFlag,
-        Force:        cmd.forceFlag,
-        Context:      cmd.detectContext(),
-    }
-    
-    // Call service
-    result, err := cmd.worktreeService.CreateWorktree(context.Background(), req)
-    if err != nil {
-        return fmt.Errorf("create worktree failed: %w", err)
-    }
-    
-    // Handle --cd flag output
-    if req.ChangeDir {
-        fmt.Println(result.Path)
-    }
-    
-    return nil
-}
+func NewCommand(config *CommandConfig) *cobra.Command
 ```
 
-### ProjectService Integration
-
-The ProjectService provides project discovery and validation:
-
+### Context Detection Pattern
 ```go
-// Service integration pattern for project operations
-type ProjectService interface {
-    DiscoverProject(ctx context.Context, projectName string, context *domain.Context) (*ProjectInfo, error)
-    ValidateProject(ctx context.Context, projectPath string) error
-    ListProjects(ctx context.Context) ([]*ProjectInfo, error)
-    GetProjectInfo(ctx context.Context, projectPath string) (*ProjectInfo, error)
-}
-
-// CLI command integration example
-func (cmd *listCmd) resolveProjectScope() (*ProjectInfo, error) {
-    if cmd.allFlag {
-        return nil, nil // List all projects
-    }
-    
-    if cmd.projectFlag != "" {
-        return cmd.projectService.DiscoverProject(
-            context.Background(), 
-            cmd.projectFlag, 
-            cmd.currentContext,
-        )
-    }
-    
-    // Use context to infer project
-    return cmd.projectService.DiscoverProject(
-        context.Background(), 
-        "", 
-        cmd.currentContext,
-    )
-}
+func executeWithContext(config *CommandConfig, operation func(*domain.Context) error) error
 ```
 
-### NavigationService Integration
-
-The NavigationService provides path resolution for the `cd` command:
-
+### Error Handling Pattern
 ```go
-// Service integration pattern for navigation operations
-type NavigationService interface {
-    ResolvePath(ctx context.Context, req *ResolvePathRequest) (*domain.ResolutionResult, error)
-    ValidatePath(ctx context.Context, path string) error
-    GetNavigationSuggestions(ctx context.Context, context *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error)
-}
-
-// CLI command integration example
-func (cmd *cdCmd) resolveTarget(target string) (string, error) {
-    req := &ResolvePathRequest{
-        Target:      target,
-        Context:     cmd.currentContext,
-        CurrentPath: cmd.originalPath,
-    }
-    
-    result, err := cmd.navigationService.ResolvePath(context.Background(), req)
-    if err != nil {
-        return "", fmt.Errorf("path resolution failed: %w", err)
-    }
-    
-    return result.ResolvedPath, nil
-}
+func executeCommand(config *CommandConfig, req interface{}) error
 ```
 
-## Context-Aware Command Behavior
+## Success Criteria
 
-### Context Detection Integration
+1. ✅ Command interfaces (list, create, delete, cd) with comprehensive contracts
+2. ✅ Command implementations with service injection and functional patterns
+3. ✅ Context-aware parameter inference following design specifications
+4. ✅ Unit tests for command contracts pass with >80% coverage
+5. ✅ Basic linting passes without errors
+6. ✅ Clean command structure following Go and Cobra standards
+7. ✅ Quality gates enforce functional programming principles
 
-All CLI commands SHALL detect context before execution:
+## Incremental Development Strategy
 
-```go
-// Context detection pattern for CLI commands
-func (cmd *BaseCommand) detectContext() (*domain.Context, error) {
-    context, err := cmd.contextService.GetCurrentContext()
-    if err != nil {
-        return nil, fmt.Errorf("context detection failed: %w", err)
-    }
-    
-    // Store for command use
-    cmd.currentContext = context
-    return context, nil
-}
+Phase 6 follows strict incremental development:
 
-// Context-aware help adaptation
-func (cmd *BaseCommand) adaptHelpText() {
-    switch cmd.currentContext.Type {
-    case domain.ContextProject:
-        cmd.Short = fmt.Sprintf("%s (project: %s)", cmd.baseShort, cmd.currentContext.ProjectName)
-    case domain.ContextWorktree:
-        cmd.Short = fmt.Sprintf("%s (worktree: %s/%s)", cmd.baseShort, cmd.currentContext.ProjectName, cmd.currentContext.BranchName)
-    case domain.ContextOutsideGit:
-        cmd.Short = fmt.Sprintf("%s (outside git)", cmd.baseShort)
-    }
-}
-```
+1. **Write Test**: Create failing test for command interface
+2. **Define Command**: Add Cobra command with proper structure
+3. **Implement**: Add minimal code to make test pass
+4. **Refactor**: Apply functional programming patterns while keeping tests green
+5. **Repeat**: Move to next command
 
-### Request Adaptation Patterns
+**No detailed implementation, no premature optimization, no future-proofing.** Each command builds only what's needed for that phase.
 
-Commands SHALL adapt their requests based on detected context:
+## Next Phases
 
-```go
-// Context-aware request adaptation
-func (cmd *createCmd) adaptRequest(req *CreateWorktreeRequest) *CreateWorktreeRequest {
-    switch cmd.currentContext.Type {
-    case domain.ContextProject:
-        // Infer project from context if not specified
-        if req.ProjectName == "" {
-            req.ProjectName = cmd.currentContext.ProjectName
-        }
-    case domain.ContextWorktree:
-        // Infer project from current worktree
-        if req.ProjectName == "" {
-            req.ProjectName = cmd.currentContext.ProjectName
-        }
-        // Default source to current branch if not specified
-        if req.SourceBranch == "" {
-            req.SourceBranch = cmd.currentContext.BranchName
-        }
-    }
-    
-    return req
-}
-```
+Phase 6 provides the CLI foundation needed for sequential development:
 
-## Validation and Error Handling
+1. **Phase 7**: Shell integration commands and completion
+2. **Phase 8**: Comprehensive testing infrastructure with E2E tests
+3. **Phase 9**: Performance optimization and advanced features
+4. **Phase 10**: Final integration and validation
 
-### Command-Level Validation
-
-CLI commands SHALL perform validation before calling services:
-
-```go
-// Command validation pattern
-func (cmd *createCmd) validateArgs(args []string) error {
-    if len(args) != 1 {
-        return fmt.Errorf("create requires exactly one argument: <project>/<branch>")
-    }
-    
-    parts := strings.Split(args[0], "/")
-    if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-        return fmt.Errorf("invalid format: expected <project>/<branch>, got %s", args[0])
-    }
-    
-    // Validate branch name
-    if strings.HasPrefix(parts[1], "-") {
-        return fmt.Errorf("branch name cannot start with '-'")
-    }
-    
-    return nil
-}
-```
-
-### Error Response Formatting
-
-Commands SHALL format service errors for CLI display:
-
-```go
-// Error formatting for CLI
-func (cmd *BaseCommand) formatServiceError(err error) error {
-    switch e := err.(type) {
-    case *domain.WorktreeExistsError:
-        return fmt.Errorf("worktree already exists at %s. Use --force to override", e.Path)
-    case *domain.ProjectNotFoundError:
-        return fmt.Errorf("project '%s' not found. Check project name or context", e.Name)
-    case *domain.UnsafeOperationError:
-        return fmt.Errorf("unsafe operation: %s. Use --force to override", e.Reason)
-    default:
-        return fmt.Errorf("operation failed: %w", err)
-    }
-}
-```
-
-## Next Steps
-
-1. Implement each command file following the structures above
-2. Add comprehensive unit and integration tests
-3. Update main.go to use the new command structure
-4. Test CLI functionality end-to-end
-5. Update documentation with command examples
-6. Performance testing and optimization
+This CLI layer provides the essential user interface needed for interacting with service operations while following true TDD principles, functional programming patterns, and maintaining clean phase boundaries.
