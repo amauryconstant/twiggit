@@ -20,6 +20,7 @@ func TestRootCommand_Integration(t *testing.T) {
 				ProjectService:    mocks.NewMockProjectService(),
 				NavigationService: mocks.NewMockNavigationService(),
 				ContextService:    mocks.NewMockContextService(),
+				ShellService:      mocks.NewMockShellService(),
 			},
 			Config: &domain.Config{},
 		}
@@ -33,7 +34,7 @@ func TestRootCommand_Integration(t *testing.T) {
 		assert.NotEmpty(t, rootCmd.Long)
 
 		// Verify all subcommands are registered
-		expectedCommands := []string{"list", "create", "delete", "cd"}
+		expectedCommands := []string{"list", "create", "delete", "cd", "setup-shell"}
 		for _, expected := range expectedCommands {
 			cmd, _, err := rootCmd.Find([]string{expected})
 			require.NoError(t, err, "Command '%s' should be registered", expected)
@@ -41,7 +42,7 @@ func TestRootCommand_Integration(t *testing.T) {
 		}
 
 		// Verify total number of commands
-		assert.Len(t, rootCmd.Commands(), 4, "Should have exactly 4 subcommands registered")
+		assert.Len(t, rootCmd.Commands(), 5, "Should have exactly 5 subcommands registered")
 	})
 
 	t.Run("command help accessibility", func(t *testing.T) {
@@ -51,6 +52,7 @@ func TestRootCommand_Integration(t *testing.T) {
 				ProjectService:    mocks.NewMockProjectService(),
 				NavigationService: mocks.NewMockNavigationService(),
 				ContextService:    mocks.NewMockContextService(),
+				ShellService:      mocks.NewMockShellService(),
 			},
 			Config: &domain.Config{},
 		}
@@ -67,6 +69,7 @@ func TestRootCommand_Integration(t *testing.T) {
 			{"create help", []string{"create", "--help"}},
 			{"delete help", []string{"delete", "--help"}},
 			{"cd help", []string{"cd", "--help"}},
+			{"setup-shell help", []string{"setup-shell", "--help"}},
 		}
 
 		for _, tc := range testCases {
@@ -85,6 +88,7 @@ func TestRootCommand_Integration(t *testing.T) {
 				ProjectService:    mocks.NewMockProjectService(),
 				NavigationService: mocks.NewMockNavigationService(),
 				ContextService:    mocks.NewMockContextService(),
+				ShellService:      mocks.NewMockShellService(),
 			},
 			Config: &domain.Config{},
 		}

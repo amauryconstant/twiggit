@@ -50,6 +50,46 @@ type NavigationConfig struct {
 	FuzzyMatching     bool `toml:"fuzzy_matching" koanf:"fuzzy_matching"`
 }
 
+// ShellConfigFiles represents shell-specific configuration file paths
+type ShellConfigFiles struct {
+	Bash string `toml:"bash" koanf:"bash"`
+	Zsh  string `toml:"zsh" koanf:"zsh"`
+	Fish string `toml:"fish" koanf:"fish"`
+}
+
+// ShellWrapperConfig represents shell wrapper specific configuration
+type ShellWrapperConfig struct {
+	// Enable shell wrapper functionality
+	Enabled bool `toml:"enabled" koanf:"enabled"`
+
+	// Auto-detect shell type
+	AutoDetect bool `toml:"auto_detect" koanf:"auto_detect"`
+
+	// Default shell type if auto-detection fails
+	DefaultShell string `toml:"default_shell" koanf:"default_shell"`
+
+	// Configuration file paths for each shell
+	ConfigFiles ShellConfigFiles `toml:"config_files" koanf:"config_files"`
+
+	// Enable backup of existing configuration files
+	BackupEnabled bool `toml:"backup_enabled" koanf:"backup_enabled"`
+
+	// Backup directory for configuration file backups
+	BackupDir string `toml:"backup_dir" koanf:"backup_dir"`
+}
+
+// ShellConfig represents shell integration specific configuration
+type ShellConfig struct {
+	// Shell wrapper configuration
+	Wrapper ShellWrapperConfig `toml:"wrapper" koanf:"wrapper"`
+
+	// Enable shell integration features
+	Enabled bool `toml:"enabled" koanf:"enabled"`
+
+	// Timeout for shell operations in seconds
+	Timeout int `toml:"timeout" koanf:"timeout"`
+}
+
 // Config represents the complete application configuration
 type Config struct {
 	// Directory paths
@@ -73,6 +113,9 @@ type Config struct {
 
 	// Navigation settings
 	Navigation NavigationConfig `toml:"navigation"`
+
+	// Shell integration settings
+	Shell ShellConfig `toml:"shell"`
 }
 
 // DefaultConfig returns the default configuration values
@@ -115,6 +158,22 @@ func DefaultConfig() *Config {
 			EnableSuggestions: true,
 			MaxSuggestions:    10,
 			FuzzyMatching:     false,
+		},
+		Shell: ShellConfig{
+			Enabled: true,
+			Timeout: 30,
+			Wrapper: ShellWrapperConfig{
+				Enabled:      true,
+				AutoDetect:   true,
+				DefaultShell: "bash",
+				ConfigFiles: ShellConfigFiles{
+					Bash: "~/.bashrc",
+					Zsh:  "~/.zshrc",
+					Fish: "~/.config/fish/config.fish",
+				},
+				BackupEnabled: true,
+				BackupDir:     "~/.config/twiggit/backups",
+			},
 		},
 	}
 }
@@ -183,5 +242,6 @@ func GetGlobalConfig() *Config {
 		Services:            globalConfig.Services,
 		Validation:          globalConfig.Validation,
 		Navigation:          globalConfig.Navigation,
+		Shell:               globalConfig.Shell,
 	}
 }

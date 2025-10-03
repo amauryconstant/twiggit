@@ -200,3 +200,40 @@ func (m *MockContextService) GetCompletionSuggestions(partial string) ([]*domain
 	}
 	return nil, nil
 }
+
+// MockShellService is a mock implementation of services.ShellService
+type MockShellService struct {
+	// Configurable functions for testing
+	SetupShellFunc           func(ctx context.Context, req *domain.SetupShellRequest) (*domain.SetupShellResult, error)
+	ValidateInstallationFunc func(ctx context.Context, req *domain.ValidateInstallationRequest) (*domain.ValidateInstallationResult, error)
+	GenerateWrapperFunc      func(ctx context.Context, req *domain.GenerateWrapperRequest) (*domain.GenerateWrapperResult, error)
+}
+
+// NewMockShellService creates a new MockShellService with default behavior
+func NewMockShellService() *MockShellService {
+	return &MockShellService{}
+}
+
+// SetupShell calls the mock function or returns default
+func (m *MockShellService) SetupShell(ctx context.Context, req *domain.SetupShellRequest) (*domain.SetupShellResult, error) {
+	if m.SetupShellFunc != nil {
+		return m.SetupShellFunc(ctx, req)
+	}
+	return &domain.SetupShellResult{}, nil
+}
+
+// ValidateInstallation calls the mock function or returns default
+func (m *MockShellService) ValidateInstallation(ctx context.Context, req *domain.ValidateInstallationRequest) (*domain.ValidateInstallationResult, error) {
+	if m.ValidateInstallationFunc != nil {
+		return m.ValidateInstallationFunc(ctx, req)
+	}
+	return &domain.ValidateInstallationResult{}, nil
+}
+
+// GenerateWrapper calls the mock function or returns default
+func (m *MockShellService) GenerateWrapper(ctx context.Context, req *domain.GenerateWrapperRequest) (*domain.GenerateWrapperResult, error) {
+	if m.GenerateWrapperFunc != nil {
+		return m.GenerateWrapperFunc(ctx, req)
+	}
+	return &domain.GenerateWrapperResult{}, nil
+}

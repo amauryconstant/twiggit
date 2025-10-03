@@ -27,6 +27,7 @@ type ServiceContainer struct {
 	ProjectService    services.ProjectService
 	NavigationService services.NavigationService
 	ContextService    domain.ContextServiceInterface
+	ShellService      services.ShellService
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -44,6 +45,25 @@ across multiple projects.`,
 		}
 		return nil
 	},
+}
+
+// Initialize commands with default config
+func init() {
+	// Create a default config for backward compatibility
+	config := &CommandConfig{
+		Config:   domain.DefaultConfig(),
+		Services: &ServiceContainer{
+			// Note: In a real implementation, these would be properly initialized
+			// For now, we'll use nil and let the commands handle initialization
+		},
+	}
+
+	// Add subcommands to global rootCmd
+	rootCmd.AddCommand(NewListCommand(config))
+	rootCmd.AddCommand(NewCreateCommand(config))
+	rootCmd.AddCommand(NewDeleteCommand(config))
+	rootCmd.AddCommand(NewCDCommand(config))
+	rootCmd.AddCommand(NewSetupShellCmd(config))
 }
 
 // Execute runs the root command.
@@ -85,6 +105,7 @@ across multiple projects.`,
 	cmd.AddCommand(NewCreateCommand(config))
 	cmd.AddCommand(NewDeleteCommand(config))
 	cmd.AddCommand(NewCDCommand(config))
+	cmd.AddCommand(NewSetupShellCmd(config))
 
 	return cmd
 }

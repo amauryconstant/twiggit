@@ -50,3 +50,15 @@ type NavigationService interface {
 	// GetNavigationSuggestions provides completion suggestions for navigation
 	GetNavigationSuggestions(ctx context.Context, context *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error)
 }
+
+// ShellService provides shell integration and wrapper management operations
+type ShellService interface {
+	// SetupShell sets up shell integration for the specified shell type
+	SetupShell(ctx context.Context, req *domain.SetupShellRequest) (*domain.SetupShellResult, error)
+
+	// ValidateInstallation validates whether shell integration is installed
+	ValidateInstallation(ctx context.Context, req *domain.ValidateInstallationRequest) (*domain.ValidateInstallationResult, error)
+
+	// GenerateWrapper generates a shell wrapper for the specified shell type
+	GenerateWrapper(ctx context.Context, req *domain.GenerateWrapperRequest) (*domain.GenerateWrapperResult, error)
+}
