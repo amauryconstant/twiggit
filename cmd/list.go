@@ -19,6 +19,7 @@ func NewListCommand(config *CommandConfig) *cobra.Command {
 		Long: `List worktrees for the current project or all projects.
 By default, lists worktrees for the detected project context.
 Use --all to list worktrees from all projects.`,
+		Args: cobra.NoArgs, // Reject any positional arguments
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return executeList(cmd, config, all)
 		},

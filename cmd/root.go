@@ -9,6 +9,7 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
+	"twiggit/internal/infrastructure"
 )
 
 var (
@@ -28,6 +29,7 @@ type ServiceContainer struct {
 	NavigationService application.NavigationService
 	ContextService    domain.ContextService
 	ShellService      application.ShellService
+	GitClient         infrastructure.GitClient
 }
 
 // rootCmd represents the base command when called without any subcommands
@@ -47,28 +49,26 @@ across multiple projects.`,
 	},
 }
 
-// Initialize commands with default config
-func init() {
-	// Create a default config for backward compatibility
-	config := &CommandConfig{
-		Config:   domain.DefaultConfig(),
-		Services: &ServiceContainer{
-			// Note: In a real implementation, these would be properly initialized
-			// For now, we'll use nil and let the commands handle initialization
-		},
-	}
-
-	// Add subcommands to global rootCmd
-	rootCmd.AddCommand(NewListCommand(config))
-	rootCmd.AddCommand(NewCreateCommand(config))
-	rootCmd.AddCommand(NewDeleteCommand(config))
-	rootCmd.AddCommand(NewCDCommand(config))
-	rootCmd.AddCommand(NewSetupShellCmd(config))
-}
+// Note: Commands are now initialized in main.go via NewRootCommand to ensure proper service injection
 
 // Execute runs the root command.
+// Note: This function is deprecated. Use NewRootCommand() instead for proper service initialization.
 func Execute() error {
-	if err := rootCmd.Execute(); err != nil {
+	// Try to get global config, but don't fail if it's not set
+	config := domain.GetGlobalConfig()
+	if config == nil {
+		config = domain.DefaultConfig()
+	}
+
+	// Create a basic command config for backward compatibility
+	commandConfig := &CommandConfig{
+		Config:   config,
+		Services: &ServiceContainer{}, // Empty services - will cause errors but won't crash
+	}
+
+	// Use NewRootCommand for proper initialization
+	cmd := NewRootCommand(commandConfig)
+	if err := cmd.Execute(); err != nil {
 		return fmt.Errorf("execute command: %w", err)
 	}
 	return nil

@@ -355,16 +355,13 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*do
 }
 
 func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*domain.ResolutionResult, error) {
-	parts := strings.Split(identifier, "/")
-	if len(parts) != 2 {
+	projectName, branchName, valid := parseCrossProjectReference(identifier)
+	if !valid {
 		return &domain.ResolutionResult{
 			Type:        domain.PathTypeInvalid,
 			Explanation: fmt.Sprintf("Invalid cross-project reference format: '%s'. Expected: project/branch", identifier),
 		}, nil
 	}
-
-	projectName := parts[0]
-	branchName := parts[1]
 
 	// Resolve to worktree of specified project
 	worktreePath := filepath.Join(cr.config.WorktreesDirectory, projectName, branchName)

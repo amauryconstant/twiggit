@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"twiggit/cmd"
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
@@ -14,8 +16,9 @@ func main() {
 	configManager := infrastructure.NewConfigManager()
 	config, err := configManager.Load()
 	if err != nil {
-		// For now, panic on config errors - this will be improved in CLI phase
-		panic(err)
+		// Use functional error handling instead of panic
+		cmd.HandleCLIError(err)
+		os.Exit(1)
 	}
 
 	// Set global configuration for simple access
@@ -49,14 +52,16 @@ func main() {
 			NavigationService: navigationService,
 			WorktreeService:   worktreeService,
 			ShellService:      shellService,
+			GitClient:         gitClient,
 		},
 	}
 
 	// Use NewRootCommand to create a properly configured command tree
 	rootCmd := cmd.NewRootCommand(commandConfig)
 
-	// Execute CLI with proper configuration
+	// Execute CLI with functional error handling
 	if err := rootCmd.Execute(); err != nil {
-		panic(err)
+		exitCode := cmd.HandleCLIError(err)
+		os.Exit(int(exitCode))
 	}
 }

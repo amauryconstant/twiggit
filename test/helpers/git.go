@@ -158,3 +158,50 @@ func (h *GitTestHelper) ListBranches(repoPath string) ([]string, error) {
 
 	return branchNames, nil
 }
+
+// CreateShallowClone creates a shallow clone of a repository
+func (h *GitTestHelper) CreateShallowClone(sourcePath, destPath string, depth int) error {
+	repo, err := git.PlainClone(destPath, false, &git.CloneOptions{
+		URL:          sourcePath,
+		Depth:        depth,
+		SingleBranch: true,
+		NoCheckout:   false,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create shallow clone: %w", err)
+	}
+	_ = repo
+	return nil
+}
+
+// CreateDetachedHEAD creates a detached HEAD state in the repository
+func (h *GitTestHelper) CreateDetachedHEAD(repoPath string) error {
+	repo, err := git.PlainOpen(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to open repository: %w", err)
+	}
+
+	// Get current HEAD
+	headRef, err := repo.Head()
+	if err != nil {
+		return fmt.Errorf("failed to get HEAD reference: %w", err)
+	}
+
+	// Create worktree in detached HEAD state
+	worktree, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	// Checkout to the commit hash (detached HEAD)
+	err = worktree.Checkout(&git.CheckoutOptions{
+		Hash:   headRef.Hash(),
+		Branch: plumbing.ReferenceName(""), // Empty branch name creates detached HEAD
+		Force:  true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create detached HEAD: %w", err)
+	}
+
+	return nil
+}

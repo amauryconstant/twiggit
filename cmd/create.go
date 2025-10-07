@@ -30,6 +30,10 @@ The source branch defaults to 'main' unless specified with --source.`,
 	cmd.Flags().StringVar(&source, "source", "main", "Source branch to create from")
 	cmd.Flags().StringVar(&cdFlag, "cd", "", "Change directory after creation (optional)")
 
+	// Silence usage to prevent double error printing
+	cmd.SilenceUsage = true
+	cmd.SilenceErrors = true
+
 	return cmd
 }
 
@@ -37,22 +41,43 @@ The source branch defaults to 'main' unless specified with --source.`,
 func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source, _ string) error {
 	ctx := context.Background()
 
-	// Detect current context
+	// Extract branch name for validation first (before any context detection)
+	branchName := extractBranchNameForValidation(spec)
+	if branchName == "" {
+		return errors.New("invalid branch name specification")
+	}
+
+	// Validate branch name first (before any context detection or project discovery)
+	branchValidation := domain.ValidateBranchName(branchName)
+	if branchValidation.IsError() {
+		return branchValidation.Error
+	}
+
+	// Now detect current context (after branch validation passes)
 	currentCtx, err := config.Services.ContextService.GetCurrentContext()
 	if err != nil {
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
-	// Parse project and branch from spec
+	// Parse project and branch from spec with proper context
 	projectName, branchName, err := parseProjectBranch(spec, currentCtx)
 	if err != nil {
 		return err
 	}
 
-	// Discover project
+	// Discover project after branch validation
 	project, err := config.Services.ProjectService.DiscoverProject(ctx, projectName, currentCtx)
 	if err != nil {
 		return fmt.Errorf("failed to discover project %s: %w", projectName, err)
+	}
+
+	// Validate source branch exists before creating worktree
+	sourceBranchExists, err := config.Services.GitClient.BranchExists(ctx, project.Path, source)
+	if err != nil {
+		return fmt.Errorf("failed to check if source branch '%s' exists: %w", source, err)
+	}
+	if !sourceBranchExists {
+		return fmt.Errorf("source branch '%s' does not exist", source)
 	}
 
 	// Create worktree request
@@ -95,6 +120,19 @@ func parseProjectBranch(spec string, ctx *domain.Context) (string, string, error
 	}
 
 	return "", "", errors.New("cannot infer project: not in a project context and no project specified")
+}
+
+// extractBranchNameForValidation extracts branch name from spec for validation
+func extractBranchNameForValidation(spec string) string {
+	// Check if spec contains a slash (project/branch format)
+	if strings.Contains(spec, "/") {
+		parts := strings.SplitN(spec, "/", 2)
+		if len(parts) == 2 && parts[1] != "" {
+			return parts[1]
+		}
+	}
+	// If no slash, the spec itself is the branch name
+	return spec
 }
 
 // displayCreateSuccess displays the success message for worktree creation

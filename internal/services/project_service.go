@@ -195,6 +195,13 @@ func (s *projectService) discoverProjectFromContext(ctx context.Context, context
 func (s *projectService) searchProjectByName(ctx context.Context, projectName string) (*domain.ProjectInfo, error) {
 	// Search in projects directory
 	projectsDir := s.config.ProjectsDirectory
+
+	// Check if projects directory exists
+	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
+		// Projects directory doesn't exist, return project not found
+		return nil, domain.NewProjectServiceError(projectName, "", "searchProjectByName", "project not found", nil)
+	}
+
 	entries, err := os.ReadDir(projectsDir)
 	if err != nil {
 		return nil, domain.NewProjectServiceError(projectName, "", "searchProjectByName", "failed to search projects", err)

@@ -89,20 +89,31 @@ func (s *worktreeService) DeleteWorktree(ctx context.Context, req *domain.Delete
 
 // ListWorktrees lists all worktrees for a project
 func (s *worktreeService) ListWorktrees(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
-	// Resolve project
-	projectName := req.ProjectName
-	if projectName == "" && req.Context != nil {
-		projectName = req.Context.ProjectName
-	}
+	var project *domain.ProjectInfo
+	var err error
 
-	if projectName == "" {
-		return nil, domain.NewValidationError("ListWorktreesRequest", "projectName", "", "project name required when not provided in context")
-	}
+	// If we're in a project context, use the current path directly
+	if req.Context != nil && (req.Context.Type == domain.ContextProject || req.Context.Type == domain.ContextWorktree) {
+		project, err = s.projectService.GetProjectInfo(ctx, req.Context.Path)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get project info from context: %w", err)
+		}
+	} else {
+		// Resolve project by name
+		projectName := req.ProjectName
+		if projectName == "" && req.Context != nil {
+			projectName = req.Context.ProjectName
+		}
 
-	// Get project info
-	project, err := s.projectService.DiscoverProject(ctx, projectName, req.Context)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve project: %w", err)
+		if projectName == "" {
+			return nil, domain.NewValidationError("ListWorktreesRequest", "projectName", "", "project name required when not provided in context")
+		}
+
+		// Get project info
+		project, err = s.projectService.DiscoverProject(ctx, projectName, req.Context)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve project: %w", err)
+		}
 	}
 
 	// List worktrees using CLI client
@@ -225,12 +236,16 @@ func (s *worktreeService) ValidateWorktree(ctx context.Context, worktreePath str
 // Private helper methods
 
 func (s *worktreeService) validateCreateRequest(req *domain.CreateWorktreeRequest) error {
-	if req.BranchName == "" {
-		return domain.NewValidationError("CreateWorktreeRequest", "BranchName", "", "branch name cannot be empty")
+	// Use functional validation pipeline for branch name
+	branchValidation := domain.ValidateBranchName(req.BranchName)
+	if branchValidation.IsError() {
+		return branchValidation.Error
 	}
 
+	// Validate project context
 	if req.ProjectName == "" && req.Context != nil && req.Context.Type != domain.ContextProject {
-		return domain.NewValidationError("CreateWorktreeRequest", "ProjectName", "", "project name required when not in project context")
+		return domain.NewValidationError("CreateWorktreeRequest", "ProjectName", "", "project name required when not in project context").
+			WithSuggestions([]string{"Specify a project name (e.g., my-project/feature-branch)", "Run from within a project directory"})
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/spf13/cobra"
 
@@ -64,32 +65,32 @@ func runSetupShell(cmd *cobra.Command, config *CommandConfig) error {
 	}
 
 	// Display results
-	return displaySetupResults(cmd, result, dryRun)
+	return displaySetupResults(cmd.OutOrStdout(), result, dryRun)
 }
 
-func displaySetupResults(cmd *cobra.Command, result *domain.SetupShellResult, dryRun bool) error {
+func displaySetupResults(out io.Writer, result *domain.SetupShellResult, dryRun bool) error {
 	if result.Skipped {
-		cmd.Printf("✓ Shell wrapper already installed for %s\n", result.ShellType)
-		cmd.Printf("Use --force to reinstall\n")
+		fmt.Fprintf(out, "✓ Shell wrapper already installed for %s\n", result.ShellType)
+		fmt.Fprintf(out, "Use --force to reinstall\n")
 		return nil
 	}
 
 	if dryRun {
-		cmd.Printf("Would install wrapper for %s:\n", result.ShellType)
-		cmd.Printf("Wrapper function:\n%s\n", result.WrapperContent)
+		fmt.Fprintf(out, "Would install wrapper for %s:\n", result.ShellType)
+		fmt.Fprintf(out, "Wrapper function:\n%s\n", result.WrapperContent)
 		return nil
 	}
 
 	if result.Installed {
-		cmd.Printf("✓ Shell wrapper installed for %s\n", result.ShellType)
-		cmd.Printf("✓ %s\n", result.Message)
+		fmt.Fprintf(out, "✓ Shell wrapper installed for %s\n", result.ShellType)
+		fmt.Fprintf(out, "✓ %s\n", result.Message)
 
-		cmd.Printf("\nTo activate the wrapper:\n")
-		cmd.Printf("  1. Restart your shell, or\n")
-		cmd.Printf("  2. Run: source ~/.bashrc (or ~/.zshrc, etc.)\n")
-		cmd.Printf("\nUsage:\n")
-		cmd.Printf("  twiggit cd <branch>     # Change to worktree\n")
-		cmd.Printf("  builtin cd <path>       # Use shell built-in cd\n")
+		fmt.Fprintf(out, "\nTo activate the wrapper:\n")
+		fmt.Fprintf(out, "  1. Restart your shell, or\n")
+		fmt.Fprintf(out, "  2. Run: source ~/.bashrc (or ~/.zshrc, etc.)\n")
+		fmt.Fprintf(out, "\nUsage:\n")
+		fmt.Fprintf(out, "  twiggit cd <branch>     # Change to worktree\n")
+		fmt.Fprintf(out, "  builtin cd <path>       # Use shell built-in cd\n")
 	}
 
 	return nil

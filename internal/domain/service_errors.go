@@ -32,25 +32,56 @@ func NewServiceError(service, operation, message string, cause error) *ServiceEr
 
 // ValidationError represents a validation error for service requests
 type ValidationError struct {
-	Field   string // Field name that failed validation
-	Value   string // Field value that failed validation
-	Message string // Validation error message
-	Request string // Request type name
+	field       string   // Field name that failed validation
+	value       string   // Field value that failed validation
+	message     string   // Validation error message
+	request     string   // Request type name
+	suggestions []string // Helpful suggestions for fixing the error
+	context     string   // Additional context information
 }
 
 func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation failed for %s.%s: %s (value: %s)", e.Request, e.Field, e.Message, e.Value)
+	return fmt.Sprintf("validation failed for %s.%s: %s (value: %s)", e.request, e.field, e.message, e.value)
 }
 
 // NewValidationError creates a new validation error
 func NewValidationError(request, field, value, message string) *ValidationError {
 	return &ValidationError{
-		Field:   field,
-		Value:   value,
-		Message: message,
-		Request: request,
+		field:       field,
+		value:       value,
+		message:     message,
+		request:     request,
+		suggestions: []string{},
+		context:     "",
 	}
 }
+
+// WithSuggestions returns a new ValidationError with suggestions (immutable)
+func (e *ValidationError) WithSuggestions(suggestions []string) *ValidationError {
+	newVE := *e // Copy
+	newVE.suggestions = make([]string, len(suggestions))
+	copy(newVE.suggestions, suggestions)
+	return &newVE
+}
+
+// WithContext returns a new ValidationError with context (immutable)
+func (e *ValidationError) WithContext(context string) *ValidationError {
+	newVE := *e // Copy
+	newVE.context = context
+	return &newVE
+}
+
+// Pure getter methods
+func (e *ValidationError) Field() string   { return e.field }
+func (e *ValidationError) Value() string   { return e.value }
+func (e *ValidationError) Message() string { return e.message }
+func (e *ValidationError) Request() string { return e.request }
+func (e *ValidationError) Suggestions() []string {
+	result := make([]string, len(e.suggestions))
+	copy(result, e.suggestions)
+	return result
+}
+func (e *ValidationError) Context() string { return e.context }
 
 // WorktreeServiceError represents worktree service specific errors
 type WorktreeServiceError struct {

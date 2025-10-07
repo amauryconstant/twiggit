@@ -48,6 +48,11 @@ func executeDelete(config *CommandConfig, target string, force, _ bool) error {
 		return fmt.Errorf("failed to resolve target %s: %w", target, err)
 	}
 
+	// Check if resolution is valid
+	if resolution.Type == domain.PathTypeInvalid {
+		return fmt.Errorf("invalid target format: %s", resolution.Explanation)
+	}
+
 	worktreePath := resolution.ResolvedPath
 
 	// Safety check: verify worktree status unless forced
@@ -61,16 +66,17 @@ func executeDelete(config *CommandConfig, target string, force, _ bool) error {
 				strings.Contains(errStr, "invalid git repository") ||
 				strings.Contains(errStr, "repository does not exist") ||
 				strings.Contains(errStr, "no such file or directory") {
-				// Worktree doesn't exist, proceed to deletion
+				// Worktree doesn't exist, proceed with deletion (idempotent)
+				fmt.Printf("Deleted worktree: %s (already removed)\n", worktreePath)
 				return nil
 			}
-			// For other errors (like HEAD reference issues), we should try to delete anyway
-			// since the worktree might exist but be in a broken state
-		} else {
-			// Worktree exists, check if it's clean
-			if !status.IsClean {
-				return errors.New("worktree has uncommitted changes (use --force to override)")
-			}
+			// For other errors, fail the deletion to be safe
+			return fmt.Errorf("failed to check worktree status: %w", err)
+		}
+
+		// Worktree exists, check if it's clean
+		if !status.IsClean {
+			return errors.New("worktree has uncommitted changes (use --force to override)")
 		}
 	}
 

@@ -1,0 +1,26 @@
+# Test configuration for e2e tests
+# This file is used during end-to-end testing to override default paths
+
+# Projects directory - will be dynamically replaced with test temp directory
+projects_dir = "__TEST_TEMP_DIR__"
+
+# Worktrees directory - also in test temp directory
+worktrees_dir = "__TEST_TEMP_DIR__/worktrees"
+
+# Default source branch for testing
+default_source_branch = "main"
+
+[context_detection]
+cache_ttl = "1m"
+git_operation_timeout = "10s"
+enable_git_validation = true
+
+[git]
+cli_timeout = 10
+cache_enabled = false
+
+[services]
+cache_enabled = false
+cache_ttl = "1m"
+concurrent_ops = false
+max_concurrent = 1
