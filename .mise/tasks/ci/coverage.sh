@@ -28,7 +28,7 @@ fi
 
 echo "🔍 Calculating coverage for core packages only (excluding cmd/, test/, main.go)..."
 # Extract coverage for internal packages only
-go tool cover -func=coverage.out | grep "^twiggit/internal/" > coverage_filtered.txt
+go tool cover -func=coverage.out | grep "^github.com/amaury/twiggit/internal/" > coverage_filtered.txt
 
 if [ ! -s coverage_filtered.txt ]; then
   echo "❌ No internal packages found in coverage report"
@@ -44,7 +44,7 @@ BEGIN {
 }
 {
   # Each line represents a function with its coverage percentage
-  # Format: "twiggit/internal/package/file.go:line:	function_name	coverage%"
+  # Format: "github.com/amaury/twiggit/internal/package/file.go:line:	function_name	coverage%"
   coverage = $NF
   gsub(/%/, "", coverage)
   

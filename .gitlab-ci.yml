@@ -1,0 +1,259 @@
+stages:
+  - build-ci
+  - setup
+  - validate
+  - distribute
+
+# --------------------------------
+# Cache configuration
+# --------------------------------
+.cache_config: &cache_config
+  key:
+    files:
+      - .cache-key
+  paths:
+    - .cache/go-mod/
+    - .go/pkg/mod/
+
+# --------------------------------
+# Pipeline rules
+# --------------------------------
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "push"'
+    - if: "$CI_COMMIT_TAG"
+
+# --------------------------------
+# Global variables
+# --------------------------------
+variables:
+  GOPATH: "$CI_PROJECT_DIR/.go"
+  GOMODCACHE: "$CI_PROJECT_DIR/.cache/go-mod"
+
+# --------------------------------
+# Build CI Docker Image
+# --------------------------------
+build-ci-image:
+  stage: build-ci
+  image:
+    name: docker:29.1.4-cli
+  services:
+    - name: docker:29.1.4-dind
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      changes:
+        - Dockerfile.ci
+        - .mise/config.toml
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - Dockerfile.ci
+        - .mise/config.toml
+    - when: manual
+      allow_failure: true
+  variables:
+    DOCKER_HOST: tcp://docker:2375
+    DOCKER_TLS_CERTDIR: ""
+    CI_REGISTRY: registry.gitlab.com
+    CI_REGISTRY_IMAGE: "$CI_REGISTRY/amoconst/twiggit/ci"
+  before_script:
+    - apk add --no-cache curl
+    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
+  script:
+    - |
+      get_mise_version() {
+        local retries=3
+        local retry=0
+        local version=""
+
+        while [ $retry -lt $retries ]; do
+          version=$(curl -s https://api.github.com/repos/jdx/mise/releases/latest \
+            | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
+          if [ -n "$version" ]; then
+            echo "$version"
+            return 0
+          fi
+
+          retry=$((retry + 1))
+          if [ $retry -lt $retries ]; then
+            echo "Retry $retry/$retries: Failed to get mise version"
+            sleep 2
+          fi
+        done
+
+        echo "Failed to get mise version from GitHub API after $retries attempts"
+        return 1
+      }
+
+      calculate_image_hash() {
+        # Generate 12-character SHA256 hash from Dockerfile.ci and .mise/config.toml
+        cat Dockerfile.ci .mise/config.toml | sha256sum | cut -c1-12
+      }
+
+      MISE_VERSION=$(get_mise_version)
+      if [ $? -ne 0 ]; then
+        echo "Using cached mise version if available"
+        MISE_VERSION="2026.1.2"
+      fi
+
+      IMAGE_HASH=$(calculate_image_hash)
+      IMAGE_TAG="${MISE_VERSION}-${IMAGE_HASH}"
+      echo "Mise version: $MISE_VERSION"
+      echo "Image hash: $IMAGE_HASH"
+      echo "Image tag: $IMAGE_TAG"
+
+      if docker manifest inspect "$CI_REGISTRY_IMAGE:$IMAGE_TAG" > /dev/null 2>&1; then
+        echo "CI image $CI_REGISTRY_IMAGE:$IMAGE_TAG already exists, skipping build"
+        exit 0
+      fi
+
+      docker build \
+        -t "$CI_REGISTRY_IMAGE:latest" \
+        -t "$CI_REGISTRY_IMAGE:$IMAGE_TAG" \
+        -f Dockerfile.ci .
+      docker push "$CI_REGISTRY_IMAGE:latest"
+      docker push "$CI_REGISTRY_IMAGE:$IMAGE_TAG"
+
+# --------------------------------
+# Default job configs
+# --------------------------------
+default:
+  image: registry.gitlab.com/amoconst/twiggit/ci:latest
+  cache:
+    key:
+      files:
+        - .cache-key
+    paths:
+      - .cache/go-mod/
+      - .go/pkg/mod/
+    policy: pull-push
+
+# --------------------------------
+# Setup (dependency resolution)
+# --------------------------------
+setup:
+  stage: setup
+  resource_group: cache_updates
+  cache:
+    <<: *cache_config
+    policy: pull-push
+  before_script:
+    - |
+      generate_cache_key() {
+        local checksum=""
+        # Process files in deterministic order
+        for file in .gitlab-ci.yml Dockerfile.ci .mise/config.toml go.mod go.sum; do
+          if [ -f "$file" ]; then
+            local file_hash=$(sha256sum "$file" | awk '{print $1}')
+            checksum="${checksum}${file}:${file_hash}|"
+          fi
+        done
+        # Write to cache key file (remove trailing pipe)
+        echo "${checksum%|}" > .cache-key
+      }
+      generate_cache_key
+  script:
+    - go mod download
+  artifacts:
+    paths:
+      - .cache/go-mod/
+      - .go/pkg/mod/
+      - .cache-key
+    expire_in: 24 hours
+
+# --------------------------------
+# Validation Jobs
+# --------------------------------
+lint:
+  stage: validate
+  needs: [setup]
+  cache:
+    <<: *cache_config
+    policy: pull
+  interruptible: true
+  script:
+    - golangci-lint run
+  rules:
+    - when: on_success
+
+test:
+  stage: validate
+  needs: [setup]
+  cache:
+    <<: *cache_config
+    policy: pull
+  script:
+    - mise run ci:coverage
+    - mise run test:race
+    - mise run build:e2e
+    - mise run test:e2e
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
+    paths:
+      - coverage.html
+      - coverage.xml
+  rules:
+    - when: on_success
+
+goreleaser-dry-run:
+  stage: validate
+  image:
+    name: goreleaser/goreleaser
+    entrypoint: [""]
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - goreleaser release --snapshot --skip-publish --clean
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      changes:
+        - .goreleaser.yml
+        - go.mod
+        - go.sum
+        - cmd/**/*
+        - internal/**/*
+
+# --------------------------------
+# Release with GoReleaser
+# --------------------------------
+release:
+  stage: distribute
+  needs: [lint, test]
+  image:
+    name: goreleaser/goreleaser
+    entrypoint: [""]
+  variables:
+    GIT_DEPTH: 0
+    GITLAB_TOKEN: "$GITLAB_RELEASE_TOKEN"
+  before_script:
+    - |
+      if [[ ! "$CI_COMMIT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        echo "ERROR: Invalid tag format: $CI_COMMIT_TAG (expected vX.Y.Z)"
+        exit 1
+      fi
+  script:
+    - goreleaser release --clean
+  rules:
+    - if: "$CI_COMMIT_TAG"
+
+# --------------------------------
+# Mirror to GitHub
+# --------------------------------
+mirror-to-github:
+  stage: distribute
+  variables:
+    GIT_STRATEGY: fetch
+  script:
+    - git remote add github "https://${GITHUB_ACCESS_TOKEN}@github.com/${GITHUB_REPO_URL}.git"
+    - git fetch github
+    - git push github HEAD:$CI_COMMIT_BRANCH --tags --force
+  interruptible: true
+  rules:
+    - if: "$CI_COMMIT_TAG"
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main" && $GITHUB_ACCESS_TOKEN && $GITHUB_REPO_URL'
+      when: on_success

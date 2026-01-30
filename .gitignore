@@ -19,6 +19,14 @@ twiggit
 # Go build cache
 .cache/
 
+# GoReleaser output
+artifacts.json
+metadata.json
+dist/
+
+# Pre-commit
+.pre-commit-config.yaml
+
 # IDE
 .vscode/
 .idea/

@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+project_name: twiggit
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+metadata:
+  mod_timestamp: '{{ .CommitTimestamp }}'
+
+builds:
+  - env: [CGO_ENABLED=0]
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w
+      - -X twiggit/internal/version.Version={{.Version}}
+      - -X twiggit/internal/version.Commit={{.Commit}}
+      - -X twiggit/internal/version.Date={{.Date}}
+    main: ./main.go
+    binary: twiggit
+    mod_timestamp: '{{ .CommitTimestamp }}'
+
+archives:
+  - formats: ["tar.gz"]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: ["zip"]
+    files:
+      - LICENSE*
+      - README.md
+      - AGENTS.md
+
+checksum:
+  name_template: 'twiggit_{{.Version}}_checksums.txt'
+  algorithm: sha256
+
+sboms:
+  - artifacts: archive
+    documents:
+      - "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_sbom.spdx.json"
+
+changelog:
+  sort: asc
+  use: git
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - '^chore:'
+      - '^build:'
+      - '^Merge pull request'
+      - '^Merge branch'
+  groups:
+    - title: Features
+      order: 0
+    - title: Bug Fixes
+      order: 100
+    - title: Other
+      order: 999
+
+release:
+  gitlab:
+    owner: amoconst
+    name: twiggit
+  mode: replace
+  name_template: "v{{ .Version }}"
+
+gomod:
+  proxy: true

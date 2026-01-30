@@ -1,10 +1,25 @@
 [tools]
-go = "1.25.1"
-golangci-lint = "latest"
-"go:github.com/onsi/ginkgo/v2/ginkgo" = "latest"
+go = "1.25.5"
+golangci-lint = "2.8.0"
+goreleaser = "2.13.3"
+ginkgo = "2.26.0"
+"go:github.com/boumenot/gocover-cobertura" = "1.4.0"
+"go:github.com/cybusio/gocovmerge" = "1.0.1"
+pre-commit = "latest"
+
+[env]
+experimental = true
 
 [tasks."test"]
-description = "Run all tests"
+description = "Run all tests (quick)"
+run = "go test ./... -v"
+
+[tasks."test:coverage"]
+description = "Run tests with coverage"
+run = "go test ./... -cover"
+
+[tasks."test:full"]
+description = "Run all tests (unit, integration, e2e, race)"
 depends = ["test:unit", "test:integration", "test:e2e", "test:race"]
 
 [tasks."test:unit"]
@@ -40,9 +55,20 @@ run = "golangci-lint run"
 description = "Auto-fix linting issues"
 run = "golangci-lint run --fix"
 
+[tasks.build]
+description = "Build CLI to bin/twiggit"
+depends = ["build:clean"]
+run = "mkdir -p bin && go build -ldflags=\"-X twiggit/internal/version.Version=$(git describe --tags --always --dirty 2>/dev/null || echo dev) -X twiggit/internal/version.Commit=$(git rev-parse HEAD 2>/dev/null || echo unknown) -X twiggit/internal/version.Date=$(date +%Y-%m-%d)\" -o bin/twiggit main.go"
+sources = ["cmd/**/*.go", "internal/**/*.go"]
+outputs = ["bin/twiggit"]
+
+[tasks."build:local"]
+description = "Build and install twiggit locally for testing"
+run = "mkdir -p $HOME/.local/bin && go build -ldflags=\"-X twiggit/internal/version.Version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)\" -o $HOME/.local/bin/twiggit main.go"
+
 [tasks."build:cli"]
-description = "Build the CLI binary"
-run = "go build -o bin/twiggit main.go"
+description = "Build the CLI binary (alias for build)"
+depends = ["build"]
 
 [tasks."build:clean"]
 description = "Clean build artifacts"
@@ -57,6 +83,34 @@ description = "Clean up go.mod and go.sum"
 run = "go mod tidy"
 
 [tasks."dev:cli"]
-description = "Build the CLI binary"
-depends = ["build:cli"]
+description = "Build and install the CLI binary locally"
+depends = ["build"]
 run = "cp ./bin/twiggit $HOME/.local/bin"
+
+[tasks.format]
+description = "Format Go code"
+run = "gofmt -w ."
+
+[tasks.check]
+description = "Run all validation checks"
+depends = ["lint:check", "format", "test:unit", "build"]
+
+[tasks."ci:coverage"]
+description = "Calculate coverage excluding cmd/, test/, and main.go packages"
+run = ".mise/tasks/ci/coverage.sh"
+
+# ========================
+# Release Management
+# ========================
+
+[tasks."release:dry-run"]
+description = "Test GoReleaser without creating release"
+run = "goreleaser release --skip=publish --clean"
+
+[tasks."release:validate"]
+description = "Validate release prerequisites before tagging"
+run = ".mise/tasks/release/validate.sh"
+
+[tasks."release:tag"]
+description = "Create and push git tag for release (patch|minor|major)"
+run = ".mise/tasks/release/tag.sh"

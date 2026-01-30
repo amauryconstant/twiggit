@@ -1,0 +1,39 @@
+FROM golang:1.25.5-alpine3.23 AS base
+
+RUN apk add --no-cache \
+    curl \
+    git \
+    ca-certificates \
+    bash \
+    docker-cli
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+ENV MISE_DATA_DIR=/mise
+ENV MISE_CONFIG_DIR=/mise
+ENV MISE_CACHE_DIR=/mise/cache
+ENV PATH="/root/.local/bin:/mise/shims:$PATH"
+
+RUN curl https://mise.run | sh
+
+FROM base AS tools
+
+COPY .mise/config.toml ${MISE_CONFIG_DIR}/config.toml
+
+RUN mise install --yes && \
+    rm -rf ${MISE_CACHE_DIR} && \
+    mkdir -p /workspace/.gomodcache /workspace/go
+
+FROM tools AS final
+
+ENV GO111MODULE=on \
+    GOMODCACHE=/workspace/.gomodcache \
+    GOPATH=/workspace/go \
+    PATH="${GOPATH}/bin:/root/.local/bin:/mise/shims:$PATH"
+
+WORKDIR /workspace
+
+RUN mise ls && \
+    go version && \
+    goreleaser --version && \
+    golangci-lint version

@@ -106,6 +106,7 @@ across multiple projects.`,
 	cmd.AddCommand(NewDeleteCommand(config))
 	cmd.AddCommand(NewCDCommand(config))
 	cmd.AddCommand(NewSetupShellCmd(config))
+	cmd.AddCommand(NewVersionCommand(config))
 
 	return cmd
 }

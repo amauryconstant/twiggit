@@ -1,0 +1,36 @@
+# Git files
+.git
+.gitignore
+
+# CI files
+.gitlab-ci.yml
+
+# Test and coverage files
+coverage*.out
+coverage.html
+*.test
+
+# Build artifacts
+bin/twiggit
+twiggit
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# AI files
+.ai/
+
+# mise local config
+.mise.local.toml
+.mise/config.local.toml
+
+# Temporary files
+tmp/
+temp/
