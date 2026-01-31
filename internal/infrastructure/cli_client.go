@@ -192,6 +192,42 @@ func (c *CLIClientImpl) PruneWorktrees(ctx context.Context, repoPath string) err
 	return nil
 }
 
+// IsBranchMerged checks if a branch is merged into the current branch
+func (c *CLIClientImpl) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
+	// Validate input
+	if repoPath == "" {
+		return false, domain.NewGitWorktreeError("", branchName, "repository path cannot be empty", nil)
+	}
+	if branchName == "" {
+		return false, domain.NewGitWorktreeError("", "", "branch name cannot be empty", nil)
+	}
+
+	// Execute git branch --merged command
+	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, "branch", "--merged")
+	if err != nil {
+		return false, domain.NewGitWorktreeError("", branchName, "failed to check merged status", err)
+	}
+
+	if result.ExitCode != 0 {
+		return false, domain.NewGitWorktreeError("", branchName,
+			"git branch --merged failed: "+result.Stderr, nil)
+	}
+
+	// Check if branch name appears in merged branches output
+	mergedBranches := strings.Split(result.Stdout, "\n")
+	for _, branch := range mergedBranches {
+		trimmed := strings.TrimSpace(branch)
+		// Remove leading asterisk if present (indicates current branch)
+		trimmed = strings.TrimPrefix(trimmed, "*")
+		trimmed = strings.TrimSpace(trimmed)
+		if trimmed == branchName {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // parseWorktreeList parses the output of `git worktree list --porcelain`
 func (c *CLIClientImpl) parseWorktreeList(output string) ([]domain.WorktreeInfo, error) {
 	var worktrees []domain.WorktreeInfo

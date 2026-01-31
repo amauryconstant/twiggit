@@ -55,6 +55,9 @@ type CLIClient interface {
 
 	// PruneWorktrees removes stale worktree references
 	PruneWorktrees(ctx context.Context, repoPath string) error
+
+	// IsBranchMerged checks if a branch is merged into the current branch
+	IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error)
 }
 
 // ShellInfrastructure defines low-level shell infrastructure operations

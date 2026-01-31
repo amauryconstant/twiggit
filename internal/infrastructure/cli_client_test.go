@@ -302,6 +302,59 @@ func TestCLIClient_PruneWorktrees(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestCLIClient_IsBranchMerged(t *testing.T) {
+	tests := []struct {
+		name       string
+		branchName string
+		output     string
+		expected   bool
+		expectErr  bool
+	}{
+		{
+			name:       "branch is merged",
+			branchName: "feature-branch",
+			output:     "  main\n* feature-branch\n  develop\n",
+			expected:   true,
+			expectErr:  false,
+		},
+		{
+			name:       "branch is not merged",
+			branchName: "feature-branch",
+			output:     "  main\n  develop\n",
+			expected:   false,
+			expectErr:  false,
+		},
+		{
+			name:       "branch with asterisk is merged",
+			branchName: "main",
+			output:     "* main\n  develop\n",
+			expected:   true,
+			expectErr:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
+				assert.Equal(t, "/test/repo", dir)
+				assert.Equal(t, "git", cmd)
+				assert.Equal(t, []string{"branch", "--merged"}, args)
+				return &CommandResult{ExitCode: 0, Stdout: tt.output}, nil
+			})
+			client := NewCLIClient(mockExecutor)
+
+			isMerged, err := client.IsBranchMerged(context.Background(), "/test/repo", tt.branchName)
+
+			if tt.expectErr {
+				assert.Error(t, err)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tt.expected, isMerged)
+			}
+		})
+	}
+}
+
 func TestCLIClient_Timeout(t *testing.T) {
 	// Create mock command executor
 	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {

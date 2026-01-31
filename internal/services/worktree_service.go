@@ -79,7 +79,7 @@ func (s *worktreeService) DeleteWorktree(ctx context.Context, req *domain.Delete
 	}
 
 	// Delete worktree using CLI client
-	err = s.gitService.DeleteWorktree(ctx, project.GitRepoPath, req.WorktreePath, false)
+	err = s.gitService.DeleteWorktree(ctx, project.GitRepoPath, req.WorktreePath, req.KeepBranch)
 	if err != nil {
 		return domain.NewWorktreeServiceError(req.WorktreePath, "", "DeleteWorktree", "failed to delete worktree", err)
 	}

@@ -97,6 +97,7 @@ type MockCLIClient struct {
 	DeleteWorktreeFunc func(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error
 	ListWorktreesFunc  func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
 	PruneWorktreesFunc func(ctx context.Context, repoPath string) error
+	IsBranchMergedFunc func(ctx context.Context, repoPath, branchName string) (bool, error)
 }
 
 // NewMockCLIClient creates a new mock CLIClient for testing
@@ -134,6 +135,14 @@ func (m *MockCLIClient) PruneWorktrees(ctx context.Context, repoPath string) err
 		return m.PruneWorktreesFunc(ctx, repoPath)
 	}
 	return nil
+}
+
+// IsBranchMerged mocks checking if a branch is merged
+func (m *MockCLIClient) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
+	if m.IsBranchMergedFunc != nil {
+		return m.IsBranchMergedFunc(ctx, repoPath, branchName)
+	}
+	return true, nil
 }
 
 // MockGitService implements infrastructure.GitClient for testing

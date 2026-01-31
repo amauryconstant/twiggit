@@ -125,3 +125,12 @@ func (c *CompositeGitClient) PruneWorktrees(ctx context.Context, repoPath string
 	}
 	return nil
 }
+
+// IsBranchMerged checks if a branch is merged into the current branch using the CLI client
+func (c *CompositeGitClient) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
+	merged, err := c.cliClient.IsBranchMerged(ctx, repoPath, branchName)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if branch is merged: %w", err)
+	}
+	return merged, nil
+}
