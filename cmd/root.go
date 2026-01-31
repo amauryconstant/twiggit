@@ -37,7 +37,7 @@ var rootCmd = &cobra.Command{
 	Use:   "twiggit",
 	Short: "A pragmatic tool for managing git worktrees",
 	Long: `twiggit is a pragmatic tool for managing git worktrees with a focus on rebase workflows.
-It provides context-aware operations for creating, listing, navigating, and deleting worktrees 
+It provides context-aware operations for creating, listing, navigating, and deleting worktrees
 across multiple projects.`,
 	PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 		// Get global configuration (loaded in main)
@@ -85,7 +85,7 @@ func NewRootCommand(config *CommandConfig) *cobra.Command {
 		Use:   "twiggit",
 		Short: "A pragmatic tool for managing git worktrees",
 		Long: `twiggit is a pragmatic tool for managing git worktrees with a focus on rebase workflows.
-It provides context-aware operations for creating, listing, navigating, and deleting worktrees 
+It provides context-aware operations for creating, listing, navigating, and deleting worktrees
 across multiple projects.`,
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			if config != nil && config.Config != nil {

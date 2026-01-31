@@ -44,7 +44,7 @@ func TestWorktreeService_CreateWorktree_Success(t *testing.T) {
 				},
 			},
 			expectError:  true,
-			errorMessage: "branch name cannot be empty",
+			errorMessage: "branch name is required",
 		},
 		{
 			name: "empty project name",

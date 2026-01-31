@@ -21,13 +21,14 @@ func TestCreateCommand_MockInterfaces(t *testing.T) {
 
 func TestCreateCommand_Execute(t *testing.T) {
 	testCases := []struct {
-		name         string
-		args         []string
-		flags        map[string]string
-		setupMocks   func(*mocks.MockWorktreeService, *mocks.MockContextService, *mocks.MockProjectService)
-		expectError  bool
-		errorMessage string
-		validateOut  func(string) bool
+		name           string
+		args           []string
+		flags          map[string]string
+		setupMocks     func(*mocks.MockWorktreeService, *mocks.MockContextService, *mocks.MockProjectService)
+		setupGitClient func(*mocks.MockGitService)
+		expectError    bool
+		errorMessage   string
+		validateOut    func(string) bool
 	}{
 		{
 			name:  "create worktree with project/branch",
@@ -48,6 +49,11 @@ func TestCreateCommand_Execute(t *testing.T) {
 						Path:   "/home/user/Worktrees/test-project/feature-branch",
 						Branch: "feature-branch",
 					}, nil
+				}
+			},
+			setupGitClient: func(mockGit *mocks.MockGitService) {
+				mockGit.BranchExistsFunc = func(ctx context.Context, repoPath, branchName string) (bool, error) {
+					return true, nil
 				}
 			},
 			expectError: false,
@@ -73,6 +79,11 @@ func TestCreateCommand_Execute(t *testing.T) {
 				}
 				mockWS.CreateWorktreeFunc = func(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error) {
 					return &domain.WorktreeInfo{}, nil
+				}
+			},
+			setupGitClient: func(mockGit *mocks.MockGitService) {
+				mockGit.BranchExistsFunc = func(ctx context.Context, repoPath, branchName string) (bool, error) {
+					return true, nil
 				}
 			},
 			expectError: false,
@@ -107,14 +118,19 @@ func TestCreateCommand_Execute(t *testing.T) {
 			mockWS := mocks.NewMockWorktreeService()
 			mockCS := mocks.NewMockContextService()
 			mockPS := mocks.NewMockProjectService()
+			mockGit := mocks.NewMockGitService()
 
 			tc.setupMocks(mockWS, mockCS, mockPS)
+			if tc.setupGitClient != nil {
+				tc.setupGitClient(mockGit)
+			}
 
 			config := &CommandConfig{
 				Services: &ServiceContainer{
 					WorktreeService: mockWS,
 					ContextService:  mockCS,
 					ProjectService:  mockPS,
+					GitClient:       mockGit,
 				},
 			}
 

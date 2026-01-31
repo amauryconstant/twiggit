@@ -8,7 +8,8 @@ import (
 	"twiggit/internal/version"
 )
 
-func NewVersionCommand(config *CommandConfig) *cobra.Command {
+// NewVersionCommand creates and returns the version command
+func NewVersionCommand(_ *CommandConfig) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
 		Short: "Show version of twiggit",

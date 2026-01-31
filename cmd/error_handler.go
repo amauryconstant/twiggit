@@ -13,21 +13,30 @@ import (
 type ExitCode int
 
 const (
+	// ExitCodeSuccess indicates successful execution
 	ExitCodeSuccess ExitCode = 0
-	ExitCodeError   ExitCode = 1
-	ExitCodeUsage   ExitCode = 2
+	// ExitCodeError indicates a general error occurred
+	ExitCodeError ExitCode = 1
+	// ExitCodeUsage indicates incorrect command-line usage
+	ExitCodeUsage ExitCode = 2
 )
 
 // ErrorCategory defines categories of errors for consistent handling
 type ErrorCategory int
 
 const (
-	ErrorCategoryCobra      ErrorCategory = iota // Cobra argument/flag validation errors
-	ErrorCategoryValidation                      // Input validation errors
-	ErrorCategoryService                         // Service operation errors
-	ErrorCategoryGit                             // Git operation errors
-	ErrorCategoryConfig                          // Configuration errors
-	ErrorCategoryGeneric                         // All other errors
+	// ErrorCategoryCobra represents Cobra argument/flag validation errors
+	ErrorCategoryCobra ErrorCategory = iota
+	// ErrorCategoryValidation represents input validation errors
+	ErrorCategoryValidation
+	// ErrorCategoryService represents service operation errors
+	ErrorCategoryService
+	// ErrorCategoryGit represents git operation errors
+	ErrorCategoryGit
+	// ErrorCategoryConfig represents configuration errors
+	ErrorCategoryConfig
+	// ErrorCategoryGeneric represents all other errors
+	ErrorCategoryGeneric
 )
 
 // HandleCLIError is a pure function that maps errors to CLI output and returns exit code

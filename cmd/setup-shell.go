@@ -70,27 +70,27 @@ func runSetupShell(cmd *cobra.Command, config *CommandConfig) error {
 
 func displaySetupResults(out io.Writer, result *domain.SetupShellResult, dryRun bool) error {
 	if result.Skipped {
-		fmt.Fprintf(out, "✓ Shell wrapper already installed for %s\n", result.ShellType)
-		fmt.Fprintf(out, "Use --force to reinstall\n")
+		_, _ = fmt.Fprintf(out, "✓ Shell wrapper already installed for %s\n", result.ShellType)
+		_, _ = fmt.Fprintf(out, "Use --force to reinstall\n")
 		return nil
 	}
 
 	if dryRun {
-		fmt.Fprintf(out, "Would install wrapper for %s:\n", result.ShellType)
-		fmt.Fprintf(out, "Wrapper function:\n%s\n", result.WrapperContent)
+		_, _ = fmt.Fprintf(out, "Would install wrapper for %s:\n", result.ShellType)
+		_, _ = fmt.Fprintf(out, "Wrapper function:\n%s\n", result.WrapperContent)
 		return nil
 	}
 
 	if result.Installed {
-		fmt.Fprintf(out, "✓ Shell wrapper installed for %s\n", result.ShellType)
-		fmt.Fprintf(out, "✓ %s\n", result.Message)
+		_, _ = fmt.Fprintf(out, "✓ Shell wrapper installed for %s\n", result.ShellType)
+		_, _ = fmt.Fprintf(out, "✓ %s\n", result.Message)
 
-		fmt.Fprintf(out, "\nTo activate the wrapper:\n")
-		fmt.Fprintf(out, "  1. Restart your shell, or\n")
-		fmt.Fprintf(out, "  2. Run: source ~/.bashrc (or ~/.zshrc, etc.)\n")
-		fmt.Fprintf(out, "\nUsage:\n")
-		fmt.Fprintf(out, "  twiggit cd <branch>     # Change to worktree\n")
-		fmt.Fprintf(out, "  builtin cd <path>       # Use shell built-in cd\n")
+		_, _ = fmt.Fprintf(out, "\nTo activate the wrapper:\n")
+		_, _ = fmt.Fprintf(out, "  1. Restart your shell, or\n")
+		_, _ = fmt.Fprintf(out, "  2. Run: source ~/.bashrc (or ~/.zshrc, etc.)\n")
+		_, _ = fmt.Fprintf(out, "\nUsage:\n")
+		_, _ = fmt.Fprintf(out, "  twiggit cd <branch>     # Change to worktree\n")
+		_, _ = fmt.Fprintf(out, "  builtin cd <path>       # Use shell built-in cd\n")
 	}
 
 	return nil

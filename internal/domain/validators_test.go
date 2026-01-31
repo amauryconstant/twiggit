@@ -29,7 +29,7 @@ func TestValidateBranchName_ValidBranch(t *testing.T) {
 	result := ValidateBranchName("feature-branch")
 
 	assert.True(t, result.IsSuccess())
-	assert.Equal(t, true, result.Value)
+	assert.True(t, result.Value)
 }
 
 func TestValidateBranchName_WhitespaceOnly(t *testing.T) {
@@ -63,7 +63,7 @@ func TestValidateProjectName_ValidProject(t *testing.T) {
 	result := ValidateProjectName("my-project")
 
 	assert.True(t, result.IsSuccess())
-	assert.Equal(t, true, result.Value)
+	assert.True(t, result.Value)
 }
 
 func TestValidateShellType_EmptyShell(t *testing.T) {
@@ -91,7 +91,7 @@ func TestValidateShellType_ValidShell(t *testing.T) {
 	for _, shell := range validShells {
 		result := ValidateShellType(shell)
 		assert.True(t, result.IsSuccess(), "Shell %s should be valid", shell)
-		assert.Equal(t, true, result.Value)
+		assert.True(t, result.Value)
 	}
 }
 
@@ -132,5 +132,5 @@ func TestValidationPipeline_EmptyPipeline(t *testing.T) {
 
 	result := pipeline.Validate("any-input")
 	assert.True(t, result.IsSuccess())
-	assert.Equal(t, true, result.Value)
+	assert.True(t, result.Value)
 }

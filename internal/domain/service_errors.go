@@ -2,6 +2,7 @@ package domain
 
 import (
 	"fmt"
+	"strings"
 )
 
 // ServiceError represents a general service operation error
@@ -41,7 +42,17 @@ type ValidationError struct {
 }
 
 func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation failed for %s.%s: %s (value: %s)", e.request, e.field, e.message, e.value)
+	baseMsg := fmt.Sprintf("validation failed for %s.%s: %s (value: %s)", e.request, e.field, e.message, e.value)
+	if len(e.suggestions) > 0 {
+		var sb strings.Builder
+		sb.WriteString(baseMsg)
+		for _, suggestion := range e.suggestions {
+			sb.WriteString("\n💡 ")
+			sb.WriteString(suggestion)
+		}
+		return sb.String()
+	}
+	return baseMsg
 }
 
 // NewValidationError creates a new validation error
@@ -72,15 +83,27 @@ func (e *ValidationError) WithContext(context string) *ValidationError {
 }
 
 // Pure getter methods
-func (e *ValidationError) Field() string   { return e.field }
-func (e *ValidationError) Value() string   { return e.value }
+
+// Field returns the validation field that failed
+func (e *ValidationError) Field() string { return e.field }
+
+// Value returns the value that caused the validation failure
+func (e *ValidationError) Value() string { return e.value }
+
+// Message returns the validation error message
 func (e *ValidationError) Message() string { return e.message }
+
+// Request returns the request context for the validation error
 func (e *ValidationError) Request() string { return e.request }
+
+// Suggestions returns suggestions for fixing the validation error
 func (e *ValidationError) Suggestions() []string {
 	result := make([]string, len(e.suggestions))
 	copy(result, e.suggestions)
 	return result
 }
+
+// Context returns the context information for the validation error
 func (e *ValidationError) Context() string { return e.context }
 
 // WorktreeServiceError represents worktree service specific errors

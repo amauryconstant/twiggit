@@ -47,7 +47,7 @@ BEGIN {
   # Format: "github.com/amaury/twiggit/internal/package/file.go:line:	function_name	coverage%"
   coverage = $NF
   gsub(/%/, "", coverage)
-  
+
   # Since we cannot get actual statement counts from -func output,
   # we use the coverage percentage as a weighted average
   # This is an approximation but better than counting functions

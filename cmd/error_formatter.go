@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -45,7 +46,11 @@ func (ef *ErrorFormatter) Format(err error) string {
 
 // formatValidationError formats ValidationError with emoji indicators and suggestions
 func formatValidationError(err error) string {
-	validationErr := err.(*domain.ValidationError)
+	validationErr := func() *domain.ValidationError {
+		target := &domain.ValidationError{}
+		_ = errors.As(err, &target)
+		return target
+	}()
 	var output strings.Builder
 
 	// Error message with emoji
@@ -66,7 +71,11 @@ func formatValidationError(err error) string {
 
 // formatWorktreeError formats WorktreeServiceError with emoji indicators
 func formatWorktreeError(err error) string {
-	worktreeErr := err.(*domain.WorktreeServiceError)
+	worktreeErr := func() *domain.WorktreeServiceError {
+		target := &domain.WorktreeServiceError{}
+		_ = errors.As(err, &target)
+		return target
+	}()
 	var output strings.Builder
 
 	if worktreeErr.BranchName != "" {
@@ -83,7 +92,11 @@ func formatWorktreeError(err error) string {
 
 // formatProjectError formats ProjectServiceError with emoji indicators
 func formatProjectError(err error) string {
-	projectErr := err.(*domain.ProjectServiceError)
+	projectErr := func() *domain.ProjectServiceError {
+		target := &domain.ProjectServiceError{}
+		_ = errors.As(err, &target)
+		return target
+	}()
 	var output strings.Builder
 
 	if projectErr.ProjectName != "" {
@@ -100,7 +113,11 @@ func formatProjectError(err error) string {
 
 // formatServiceError formats ServiceError with emoji indicators
 func formatServiceError(err error) string {
-	serviceErr := err.(*domain.ServiceError)
+	serviceErr := func() *domain.ServiceError {
+		target := &domain.ServiceError{}
+		_ = errors.As(err, &target)
+		return target
+	}()
 	var output strings.Builder
 
 	output.WriteString(fmt.Sprintf("❌ %s\n", serviceErr.Message))
@@ -122,5 +139,5 @@ func formatServiceError(err error) string {
 
 // formatGenericError formats any error with basic emoji formatting
 func formatGenericError(err error) string {
-	return fmt.Sprintf("❌ %s", err.Error())
+	return "❌ " + err.Error()
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -199,9 +200,11 @@ func (c *Config) Validate() error {
 
 	if len(validationErrors) > 0 {
 		var errorMsg string
+		var errorMsgSb strings.Builder
 		for _, err := range validationErrors {
-			errorMsg += err.Error() + "; "
+			errorMsgSb.WriteString(err.Error() + "; ")
 		}
+		errorMsg += errorMsgSb.String()
 		return errors.New("config validation failed: " + errorMsg)
 	}
 

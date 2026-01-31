@@ -15,34 +15,34 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    
+
     # Code quality
     - gocyclo
     - gocognit
     - funlen
-    
+
     # Style
     - misspell
     - whitespace
     - revive
-    
+
     # Error handling
     - errorlint
     - wrapcheck
     - errname
-    
+
     # Performance
     - prealloc
     - perfsprint
-    
+
     # Security
     - gosec
-    
+
     # Tests
     - testifylint
     - tparallel
     - thelper
-    
+
     # Best practices
     - nakedret
     - unconvert
