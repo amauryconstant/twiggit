@@ -26,6 +26,11 @@ func parseCrossProjectReference(identifier string) (project, branch string, vali
 	return parts[0], parts[1], true
 }
 
+// containsPathTraversal checks if a string contains path traversal sequences
+func containsPathTraversal(s string) bool {
+	return strings.Contains(s, "..") || strings.Contains(s, string(filepath.Separator)+".")
+}
+
 // buildWorktreePath builds the path to a worktree for a given project and branch
 func buildWorktreePath(worktreesDir, project, branch string) string {
 	return filepath.Join(worktreesDir, project, branch)
@@ -112,8 +117,24 @@ func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identi
 		return cr.resolveCrossProjectReference(identifier)
 	}
 
+	// Validate project name and branch name don't contain path traversal sequences
+	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
+		return nil, domain.NewContextDetectionError(
+			filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier),
+			"project or branch name contains path traversal sequences",
+			nil,
+		)
+	}
+
 	// Resolve as branch name (worktree of current project)
 	worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
+
+	// Validate the worktree path is under the worktrees directory to prevent path traversal
+	if under, err := IsPathUnder(cr.config.WorktreesDirectory, worktreePath); err != nil {
+		return nil, fmt.Errorf("failed to validate worktree path: %w", err)
+	} else if !under {
+		return nil, domain.NewContextDetectionError(worktreePath, "worktree path is outside configured worktrees directory", nil)
+	}
 
 	return &domain.ResolutionResult{
 		ResolvedPath: worktreePath,
@@ -204,7 +225,24 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.Resolution
 func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
 	// Handle special case: "main" resolves to project root
 	if identifier == "main" {
+		// Validate project name doesn't contain path traversal sequences
+		if containsPathTraversal(ctx.ProjectName) {
+			return nil, domain.NewContextDetectionError(
+				filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName),
+				"project name contains path traversal sequences",
+				nil,
+			)
+		}
+
 		projectPath := filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
+
+		// Validate the project path is under the projects directory to prevent path traversal
+		if under, err := IsPathUnder(cr.config.ProjectsDirectory, projectPath); err != nil {
+			return nil, fmt.Errorf("failed to validate project path: %w", err)
+		} else if !under {
+			return nil, domain.NewContextDetectionError(projectPath, "project path is outside configured projects directory", nil)
+		}
+
 		return &domain.ResolutionResult{
 			ResolvedPath: projectPath,
 			Type:         domain.PathTypeProject,
@@ -218,8 +256,24 @@ func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, ident
 		return cr.resolveCrossProjectReference(identifier)
 	}
 
+	// Validate project name and branch name don't contain path traversal sequences
+	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
+		return nil, domain.NewContextDetectionError(
+			filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier),
+			"project or branch name contains path traversal sequences",
+			nil,
+		)
+	}
+
 	// Resolve as different worktree of same project
 	worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
+
+	// Validate the worktree path is under the worktrees directory to prevent path traversal
+	if under, err := IsPathUnder(cr.config.WorktreesDirectory, worktreePath); err != nil {
+		return nil, fmt.Errorf("failed to validate worktree path: %w", err)
+	} else if !under {
+		return nil, domain.NewContextDetectionError(worktreePath, "worktree path is outside configured worktrees directory", nil)
+	}
 
 	return &domain.ResolutionResult{
 		ResolvedPath: worktreePath,
@@ -269,8 +323,24 @@ func (cr *contextResolver) resolveFromOutsideGitContext(_ *domain.Context, ident
 		return cr.resolveCrossProjectReference(identifier)
 	}
 
+	// Validate project name doesn't contain path traversal sequences
+	if containsPathTraversal(identifier) {
+		return nil, domain.NewContextDetectionError(
+			filepath.Join(cr.config.ProjectsDirectory, identifier),
+			"project name contains path traversal sequences",
+			nil,
+		)
+	}
+
 	// Resolve as project name
 	projectPath := filepath.Join(cr.config.ProjectsDirectory, identifier)
+
+	// Validate the project path is under the projects directory to prevent path traversal
+	if under, err := IsPathUnder(cr.config.ProjectsDirectory, projectPath); err != nil {
+		return nil, fmt.Errorf("failed to validate project path: %w", err)
+	} else if !under {
+		return nil, domain.NewContextDetectionError(projectPath, "project path is outside configured projects directory", nil)
+	}
 
 	return &domain.ResolutionResult{
 		ResolvedPath: projectPath,
@@ -355,6 +425,15 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*do
 }
 
 func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*domain.ResolutionResult, error) {
+	// Check for path traversal before parsing
+	if containsPathTraversal(identifier) {
+		return nil, domain.NewContextDetectionError(
+			filepath.Join(cr.config.WorktreesDirectory, identifier),
+			"identifier contains path traversal sequences",
+			nil,
+		)
+	}
+
 	projectName, branchName, valid := parseCrossProjectReference(identifier)
 	if !valid {
 		return &domain.ResolutionResult{
@@ -365,6 +444,13 @@ func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*dom
 
 	// Resolve to worktree of specified project
 	worktreePath := filepath.Join(cr.config.WorktreesDirectory, projectName, branchName)
+
+	// Validate the worktree path is under the worktrees directory to prevent path traversal
+	if under, err := IsPathUnder(cr.config.WorktreesDirectory, worktreePath); err != nil {
+		return nil, fmt.Errorf("failed to validate worktree path: %w", err)
+	} else if !under {
+		return nil, domain.NewContextDetectionError(worktreePath, "worktree path is outside configured worktrees directory", nil)
+	}
 
 	return &domain.ResolutionResult{
 		ResolvedPath: worktreePath,

@@ -451,6 +451,174 @@ func TestFilterSuggestions(t *testing.T) {
 	}
 }
 
+func TestContextResolver_PathTraversalProtection(t *testing.T) {
+	tests := []struct {
+		name          string
+		context       *domain.Context
+		identifier    string
+		expectError   bool
+		errorContains string
+		description   string
+	}{
+		{
+			name: "path traversal attack - worktree resolution from project context",
+			context: &domain.Context{
+				Type:        domain.ContextProject,
+				ProjectName: "test-project",
+				Path:        "/home/user/Projects/test-project",
+			},
+			identifier:    "../../../etc/passwd",
+			expectError:   true,
+			errorContains: "identifier contains path traversal sequences",
+			description:   "Path traversal in branch name should be rejected",
+		},
+		{
+			name: "path traversal attack - worktree resolution from worktree context",
+			context: &domain.Context{
+				Type:        domain.ContextWorktree,
+				ProjectName: "test-project",
+				BranchName:  "current-branch",
+				Path:        "/home/user/Worktrees/test-project/current-branch",
+			},
+			identifier:    "../../etc/passwd",
+			expectError:   true,
+			errorContains: "identifier contains path traversal sequences",
+			description:   "Path traversal in branch name from worktree context should be rejected",
+		},
+		{
+			name: "path traversal attack - project resolution from worktree context",
+			context: &domain.Context{
+				Type:        domain.ContextWorktree,
+				ProjectName: "../../../etc",
+				BranchName:  "current-branch",
+				Path:        "/home/user/Worktrees/test-project/current-branch",
+			},
+			identifier:    "main",
+			expectError:   true,
+			errorContains: "project name contains path traversal sequences",
+			description:   "Path traversal via project name in context should be rejected",
+		},
+		{
+			name: "path traversal attack - project resolution from outside git context",
+			context: &domain.Context{
+				Type: domain.ContextOutsideGit,
+				Path: "/home/user",
+			},
+			identifier:    "../../../etc/passwd",
+			expectError:   true,
+			errorContains: "identifier contains path traversal sequences",
+			description:   "Path traversal in project name from outside git context should be rejected",
+		},
+		{
+			name: "path traversal attack - cross-project reference",
+			context: &domain.Context{
+				Type: domain.ContextOutsideGit,
+				Path: "/home/user",
+			},
+			identifier:    "../../../etc/passwd/../../passwd",
+			expectError:   true,
+			errorContains: "identifier contains path traversal sequences",
+			description:   "Path traversal in cross-project reference should be rejected",
+		},
+		{
+			name: "absolute path escape attempt",
+			context: &domain.Context{
+				Type:        domain.ContextProject,
+				ProjectName: "test-project",
+				Path:        "/home/user/Projects/test-project",
+			},
+			identifier:  "/etc/passwd",
+			expectError: false,
+			description: "Absolute path is treated as invalid format, not an error",
+		},
+		{
+			name: "valid path with special characters should work",
+			context: &domain.Context{
+				Type:        domain.ContextProject,
+				ProjectName: "test-project",
+				Path:        "/home/user/Projects/test-project",
+			},
+			identifier:  "feature/branch-123",
+			expectError: false,
+			description: "Valid branch names with slashes should be accepted",
+		},
+		{
+			name: "cross-project reference with traversal in project",
+			context: &domain.Context{
+				Type: domain.ContextOutsideGit,
+				Path: "/home/user",
+			},
+			identifier:    "../../etc/passwd/branch",
+			expectError:   true,
+			errorContains: "identifier contains path traversal sequences",
+			description:   "Path traversal in project part of cross-project reference should be rejected",
+		},
+		{
+			name: "cross-project reference with traversal in branch",
+			context: &domain.Context{
+				Type: domain.ContextOutsideGit,
+				Path: "/home/user",
+			},
+			identifier:    "other-project/../../../etc/passwd",
+			expectError:   true,
+			errorContains: "identifier contains path traversal sequences",
+			description:   "Path traversal in branch part of cross-project reference should be rejected",
+		},
+		{
+			name: "normal branch resolution should work",
+			context: &domain.Context{
+				Type:        domain.ContextProject,
+				ProjectName: "test-project",
+				Path:        "/home/user/Projects/test-project",
+			},
+			identifier:  "normal-branch",
+			expectError: false,
+			description: "Normal branch resolution should succeed",
+		},
+		{
+			name: "normal project resolution should work",
+			context: &domain.Context{
+				Type: domain.ContextOutsideGit,
+				Path: "/home/user",
+			},
+			identifier:  "test-project",
+			expectError: false,
+			description: "Normal project resolution should succeed",
+		},
+		{
+			name: "normal cross-project reference should work",
+			context: &domain.Context{
+				Type: domain.ContextOutsideGit,
+				Path: "/home/user",
+			},
+			identifier:  "other-project/feature-branch",
+			expectError: false,
+			description: "Normal cross-project reference should succeed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			config := &domain.Config{
+				ProjectsDirectory:  "/home/user/Projects",
+				WorktreesDirectory: "/home/user/Worktrees",
+			}
+
+			resolver := NewContextResolver(config, nil)
+			result, err := resolver.ResolveIdentifier(tt.context, tt.identifier)
+
+			if tt.expectError {
+				require.Error(t, err, tt.description)
+				assert.Contains(t, err.Error(), tt.errorContains, tt.description)
+				assert.Nil(t, result, tt.description)
+			} else {
+				require.NoError(t, err, tt.description)
+				assert.NotNil(t, result, tt.description)
+			}
+		})
+	}
+}
+
 func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 	tests := []struct {
 		name          string
