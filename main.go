@@ -4,7 +4,6 @@ import (
 	"os"
 
 	"twiggit/cmd"
-	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/infrastructure/shell"
 	"twiggit/internal/service"
@@ -20,9 +19,6 @@ func main() {
 		cmd.HandleCLIError(err)
 		os.Exit(1)
 	}
-
-	// Set global configuration for simple access
-	domain.SetGlobalConfig(config)
 
 	// Initialize infrastructure services in dependency order
 	commandExecutor := infrastructure.NewDefaultCommandExecutor(30 * 1000000000) // 30 seconds

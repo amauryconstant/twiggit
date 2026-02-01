@@ -79,7 +79,9 @@ func NewConfigManager() domain.ConfigManager {
 // Load loads configuration from defaults and config file
 func (m *koanfConfigManager) Load() (*domain.Config, error) {
 	// 1. Load defaults
-	m.loadDefaults()
+	if err := m.loadDefaults(); err != nil {
+		return nil, fmt.Errorf("failed to load default configuration: %w", err)
+	}
 
 	// 2. Load config file using pure function for existence check
 	configPath := m.getConfigFilePath()
@@ -118,38 +120,38 @@ func (m *koanfConfigManager) GetConfig() *domain.Config {
 }
 
 // loadDefaults loads default configuration values
-func (m *koanfConfigManager) loadDefaults() {
+func (m *koanfConfigManager) loadDefaults() error {
 	defaults := buildDefaultConfig()
 
 	// Set defaults using koanf (matching the struct tags)
 	if err := m.ko.Set("projects_dir", defaults.ProjectsDirectory); err != nil {
-		// Koanf Set only returns error for invalid keys, which shouldn't happen with our keys
-		panic(fmt.Errorf("failed to set projects_dir default: %w", err))
+		return fmt.Errorf("failed to set projects_dir default: %w", err)
 	}
 	if err := m.ko.Set("worktrees_dir", defaults.WorktreesDirectory); err != nil {
-		panic(fmt.Errorf("failed to set worktrees_dir default: %w", err))
+		return fmt.Errorf("failed to set worktrees_dir default: %w", err)
 	}
 	if err := m.ko.Set("default_source_branch", defaults.DefaultSourceBranch); err != nil {
-		panic(fmt.Errorf("failed to set default_source_branch default: %w", err))
+		return fmt.Errorf("failed to set default_source_branch default: %w", err)
 	}
 
 	// Set nested structure defaults
 	if err := m.ko.Set("context_detection.cache_ttl", defaults.ContextDetection.CacheTTL); err != nil {
-		panic(fmt.Errorf("failed to set context_detection.cache_ttl default: %w", err))
+		return fmt.Errorf("failed to set context_detection.cache_ttl default: %w", err)
 	}
 	if err := m.ko.Set("context_detection.git_operation_timeout", defaults.ContextDetection.GitOperationTimeout); err != nil {
-		panic(fmt.Errorf("failed to set context_detection.git_operation_timeout default: %w", err))
+		return fmt.Errorf("failed to set context_detection.git_operation_timeout default: %w", err)
 	}
 	if err := m.ko.Set("context_detection.enable_git_validation", defaults.ContextDetection.EnableGitValidation); err != nil {
-		panic(fmt.Errorf("failed to set context_detection.enable_git_validation default: %w", err))
+		return fmt.Errorf("failed to set context_detection.enable_git_validation default: %w", err)
 	}
 
 	if err := m.ko.Set("git.cli_timeout", defaults.Git.CLITimeout); err != nil {
-		panic(fmt.Errorf("failed to set git.cli_timeout default: %w", err))
+		return fmt.Errorf("failed to set git.cli_timeout default: %w", err)
 	}
 	if err := m.ko.Set("git.cache_enabled", defaults.Git.CacheEnabled); err != nil {
-		panic(fmt.Errorf("failed to set git.cache_enabled default: %w", err))
+		return fmt.Errorf("failed to set git.cache_enabled default: %w", err)
 	}
+	return nil
 }
 
 // getConfigFilePath returns the path to the configuration file following XDG Base Directory specification

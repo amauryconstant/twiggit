@@ -101,22 +101,22 @@ type Config struct {
 	DefaultSourceBranch string `toml:"default_source_branch" koanf:"default_source_branch"`
 
 	// Context detection settings
-	ContextDetection ContextDetectionConfig `toml:"context_detection"`
+	ContextDetection ContextDetectionConfig `toml:"context_detection" koanf:"context_detection"`
 
 	// Git operations settings
-	Git GitConfig `toml:"git"`
+	Git GitConfig `toml:"git" koanf:"git"`
 
 	// Service settings
-	Services ServiceConfig `toml:"services"`
+	Services ServiceConfig `toml:"services" koanf:"services"`
 
 	// Validation settings
-	Validation ValidationConfig `toml:"validation"`
+	Validation ValidationConfig `toml:"validation" koanf:"validation"`
 
 	// Navigation settings
-	Navigation NavigationConfig `toml:"navigation"`
+	Navigation NavigationConfig `toml:"navigation" koanf:"navigation"`
 
 	// Shell integration settings
-	Shell ShellConfig `toml:"shell"`
+	Shell ShellConfig `toml:"shell" koanf:"shell"`
 }
 
 // DefaultConfig returns the default configuration values
@@ -218,33 +218,4 @@ type ConfigManager interface {
 
 	// GetConfig returns the loaded configuration (immutable after Load)
 	GetConfig() *Config
-}
-
-// Global configuration accessor (simple approach for Phase 2)
-// Note: This will be replaced with dependency injection in later phases
-
-var globalConfig *Config
-
-// SetGlobalConfig sets the global configuration (called from main)
-func SetGlobalConfig(config *Config) {
-	globalConfig = config
-}
-
-// GetGlobalConfig returns the global configuration
-func GetGlobalConfig() *Config {
-	if globalConfig == nil {
-		return DefaultConfig()
-	}
-	// Return a copy to maintain immutability
-	return &Config{
-		ProjectsDirectory:   globalConfig.ProjectsDirectory,
-		WorktreesDirectory:  globalConfig.WorktreesDirectory,
-		DefaultSourceBranch: globalConfig.DefaultSourceBranch,
-		ContextDetection:    globalConfig.ContextDetection,
-		Git:                 globalConfig.Git,
-		Services:            globalConfig.Services,
-		Validation:          globalConfig.Validation,
-		Navigation:          globalConfig.Navigation,
-		Shell:               globalConfig.Shell,
-	}
 }
