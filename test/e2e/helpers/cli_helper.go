@@ -31,7 +31,7 @@ func NewTwiggitCLI() *TwiggitCLI {
 		cwd = filepath.Dir(filepath.Dir(cwd))
 	}
 
-	binaryPath := filepath.Join(cwd, "bin", "twiggit")
+	binaryPath := filepath.Join(cwd, "bin", "twiggit-e2e")
 
 	// Ensure binary exists
 	_, err = os.Stat(binaryPath)
