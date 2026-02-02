@@ -43,9 +43,6 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source, _ st
 
 	// Extract branch name for validation first (before any context detection)
 	branchName := extractBranchNameForValidation(spec)
-	if branchName == "" {
-		return errors.New("invalid branch name specification")
-	}
 
 	// Validate branch name first (before any context detection or project discovery)
 	branchValidation := domain.ValidateBranchName(branchName)

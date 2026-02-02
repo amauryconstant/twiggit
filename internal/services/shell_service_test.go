@@ -376,3 +376,74 @@ func (m *mockShellIntegration) ValidateInstallation(shellType domain.ShellType) 
 	// Always fail validation in tests since wrapper not installed
 	return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "mock validation failure")
 }
+
+func TestShellService_composeWrapper(t *testing.T) {
+	testCases := []struct {
+		name      string
+		template  string
+		shellType domain.ShellType
+		expected  string
+	}{
+		{
+			name:      "template with %s format specifier",
+			template:  "# Shell: %s",
+			shellType: domain.ShellBash,
+			expected:  "# Shell: {{SHELL_TYPE}}%!(EXTRA string=bash)",
+		},
+		{
+			name:      "multiple %s placeholders",
+			template:  "%s wrapper for %s",
+			shellType: domain.ShellZsh,
+			expected:  "{{SHELL_TYPE}} wrapper for zsh",
+		},
+		{
+			name:      "custom template with %s",
+			template:  "function twiggit_%s { echo 'hello'; }",
+			shellType: domain.ShellFish,
+			expected:  "function twiggit_{{SHELL_TYPE}} { echo 'hello'; }%!(EXTRA string=fish)",
+		},
+		{
+			name:      "empty template",
+			template:  "",
+			shellType: domain.ShellBash,
+			expected:  "%!(EXTRA string={{SHELL_TYPE}}, string=bash)",
+		},
+		{
+			name:      "bash shell type",
+			template:  "SHELL=%s",
+			shellType: domain.ShellBash,
+			expected:  "SHELL={{SHELL_TYPE}}%!(EXTRA string=bash)",
+		},
+		{
+			name:      "zsh shell type",
+			template:  "SHELL=%s",
+			shellType: domain.ShellZsh,
+			expected:  "SHELL={{SHELL_TYPE}}%!(EXTRA string=zsh)",
+		},
+		{
+			name:      "fish shell type",
+			template:  "SHELL=%s",
+			shellType: domain.ShellFish,
+			expected:  "SHELL={{SHELL_TYPE}}%!(EXTRA string=fish)",
+		},
+		{
+			name:      "template without %s placeholder",
+			template:  "No placeholders here",
+			shellType: domain.ShellBash,
+			expected:  "No placeholders here%!(EXTRA string={{SHELL_TYPE}}, string=bash)",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			config := domain.DefaultConfig()
+			service := &shellService{
+				config: config,
+			}
+
+			result := service.composeWrapper(tc.template, tc.shellType)
+
+			assert.Equal(t, tc.expected, result)
+		})
+	}
+}

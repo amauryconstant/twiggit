@@ -82,3 +82,12 @@ func (cs *ContextService) GetCompletionSuggestions(partial string) ([]*domain.Re
 	}
 	return suggestions, nil
 }
+
+// GetCompletionSuggestionsFromContext provides completion suggestions based on specified context
+func (cs *ContextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+	suggestions, err := cs.resolver.GetResolutionSuggestions(ctx, partial)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get completion suggestions: %w", err)
+	}
+	return suggestions, nil
+}

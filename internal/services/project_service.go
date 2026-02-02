@@ -34,7 +34,7 @@ func NewProjectService(
 // DiscoverProject discovers a project by name or from context
 func (s *projectService) DiscoverProject(ctx context.Context, projectName string, context *domain.Context) (*domain.ProjectInfo, error) {
 	if projectName != "" {
-		return s.discoverProjectByName(ctx, projectName)
+		return s.discoverProjectByName(ctx, projectName, context)
 	}
 
 	if context != nil {
@@ -111,14 +111,17 @@ func (s *projectService) GetProjectInfo(ctx context.Context, projectPath string)
 		return nil, err
 	}
 
+	// If projectPath is a worktree, get the main repository path
+	mainRepoPath := s.findMainRepoFromWorktree(projectPath)
+
 	// Get repository info
-	repoInfo, err := s.gitService.GetRepositoryInfo(ctx, projectPath)
+	repoInfo, err := s.gitService.GetRepositoryInfo(ctx, mainRepoPath)
 	if err != nil {
 		return nil, domain.NewProjectServiceError("", projectPath, "GetProjectInfo", "failed to get repository info", err)
 	}
 
 	// Get worktrees
-	worktrees, err := s.gitService.ListWorktrees(ctx, projectPath)
+	worktrees, err := s.gitService.ListWorktrees(ctx, mainRepoPath)
 	if err != nil {
 		return nil, domain.NewProjectServiceError("", projectPath, "GetProjectInfo", "failed to list worktrees", err)
 	}
@@ -141,13 +144,13 @@ func (s *projectService) GetProjectInfo(ctx context.Context, projectPath string)
 		remotePtrs[i] = &repoInfo.Remotes[i]
 	}
 
-	// Extract project name from path
-	projectName := filepath.Base(projectPath)
+	// Extract project name from main repository path
+	projectName := filepath.Base(mainRepoPath)
 
 	return &domain.ProjectInfo{
 		Name:          projectName,
 		Path:          projectPath,
-		GitRepoPath:   projectPath,
+		GitRepoPath:   mainRepoPath,
 		Worktrees:     worktreePtrs,
 		Branches:      branchPtrs,
 		Remotes:       remotePtrs,
@@ -158,7 +161,14 @@ func (s *projectService) GetProjectInfo(ctx context.Context, projectPath string)
 
 // Private helper methods
 
-func (s *projectService) discoverProjectByName(ctx context.Context, projectName string) (*domain.ProjectInfo, error) {
+func (s *projectService) discoverProjectByName(ctx context.Context, projectName string, currentContext *domain.Context) (*domain.ProjectInfo, error) {
+	// If in project context and project name matches, use context path
+	if currentContext != nil && currentContext.Type == domain.ContextProject {
+		if currentContext.ProjectName == projectName {
+			return s.GetProjectInfo(ctx, currentContext.Path)
+		}
+	}
+
 	// Look for project in projects directory
 	projectPath := filepath.Join(s.config.ProjectsDirectory, projectName)
 
@@ -222,10 +232,29 @@ func (s *projectService) searchProjectByName(ctx context.Context, projectName st
 }
 
 func (s *projectService) findMainRepoFromWorktree(worktreePath string) string {
-	// Simple implementation: go up directories until we find a .git directory
-	// that doesn't contain a gitdir file (which indicates a worktree)
-	currentPath := worktreePath
+	// Check if we can use the configured directories
+	if s.config != nil && s.config.WorktreesDirectory != "" && s.config.ProjectsDirectory != "" {
+		worktreeDir := filepath.Clean(s.config.WorktreesDirectory)
 
+		// Check if worktree path is under worktrees directory
+		if strings.HasPrefix(worktreePath, worktreeDir+string(filepath.Separator)) {
+			relPath, err := filepath.Rel(worktreeDir, worktreePath)
+			if err == nil {
+				parts := strings.Split(relPath, string(filepath.Separator))
+				if len(parts) >= 1 {
+					projectName := parts[0]
+					// Construct main repository path
+					mainRepoPath := filepath.Join(s.config.ProjectsDirectory, projectName)
+					if _, err := os.Stat(filepath.Join(mainRepoPath, ".git")); err == nil {
+						return mainRepoPath
+					}
+				}
+			}
+		}
+	}
+
+	// Fallback: traverse up directories looking for .git directory
+	currentPath := worktreePath
 	for {
 		gitPath := filepath.Join(currentPath, ".git")
 
@@ -248,6 +277,6 @@ func (s *projectService) findMainRepoFromWorktree(worktreePath string) string {
 		currentPath = parent
 	}
 
-	// Fallback to worktree path if we can't find main repo
+	// Last fallback to worktree path
 	return worktreePath
 }

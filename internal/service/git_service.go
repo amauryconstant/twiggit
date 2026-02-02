@@ -50,6 +50,9 @@ type CLIClient interface {
 
 	// PruneWorktrees removes stale worktree references
 	PruneWorktrees(ctx context.Context, repoPath string) error
+
+	// IsBranchMerged checks if a branch is merged into the current branch
+	IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error)
 }
 
 // GitService provides unified git operations with deterministic routing
@@ -194,4 +197,12 @@ func (gs *gitService) PruneWorktrees(ctx context.Context, repoPath string) error
 		return fmt.Errorf("failed to prune worktrees: %w", err)
 	}
 	return nil
+}
+
+func (gs *gitService) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
+	merged, err := gs.cliClient.IsBranchMerged(ctx, repoPath, branchName)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if branch is merged: %w", err)
+	}
+	return merged, nil
 }

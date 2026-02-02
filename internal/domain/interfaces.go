@@ -18,6 +18,9 @@ type ContextService interface {
 
 	// GetCompletionSuggestions provides completion suggestions for partial identifiers
 	GetCompletionSuggestions(partial string) ([]*ResolutionSuggestion, error)
+
+	// GetCompletionSuggestionsFromContext provides completion suggestions for partial identifiers within a specific context
+	GetCompletionSuggestionsFromContext(ctx *Context, partial string) ([]*ResolutionSuggestion, error)
 }
 
 // GitRepositoryInterface defines repository operations for git entities

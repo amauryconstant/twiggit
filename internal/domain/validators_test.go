@@ -134,3 +134,162 @@ func TestValidationPipeline_EmptyPipeline(t *testing.T) {
 	assert.True(t, result.IsSuccess())
 	assert.True(t, result.Value)
 }
+
+func TestValidateBranchName_InvalidTrailingChars(t *testing.T) {
+	invalidCases := []string{
+		"branch-",
+		"branch.",
+		"branch_",
+		"feature-branch-",
+		"develop.",
+		"release_",
+		"hotfix--",
+		"bugfix..",
+		"test__",
+	}
+
+	for _, branchName := range invalidCases {
+		t.Run(branchName, func(t *testing.T) {
+			result := ValidateBranchName(branchName)
+
+			assert.False(t, result.IsSuccess())
+			assert.Contains(t, result.Error.Error(), "cannot end with")
+		})
+	}
+}
+
+func TestValidateBranchName_ValidEndingChars(t *testing.T) {
+	validCases := []string{
+		"branch-1",
+		"branch_a",
+		"branch.b",
+		"feature-branch-123",
+		"develop_abc",
+		"release.v1.0",
+		"hotfix-final",
+		"bugfix_2.0",
+		"test-main",
+	}
+
+	for _, branchName := range validCases {
+		t.Run(branchName, func(t *testing.T) {
+			result := ValidateBranchName(branchName)
+
+			assert.True(t, result.IsSuccess())
+			assert.True(t, result.Value)
+		})
+	}
+}
+
+func TestValidateBranchName_ReservedNames(t *testing.T) {
+	reservedCases := []struct {
+		name       string
+		branchName string
+	}{
+		{"HEAD uppercase", "HEAD"},
+		{"HEAD lowercase", "head"},
+		{"HEAD mixed", "HeAd"},
+		{"main", "main"},
+		{"Main", "Main"},
+		{"MASTER uppercase", "MASTER"},
+		{"master lowercase", "master"},
+		{"Master mixed", "Master"},
+		{"ORIG_HEAD", "ORIG_HEAD"},
+		{"orig_head lowercase", "orig_head"},
+		{"FETCH_HEAD", "FETCH_HEAD"},
+		{"fetch_head lowercase", "fetch_head"},
+		{"MERGE_HEAD", "MERGE_HEAD"},
+		{"merge_head lowercase", "merge_head"},
+		{"MERGE_STATE", "MERGE_STATE"},
+		{"merge_state lowercase", "merge_state"},
+		{"CHERRY_PICK_HEAD", "CHERRY_PICK_HEAD"},
+		{"cherry_pick_head lowercase", "cherry_pick_head"},
+		{"REVERT_HEAD", "REVERT_HEAD"},
+		{"revert_head lowercase", "revert_head"},
+	}
+
+	for _, tc := range reservedCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ValidateBranchName(tc.branchName)
+
+			assert.False(t, result.IsSuccess(), "Reserved branch name %q should fail validation", tc.branchName)
+			assert.Contains(t, result.Error.Error(), "reserved branch name")
+		})
+	}
+}
+
+func TestValidateBranchName_NotReserved(t *testing.T) {
+	validCases := []string{
+		"main-fix",
+		"master-branch",
+		"header-branch",
+		"main_branch",
+		"master_branch",
+		"header_branch",
+		"main.branch",
+		"master.branch",
+		"header.branch",
+		"main-fix-1",
+		"master-branch-2",
+		"header-branch-3",
+	}
+
+	for _, branchName := range validCases {
+		t.Run(branchName, func(t *testing.T) {
+			result := ValidateBranchName(branchName)
+
+			assert.True(t, result.IsSuccess(), "Branch name %q should pass validation", branchName)
+			assert.True(t, result.Value)
+		})
+	}
+}
+
+func TestValidateBranchName_InvalidLeadingChars(t *testing.T) {
+	invalidCases := []string{
+		"-branch",
+		".branch",
+		"-feature-branch",
+		".develop",
+		"-release",
+		".hotfix",
+		"-test",
+		".bugfix",
+		"-1-branch",
+		".test-branch",
+	}
+
+	for _, branchName := range invalidCases {
+		t.Run(branchName, func(t *testing.T) {
+			result := ValidateBranchName(branchName)
+
+			assert.False(t, result.IsSuccess(), "Branch name %q should fail validation", branchName)
+			assert.Contains(t, result.Error.Error(), "cannot start with")
+		})
+	}
+}
+
+func TestValidateBranchName_ValidLeadingChars(t *testing.T) {
+	validCases := []string{
+		"branch-1",
+		"branch-a",
+		"feature.branch",
+		"develop_1",
+		"release-2.0",
+		"hotfix_fix",
+		"test-branch",
+		"bugfix_123",
+		"1-branch",
+		"a-branch",
+		"branch.1",
+		"branch_name",
+	}
+
+	for _, branchName := range validCases {
+		t.Run(branchName, func(t *testing.T) {
+			result := ValidateBranchName(branchName)
+
+			assert.True(t, result.IsSuccess(), "Branch name %q should pass validation", branchName)
+			assert.True(t, result.Value)
+		})
+	}
+}

@@ -80,8 +80,17 @@ func (s *navigationService) ValidatePath(_ context.Context, path string) error {
 
 // GetNavigationSuggestions provides completion suggestions for navigation
 func (s *navigationService) GetNavigationSuggestions(_ context.Context, context *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+	var suggestions []*domain.ResolutionSuggestion
+	var err error
+
 	// Get completion suggestions from context service
-	suggestions, err := s.contextService.GetCompletionSuggestions(partial)
+	// If a specific context is provided, use it; otherwise use current context
+	if context != nil {
+		suggestions, err = s.contextService.GetCompletionSuggestionsFromContext(context, partial)
+	} else {
+		suggestions, err = s.contextService.GetCompletionSuggestions(partial)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get completion suggestions: %w", err)
 	}

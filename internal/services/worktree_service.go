@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -47,6 +48,12 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 
 	// Calculate worktree path
 	worktreePath := s.calculateWorktreePath(project.Name, req.BranchName)
+
+	// Ensure parent directories exist
+	parentDir := filepath.Dir(worktreePath)
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create worktree parent directory: %w", err)
+	}
 
 	// Create worktree using CLI client
 	err = s.gitService.CreateWorktree(ctx, project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)

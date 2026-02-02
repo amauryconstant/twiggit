@@ -113,17 +113,17 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Add uncommitted changes to the worktree
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			testFile := filepath.Join(worktreePath, "test.txt")
 			err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Try to delete without --force
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(1))
 
 			output := cli.GetError(session2)
@@ -143,22 +143,22 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Add uncommitted changes to the worktree
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			testFile := filepath.Join(worktreePath, "test.txt")
 			err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Delete with --force
-			session2 := cli.WithConfigDir(configDir).Run("delete", "--force", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "--force", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
 			Expect(output).To(ContainSubstring("Deleted worktree"))
-			Expect(output).To(ContainSubstring("feature-branch"))
+			Expect(output).To(ContainSubstring("feature-1"))
 
 			// Verify worktree directory is removed
 			_, err = os.Stat(worktreePath)
@@ -173,19 +173,19 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Delete clean worktree without --force
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
 			Expect(output).To(ContainSubstring("Deleted worktree"))
-			Expect(output).To(ContainSubstring("feature-branch"))
+			Expect(output).To(ContainSubstring("feature-1"))
 
 			// Verify worktree directory is removed
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			_, err := os.Stat(worktreePath)
 			Expect(os.IsNotExist(err)).To(BeTrue())
 		})
@@ -211,17 +211,17 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Break the worktree by removing .git directory
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			gitDir := filepath.Join(worktreePath, ".git")
 			err := os.RemoveAll(gitDir)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Delete broken worktree
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
@@ -270,7 +270,7 @@ var _ = Describe("Delete Command", func() {
 			fixture.CreateWorktreeSetup("test-project")
 			configDir := fixture.Build()
 
-			session := cli.WithConfigDir(configDir).Run("delete", "non-existent-project/feature-branch")
+			session := cli.WithConfigDir(configDir).Run("delete", "non-existent-project/feature-1")
 			Eventually(session).Should(gexec.Exit(1))
 
 			output := cli.GetError(session)
@@ -297,11 +297,11 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Delete using absolute path
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			session2 := cli.WithConfigDir(configDir).Run("delete", worktreePath)
 			Eventually(session2).Should(gexec.Exit(0))
 
@@ -317,11 +317,11 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Change to worktrees directory and use relative path
-			session2 := cli.WithConfigDir(configDir).RunWithDir(worktreesDir, "delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).RunWithDir(worktreesDir, "delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
@@ -399,16 +399,16 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Verify worktree directory exists
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			_, err := os.Stat(worktreePath)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Delete the worktree
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			// Verify worktree directory is completely removed
@@ -429,11 +429,11 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Add nested directories and files
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			nestedDir := filepath.Join(worktreePath, "src", "components")
 			err := os.MkdirAll(nestedDir, 0755)
 			Expect(err).NotTo(HaveOccurred())
@@ -443,7 +443,7 @@ var _ = Describe("Delete Command", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			// Delete the worktree
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			// Verify everything is removed
@@ -459,11 +459,11 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Add a symlink (if supported on the platform)
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			linkPath := filepath.Join(worktreePath, "symlink")
 			targetPath := filepath.Join(worktreePath, "target.txt")
 
@@ -480,7 +480,7 @@ var _ = Describe("Delete Command", func() {
 			}
 
 			// Delete the worktree
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			// Verify everything is removed
@@ -598,11 +598,11 @@ var _ = Describe("Delete Command", func() {
 			projectPath := fixture.GetProjectPath("test-project")
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Delete using project/branch format
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
@@ -620,16 +620,16 @@ var _ = Describe("Delete Command", func() {
 			projectPath := fixture.GetProjectPath("test-project")
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Verify worktree is in custom directory
-			worktreePath := filepath.Join(customWorktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(customWorktreesDir, "test-project", "feature-1")
 			_, err := os.Stat(worktreePath)
 			Expect(err).NotTo(HaveOccurred())
 
 			// Delete the worktree
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
@@ -642,7 +642,7 @@ var _ = Describe("Delete Command", func() {
 
 		It("handles missing config gracefully", func() {
 			// Run without any config
-			session := cli.Run("delete", "test-project/feature-branch")
+			session := cli.Run("delete", "test-project/feature-1")
 			Eventually(session).Should(gexec.Exit(1))
 
 			output := cli.GetError(session)
@@ -656,7 +656,7 @@ var _ = Describe("Delete Command", func() {
 			fixture.CreateWorktreeSetup("test-project")
 			configDir := fixture.Build()
 
-			session := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session).Should(gexec.Exit(1))
 
 			output := cli.GetError(session)
@@ -684,11 +684,11 @@ var _ = Describe("Delete Command", func() {
 			projectPath := fixture.GetProjectPath("test-project")
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(customConfigDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(customConfigDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Delete using custom config
-			session2 := cli.WithConfigDir(customConfigDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(customConfigDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
@@ -714,11 +714,11 @@ var _ = Describe("Delete Command", func() {
 			projectPath := fixture.GetProjectPath("test-project")
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "--source", "master", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "--source", "master", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Delete the worktree
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
@@ -774,7 +774,7 @@ var _ = Describe("Delete Command", func() {
 		It("handles non-git directory gracefully", func() {
 			nonGitDir := GinkgoT().TempDir()
 
-			session := cli.RunWithDir(nonGitDir, "delete", "test-project/feature-branch")
+			session := cli.RunWithDir(nonGitDir, "delete", "test-project/feature-1")
 			Eventually(session).Should(gexec.Exit(1))
 
 			output := cli.GetError(session)
@@ -867,11 +867,11 @@ var _ = Describe("Delete Command", func() {
 			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Add many files to the worktree
-			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-branch")
+			worktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
 			for i := 0; i < 100; i++ {
 				filePath := filepath.Join(worktreePath, "file", fmt.Sprintf("test%d.txt", i))
 				err := os.MkdirAll(filepath.Dir(filePath), 0755)
@@ -881,7 +881,7 @@ var _ = Describe("Delete Command", func() {
 			}
 
 			// Delete the worktree (should complete in reasonable time)
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session2)
@@ -899,15 +899,15 @@ var _ = Describe("Delete Command", func() {
 			projectPath := fixture.GetProjectPath("test-project")
 
 			// Create a worktree first
-			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-branch")
+			session1 := cli.WithConfigDir(configDir).RunWithDir(projectPath, "create", "feature-1")
 			Eventually(session1).Should(gexec.Exit(0))
 
 			// Delete the worktree
-			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session2 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session2).Should(gexec.Exit(0))
 
 			// Try to delete again (should be idempotent)
-			session3 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-branch")
+			session3 := cli.WithConfigDir(configDir).Run("delete", "test-project/feature-1")
 			Eventually(session3).Should(gexec.Exit(0))
 
 			output := cli.GetOutput(session3)

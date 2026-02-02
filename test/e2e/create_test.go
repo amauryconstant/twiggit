@@ -60,8 +60,8 @@ var _ = Describe("Create Command", func() {
 
 		It("errors when empty branch name provided", func() {
 			session := cli.Run("create", "")
-			Eventually(session).Should(gexec.Exit(2))
-			Expect(cli.GetError(session)).To(ContainSubstring("failed to discover project"))
+			Eventually(session).Should(gexec.Exit(1))
+			Expect(cli.GetError(session)).To(ContainSubstring("branch name is required"))
 		})
 
 		It("shows --cd flag in help", func() {
@@ -96,7 +96,6 @@ var _ = Describe("Create Command", func() {
 				"branch#name",
 				"branch$name",
 				"branch name",
-				"branch/name",
 				"branch\\name",
 				"branch:name",
 				"branch*name",
@@ -108,12 +107,14 @@ var _ = Describe("Create Command", func() {
 
 			for _, name := range invalidNames {
 				session := cli.Run("create", name)
-				Eventually(session).Should(gexec.Exit(2))
-				Expect(cli.GetError(session)).To(ContainSubstring("failed to discover project"))
+				Eventually(session).Should(gexec.Exit(1))
+				Expect(cli.GetError(session)).To(ContainSubstring("branch name format is invalid"))
 			}
 		})
 
 		It("rejects branch names that start with invalid characters", func() {
+			// Note: Branches starting with dash (-) are interpreted as flags by Cobra and exit with code 2
+			// This is a Cobra framework limitation that cannot be easily resolved without escaping arguments
 			invalidNames := []string{
 				"-branch",
 				".branch",
@@ -123,8 +124,12 @@ var _ = Describe("Create Command", func() {
 
 			for _, name := range invalidNames {
 				session := cli.Run("create", name)
-				Eventually(session).Should(gexec.Exit(1))
-				Expect(cli.GetError(session)).To(ContainSubstring("branch name format is invalid"))
+				if name == "-branch" {
+					Eventually(session).Should(gexec.Exit(2))
+				} else {
+					Eventually(session).Should(gexec.Exit(1))
+					Expect(cli.GetError(session)).To(ContainSubstring("branch name format is invalid"))
+				}
 			}
 		})
 
@@ -170,7 +175,7 @@ var _ = Describe("Create Command", func() {
 			longName := strings.Repeat("a", 256)
 			session := cli.Run("create", longName)
 			Eventually(session).Should(gexec.Exit(1))
-			Expect(cli.GetError(session)).To(ContainSubstring("branch name format is invalid"))
+			Expect(cli.GetError(session)).To(ContainSubstring("branch name is too long"))
 		})
 
 		It("rejects branch names that are git reserved names", func() {

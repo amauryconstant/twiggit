@@ -109,15 +109,11 @@ func (cd *contextDetector) detectWorktreeContext(dir string) *domain.Context {
 	projectName := parts[0]
 	branchName := parts[1]
 
-	// Validate that we have exactly 2 parts (project/branch)
-	if len(parts) > 2 {
-		// Check if we're in a subdirectory of the worktree
-		// Still consider this a worktree context
-		branchName = parts[1]
-	}
+	// Construct worktree root path for validation
+	worktreeRoot := filepath.Join(worktreeDir, projectName, branchName)
 
-	// Validate this is a valid git worktree
-	if !cd.isValidGitWorktree(dir) {
+	// Validate the worktree root (not current dir) has .git file
+	if !cd.isValidGitWorktree(worktreeRoot) {
 		return nil
 	}
 

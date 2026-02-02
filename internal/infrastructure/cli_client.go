@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -288,7 +289,18 @@ func (c *CLIClientImpl) branchExists(ctx context.Context, repoPath, branchName s
 	// Use git show-ref to check if branch exists
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, "show-ref", "--verify", "--quiet", "refs/heads/"+branchName)
 	if err != nil {
-		return false, fmt.Errorf("failed to check if branch exists: %w", err)
+		// Check if it's a GitCommandError (which happens when exit code is non-zero)
+		gitCmdErr := &domain.GitCommandError{}
+		if errors.As(err, &gitCmdErr) {
+			// Use the exit code from the GitCommandError
+			result = &CommandResult{
+				ExitCode: gitCmdErr.ExitCode,
+				Stdout:   gitCmdErr.Stdout,
+				Stderr:   gitCmdErr.Stderr,
+			}
+		} else {
+			return false, fmt.Errorf("failed to check if branch exists: %w", err)
+		}
 	}
 
 	// Exit code 0 means branch exists, exit code 1 means branch doesn't exist
@@ -309,6 +321,7 @@ type MockCLIClient struct {
 	DeleteWorktreeFunc func(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error
 	ListWorktreesFunc  func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
 	PruneWorktreesFunc func(ctx context.Context, repoPath string) error
+	IsBranchMergedFunc func(ctx context.Context, repoPath, branchName string) (bool, error)
 }
 
 // NewMockCLIClient creates a new MockCLIClient
@@ -346,4 +359,12 @@ func (m *MockCLIClient) PruneWorktrees(ctx context.Context, repoPath string) err
 		return m.PruneWorktreesFunc(ctx, repoPath)
 	}
 	return nil
+}
+
+// IsBranchMerged mock implementation for testing
+func (m *MockCLIClient) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
+	if m.IsBranchMergedFunc != nil {
+		return m.IsBranchMergedFunc(ctx, repoPath, branchName)
+	}
+	return false, nil
 }

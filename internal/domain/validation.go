@@ -43,6 +43,52 @@ func ValidateBranchNameNotEmpty(branchName string) Result[bool] {
 	return NewResult(true)
 }
 
+// ValidateBranchNameReserved checks if branch name is a git reserved name
+func ValidateBranchNameReserved(branchName string) Result[bool] {
+	reservedNames := map[string]bool{
+		"head":             true,
+		"main":             true,
+		"master":           true,
+		"orig_head":        true,
+		"fetch_head":       true,
+		"merge_head":       true,
+		"merge_state":      true,
+		"cherry_pick_head": true,
+		"revert_head":      true,
+	}
+
+	if reservedNames[strings.ToLower(branchName)] {
+		return NewErrorResult[bool](
+			NewValidationError("Validation", "BranchName", branchName, "branch name format is invalid").
+				WithSuggestions([]string{"This is a git reserved branch name"}),
+		)
+	}
+	return NewResult(true)
+}
+
+// ValidateBranchNameLeadingChars checks if branch name starts with invalid characters
+func ValidateBranchNameLeadingChars(branchName string) Result[bool] {
+	if len(branchName) > 0 && (branchName[0] == '.' || branchName[0] == '-') {
+		return NewErrorResult[bool](
+			NewValidationError("Validation", "BranchName", branchName, "branch name format is invalid").
+				WithSuggestions([]string{"Branch names cannot start with . or -"}),
+		)
+	}
+	return NewResult(true)
+}
+
+// ValidateBranchNameTrailingChars checks if branch name ends with invalid characters
+func ValidateBranchNameTrailingChars(branchName string) Result[bool] {
+	trimmed := strings.TrimRight(branchName, ".-_")
+	if len(trimmed) != len(branchName) {
+		return NewErrorResult[bool](
+			NewValidationError("Validation", "BranchName", branchName, "branch name format is invalid").
+				WithSuggestions([]string{"Branch names cannot end with ., -, or _"}),
+		)
+	}
+	return NewResult(true)
+}
+
 // ValidateBranchNameFormat checks if branch name contains only valid characters
 func ValidateBranchNameFormat(branchName string) Result[bool] {
 	// Git branch names should follow: no spaces, no @, no #, etc.
@@ -71,7 +117,10 @@ func ValidateBranchNameLength(branchName string) Result[bool] {
 func ValidateBranchName(branchName string) Result[bool] {
 	pipeline := NewValidationPipeline(
 		ValidateBranchNameNotEmpty,
+		ValidateBranchNameReserved,
+		ValidateBranchNameLeadingChars,
 		ValidateBranchNameFormat,
+		ValidateBranchNameTrailingChars,
 		ValidateBranchNameLength,
 	)
 	return pipeline.Validate(branchName)
