@@ -186,7 +186,7 @@ test:
   script:
     - mise run ci:coverage
     - mise run test:race
-    - mise run build:e2e
+    - mise run build
     - mise run test:e2e
   artifacts:
     reports:
