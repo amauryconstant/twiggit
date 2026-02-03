@@ -1,0 +1,59 @@
+//go:build e2e
+// +build e2e
+
+package fixtures
+
+import (
+	"path/filepath"
+
+	"github.com/onsi/gomega/gexec"
+
+	e2ehelpers "twiggit/test/e2e/helpers"
+)
+
+// ContextHelper provides utilities for testing context-aware behavior
+// Tests commands from different git contexts: project directory, worktree directory, outside git
+type ContextHelper struct {
+	fixture *E2ETestFixture
+	cli     *e2ehelpers.TwiggitCLI
+}
+
+// NewContextHelper creates a new ContextHelper instance
+func NewContextHelper(fixture *E2ETestFixture, cli *e2ehelpers.TwiggitCLI) *ContextHelper {
+	return &ContextHelper{
+		fixture: fixture,
+		cli:     cli,
+	}
+}
+
+// FromProjectDir runs command from within a project directory
+// Use this to test commands that should infer project name from current directory
+func (h *ContextHelper) FromProjectDir(projectName string, args ...string) *gexec.Session {
+	projectPath := h.fixture.GetProjectPath(projectName)
+	return h.cli.RunWithDir(projectPath, args...)
+}
+
+// FromWorktreeDir runs command from within a worktree directory
+// Use this to test commands that should detect worktree context
+func (h *ContextHelper) FromWorktreeDir(projectName, branch string, args ...string) *gexec.Session {
+	worktreePath := filepath.Join(
+		h.fixture.GetConfigHelper().GetWorktreesDir(),
+		projectName,
+		branch,
+	)
+	return h.cli.RunWithDir(worktreePath, args...)
+}
+
+// FromOutsideGit runs command from outside any git repository
+// Use this to test commands that require explicit project names
+func (h *ContextHelper) FromOutsideGit(args ...string) *gexec.Session {
+	return h.cli.RunWithDir(h.fixture.GetTempDir(), args...)
+}
+
+// WithConfigDir returns a new ContextHelper with the specified config directory
+func (h *ContextHelper) WithConfigDir(configDir string) *ContextHelper {
+	return &ContextHelper{
+		fixture: h.fixture,
+		cli:     h.cli.WithConfigDir(configDir),
+	}
+}

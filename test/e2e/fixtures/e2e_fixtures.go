@@ -4,24 +4,32 @@
 package fixtures
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"twiggit/internal/infrastructure"
 	e2ehelpers "twiggit/test/e2e/helpers"
 	"twiggit/test/helpers"
 )
 
 // E2ETestFixture provides comprehensive test setup for E2E tests
 type E2ETestFixture struct {
-	tempDir      string
-	configHelper *e2ehelpers.ConfigHelper
-	gitHelper    *helpers.GitTestHelper
-	repoHelper   *helpers.RepoTestHelper
-	projects     map[string]string
+	tempDir          string
+	configHelper     *e2ehelpers.ConfigHelper
+	gitHelper        *helpers.GitTestHelper
+	repoHelper       *helpers.RepoTestHelper
+	gitExecutor      infrastructure.CommandExecutor
+	projects         map[string]string
+	testID           *e2ehelpers.TestIDGenerator
+	createdWorktrees []string
 }
 
 // NewE2ETestFixture creates a new E2E test fixture
@@ -29,11 +37,14 @@ func NewE2ETestFixture() *E2ETestFixture {
 	tempDir := GinkgoT().TempDir()
 
 	return &E2ETestFixture{
-		tempDir:      tempDir,
-		configHelper: e2ehelpers.NewConfigHelper(),
-		gitHelper:    helpers.NewGitTestHelper(&testing.T{}),
-		repoHelper:   helpers.NewRepoTestHelper(&testing.T{}),
-		projects:     make(map[string]string),
+		tempDir:          tempDir,
+		configHelper:     e2ehelpers.NewConfigHelper(),
+		gitHelper:        helpers.NewGitTestHelper(&testing.T{}),
+		repoHelper:       helpers.NewRepoTestHelper(&testing.T{}),
+		gitExecutor:      infrastructure.NewDefaultCommandExecutor(30 * time.Second),
+		projects:         make(map[string]string),
+		testID:           e2ehelpers.NewTestIDGenerator(),
+		createdWorktrees: make([]string, 0),
 	}
 }
 
@@ -51,22 +62,22 @@ func (f *E2ETestFixture) SetupMultiProject() *E2ETestFixture {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Project 1: Simple project with main branch
-	project1Path := f.repoHelper.SetupTestRepo("project1")
-	f.projects["project1"] = project1Path
+	project1Path := f.repoHelper.SetupTestRepo(f.testID.ProjectNameWithSuffix("1"))
+	f.projects[f.testID.ProjectNameWithSuffix("1")] = project1Path
 
 	// Project 2: Project with feature branches
-	project2Path := f.repoHelper.SetupTestRepo("project2")
-	f.projects["project2"] = project2Path
+	project2Path := f.repoHelper.SetupTestRepo(f.testID.ProjectNameWithSuffix("2"))
+	f.projects[f.testID.ProjectNameWithSuffix("2")] = project2Path
 
 	// Add feature branches to project2
-	err = f.gitHelper.CreateBranch(project2Path, "feature-a")
+	err = f.gitHelper.CreateBranch(project2Path, f.testID.BranchName("feature-a"))
 	Expect(err).NotTo(HaveOccurred())
-	err = f.gitHelper.CreateBranch(project2Path, "feature-b")
+	err = f.gitHelper.CreateBranch(project2Path, f.testID.BranchName("feature-b"))
 	Expect(err).NotTo(HaveOccurred())
 
 	// Project 3: Project with develop as default branch
-	project3Path := f.repoHelper.SetupTestRepo("project3")
-	f.projects["project3"] = project3Path
+	project3Path := f.repoHelper.SetupTestRepo(f.testID.ProjectNameWithSuffix("3"))
+	f.projects[f.testID.ProjectNameWithSuffix("3")] = project3Path
 
 	// Rename default branch to develop
 	err = f.gitHelper.CreateBranch(project3Path, "develop")
@@ -83,8 +94,7 @@ func (f *E2ETestFixture) SetupSingleProject(name string) *E2ETestFixture {
 	projectPath := f.repoHelper.SetupTestRepo(name)
 	f.projects[name] = projectPath
 
-	// Update config to use the temp directory as projects directory
-	projectsDir := filepath.Join(f.tempDir, "projects")
+	projectsDir := filepath.Dir(projectPath)
 	err := os.MkdirAll(projectsDir, 0755)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -105,35 +115,118 @@ func (f *E2ETestFixture) GetConfigHelper() *e2ehelpers.ConfigHelper {
 	return f.configHelper
 }
 
+// GetTestID returns the test ID generator
+func (f *E2ETestFixture) GetTestID() *e2ehelpers.TestIDGenerator {
+	return f.testID
+}
+
+// GetGitHelper returns the git helper
+func (f *E2ETestFixture) GetGitHelper() *helpers.GitTestHelper {
+	return f.gitHelper
+}
+
+// GetTempDir returns the temporary directory
+func (f *E2ETestFixture) GetTempDir() string {
+	return f.tempDir
+}
+
 // Build builds the configuration and returns the config directory
 func (f *E2ETestFixture) Build() string {
 	return f.configHelper.Build()
 }
 
+// removeWorktreeWithRetry removes a worktree with retry logic and force flag
+func (f *E2ETestFixture) removeWorktreeWithRetry(worktreePath, mainRepoPath string) error {
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		result, err := f.gitExecutor.Execute(
+			context.Background(),
+			mainRepoPath,
+			"git", "worktree", "remove", "--force", worktreePath,
+		)
+
+		if err == nil && result != nil && result.ExitCode == 0 {
+			return nil
+		}
+
+		if i < maxRetries-1 {
+			GinkgoT().Logf("Retry %d/%d: removing worktree %s", i+1, maxRetries, worktreePath)
+			time.Sleep(time.Millisecond * 100 * time.Duration(i+1))
+		}
+	}
+	return fmt.Errorf("failed to remove worktree after %d attempts: %s", maxRetries, worktreePath)
+}
+
 // Cleanup cleans up all test resources
 func (f *E2ETestFixture) Cleanup() {
-	f.repoHelper.Cleanup()
-	f.configHelper.Cleanup()
+	if f == nil {
+		return
+	}
+
+	mainRepoPath := ""
+	if len(f.projects) > 0 {
+		for _, repoPath := range f.projects {
+			if repoPath != "" {
+				mainRepoPath = repoPath
+				break
+			}
+		}
+	}
+
+	if mainRepoPath == "" || len(f.createdWorktrees) == 0 {
+		if f.repoHelper != nil {
+			f.repoHelper.Cleanup()
+		}
+		if f.configHelper != nil {
+			f.configHelper.Cleanup()
+		}
+		return
+	}
+
+	for _, wt := range f.createdWorktrees {
+		if wt != "" {
+			err := f.removeWorktreeWithRetry(wt, mainRepoPath)
+			if err != nil {
+				GinkgoT().Logf("Warning: %v", err)
+			}
+		}
+	}
+
+	if f.repoHelper != nil {
+		f.repoHelper.Cleanup()
+	}
+	if f.configHelper != nil {
+		f.configHelper.Cleanup()
+	}
 }
 
 // CreateWorktreeSetup creates a project with worktrees for testing
 func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *E2ETestFixture {
-	// Create main project
 	projectPath := f.SetupSingleProject(projectName).GetProjectPath(projectName)
 
-	// Create worktrees directory
 	worktreesDir := filepath.Join(f.tempDir, "worktrees", projectName)
 	err := os.MkdirAll(worktreesDir, 0755)
 	Expect(err).NotTo(HaveOccurred())
 
-	// Update config
 	f.configHelper.WithWorktreesDir(filepath.Join(f.tempDir, "worktrees"))
 
-	// Create some feature branches for worktree testing
-	err = f.gitHelper.CreateBranch(projectPath, "feature-1")
-	Expect(err).NotTo(HaveOccurred())
-	err = f.gitHelper.CreateBranch(projectPath, "feature-2")
-	Expect(err).NotTo(HaveOccurred())
+	worktree1Path := filepath.Join(worktreesDir, f.testID.BranchName("feature-1"))
+	_, err = f.gitExecutor.Execute(
+		context.Background(),
+		projectPath,
+		"git", "worktree", "add", "-b", f.testID.BranchName("feature-1"), worktree1Path,
+	)
+	Expect(err).NotTo(HaveOccurred(), "Failed to create worktree for feature-1")
+	f.createdWorktrees = append(f.createdWorktrees, worktree1Path)
+
+	worktree2Path := filepath.Join(worktreesDir, f.testID.BranchName("feature-2"))
+	_, err = f.gitExecutor.Execute(
+		context.Background(),
+		projectPath,
+		"git", "worktree", "add", "-b", f.testID.BranchName("feature-2"), worktree2Path,
+	)
+	Expect(err).NotTo(HaveOccurred(), "Failed to create worktree for feature-2")
+	f.createdWorktrees = append(f.createdWorktrees, worktree2Path)
 
 	return f
 }
@@ -159,4 +252,79 @@ func (f *E2ETestFixture) GetProjects() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+// GetCreatedWorktrees returns all created worktree paths
+func (f *E2ETestFixture) GetCreatedWorktrees() []string {
+	return f.createdWorktrees
+}
+
+// Inspect returns a detailed snapshot of the fixture state for debugging
+func (f *E2ETestFixture) Inspect() string {
+	var sb strings.Builder
+
+	sb.WriteString("=== E2ETestFixture State ===\n")
+	sb.WriteString(fmt.Sprintf("TempDir: %s\n", f.tempDir))
+
+	sb.WriteString("\n=== Projects ===\n")
+	for name, path := range f.projects {
+		exists := ""
+		if _, err := os.Stat(path); err == nil {
+			exists = "✓"
+		} else {
+			exists = "✗"
+		}
+		sb.WriteString(fmt.Sprintf("  %s: %s [%s]\n", name, path, exists))
+	}
+
+	sb.WriteString("\n=== Worktrees ===\n")
+	for i, wt := range f.createdWorktrees {
+		exists := ""
+		if _, err := os.Stat(wt); err == nil {
+			exists = "✓"
+		} else {
+			exists = "✗"
+		}
+		sb.WriteString(fmt.Sprintf("  [%d] %s [%s]\n", i, wt, exists))
+	}
+
+	sb.WriteString("\n=== Config ===\n")
+	if f.configHelper != nil {
+		sb.WriteString(fmt.Sprintf("  ConfigPath: %s\n", f.configHelper.GetConfigPath()))
+		sb.WriteString(fmt.Sprintf("  ProjectsDir: %s\n", f.configHelper.GetProjectsDir()))
+		sb.WriteString(fmt.Sprintf("  WorktreesDir: %s\n", f.configHelper.GetWorktreesDir()))
+	}
+
+	return sb.String()
+}
+
+// WithDebugLogging enables debug logging for this fixture
+func (f *E2ETestFixture) WithDebugLogging(enabled bool) *E2ETestFixture {
+	if enabled {
+		GinkgoT().Log("Debug mode enabled\n", f.Inspect())
+	}
+	return f
+}
+
+// ValidateCleanup verifies that cleanup was successful
+func (f *E2ETestFixture) ValidateCleanup() error {
+	var validationErrors []error
+
+	for _, wt := range f.createdWorktrees {
+		if _, err := os.Stat(wt); err == nil {
+			validationErrors = append(validationErrors, fmt.Errorf("worktree %s still exists after cleanup", wt))
+		}
+	}
+
+	for _, repoPath := range f.projects {
+		if _, err := os.Stat(repoPath); err == nil {
+			validationErrors = append(validationErrors, fmt.Errorf("project %s still exists after cleanup", repoPath))
+		}
+	}
+
+	if len(validationErrors) > 0 {
+		return fmt.Errorf("cleanup validation failed: %v", validationErrors)
+	}
+
+	return nil
 }

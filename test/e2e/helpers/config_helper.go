@@ -8,9 +8,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+
+	"github.com/pelletier/go-toml"
+	"twiggit/internal/domain"
 )
 
 // ConfigHelper provides configuration management utilities for E2E tests
@@ -115,6 +119,37 @@ max_concurrent = 1
 	err = os.WriteFile(c.configPath, []byte(configContent.String()), 0644)
 	Expect(err).NotTo(HaveOccurred())
 
+	// Validate TOML syntax
+	if _, err := toml.LoadFile(c.configPath); err != nil {
+		GinkgoT().Fatalf("Invalid TOML configuration: %v", err)
+	}
+
+	// Validate against domain.Config struct
+	config := &domain.Config{
+		ProjectsDirectory:   c.projectsDir,
+		WorktreesDirectory:  c.worktreesDir,
+		DefaultSourceBranch: c.defaultBranch,
+		ContextDetection: domain.ContextDetectionConfig{
+			CacheTTL:            "1m",
+			GitOperationTimeout: "10s",
+			EnableGitValidation: true,
+		},
+		Git: domain.GitConfig{
+			CLITimeout:   10,
+			CacheEnabled: false,
+		},
+		Services: domain.ServiceConfig{
+			CacheEnabled:  false,
+			CacheTTL:      time.Minute,
+			ConcurrentOps: false,
+			MaxConcurrent: 1,
+		},
+	}
+
+	if err := config.Validate(); err != nil {
+		GinkgoT().Fatalf("Config validation failed: %v", err)
+	}
+
 	return c.tempDir
 }
 
@@ -138,7 +173,10 @@ func (c *ConfigHelper) GetWorktreesDir() string {
 	return c.worktreesDir
 }
 
-// Cleanup removes all created directories
+func (c *ConfigHelper) GetTempDir() string {
+	return c.tempDir
+}
+
 func (c *ConfigHelper) Cleanup() {
 	if c.tempDir != "" {
 		os.RemoveAll(c.tempDir)

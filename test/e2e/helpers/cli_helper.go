@@ -10,7 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
 )
 
@@ -22,20 +24,23 @@ type TwiggitCLI struct {
 
 // NewTwiggitCLI creates a new TwiggitCLI instance
 func NewTwiggitCLI() *TwiggitCLI {
-	// Get project root (go up from test/e2e to project root)
 	cwd, err := os.Getwd()
 	Expect(err).NotTo(HaveOccurred())
 
-	// If we're in test/e2e, go up two levels to project root
 	if strings.HasSuffix(cwd, "test/e2e") {
 		cwd = filepath.Dir(filepath.Dir(cwd))
 	}
 
 	binaryPath := filepath.Join(cwd, "bin", "twiggit-e2e")
 
-	// Ensure binary exists
+	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+		GinkgoT().Logf("Binary not found at %s, attempting to build...", binaryPath)
+		BuildBinary()
+	}
+
 	_, err = os.Stat(binaryPath)
-	Expect(err).NotTo(HaveOccurred(), "Twiggit binary not found at %s. Run 'mise run build:e2e' first", binaryPath)
+	Expect(err).NotTo(HaveOccurred(),
+		"Twiggit binary not found at %s. Run 'mise run build:e2e' first", binaryPath)
 
 	return &TwiggitCLI{
 		binaryPath: binaryPath,
@@ -119,14 +124,46 @@ func (cli *TwiggitCLI) Reset() *TwiggitCLI {
 
 // BuildBinary builds the twiggit binary for E2E tests
 func BuildBinary() {
-	// Change to project root
-	projectRoot, err := filepath.Abs("../../..")
+	cwd, err := os.Getwd()
 	Expect(err).NotTo(HaveOccurred())
 
-	// Build the binary
-	cmd := exec.Command("go", "build", "-tags=e2e", "-o", "bin/twiggit", "main.go")
-	cmd.Dir = projectRoot
+	if strings.HasSuffix(cwd, "test/e2e") {
+		cwd = filepath.Dir(filepath.Dir(cwd))
+	}
+
+	cmd := exec.Command("go", "build", "-tags=e2e", "-o", filepath.Join(cwd, "bin", "twiggit-e2e"), "main.go")
+	cmd.Dir = cwd
 
 	output, err := cmd.CombinedOutput()
 	Expect(err).NotTo(HaveOccurred(), "Failed to build twiggit binary: %s", string(output))
+}
+
+// ShouldSucceed asserts the command succeeds with exit code 0
+func (cli *TwiggitCLI) ShouldSucceed(session *gexec.Session) {
+	Eventually(session).Should(gexec.Exit(0))
+}
+
+// ShouldFailWithExit asserts the command fails with specific exit code
+func (cli *TwiggitCLI) ShouldFailWithExit(session *gexec.Session, exitCode int) {
+	Eventually(session).Should(gexec.Exit(exitCode))
+}
+
+// ShouldOutput asserts stdout contains expected text
+func (cli *TwiggitCLI) ShouldOutput(session *gexec.Session, expected string) {
+	Eventually(session.Out).Should(gbytes.Say(expected))
+}
+
+// ShouldErrorOutput asserts stderr contains expected text
+func (cli *TwiggitCLI) ShouldErrorOutput(session *gexec.Session, expected string) {
+	Eventually(session.Err).Should(gbytes.Say(expected))
+}
+
+// ShouldOutputMatch asserts stdout matches regex pattern
+func (cli *TwiggitCLI) ShouldOutputMatch(session *gexec.Session, pattern string) {
+	Eventually(session.Out).Should(gbytes.Say(pattern))
+}
+
+// ShouldErrorOutputMatch asserts stderr matches regex pattern
+func (cli *TwiggitCLI) ShouldErrorOutputMatch(session *gexec.Session, pattern string) {
+	Eventually(session.Err).Should(gbytes.Say(pattern))
 }
