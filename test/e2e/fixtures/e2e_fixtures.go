@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -33,9 +34,17 @@ type E2ETestFixture struct {
 	gitHelper        *helpers.GitTestHelper
 	repoHelper       *helpers.RepoTestHelper
 	gitExecutor      infrastructure.CommandExecutor
-	projects         map[string]string
+	projects         map[string]*ProjectInfo
 	testID           *e2ehelpers.TestIDGenerator
 	createdWorktrees []string
+	worktreeOwners   map[string]string
+	mu               sync.Mutex
+}
+
+type ProjectInfo struct {
+	Name    string
+	Path    string
+	Fixture *RepoFixture
 }
 
 // NewE2ETestFixture creates a new E2E test fixture
@@ -48,9 +57,10 @@ func NewE2ETestFixture() *E2ETestFixture {
 		gitHelper:        helpers.NewGitTestHelper(&testing.T{}),
 		repoHelper:       helpers.NewRepoTestHelper(&testing.T{}),
 		gitExecutor:      infrastructure.NewDefaultCommandExecutor(30 * time.Second),
-		projects:         make(map[string]string),
+		projects:         make(map[string]*ProjectInfo),
 		testID:           e2ehelpers.NewTestIDGenerator(),
 		createdWorktrees: make([]string, 0),
+		worktreeOwners:   make(map[string]string),
 	}
 }
 
@@ -67,29 +77,41 @@ func (f *E2ETestFixture) SetupMultiProject() *E2ETestFixture {
 	err := os.MkdirAll(projectsDir, FilePermAll)
 	Expect(err).NotTo(HaveOccurred())
 
-	// Project 1: Simple project with main branch
-	project1Path := f.repoHelper.SetupTestRepo(f.testID.ProjectNameWithSuffix("1"))
-	f.projects[f.testID.ProjectNameWithSuffix("1")] = project1Path
-
-	// Project 2: Project with feature branches
-	project2Path := f.repoHelper.SetupTestRepo(f.testID.ProjectNameWithSuffix("2"))
-	f.projects[f.testID.ProjectNameWithSuffix("2")] = project2Path
-
-	// Add feature branches to project2
-	err = f.gitHelper.CreateBranch(project2Path, f.testID.BranchName("feature-a"))
+	// Project 1: Simple project with main branch using fixture
+	fixture1, err := ExtractRepoFixture("single-branch")
 	Expect(err).NotTo(HaveOccurred())
-	err = f.gitHelper.CreateBranch(project2Path, f.testID.BranchName("feature-b"))
+	project1Path := fixture1.Path()
+	f.projects[f.testID.ProjectNameWithSuffix("1")] = &ProjectInfo{
+		Name:    f.testID.ProjectNameWithSuffix("1"),
+		Path:    project1Path,
+		Fixture: fixture1,
+	}
+
+	// Project 2: Project with feature branches using fixture
+	fixture2, err := ExtractRepoFixture("multi-branch")
 	Expect(err).NotTo(HaveOccurred())
+	project2Path := fixture2.Path()
+	f.projects[f.testID.ProjectNameWithSuffix("2")] = &ProjectInfo{
+		Name:    f.testID.ProjectNameWithSuffix("2"),
+		Path:    project2Path,
+		Fixture: fixture2,
+	}
 
-	// Project 3: Project with develop as default branch
-	project3Path := f.repoHelper.SetupTestRepo(f.testID.ProjectNameWithSuffix("3"))
-	f.projects[f.testID.ProjectNameWithSuffix("3")] = project3Path
+	// Project 3: Project with develop as default branch using fixture
+	fixture3, err := ExtractRepoFixture("single-branch")
+	Expect(err).NotTo(HaveOccurred())
+	project3Path := fixture3.Path()
+	f.projects[f.testID.ProjectNameWithSuffix("3")] = &ProjectInfo{
+		Name:    f.testID.ProjectNameWithSuffix("3"),
+		Path:    project3Path,
+		Fixture: fixture3,
+	}
 
-	// Rename default branch to develop
+	// Rename default branch to develop in project3
 	err = f.gitHelper.CreateBranch(project3Path, "develop")
 	Expect(err).NotTo(HaveOccurred())
 
-	// Update config to use the projects directory
+	// Update config to use projects directory
 	f.configHelper.WithProjectsDir(projectsDir)
 
 	return f
@@ -97,11 +119,18 @@ func (f *E2ETestFixture) SetupMultiProject() *E2ETestFixture {
 
 // SetupSingleProject creates a single test project
 func (f *E2ETestFixture) SetupSingleProject(name string) *E2ETestFixture {
-	projectPath := f.repoHelper.SetupTestRepo(name)
-	f.projects[name] = projectPath
+	fixture, err := ExtractRepoFixture("single-branch")
+	Expect(err).NotTo(HaveOccurred())
+	projectPath := fixture.Path()
 
-	projectsDir := filepath.Dir(projectPath)
-	err := os.MkdirAll(projectsDir, FilePermAll)
+	f.projects[name] = &ProjectInfo{
+		Name:    name,
+		Path:    projectPath,
+		Fixture: fixture,
+	}
+
+	projectsDir := filepath.Join(f.tempDir, "projects")
+	err = os.MkdirAll(projectsDir, FilePermAll)
 	Expect(err).NotTo(HaveOccurred())
 
 	f.configHelper.WithProjectsDir(projectsDir)
@@ -111,9 +140,9 @@ func (f *E2ETestFixture) SetupSingleProject(name string) *E2ETestFixture {
 
 // GetProjectPath returns the path for a specific project
 func (f *E2ETestFixture) GetProjectPath(projectName string) string {
-	path, exists := f.projects[projectName]
+	info, exists := f.projects[projectName]
 	Expect(exists).To(BeTrue(), "Project %s not found", projectName)
-	return path
+	return info.Path
 }
 
 // GetConfigHelper returns the config helper
@@ -169,29 +198,10 @@ func (f *E2ETestFixture) Cleanup() {
 		return
 	}
 
-	mainRepoPath := ""
-	if len(f.projects) > 0 {
-		for _, repoPath := range f.projects {
-			if repoPath != "" {
-				mainRepoPath = repoPath
-				break
-			}
-		}
-	}
-
-	if mainRepoPath == "" || len(f.createdWorktrees) == 0 {
-		if f.repoHelper != nil {
-			f.repoHelper.Cleanup()
-		}
-		if f.configHelper != nil {
-			f.configHelper.Cleanup()
-		}
-		return
-	}
-
-	for _, wt := range f.createdWorktrees {
-		if wt != "" {
-			err := f.removeWorktreeWithRetry(wt, mainRepoPath)
+	// Cleanup worktrees using their owning repos (fixes multi-project bug)
+	for worktreePath, repoPath := range f.worktreeOwners {
+		if worktreePath != "" {
+			err := f.removeWorktreeWithRetry(worktreePath, repoPath)
 			if err != nil {
 				GinkgoT().Logf("Warning: %v", err)
 			}
@@ -204,6 +214,13 @@ func (f *E2ETestFixture) Cleanup() {
 	if f.configHelper != nil {
 		f.configHelper.Cleanup()
 	}
+}
+
+// TrackWorktree registers a worktree with its owning repository
+func (f *E2ETestFixture) TrackWorktree(worktreePath, repoPath string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.worktreeOwners[worktreePath] = repoPath
 }
 
 // CreateWorktreeSetup creates a project with worktrees for testing
@@ -273,14 +290,14 @@ func (f *E2ETestFixture) Inspect() string {
 	sb.WriteString(fmt.Sprintf("TempDir: %s\n", f.tempDir))
 
 	sb.WriteString("\n=== Projects ===\n")
-	for name, path := range f.projects {
+	for name, info := range f.projects {
 		exists := ""
-		if _, err := os.Stat(path); err == nil {
+		if _, err := os.Stat(info.Path); err == nil {
 			exists = "✓"
 		} else {
 			exists = "✗"
 		}
-		sb.WriteString(fmt.Sprintf("  %s: %s [%s]\n", name, path, exists))
+		sb.WriteString(fmt.Sprintf("  %s: %s [%s]\n", name, info.Path, exists))
 	}
 
 	sb.WriteString("\n=== Worktrees ===\n")
@@ -322,9 +339,9 @@ func (f *E2ETestFixture) ValidateCleanup() error {
 		}
 	}
 
-	for _, repoPath := range f.projects {
-		if _, err := os.Stat(repoPath); err == nil {
-			validationErrors = append(validationErrors, fmt.Errorf("project %s still exists after cleanup", repoPath))
+	for _, info := range f.projects {
+		if _, err := os.Stat(info.Path); err == nil {
+			validationErrors = append(validationErrors, fmt.Errorf("project %s still exists after cleanup", info.Path))
 		}
 	}
 
@@ -351,21 +368,22 @@ func (f *E2ETestFixture) CreateWorktree(projectPath, worktreePath, branch string
 
 // RemoveWorktree removes a worktree using git CLI
 func (f *E2ETestFixture) RemoveWorktree(worktreePath string) error {
-	mainRepoPath := ""
-	for _, repoPath := range f.projects {
-		if repoPath != "" {
-			mainRepoPath = repoPath
+	// Find owning repository
+	var repoPath string
+	for _, info := range f.projects {
+		if info != nil && info.Path != "" {
+			repoPath = info.Path
 			break
 		}
 	}
 
-	if mainRepoPath == "" {
+	if repoPath == "" {
 		return fmt.Errorf("no main repo found")
 	}
 
 	result, err := f.gitExecutor.Execute(
 		context.Background(),
-		mainRepoPath,
+		repoPath,
 		"git", "worktree", "remove", worktreePath,
 	)
 	if err != nil {

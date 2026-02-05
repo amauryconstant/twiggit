@@ -4,24 +4,23 @@
 package helpers
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 )
 
 type TestIDGenerator struct {
-	testName  string
-	randomID  string
+	timestamp string
+	counter   int32
 	shortName string
 }
 
 func NewTestIDGenerator() *TestIDGenerator {
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
-	randomID := fmt.Sprintf("%04x", rng.Uint32())
-
 	testName := GinkgoT().Name()
 
 	shortName := strings.ToLower(testName)
@@ -33,14 +32,22 @@ func NewTestIDGenerator() *TestIDGenerator {
 	}
 
 	return &TestIDGenerator{
-		testName:  testName,
-		randomID:  randomID,
+		timestamp: time.Now().Format("20060102-150405"),
+		counter:   1,
 		shortName: shortName,
 	}
 }
 
+func (g *TestIDGenerator) generateRandomID() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("%s-%d", g.timestamp, atomic.AddInt32(&g.counter, 1))
+	}
+	return hex.EncodeToString(b)
+}
+
 func (g *TestIDGenerator) String() string {
-	return fmt.Sprintf("%s-%s", g.shortName, g.randomID)
+	return fmt.Sprintf("%s-%s", g.shortName, g.generateRandomID())
 }
 
 func (g *TestIDGenerator) ProjectName() string {
@@ -48,11 +55,11 @@ func (g *TestIDGenerator) ProjectName() string {
 }
 
 func (g *TestIDGenerator) ProjectNameWithSuffix(suffix string) string {
-	return fmt.Sprintf("%s-%s", g.String(), suffix)
+	return fmt.Sprintf("%s-%s-%s", suffix, g.shortName, g.generateRandomID())
 }
 
 func (g *TestIDGenerator) BranchName(branch string) string {
-	return fmt.Sprintf("%s-%s", branch, g.randomID)
+	return fmt.Sprintf("%s-%s", branch, g.generateRandomID())
 }
 
 func (g *TestIDGenerator) WorktreeName(branch string) string {
