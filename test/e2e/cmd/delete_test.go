@@ -1,0 +1,245 @@
+//go:build e2e
+// +build e2e
+
+// Package e2e provides end-to-end tests for twiggit delete command.
+// Tests validate worktree deletion with force, keep-branch, and merged-only flags.
+package e2e
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"twiggit/test/e2e/fixtures"
+	"twiggit/test/e2e/helpers"
+)
+
+var _ = Describe("delete command", func() {
+	var fixture *fixtures.E2ETestFixture
+	var cli *helpers.TwiggitCLI
+	var ctxHelper *fixtures.ContextHelper
+	var assertions *helpers.TwiggitAssertions
+
+	BeforeEach(func() {
+		fixture = fixtures.NewE2ETestFixture()
+		cli = helpers.NewTwiggitCLI()
+		ctxHelper = fixtures.NewContextHelper(fixture, cli)
+		cli = cli.WithConfigDir(fixture.Build())
+		assertions = helpers.NewTwiggitAssertions()
+	})
+
+	AfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			GinkgoT().Log(fixture.Inspect())
+		}
+		fixture.Cleanup()
+	})
+
+	It("deletes worktree from project context", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		testID := fixture.GetTestID()
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+
+		session := ctxHelper.FromProjectDir("test", "delete", testID.BranchName("feature-1"))
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("deletes other worktree from worktree context", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		testID := fixture.GetTestID()
+		worktree2Path := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-2"))
+
+		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "delete", testID.BranchName("feature-2"))
+		assertions.ShouldDeleteWorktree(session, testID.BranchName("feature-2"))
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktree2Path).NotTo(BeADirectory())
+	})
+
+	It("fails with uncommitted changes", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		testID := fixture.GetTestID()
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+
+		testFile := filepath.Join(worktreePath, "test.txt")
+		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
+		Expect(err).NotTo(HaveOccurred())
+
+		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "delete", testID.BranchName("feature-1"))
+		cli.ShouldFailWithExit(session, 1)
+
+		if session.ExitCode() != 1 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		cli.ShouldErrorOutput(session, "uncommitted changes")
+	})
+
+	It("deletes with --force flag despite uncommitted changes", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		testID := fixture.GetTestID()
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+
+		testFile := filepath.Join(worktreePath, "test.txt")
+		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
+		Expect(err).NotTo(HaveOccurred())
+
+		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "delete", testID.BranchName("feature-1"), "--force")
+		assertions.ShouldDeleteWorktree(session, testID.BranchName("feature-1"))
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("keeps branch with --keep-branch flag", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		testID := fixture.GetTestID()
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+		projectPath := fixture.GetProjectPath("test")
+		gitHelper := fixture.GetGitHelper()
+
+		session := cli.Run("delete", "test/"+testID.BranchName("feature-1"), "--keep-branch")
+		assertions.ShouldDeleteWorktree(session, testID.BranchName("feature-1"))
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+
+		branches, err := gitHelper.ListBranches(projectPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(branches).To(ContainElement(testID.BranchName("feature-1")))
+	})
+
+	It("succeeds with --merged-only when branch is merged", func() {
+		fixture.SetupSingleProject("test")
+		projectPath := fixture.GetProjectPath("test")
+		testID := fixture.GetTestID()
+		gitHelper := fixture.GetGitHelper()
+
+		err := gitHelper.CreateBranch(projectPath, testID.BranchName("merged-feature"))
+		Expect(err).NotTo(HaveOccurred())
+
+		worktreesDir := filepath.Join(fixture.GetTempDir(), "worktrees")
+		err = os.MkdirAll(worktreesDir, 0755)
+		Expect(err).NotTo(HaveOccurred())
+		fixture.GetConfigHelper().WithWorktreesDir(worktreesDir)
+
+		worktreePath := filepath.Join(worktreesDir, testID.BranchName("merged-feature"))
+		err = fixture.CreateWorktree(projectPath, worktreePath, testID.BranchName("merged-feature"))
+		Expect(err).NotTo(HaveOccurred())
+
+		session := ctxHelper.FromProjectDir("test", "delete", testID.BranchName("merged-feature"), "--merged-only")
+		assertions.ShouldDeleteWorktree(session, testID.BranchName("merged-feature"))
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("fails with --merged-only when branch is not merged", func() {
+		fixture.SetupSingleProject("test")
+		projectPath := fixture.GetProjectPath("test")
+		testID := fixture.GetTestID()
+		gitHelper := fixture.GetGitHelper()
+
+		err := gitHelper.CreateBranch(projectPath, testID.BranchName("unmerged"))
+		Expect(err).NotTo(HaveOccurred())
+
+		worktreesDir := filepath.Join(fixture.GetTempDir(), "worktrees")
+		err = os.MkdirAll(worktreesDir, 0755)
+		Expect(err).NotTo(HaveOccurred())
+		fixture.GetConfigHelper().WithWorktreesDir(worktreesDir)
+
+		worktreePath := filepath.Join(worktreesDir, testID.BranchName("unmerged"))
+		err = fixture.CreateWorktree(projectPath, worktreePath, testID.BranchName("unmerged"))
+		Expect(err).NotTo(HaveOccurred())
+
+		session := ctxHelper.FromProjectDir("test", "delete", testID.BranchName("unmerged"), "--merged-only")
+		cli.ShouldFailWithExit(session, 1)
+
+		if session.ExitCode() != 1 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		cli.ShouldErrorOutput(session, "not merged")
+	})
+
+	It("changes to main project with -C flag", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		testID := fixture.GetTestID()
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+
+		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "delete", testID.BranchName("feature-1"), "-C")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := cli.GetOutput(session)
+		lines := strings.Split(output, "\n")
+		Expect(len(lines)).To(BeNumerically(">=", 2))
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("fails to delete non-existent worktree", func() {
+		fixture.SetupSingleProject("test")
+
+		session := ctxHelper.FromProjectDir("test", "delete", "nonexistent")
+		cli.ShouldFailWithExit(session, 1)
+
+		if session.ExitCode() != 1 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		cli.ShouldErrorOutput(session, "worktree not found")
+	})
+
+	It("gracefully handles already removed worktree", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		testID := fixture.GetTestID()
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+
+		err := fixture.RemoveWorktree(worktreePath)
+		Expect(err).NotTo(HaveOccurred())
+
+		session := ctxHelper.FromProjectDir("test", "delete", testID.BranchName("feature-1"))
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		cli.ShouldOutput(session, "already removed")
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+})

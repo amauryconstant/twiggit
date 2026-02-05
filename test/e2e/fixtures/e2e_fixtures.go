@@ -20,6 +20,12 @@ import (
 	"twiggit/test/helpers"
 )
 
+const (
+	// File permissions for test files
+	FilePermReadWrite = 0644 // read/write for owner, read for others
+	FilePermAll       = 0755 // read/write/execute for all (or use git default)
+)
+
 // E2ETestFixture provides comprehensive test setup for E2E tests
 type E2ETestFixture struct {
 	tempDir          string
@@ -58,7 +64,7 @@ func (f *E2ETestFixture) WithConfig(configFunc func(*e2ehelpers.ConfigHelper)) *
 func (f *E2ETestFixture) SetupMultiProject() *E2ETestFixture {
 	// Create projects directory
 	projectsDir := filepath.Join(f.tempDir, "projects")
-	err := os.MkdirAll(projectsDir, 0755)
+	err := os.MkdirAll(projectsDir, FilePermAll)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Project 1: Simple project with main branch
@@ -95,7 +101,7 @@ func (f *E2ETestFixture) SetupSingleProject(name string) *E2ETestFixture {
 	f.projects[name] = projectPath
 
 	projectsDir := filepath.Dir(projectPath)
-	err := os.MkdirAll(projectsDir, 0755)
+	err := os.MkdirAll(projectsDir, FilePermAll)
 	Expect(err).NotTo(HaveOccurred())
 
 	f.configHelper.WithProjectsDir(projectsDir)
@@ -205,7 +211,7 @@ func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *E2ETestFixture
 	projectPath := f.SetupSingleProject(projectName).GetProjectPath(projectName)
 
 	worktreesDir := filepath.Join(f.tempDir, "worktrees", projectName)
-	err := os.MkdirAll(worktreesDir, 0755)
+	err := os.MkdirAll(worktreesDir, FilePermAll)
 	Expect(err).NotTo(HaveOccurred())
 
 	f.configHelper.WithWorktreesDir(filepath.Join(f.tempDir, "worktrees"))
@@ -327,4 +333,77 @@ func (f *E2ETestFixture) ValidateCleanup() error {
 	}
 
 	return nil
+}
+
+// CreateWorktree creates a new worktree manually using git CLI
+func (f *E2ETestFixture) CreateWorktree(projectPath, worktreePath, branch string) error {
+	result, err := f.gitExecutor.Execute(
+		context.Background(),
+		projectPath,
+		"git", "worktree", "add", "-b", branch, worktreePath,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create worktree: %w, output: %s", err, result.Stdout)
+	}
+	f.createdWorktrees = append(f.createdWorktrees, worktreePath)
+	return nil
+}
+
+// RemoveWorktree removes a worktree using git CLI
+func (f *E2ETestFixture) RemoveWorktree(worktreePath string) error {
+	mainRepoPath := ""
+	for _, repoPath := range f.projects {
+		if repoPath != "" {
+			mainRepoPath = repoPath
+			break
+		}
+	}
+
+	if mainRepoPath == "" {
+		return fmt.Errorf("no main repo found")
+	}
+
+	result, err := f.gitExecutor.Execute(
+		context.Background(),
+		mainRepoPath,
+		"git", "worktree", "remove", worktreePath,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to remove worktree: %w, output: %s", err, result.Stdout)
+	}
+	return nil
+}
+
+// CreateFileAndCommit creates a file with content, adds it to the worktree, and commits with the given message
+func (f *E2ETestFixture) CreateFileAndCommit(worktreePath, filename, content, commitMsg string) error {
+	filePath := filepath.Join(worktreePath, filename)
+	if err := os.WriteFile(filePath, []byte(content), FilePermReadWrite); err != nil {
+		return fmt.Errorf("failed to write file %s: %w", filePath, err)
+	}
+
+	repo, err := f.gitHelper.PlainOpen(worktreePath)
+	if err != nil {
+		return fmt.Errorf("failed to open repo at %s: %w", worktreePath, err)
+	}
+
+	wt, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree: %w", err)
+	}
+
+	if _, err := wt.Add(filename); err != nil {
+		return fmt.Errorf("failed to add file %s: %w", filename, err)
+	}
+
+	if _, err := wt.Commit(commitMsg, nil); err != nil {
+		return fmt.Errorf("failed to commit: %w", err)
+	}
+
+	return nil
+}
+
+// GetWorktreePath returns the full worktree path for a given project and branch
+func (f *E2ETestFixture) GetWorktreePath(projectName, branch string) string {
+	worktreesDir := f.configHelper.GetWorktreesDir()
+	return filepath.Join(worktreesDir, projectName, branch)
 }

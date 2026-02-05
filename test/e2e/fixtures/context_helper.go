@@ -57,3 +57,27 @@ func (h *ContextHelper) WithConfigDir(configDir string) *ContextHelper {
 		cli:     h.cli.WithConfigDir(configDir),
 	}
 }
+
+// FromProjectDirWithDebug runs command from within a project directory with debug logging
+// Logs session details and fixture state if exit code != 0
+func (h *ContextHelper) FromProjectDirWithDebug(projectName string, args ...string) *gexec.Session {
+	session := h.FromProjectDir(projectName, args...)
+	h.cli.DebugSession(session, h.fixture.Inspect())
+	return session
+}
+
+// FromWorktreeDirWithDebug runs command from within a worktree directory with debug logging
+// Logs session details and fixture state if exit code != 0
+func (h *ContextHelper) FromWorktreeDirWithDebug(projectName, branch string, args ...string) *gexec.Session {
+	session := h.FromWorktreeDir(projectName, branch, args...)
+	h.cli.DebugSession(session, h.fixture.Inspect())
+	return session
+}
+
+// FromOutsideGitWithDebug runs command from outside any git repository with debug logging
+// Logs session details and fixture state if exit code != 0
+func (h *ContextHelper) FromOutsideGitWithDebug(args ...string) *gexec.Session {
+	session := h.FromOutsideGit(args...)
+	h.cli.DebugSession(session, h.fixture.Inspect())
+	return session
+}
