@@ -3,7 +3,7 @@
 
 // Package e2e provides end-to-end tests for twiggit list command.
 // Tests validate context-aware listing behavior across project, worktree, and outside git contexts.
-package e2e
+package cmde2e
 
 import (
 	. "github.com/onsi/ginkgo/v2"

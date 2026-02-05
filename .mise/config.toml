@@ -33,7 +33,7 @@ run = "go test -race ./..."
 [tasks."test:e2e"]
 description = "Run CLI end-to-end tests"
 depends = ["build:e2e"]
-run = "ginkgo --tags=e2e ./test/e2e/..."
+run = "ginkgo --tags=e2e --keep-going ./test/e2e/..."
 
 [tasks."lint:check"]
 description = "Run linting and formatting checks"
@@ -49,7 +49,7 @@ run = "gofmt -w ."
 
 [tasks.check]
 description = "Run all validation checks (quick)"
-depends = ["lint:fix", "format", "test", "build:local"]
+depends = ["lint:fix", "test", "build:local"]
 
 # ========================
 # Building

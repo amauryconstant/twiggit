@@ -3,7 +3,7 @@
 
 // Package e2e provides end-to-end tests for twiggit help command.
 // Tests validate help display for main command and subcommands.
-package e2e
+package cmde2e
 
 import (
 	. "github.com/onsi/ginkgo/v2"

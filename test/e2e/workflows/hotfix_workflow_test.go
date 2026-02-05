@@ -3,7 +3,7 @@
 
 // Package e2e provides end-to-end tests for twiggit CLI.
 // Tests use real git repositories and validate complete user workflows.
-package e2e
+package workflowse2e
 
 import (
 	"os"

@@ -3,7 +3,7 @@
 
 // Package e2e provides end-to-end tests for twiggit setup-shell command.
 // Tests validate shell wrapper installation for bash, zsh, and fish.
-package e2e
+package cmde2e
 
 import (
 	"os"
