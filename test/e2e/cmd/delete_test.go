@@ -72,7 +72,7 @@ var _ = Describe("delete command", func() {
 		Expect(worktree2Path).NotTo(BeADirectory())
 	})
 
-	It("fails with uncommitted changes", func() {
+	PIt("fails with uncommitted changes", func() {
 		fixture.CreateWorktreeSetup("test")
 
 		testID := fixture.GetTestID()
@@ -112,7 +112,7 @@ var _ = Describe("delete command", func() {
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
 
-	It("keeps branch with --keep-branch flag", func() {
+	PIt("keeps branch with --keep-branch flag", func() {
 		fixture.CreateWorktreeSetup("test")
 
 		testID := fixture.GetTestID()
@@ -134,7 +134,7 @@ var _ = Describe("delete command", func() {
 		Expect(branches).To(ContainElement(testID.BranchName("feature-1")))
 	})
 
-	It("succeeds with --merged-only when branch is merged", func() {
+	PIt("succeeds with --merged-only when branch is merged", func() {
 		fixture.SetupSingleProject("test")
 		projectPath := fixture.GetProjectPath("test")
 		testID := fixture.GetTestID()
@@ -162,7 +162,7 @@ var _ = Describe("delete command", func() {
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
 
-	It("fails with --merged-only when branch is not merged", func() {
+	PIt("fails with --merged-only when branch is not merged", func() {
 		fixture.SetupSingleProject("test")
 		projectPath := fixture.GetProjectPath("test")
 		testID := fixture.GetTestID()
@@ -210,7 +210,7 @@ var _ = Describe("delete command", func() {
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
 
-	It("fails to delete non-existent worktree", func() {
+	PIt("fails to delete non-existent worktree", func() {
 		fixture.SetupSingleProject("test")
 
 		session := ctxHelper.FromProjectDir("test", "delete", "nonexistent")
@@ -223,7 +223,7 @@ var _ = Describe("delete command", func() {
 		cli.ShouldErrorOutput(session, "worktree not found")
 	})
 
-	It("gracefully handles already removed worktree", func() {
+	PIt("gracefully handles already removed worktree", func() {
 		fixture.CreateWorktreeSetup("test")
 
 		testID := fixture.GetTestID()

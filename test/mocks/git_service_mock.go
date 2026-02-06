@@ -94,7 +94,7 @@ func (m *MockGoGitClient) GetCommitInfo(ctx context.Context, repoPath, commitHas
 type MockCLIClient struct {
 	// Mock functions
 	CreateWorktreeFunc func(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error
-	DeleteWorktreeFunc func(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error
+	DeleteWorktreeFunc func(ctx context.Context, repoPath, worktreePath string, force bool) error
 	ListWorktreesFunc  func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
 	PruneWorktreesFunc func(ctx context.Context, repoPath string) error
 	IsBranchMergedFunc func(ctx context.Context, repoPath, branchName string) (bool, error)
@@ -114,9 +114,9 @@ func (m *MockCLIClient) CreateWorktree(ctx context.Context, repoPath, branchName
 }
 
 // DeleteWorktree mocks deleting a worktree
-func (m *MockCLIClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error {
+func (m *MockCLIClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
 	if m.DeleteWorktreeFunc != nil {
-		return m.DeleteWorktreeFunc(ctx, repoPath, worktreePath, keepBranch)
+		return m.DeleteWorktreeFunc(ctx, repoPath, worktreePath, force)
 	}
 	return nil
 }

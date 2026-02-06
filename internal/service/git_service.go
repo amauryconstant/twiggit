@@ -43,7 +43,7 @@ type CLIClient interface {
 	CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error
 
 	// DeleteWorktree removes worktree using git CLI (idempotent, no-op if already deleted)
-	DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error
+	DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error
 
 	// ListWorktrees lists all worktrees using git CLI (idempotent)
 	ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
@@ -177,8 +177,8 @@ func (gs *gitService) CreateWorktree(ctx context.Context, repoPath, branchName, 
 	return nil
 }
 
-func (gs *gitService) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error {
-	if err := gs.cliClient.DeleteWorktree(ctx, repoPath, worktreePath, keepBranch); err != nil {
+func (gs *gitService) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
+	if err := gs.cliClient.DeleteWorktree(ctx, repoPath, worktreePath, force); err != nil {
 		return fmt.Errorf("failed to delete worktree: %w", err)
 	}
 	return nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -52,10 +53,10 @@ func buildWorktreeAddArgs(branchExists bool, branchName, worktreePath, sourceBra
 }
 
 // buildWorktreeRemoveArgs builds arguments for git worktree remove command
-func buildWorktreeRemoveArgs(worktreePath string, keepBranch bool) []string {
+func buildWorktreeRemoveArgs(worktreePath string, force bool) []string {
 	args := []string{"worktree", "remove"}
-	if keepBranch {
-		args = append(args, "--force") // Use force to avoid branch deletion prompts
+	if force {
+		args = append(args, "--force")
 	}
 	args = append(args, worktreePath)
 	return args
@@ -103,7 +104,10 @@ func (c *CLIClientImpl) CreateWorktree(ctx context.Context, repoPath, branchName
 	args := buildWorktreeAddArgs(branchExists, branchName, worktreePath, sourceBranch)
 
 	// Execute command
+	fmt.Fprintf(os.Stderr, "DEBUG: Executing git worktree add in dir=%s with args=%v\n", repoPath, args)
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, args...)
+	fmt.Fprintf(os.Stderr, "DEBUG: git command completed - exitCode=%d, stdout=%q, stderr=%q, err=%v\n",
+		result.ExitCode, result.Stdout, result.Stderr, err)
 	if err != nil {
 		return domain.NewGitWorktreeError(worktreePath, branchName, "failed to create worktree", err)
 	}
@@ -113,11 +117,18 @@ func (c *CLIClientImpl) CreateWorktree(ctx context.Context, repoPath, branchName
 			"git worktree add failed: "+result.Stderr, nil)
 	}
 
+	// Check if worktree was actually created
+	if _, err := os.Stat(worktreePath); err != nil {
+		fmt.Fprintf(os.Stderr, "DEBUG: Worktree path does not exist after git command: %v\n", err)
+		return domain.NewGitWorktreeError(worktreePath, branchName,
+			"git worktree add succeeded but worktree directory not found: "+err.Error(), nil)
+	}
+
 	return nil
 }
 
 // DeleteWorktree removes worktree using git CLI (idempotent, no-op if already deleted)
-func (c *CLIClientImpl) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error {
+func (c *CLIClientImpl) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
 	// Validate inputs
 	if repoPath == "" {
 		return domain.NewGitWorktreeError(worktreePath, "", "repository path cannot be empty", nil)
@@ -130,7 +141,7 @@ func (c *CLIClientImpl) DeleteWorktree(ctx context.Context, repoPath, worktreePa
 	// This is more efficient than listing worktrees first
 
 	// Build command arguments using pure function
-	args := buildWorktreeRemoveArgs(worktreePath, keepBranch)
+	args := buildWorktreeRemoveArgs(worktreePath, force)
 
 	// Execute command
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, args...)
@@ -318,7 +329,7 @@ func (c *CLIClientImpl) branchExists(ctx context.Context, repoPath, branchName s
 type MockCLIClient struct {
 	// Mock functions
 	CreateWorktreeFunc func(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error
-	DeleteWorktreeFunc func(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error
+	DeleteWorktreeFunc func(ctx context.Context, repoPath, worktreePath string, force bool) error
 	ListWorktreesFunc  func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
 	PruneWorktreesFunc func(ctx context.Context, repoPath string) error
 	IsBranchMergedFunc func(ctx context.Context, repoPath, branchName string) (bool, error)
@@ -338,9 +349,9 @@ func (m *MockCLIClient) CreateWorktree(ctx context.Context, repoPath, branchName
 }
 
 // DeleteWorktree mock implementation for testing
-func (m *MockCLIClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error {
+func (m *MockCLIClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
 	if m.DeleteWorktreeFunc != nil {
-		return m.DeleteWorktreeFunc(ctx, repoPath, worktreePath, keepBranch)
+		return m.DeleteWorktreeFunc(ctx, repoPath, worktreePath, force)
 	}
 	return nil
 }

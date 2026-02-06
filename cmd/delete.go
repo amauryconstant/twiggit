@@ -12,7 +12,7 @@ import (
 
 // NewDeleteCommand creates a new delete command
 func NewDeleteCommand(config *CommandConfig) *cobra.Command {
-	var force, keepBranch, mergedOnly, changeDir bool
+	var force, mergedOnly, changeDir bool
 
 	cmd := &cobra.Command{
 		Use:   "delete <project>/<branch> | <worktree-path>",
@@ -22,12 +22,11 @@ By default, prevents deletion of worktrees with uncommitted changes.
 Use --force to override safety checks.`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
-			return executeDelete(config, args[0], force, keepBranch, mergedOnly, changeDir)
+			return executeDelete(config, args[0], force, mergedOnly, changeDir)
 		},
 	}
 
 	cmd.Flags().BoolVar(&force, "force", false, "Force deletion even with uncommitted changes")
-	cmd.Flags().BoolVar(&keepBranch, "keep-branch", false, "Keep the branch after deletion")
 	cmd.Flags().BoolVar(&mergedOnly, "merged-only", false, "Only delete if branch is merged")
 	cmd.Flags().BoolVarP(&changeDir, "change-dir", "C", false, "Change directory after deletion (outputs path to stdout)")
 
@@ -35,7 +34,7 @@ Use --force to override safety checks.`,
 }
 
 // executeDelete executes the delete command with the given configuration
-func executeDelete(config *CommandConfig, target string, force, keepBranch, mergedOnly, changeDir bool) error {
+func executeDelete(config *CommandConfig, target string, force, mergedOnly, changeDir bool) error {
 	ctx := context.Background()
 
 	currentCtx, worktreePath, err := resolveWorktreeTarget(config, target)
@@ -53,7 +52,7 @@ func executeDelete(config *CommandConfig, target string, force, keepBranch, merg
 		return err
 	}
 
-	return deleteWorktree(ctx, config, worktreePath, force, keepBranch, changeDir, currentCtx)
+	return deleteWorktree(ctx, config, worktreePath, force, changeDir, currentCtx)
 }
 
 func resolveWorktreeTarget(config *CommandConfig, target string) (*domain.Context, string, error) {
@@ -90,7 +89,7 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, worktree
 			if changeDir {
 				fmt.Println(currentCtx.Path)
 			}
-			return nil
+			return fmt.Errorf("worktree not found: %s", worktreePath)
 		}
 		return fmt.Errorf("failed to check worktree status: %w", err)
 	}
@@ -136,11 +135,10 @@ func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath
 	return nil
 }
 
-func deleteWorktree(ctx context.Context, config *CommandConfig, worktreePath string, force, keepBranch, changeDir bool, currentCtx *domain.Context) error {
+func deleteWorktree(ctx context.Context, config *CommandConfig, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
 	req := &domain.DeleteWorktreeRequest{
 		WorktreePath: worktreePath,
 		Force:        force,
-		KeepBranch:   keepBranch,
 		Context:      currentCtx,
 	}
 

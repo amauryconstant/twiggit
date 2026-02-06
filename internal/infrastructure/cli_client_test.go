@@ -114,26 +114,26 @@ func (s *CLIClientTestSuite) TestBuildWorktreeRemoveArgs() {
 	testCases := []struct {
 		name         string
 		worktreePath string
-		keepBranch   bool
+		force        bool
 		expectedArgs []string
 	}{
 		{
-			name:         "remove with branch deletion",
+			name:         "remove without force",
 			worktreePath: "/path/to/worktree",
-			keepBranch:   false,
+			force:        false,
 			expectedArgs: []string{"worktree", "remove", "/path/to/worktree"},
 		},
 		{
-			name:         "remove with branch preservation",
+			name:         "remove with force",
 			worktreePath: "/path/to/worktree",
-			keepBranch:   true,
+			force:        true,
 			expectedArgs: []string{"worktree", "remove", "--force", "/path/to/worktree"},
 		},
 	}
 
 	for _, tt := range testCases {
 		s.Run(tt.name, func() {
-			args := buildWorktreeRemoveArgs(tt.worktreePath, tt.keepBranch)
+			args := buildWorktreeRemoveArgs(tt.worktreePath, tt.force)
 			s.Equal(tt.expectedArgs, args)
 		})
 	}

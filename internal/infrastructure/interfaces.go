@@ -48,7 +48,7 @@ type CLIClient interface {
 	CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error
 
 	// DeleteWorktree removes worktree using git CLI (idempotent, no-op if already deleted)
-	DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error
+	DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error
 
 	// ListWorktrees lists all worktrees using git CLI (idempotent)
 	ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)

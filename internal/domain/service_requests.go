@@ -13,7 +13,6 @@ type CreateWorktreeRequest struct {
 type DeleteWorktreeRequest struct {
 	WorktreePath string   // Path to the worktree to delete
 	Force        bool     // Force deletion even if there are uncommitted changes
-	KeepBranch   bool     // Keep the branch after deletion
 	Context      *Context // Current context for validation
 }
 

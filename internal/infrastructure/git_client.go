@@ -102,8 +102,8 @@ func (c *CompositeGitClient) CreateWorktree(ctx context.Context, repoPath, branc
 }
 
 // DeleteWorktree deletes a worktree using the CLI client
-func (c *CompositeGitClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error {
-	if err := c.cliClient.DeleteWorktree(ctx, repoPath, worktreePath, keepBranch); err != nil {
+func (c *CompositeGitClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
+	if err := c.cliClient.DeleteWorktree(ctx, repoPath, worktreePath, force); err != nil {
 		return fmt.Errorf("failed to delete worktree: %w", err)
 	}
 	return nil
