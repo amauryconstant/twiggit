@@ -49,6 +49,12 @@ type ProjectInfo struct {
 	Fixture *RepoFixture
 }
 
+// CreateWorktreeSetupResult contains branch names created by CreateWorktreeSetup
+type CreateWorktreeSetupResult struct {
+	Feature1Branch string
+	Feature2Branch string
+}
+
 // NewE2ETestFixture creates a new E2E test fixture
 func NewE2ETestFixture() *E2ETestFixture {
 	tempDir := GinkgoT().TempDir()
@@ -233,7 +239,7 @@ func (f *E2ETestFixture) TrackWorktree(worktreePath, repoPath string) {
 }
 
 // CreateWorktreeSetup creates a project with worktrees for testing
-func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *E2ETestFixture {
+func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *CreateWorktreeSetupResult {
 	projectsDir := filepath.Join(f.tempDir, "projects")
 	err := os.MkdirAll(projectsDir, FilePermAll)
 	Expect(err).NotTo(HaveOccurred())
@@ -248,9 +254,10 @@ func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *E2ETestFixture
 		Fixture: nil,
 	}
 
-	f.configHelper.WithProjectsDir(projectsDir)
-
 	worktreesDir := filepath.Join(f.tempDir, "worktrees")
+
+	// Update in-memory config paths
+	f.configHelper.WithProjectsDir(projectsDir)
 	f.configHelper.WithWorktreesDir(worktreesDir)
 
 	// Generate branch names once to ensure consistency across the method
@@ -279,7 +286,10 @@ func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *E2ETestFixture
 	f.createdWorktrees = append(f.createdWorktrees, worktree2Path)
 	f.TrackWorktree(worktree2Path, projectPath)
 
-	return f
+	return &CreateWorktreeSetupResult{
+		Feature1Branch: feature1Branch,
+		Feature2Branch: feature2Branch,
+	}
 }
 
 // CreateCustomBranchSetup creates a project with custom default branch
