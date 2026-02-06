@@ -51,17 +51,16 @@ var _ = Describe("context-aware behavior", func() {
 	})
 
 	It("creates worktree from worktree context", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "create", "feature-2")
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "create", "feature-2")
 		assertions.ShouldCreateWorktree(session, "feature-2")
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
 		}
 
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-2"))
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", "feature-2")
 		assertions.ShouldHaveWorktree(worktreePath)
 	})
 
@@ -80,9 +79,8 @@ var _ = Describe("context-aware behavior", func() {
 	})
 
 	It("lists worktrees from project context", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
 		session := ctxHelper.FromProjectDir("test", "list")
 		cli.ShouldSucceed(session)
 
@@ -90,41 +88,35 @@ var _ = Describe("context-aware behavior", func() {
 			GinkgoT().Log(fixture.Inspect())
 		}
 
-		cli.ShouldOutput(session, testID.BranchName("feature-1"))
-		cli.ShouldOutput(session, testID.BranchName("feature-2"))
+		cli.ShouldOutput(session, result.Feature1Branch)
+		cli.ShouldOutput(session, result.Feature2Branch)
 	})
 
 	It("deletes worktree from worktree context", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		branchToDelete := testID.BranchName("feature-1")
-
-		session := ctxHelper.FromWorktreeDir("test", branchToDelete, "delete", branchToDelete)
-		assertions.ShouldDeleteWorktree(session, branchToDelete)
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch)
+		assertions.ShouldDeleteWorktree(session, result.Feature1Branch)
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
 		}
 
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", branchToDelete)
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
 
 	It("changes directory from outside git", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		targetBranch := testID.BranchName("feature-1")
-
-		session := ctxHelper.FromOutsideGit("cd", "test", targetBranch)
+		session := ctxHelper.FromOutsideGit("cd", "test", result.Feature1Branch)
 		cli.ShouldSucceed(session)
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
 		}
 
-		expectedPath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", targetBranch)
+		expectedPath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 		cli.ShouldOutput(session, expectedPath)
 	})
 

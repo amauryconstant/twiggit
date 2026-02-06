@@ -104,15 +104,22 @@ func (s *worktreeService) DeleteWorktree(ctx context.Context, req *domain.Delete
 
 // ListWorktrees lists all worktrees for a project
 func (s *worktreeService) ListWorktrees(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
-	var project *domain.ProjectInfo
+	var projects []*domain.ProjectInfo
 	var err error
 
-	// If we're in a project context, use the current path directly
-	if req.Context != nil && (req.Context.Type == domain.ContextProject || req.Context.Type == domain.ContextWorktree) {
-		project, err = s.projectService.GetProjectInfo(ctx, req.Context.Path)
+	// Handle ListAllProjects case
+	if req.ListAllProjects {
+		projects, err = s.listAllProjects(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list all projects: %w", err)
+		}
+	} else if req.Context != nil && (req.Context.Type == domain.ContextProject || req.Context.Type == domain.ContextWorktree) {
+		// If we're in a project context, use the current path directly
+		project, err := s.projectService.GetProjectInfo(ctx, req.Context.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get project info from context: %w", err)
 		}
+		projects = []*domain.ProjectInfo{project}
 	} else {
 		// Resolve project by name
 		projectName := req.ProjectName
@@ -125,33 +132,56 @@ func (s *worktreeService) ListWorktrees(ctx context.Context, req *domain.ListWor
 		}
 
 		// Get project info
-		project, err = s.projectService.DiscoverProject(ctx, projectName, req.Context)
+		project, err := s.projectService.DiscoverProject(ctx, projectName, req.Context)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve project: %w", err)
 		}
+		projects = []*domain.ProjectInfo{project}
 	}
 
-	// List worktrees using CLI client
-	worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath)
-	if err != nil {
-		return nil, domain.NewWorktreeServiceError(project.GitRepoPath, "", "ListWorktrees", "failed to list worktrees", err)
-	}
-
-	// Filter out main worktree if not requested
-	if !req.IncludeMain {
-		var filtered []domain.WorktreeInfo
-		for _, wt := range worktrees {
-			if wt.Path != project.GitRepoPath {
-				filtered = append(filtered, wt)
-			}
+	// Aggregate worktrees from all projects
+	var allWorktrees []*domain.WorktreeInfo
+	for _, project := range projects {
+		// List worktrees using CLI client
+		worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath)
+		if err != nil {
+			return nil, domain.NewWorktreeServiceError(project.GitRepoPath, "", "ListWorktrees", "failed to list worktrees", err)
 		}
-		worktrees = filtered
+
+		// Filter out main worktree if not requested
+		if !req.IncludeMain {
+			var filtered []domain.WorktreeInfo
+			for _, wt := range worktrees {
+				if wt.Path != project.GitRepoPath {
+					filtered = append(filtered, wt)
+				}
+			}
+			worktrees = filtered
+		}
+
+		// Convert to pointers and add to result
+		for i := range worktrees {
+			allWorktrees = append(allWorktrees, &worktrees[i])
+		}
 	}
 
-	// Convert to pointers for return
-	result := make([]*domain.WorktreeInfo, len(worktrees))
-	for i := range worktrees {
-		result[i] = &worktrees[i]
+	return allWorktrees, nil
+}
+
+// listAllProjects retrieves all available projects from the projects directory
+func (s *worktreeService) listAllProjects(ctx context.Context) ([]*domain.ProjectInfo, error) {
+	projects, err := s.projectService.ListProjects(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list projects: %w", err)
+	}
+
+	result := make([]*domain.ProjectInfo, len(projects))
+	for i, project := range projects {
+		result[i] = &domain.ProjectInfo{
+			Name:        project.Name,
+			Path:        project.Path,
+			GitRepoPath: project.GitRepoPath,
+		}
 	}
 
 	return result, nil

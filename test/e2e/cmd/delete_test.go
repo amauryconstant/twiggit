@@ -26,8 +26,8 @@ var _ = Describe("delete command", func() {
 	BeforeEach(func() {
 		fixture = fixtures.NewE2ETestFixture()
 		cli = helpers.NewTwiggitCLI()
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		cli = cli.WithConfigDir(fixture.Build())
+		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		assertions = helpers.NewTwiggitAssertions()
 	})
 
@@ -39,12 +39,14 @@ var _ = Describe("delete command", func() {
 	})
 
 	It("deletes worktree from project context", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 
-		session := ctxHelper.FromProjectDir("test", "delete", testID.BranchName("feature-1"))
+		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch)
+		GinkgoT().Logf("Session output: %s", string(session.Out.Contents()))
+		GinkgoT().Logf("Session error: %s", string(session.Err.Contents()))
+		GinkgoT().Logf("Session exit code: %d", session.ExitCode())
 		cli.ShouldSucceed(session)
 
 		if session.ExitCode() != 0 {
@@ -57,13 +59,12 @@ var _ = Describe("delete command", func() {
 	})
 
 	It("deletes other worktree from worktree context", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		worktree2Path := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-2"))
+		worktree2Path := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature2Branch)
 
-		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "delete", testID.BranchName("feature-2"))
-		assertions.ShouldDeleteWorktree(session, testID.BranchName("feature-2"))
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature2Branch)
+		assertions.ShouldDeleteWorktree(session, result.Feature2Branch)
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
@@ -73,16 +74,15 @@ var _ = Describe("delete command", func() {
 	})
 
 	PIt("fails with uncommitted changes", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 
 		testFile := filepath.Join(worktreePath, "test.txt")
 		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
 		Expect(err).NotTo(HaveOccurred())
 
-		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "delete", testID.BranchName("feature-1"))
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch)
 		cli.ShouldFailWithExit(session, 1)
 
 		if session.ExitCode() != 1 {
@@ -93,17 +93,16 @@ var _ = Describe("delete command", func() {
 	})
 
 	It("deletes with --force flag despite uncommitted changes", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 
 		testFile := filepath.Join(worktreePath, "test.txt")
 		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
 		Expect(err).NotTo(HaveOccurred())
 
-		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "delete", testID.BranchName("feature-1"), "--force")
-		assertions.ShouldDeleteWorktree(session, testID.BranchName("feature-1"))
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "--force")
+		assertions.ShouldDeleteWorktree(session, result.Feature1Branch)
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
@@ -113,15 +112,14 @@ var _ = Describe("delete command", func() {
 	})
 
 	PIt("keeps branch with --keep-branch flag", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 		projectPath := fixture.GetProjectPath("test")
 		gitHelper := fixture.GetGitHelper()
 
-		session := cli.Run("delete", "test/"+testID.BranchName("feature-1"), "--keep-branch")
-		assertions.ShouldDeleteWorktree(session, testID.BranchName("feature-1"))
+		session := cli.Run("delete", "test/"+result.Feature1Branch, "--keep-branch")
+		assertions.ShouldDeleteWorktree(session, result.Feature1Branch)
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
@@ -131,7 +129,7 @@ var _ = Describe("delete command", func() {
 
 		branches, err := gitHelper.ListBranches(projectPath)
 		Expect(err).NotTo(HaveOccurred())
-		Expect(branches).To(ContainElement(testID.BranchName("feature-1")))
+		Expect(branches).To(ContainElement(result.Feature1Branch))
 	})
 
 	PIt("succeeds with --merged-only when branch is merged", func() {
@@ -191,12 +189,11 @@ var _ = Describe("delete command", func() {
 	})
 
 	It("changes to main project with -C flag", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 
-		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "delete", testID.BranchName("feature-1"), "-C")
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "-C")
 		cli.ShouldSucceed(session)
 
 		if session.ExitCode() != 0 {
@@ -224,15 +221,14 @@ var _ = Describe("delete command", func() {
 	})
 
 	PIt("gracefully handles already removed worktree", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", testID.BranchName("feature-1"))
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 
 		err := fixture.RemoveWorktree(worktreePath)
 		Expect(err).NotTo(HaveOccurred())
 
-		session := ctxHelper.FromProjectDir("test", "delete", testID.BranchName("feature-1"))
+		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch)
 		cli.ShouldSucceed(session)
 
 		if session.ExitCode() != 0 {

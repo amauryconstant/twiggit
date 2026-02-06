@@ -42,8 +42,9 @@ func executeList(cmd *cobra.Command, config *CommandConfig, all bool) error {
 
 	// Build list request
 	req := &domain.ListWorktreesRequest{
-		Context:     currentCtx,
-		IncludeMain: all, // Use all flag to determine if main worktree should be included
+		Context:         currentCtx,
+		IncludeMain:     false, // By default, don't include main worktree
+		ListAllProjects: all,   // Use --all flag to list worktrees from all projects
 	}
 
 	// If not listing all, use project name from context

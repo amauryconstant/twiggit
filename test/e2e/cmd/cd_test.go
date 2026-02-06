@@ -24,6 +24,7 @@ var _ = Describe("cd command", func() {
 	BeforeEach(func() {
 		fixture = fixtures.NewE2ETestFixture()
 		cli = helpers.NewTwiggitCLI()
+		cli = cli.WithConfigDir(fixture.Build())
 		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 	})
 
@@ -32,42 +33,32 @@ var _ = Describe("cd command", func() {
 	})
 
 	It("cd from project to worktree", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 		cli = cli.WithConfigDir(fixture.Build())
 
-		testID := fixture.GetTestID()
-		branchName := testID.BranchName("feature-1")
-
-		session := ctxHelper.FromProjectDir("test", "cd", branchName)
+		session := ctxHelper.FromProjectDir("test", "cd", result.Feature1Branch)
 		Eventually(session).Should(gexec.Exit(0))
 
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", branchName)
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 		Expect(string(session.Out.Contents())).To(ContainSubstring(worktreePath))
 	})
 
 	It("cd from worktree to different worktree", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 		cli = cli.WithConfigDir(fixture.Build())
 
-		testID := fixture.GetTestID()
-		branch1 := testID.BranchName("feature-1")
-		branch2 := testID.BranchName("feature-2")
-
-		session := ctxHelper.FromWorktreeDir("test", branch1, "cd", branch2)
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "cd", result.Feature2Branch)
 		Eventually(session).Should(gexec.Exit(0))
 
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", branch2)
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature2Branch)
 		Expect(string(session.Out.Contents())).To(ContainSubstring(worktreePath))
 	})
 
 	It("cd from worktree to main project", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 		cli = cli.WithConfigDir(fixture.Build())
 
-		testID := fixture.GetTestID()
-		branchName := testID.BranchName("feature-1")
-
-		session := ctxHelper.FromWorktreeDir("test", branchName, "cd", "main")
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "cd", "main")
 		Eventually(session).Should(gexec.Exit(0))
 
 		projectPath := fixture.GetProjectPath("test")
@@ -86,16 +77,13 @@ var _ = Describe("cd command", func() {
 	})
 
 	It("cd from outside git to cross-project worktree", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 		cli = cli.WithConfigDir(fixture.Build())
 
-		testID := fixture.GetTestID()
-		branchName := testID.BranchName("feature-1")
-
-		session := ctxHelper.FromOutsideGit("cd", "test/"+branchName)
+		session := ctxHelper.FromOutsideGit("cd", "test/"+result.Feature1Branch)
 		Eventually(session).Should(gexec.Exit(0))
 
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", branchName)
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 		Expect(string(session.Out.Contents())).To(ContainSubstring(worktreePath))
 	})
 
@@ -111,16 +99,13 @@ var _ = Describe("cd command", func() {
 	})
 
 	It("cd with no target from worktree context", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 		cli = cli.WithConfigDir(fixture.Build())
 
-		testID := fixture.GetTestID()
-		branchName := testID.BranchName("feature-1")
-
-		session := ctxHelper.FromWorktreeDir("test", branchName, "cd")
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "cd")
 		Eventually(session).Should(gexec.Exit(0))
 
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", branchName)
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 		Expect(string(session.Out.Contents())).To(ContainSubstring(worktreePath))
 	})
 

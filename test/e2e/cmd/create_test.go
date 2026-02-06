@@ -24,8 +24,8 @@ var _ = Describe("create command", func() {
 	BeforeEach(func() {
 		fixture = fixtures.NewE2ETestFixture()
 		cli = helpers.NewTwiggitCLI()
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		cli = cli.WithConfigDir(fixture.Build())
+		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		assertions = helpers.NewTwiggitAssertions()
 	})
 
@@ -72,19 +72,16 @@ var _ = Describe("create command", func() {
 	})
 
 	PIt("creates worktree from worktree context", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		feature1Branch := testID.BranchName("feature-1")
-		feature2Branch := testID.BranchName("feature-2")
-		session := ctxHelper.FromWorktreeDir("test", feature1Branch, "create", feature2Branch)
-		assertions.ShouldCreateWorktree(session, feature2Branch)
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "create", result.Feature2Branch)
+		assertions.ShouldCreateWorktree(session, result.Feature2Branch)
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
 		}
 
-		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", feature2Branch)
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature2Branch)
 		assertions.ShouldHaveWorktree(worktreePath)
 	})
 

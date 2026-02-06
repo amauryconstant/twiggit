@@ -20,8 +20,8 @@ var _ = Describe("list command", func() {
 	BeforeEach(func() {
 		fixture = fixtures.NewE2ETestFixture()
 		cli = helpers.NewTwiggitCLI()
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		cli = cli.WithConfigDir(fixture.Build())
+		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 	})
 
 	AfterEach(func() {
@@ -51,10 +51,9 @@ var _ = Describe("list command", func() {
 	})
 
 	It("lists worktrees from worktree context", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "list")
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "list")
 		cli.ShouldSucceed(session)
 
 		if session.ExitCode() != 0 {
@@ -84,7 +83,7 @@ var _ = Describe("list command", func() {
 	})
 
 	It("shows (modified) status for modified worktree", func() {
-		fixture.CreateWorktreeSetup("test")
+		_ = fixture.CreateWorktreeSetup("test")
 
 		session := ctxHelper.FromProjectDir("test", "list")
 		cli.ShouldSucceed(session)
@@ -95,10 +94,9 @@ var _ = Describe("list command", func() {
 	})
 
 	It("shows (detached) status for detached worktree", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		testID := fixture.GetTestID()
-		session := ctxHelper.FromWorktreeDir("test", testID.BranchName("feature-1"), "list")
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "list")
 		cli.ShouldSucceed(session)
 
 		if session.ExitCode() != 0 {

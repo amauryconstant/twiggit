@@ -18,9 +18,10 @@ type DeleteWorktreeRequest struct {
 
 // ListWorktreesRequest represents a request to list worktrees
 type ListWorktreesRequest struct {
-	ProjectName string   // Name of the project (optional, uses context if empty)
-	Context     *Context // Current context for project resolution
-	IncludeMain bool     // Include main worktree in results
+	ProjectName     string   // Name of the project (optional, uses context if empty)
+	Context         *Context // Current context for project resolution
+	IncludeMain     bool     // Include main worktree in results
+	ListAllProjects bool     // List worktrees from all discovered projects (overrides ProjectName)
 }
 
 // GetWorktreeStatusRequest represents a request to get worktree status
