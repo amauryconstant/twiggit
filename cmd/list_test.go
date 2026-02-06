@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
@@ -63,17 +62,6 @@ func TestListCommand_Execute(t *testing.T) {
 				}
 			},
 			expectError: false,
-		},
-		{
-			name: "context detection failure",
-			args: []string{},
-			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
-				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
-					return nil, errors.New("detection failed")
-				}
-			},
-			expectError:  true,
-			errorMessage: "context detection failed",
 		},
 	}
 

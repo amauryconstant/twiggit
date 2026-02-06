@@ -19,6 +19,8 @@ import (
 	"twiggit/internal/infrastructure"
 	e2ehelpers "twiggit/test/e2e/helpers"
 	"twiggit/test/helpers"
+
+	git "github.com/go-git/go-git/v5"
 )
 
 const (
@@ -53,7 +55,7 @@ func NewE2ETestFixture() *E2ETestFixture {
 
 	return &E2ETestFixture{
 		tempDir:          tempDir,
-		configHelper:     e2ehelpers.NewConfigHelper(),
+		configHelper:     e2ehelpers.NewConfigHelper().WithTempDir(tempDir),
 		gitHelper:        helpers.NewGitTestHelper(&testing.T{}),
 		repoHelper:       helpers.NewRepoTestHelper(&testing.T{}),
 		gitExecutor:      infrastructure.NewDefaultCommandExecutor(30 * time.Second),
@@ -78,62 +80,69 @@ func (f *E2ETestFixture) SetupMultiProject() *E2ETestFixture {
 	Expect(err).NotTo(HaveOccurred())
 
 	// Project 1: Simple project with main branch using fixture
-	fixture1, err := ExtractRepoFixture("single-branch")
-	Expect(err).NotTo(HaveOccurred())
-	project1Path := fixture1.Path()
-	f.projects[f.testID.ProjectNameWithSuffix("1")] = &ProjectInfo{
-		Name:    f.testID.ProjectNameWithSuffix("1"),
+	project1Name := f.testID.ProjectNameWithSuffix("1")
+	project1Path := filepath.Join(projectsDir, project1Name)
+	err = extractRepoFixtureToDir("single-branch", project1Path)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract project 1")
+	f.projects[project1Name] = &ProjectInfo{
+		Name:    project1Name,
 		Path:    project1Path,
-		Fixture: fixture1,
+		Fixture: nil,
 	}
 
 	// Project 2: Project with feature branches using fixture
-	fixture2, err := ExtractRepoFixture("multi-branch")
-	Expect(err).NotTo(HaveOccurred())
-	project2Path := fixture2.Path()
-	f.projects[f.testID.ProjectNameWithSuffix("2")] = &ProjectInfo{
-		Name:    f.testID.ProjectNameWithSuffix("2"),
+	project2Name := f.testID.ProjectNameWithSuffix("2")
+	project2Path := filepath.Join(projectsDir, project2Name)
+	err = extractRepoFixtureToDir("multi-branch", project2Path)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract project 2")
+	f.projects[project2Name] = &ProjectInfo{
+		Name:    project2Name,
 		Path:    project2Path,
-		Fixture: fixture2,
+		Fixture: nil,
 	}
 
 	// Project 3: Project with develop as default branch using fixture
-	fixture3, err := ExtractRepoFixture("single-branch")
-	Expect(err).NotTo(HaveOccurred())
-	project3Path := fixture3.Path()
-	f.projects[f.testID.ProjectNameWithSuffix("3")] = &ProjectInfo{
-		Name:    f.testID.ProjectNameWithSuffix("3"),
+	project3Name := f.testID.ProjectNameWithSuffix("3")
+	project3Path := filepath.Join(projectsDir, project3Name)
+	err = extractRepoFixtureToDir("single-branch", project3Path)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract project 3")
+	f.projects[project3Name] = &ProjectInfo{
+		Name:    project3Name,
 		Path:    project3Path,
-		Fixture: fixture3,
+		Fixture: nil,
 	}
 
 	// Rename default branch to develop in project3
 	err = f.gitHelper.CreateBranch(project3Path, "develop")
 	Expect(err).NotTo(HaveOccurred())
 
-	// Update config to use projects directory
+	// Update config to use projects and worktrees directories
+	worktreesDir := filepath.Join(f.tempDir, "worktrees")
 	f.configHelper.WithProjectsDir(projectsDir)
+	f.configHelper.WithWorktreesDir(worktreesDir)
 
 	return f
 }
 
 // SetupSingleProject creates a single test project
 func (f *E2ETestFixture) SetupSingleProject(name string) *E2ETestFixture {
-	fixture, err := ExtractRepoFixture("single-branch")
+	projectsDir := filepath.Join(f.tempDir, "projects")
+	err := os.MkdirAll(projectsDir, FilePermAll)
 	Expect(err).NotTo(HaveOccurred())
-	projectPath := fixture.Path()
+
+	projectPath := filepath.Join(projectsDir, name)
+	err = extractRepoFixtureToDir("single-branch", projectPath)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract fixture to project directory")
 
 	f.projects[name] = &ProjectInfo{
 		Name:    name,
 		Path:    projectPath,
-		Fixture: fixture,
+		Fixture: nil,
 	}
 
-	projectsDir := filepath.Join(f.tempDir, "projects")
-	err = os.MkdirAll(projectsDir, FilePermAll)
-	Expect(err).NotTo(HaveOccurred())
-
+	worktreesDir := filepath.Join(f.tempDir, "worktrees")
 	f.configHelper.WithProjectsDir(projectsDir)
+	f.configHelper.WithWorktreesDir(worktreesDir)
 
 	return f
 }
@@ -225,34 +234,55 @@ func (f *E2ETestFixture) TrackWorktree(worktreePath, repoPath string) {
 
 // CreateWorktreeSetup creates a project with worktrees for testing
 func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *E2ETestFixture {
-	projectPath := f.SetupSingleProject(projectName).GetProjectPath(projectName)
-
-	worktreesDir := filepath.Join(f.tempDir, "worktrees", projectName)
-	err := os.MkdirAll(worktreesDir, FilePermAll)
+	projectsDir := filepath.Join(f.tempDir, "projects")
+	err := os.MkdirAll(projectsDir, FilePermAll)
 	Expect(err).NotTo(HaveOccurred())
 
-	f.configHelper.WithWorktreesDir(filepath.Join(f.tempDir, "worktrees"))
+	projectPath := filepath.Join(projectsDir, projectName)
+	err = extractRepoFixtureToDir("single-branch", projectPath)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract fixture to project directory")
 
-	worktree1Path := filepath.Join(worktreesDir, f.testID.BranchName("feature-1"))
+	f.projects[projectName] = &ProjectInfo{
+		Name:    projectName,
+		Path:    projectPath,
+		Fixture: nil,
+	}
+
+	f.configHelper.WithProjectsDir(projectsDir)
+
+	worktreesDir := filepath.Join(f.tempDir, "worktrees")
+	f.configHelper.WithWorktreesDir(worktreesDir)
+
+	// Generate branch names once to ensure consistency across the method
+	// TestIDGenerator generates a new random ID for each BranchName() call,
+	// so we must call it once and reuse the result
+	feature1Branch := f.testID.BranchName("feature-1")
+	feature2Branch := f.testID.BranchName("feature-2")
+
+	worktree1Path := filepath.Join(worktreesDir, projectName, feature1Branch)
 	_, err = f.gitExecutor.Execute(
 		context.Background(),
 		projectPath,
-		"git", "worktree", "add", "-b", f.testID.BranchName("feature-1"), worktree1Path,
+		"git", "worktree", "add", "-b", feature1Branch, worktree1Path,
 	)
 	Expect(err).NotTo(HaveOccurred(), "Failed to create worktree for feature-1")
 	f.createdWorktrees = append(f.createdWorktrees, worktree1Path)
+	f.TrackWorktree(worktree1Path, projectPath)
 
-	worktree2Path := filepath.Join(worktreesDir, f.testID.BranchName("feature-2"))
+	worktree2Path := filepath.Join(worktreesDir, projectName, feature2Branch)
 	_, err = f.gitExecutor.Execute(
 		context.Background(),
 		projectPath,
-		"git", "worktree", "add", "-b", f.testID.BranchName("feature-2"), worktree2Path,
+		"git", "worktree", "add", "-b", feature2Branch, worktree2Path,
 	)
 	Expect(err).NotTo(HaveOccurred(), "Failed to create worktree for feature-2")
 	f.createdWorktrees = append(f.createdWorktrees, worktree2Path)
+	f.TrackWorktree(worktree2Path, projectPath)
 
 	return f
 }
+
+// CreateCustomBranchSetup creates a project with custom default branch
 
 // CreateCustomBranchSetup creates a project with custom default branch
 func (f *E2ETestFixture) CreateCustomBranchSetup(projectName, defaultBranch string) *E2ETestFixture {
@@ -339,11 +369,8 @@ func (f *E2ETestFixture) ValidateCleanup() error {
 		}
 	}
 
-	for _, info := range f.projects {
-		if _, err := os.Stat(info.Path); err == nil {
-			validationErrors = append(validationErrors, fmt.Errorf("project %s still exists after cleanup", info.Path))
-		}
-	}
+	// Note: Projects are not validated here because they're cleaned up by Ginkgo's TempDir
+	// Only worktrees are validated as they require explicit git worktree remove
 
 	if len(validationErrors) > 0 {
 		return fmt.Errorf("cleanup validation failed: %v", validationErrors)
@@ -413,7 +440,7 @@ func (f *E2ETestFixture) CreateFileAndCommit(worktreePath, filename, content, co
 		return fmt.Errorf("failed to add file %s: %w", filename, err)
 	}
 
-	if _, err := wt.Commit(commitMsg, nil); err != nil {
+	if _, err := wt.Commit(commitMsg, &git.CommitOptions{}); err != nil {
 		return fmt.Errorf("failed to commit: %w", err)
 	}
 

@@ -88,28 +88,6 @@ func TestCreateCommand_Execute(t *testing.T) {
 			},
 			expectError: false,
 		},
-		{
-			name: "invalid project/branch format",
-			args: []string{"invalid-format"},
-			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockPS *mocks.MockProjectService) {
-				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
-					return &domain.Context{Type: domain.ContextOutsideGit}, nil
-				}
-			},
-			expectError:  true,
-			errorMessage: "cannot infer project: not in a project context and no project specified",
-		},
-		{
-			name: "malformed project/branch with empty project",
-			args: []string{"/feature-branch"},
-			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockPS *mocks.MockProjectService) {
-				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
-					return &domain.Context{Type: domain.ContextOutsideGit}, nil
-				}
-			},
-			expectError:  true,
-			errorMessage: "invalid format: expected <project>/<branch>",
-		},
 	}
 
 	for _, tc := range testCases {

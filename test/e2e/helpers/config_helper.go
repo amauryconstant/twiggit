@@ -43,6 +43,16 @@ func NewConfigHelper() *ConfigHelper {
 	}
 }
 
+// WithTempDir sets the temp directory for this ConfigHelper
+func (c *ConfigHelper) WithTempDir(tempDir string) *ConfigHelper {
+	c.tempDir = tempDir
+	c.configDir = filepath.Join(tempDir, "twiggit")
+	c.configPath = filepath.Join(c.configDir, "config.toml")
+	c.projectsDir = filepath.Join(tempDir, "projects")
+	c.worktreesDir = filepath.Join(tempDir, "worktrees")
+	return c
+}
+
 // WithProjectsDir sets the projects directory
 func (c *ConfigHelper) WithProjectsDir(path string) *ConfigHelper {
 	c.projectsDir = path

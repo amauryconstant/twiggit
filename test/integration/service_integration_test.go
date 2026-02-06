@@ -352,7 +352,6 @@ func (s *ServiceIntegrationTestSuite) TestFullWorkflow() {
 	deleteReq := &domain.DeleteWorktreeRequest{
 		WorktreePath: createdWorktree.Path,
 		Force:        true,
-		KeepBranch:   false,
 		Context: &domain.Context{
 			Type:        domain.ContextProject,
 			ProjectName: projectName,
@@ -481,7 +480,6 @@ func (s *ServiceIntegrationTestSuite) TestContextPropagation() {
 	deleteReq := &domain.DeleteWorktreeRequest{
 		WorktreePath: createdWorktree.Path,
 		Force:        true,
-		KeepBranch:   false,
 		Context:      worktreeContext,
 	}
 

@@ -22,12 +22,16 @@ func findFixtureArchive(name string) string {
 		filepath.Join(wd, "fixtures", "repos", name+".tar.gz"),
 		filepath.Join(wd, "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
 		filepath.Join(wd, "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
-		filepath.Join(wd, "..", "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
+		filepath.Join(wd, "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
+		filepath.Join(wd, "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
+		filepath.Join(wd, "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
 		filepath.Join("test", "e2e", "fixtures", "repos", name+".tar.gz"),
 		filepath.Join("fixtures", "repos", name+".tar.gz"),
+		filepath.Join("..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
 		filepath.Join("..", "fixtures", "repos", name+".tar.gz"),
-		filepath.Join("..", "..", "fixtures", "repos", name+".tar.gz"),
-		filepath.Join("..", "..", "..", "fixtures", "repos", name+".tar.gz"),
+		filepath.Join("..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
+		filepath.Join("..", "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
+		filepath.Join("..", "..", "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
 	}
 
 	for _, path := range candidates {
@@ -71,18 +75,6 @@ func ExtractRepoFixture(name string) (*RepoFixture, error) {
 		repoPath: repoPath,
 		tempDir:  tempDir,
 	}, nil
-}
-
-func (rf *RepoFixture) Path() string {
-	return rf.repoPath
-}
-
-func (rf *RepoFixture) TempDir() string {
-	return rf.tempDir
-}
-
-func (rf *RepoFixture) Name() string {
-	return rf.name
 }
 
 func extractTarGz(src, dst string) error {
@@ -131,4 +123,28 @@ func extractTarGz(src, dst string) error {
 		}
 	}
 	return nil
+}
+
+func (rf *RepoFixture) Path() string {
+	return rf.repoPath
+}
+
+func (rf *RepoFixture) TempDir() string {
+	return rf.tempDir
+}
+
+func (rf *RepoFixture) Name() string {
+	return rf.name
+}
+
+// extractRepoFixtureToDir extracts a fixture archive to a specific destination directory
+// This allows extracting fixtures directly into f.tempDir without creating additional temp directories
+func extractRepoFixtureToDir(fixtureName, destDir string) error {
+	archivePath := findFixtureArchive(fixtureName)
+	if archivePath == "" {
+		wd, _ := os.Getwd()
+		return fmt.Errorf("repo fixture '%s' not found (working dir: %s, tried: test/e2e/fixtures/repos/%s.tar.gz, fixtures/repos/%s.tar.gz)",
+			fixtureName, wd, fixtureName, fixtureName)
+	}
+	return extractTarGz(archivePath, destDir)
 }

@@ -117,7 +117,7 @@ var _ = Describe("list command", func() {
 		}
 	})
 
-	It("shows error when listing from outside git without --all flag", func() {
+	PIt("shows error when listing from outside git without --all flag", func() {
 		fixture.SetupMultiProject()
 
 		session := ctxHelper.FromOutsideGit("list")

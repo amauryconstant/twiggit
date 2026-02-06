@@ -16,6 +16,8 @@ import (
 	"twiggit/test/e2e/fixtures"
 	e2ehelpers "twiggit/test/e2e/helpers"
 	"twiggit/test/helpers"
+
+	git "github.com/go-git/go-git/v5"
 )
 
 var _ = Describe("hotfix workflow", func() {
@@ -72,7 +74,7 @@ var _ = Describe("hotfix workflow", func() {
 		_, err = wt.Add("urgent-fix.txt")
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = wt.Commit("Fix critical bug in production", nil)
+		_, err = wt.Commit("Fix critical bug in production", &git.CommitOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		session = ctxHelper.FromWorktreeDir(projectName, hotfixBranch, "delete", hotfixBranch)
@@ -123,7 +125,7 @@ var _ = Describe("hotfix workflow", func() {
 			Expect(err).NotTo(HaveOccurred())
 		}
 
-		_, err = wt.Commit("Fix multiple critical bugs", nil)
+		_, err = wt.Commit("Fix multiple critical bugs", &git.CommitOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		session = ctxHelper.FromWorktreeDir(projectName, hotfixBranch, "delete", hotfixBranch)

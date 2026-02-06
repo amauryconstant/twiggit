@@ -16,6 +16,8 @@ import (
 	"twiggit/test/e2e/fixtures"
 	e2ehelpers "twiggit/test/e2e/helpers"
 	"twiggit/test/helpers"
+
+	git "github.com/go-git/go-git/v5"
 )
 
 var _ = Describe("rebase workflow", func() {
@@ -73,7 +75,7 @@ var _ = Describe("rebase workflow", func() {
 		_, err = wt.Add("feature1.txt")
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = wt.Commit("Add feature1.txt", nil)
+		_, err = wt.Commit("Add feature1.txt", &git.CommitOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		session = ctxHelper.FromProjectDir(projectName, "create", feature2Branch)

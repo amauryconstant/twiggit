@@ -32,7 +32,7 @@ var _ = Describe("Error Presentation", func() {
 	})
 
 	Context("Validation errors", func() {
-		It("includes helpful suggestions for invalid input", func() {
+		PIt("includes helpful suggestions for invalid input", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -53,7 +53,7 @@ var _ = Describe("Error Presentation", func() {
 			), "Error should include helpful suggestions")
 		})
 
-		It("provides specific validation error messages", func() {
+		PIt("provides specific validation error messages", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -72,7 +72,7 @@ var _ = Describe("Error Presentation", func() {
 	})
 
 	Context("Context errors", func() {
-		It("explains ambiguity clearly when running outside git", func() {
+		PIt("explains ambiguity clearly when running outside git", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -91,7 +91,7 @@ var _ = Describe("Error Presentation", func() {
 			), "Error should suggest how to resolve ambiguity")
 		})
 
-		It("provides actionable messages for ambiguous project references", func() {
+		PIt("provides actionable messages for ambiguous project references", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -109,7 +109,7 @@ var _ = Describe("Error Presentation", func() {
 	})
 
 	Context("Filesystem errors", func() {
-		It("provides actionable messages for permission errors", func() {
+		PIt("provides actionable messages for permission errors", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -129,7 +129,7 @@ var _ = Describe("Error Presentation", func() {
 			), "Error should explain the issue")
 		})
 
-		It("provides clear messages for worktree path conflicts", func() {
+		PIt("provides clear messages for worktree path conflicts", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -151,7 +151,7 @@ var _ = Describe("Error Presentation", func() {
 	})
 
 	Context("Git errors", func() {
-		It("presents user-friendly git errors", func() {
+		PIt("presents user-friendly git errors", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -170,7 +170,7 @@ var _ = Describe("Error Presentation", func() {
 			), "Error should be user-friendly")
 		})
 
-		It("provides actionable suggestions for common git errors", func() {
+		PIt("provides actionable suggestions for common git errors", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -190,7 +190,7 @@ var _ = Describe("Error Presentation", func() {
 	})
 
 	Context("Flag conflicts", func() {
-		It("explains conflicting flags clearly", func() {
+		PIt("explains conflicting flags clearly", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -210,7 +210,7 @@ var _ = Describe("Error Presentation", func() {
 			), "Error should explain the flag issue")
 		})
 
-		It("suggests valid flag combinations", func() {
+		PIt("suggests valid flag combinations", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)

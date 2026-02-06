@@ -16,6 +16,8 @@ import (
 	"twiggit/test/e2e/fixtures"
 	e2ehelpers "twiggit/test/e2e/helpers"
 	twiggithelpers "twiggit/test/helpers"
+
+	git "github.com/go-git/go-git/v5"
 )
 
 var _ = Describe("feature lifecycle", func() {
@@ -72,7 +74,7 @@ var _ = Describe("feature lifecycle", func() {
 		_, err = wt.Add("feature.txt")
 		Expect(err).NotTo(HaveOccurred())
 
-		_, err = wt.Commit("Add feature.txt", nil)
+		_, err = wt.Commit("Add feature.txt", &git.CommitOptions{})
 		Expect(err).NotTo(HaveOccurred())
 
 		session = ctxHelper.FromProjectDir(projectName, "merge", featureBranch)

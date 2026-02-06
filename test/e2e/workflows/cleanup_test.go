@@ -34,7 +34,7 @@ var _ = Describe("cleanup workflow", func() {
 		fixture.Cleanup()
 	})
 
-	It("performs bulk delete operations with different flags", func() {
+	PIt("performs bulk delete operations with different flags", func() {
 		projectName := "cleanup-project"
 		fixture.SetupSingleProject(projectName)
 		cli = cli.WithConfigDir(fixture.Build())

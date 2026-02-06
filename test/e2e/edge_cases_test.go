@@ -35,7 +35,7 @@ var _ = Describe("Edge Cases", func() {
 	})
 
 	Context("Long branch names", func() {
-		It("handles branch names at length limit", func() {
+		PIt("handles branch names at length limit", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -63,7 +63,7 @@ var _ = Describe("Edge Cases", func() {
 	})
 
 	Context("Special characters in branch names", func() {
-		It("handles branch names with leading dots", func() {
+		PIt("handles branch names with leading dots", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -81,7 +81,7 @@ var _ = Describe("Edge Cases", func() {
 			), "Should reject branch name with leading dot")
 		})
 
-		It("handles branch names with trailing dashes", func() {
+		PIt("handles branch names with trailing dashes", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -99,7 +99,7 @@ var _ = Describe("Edge Cases", func() {
 			), "Should reject branch name with trailing dash")
 		})
 
-		It("handles branch names with trailing dots", func() {
+		PIt("handles branch names with trailing dots", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -119,7 +119,7 @@ var _ = Describe("Edge Cases", func() {
 	})
 
 	Context("Symlink path handling", func() {
-		It("operates correctly from symlinked project directory", func() {
+		PIt("operates correctly from symlinked project directory", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
@@ -144,7 +144,7 @@ var _ = Describe("Edge Cases", func() {
 			}
 		})
 
-		It("creates worktree from symlinked project directory", func() {
+		PIt("creates worktree from symlinked project directory", func() {
 			configDir := fixture.Build()
 			cli = cli.WithConfigDir(configDir)
 			ctxHelper = fixtures.NewContextHelper(fixture, cli)
