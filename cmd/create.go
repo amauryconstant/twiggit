@@ -86,11 +86,18 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source, _ st
 		Force:        false,
 	}
 
+	// Debug logging
+	fmt.Fprintf(cmd.ErrOrStderr(), "DEBUG: Creating worktree - project: %s, branch: %s, source: %s, projectPath: %s, gitRepoPath: %s\n",
+		project.Name, branchName, source, project.Path, project.GitRepoPath)
+
 	// Create worktree
 	worktree, err := config.Services.WorktreeService.CreateWorktree(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
+
+	// Debug logging
+	fmt.Fprintf(cmd.ErrOrStderr(), "DEBUG: Worktree created at: %s\n", worktree.Path)
 
 	// Display success message
 	if err := displayCreateSuccess(cmd.OutOrStdout(), worktree); err != nil {
