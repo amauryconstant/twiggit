@@ -10,7 +10,7 @@ import (
 	"twiggit/internal/domain"
 )
 
-func TestErrorFormatter_FormatValidationError_EmojiFormatting(t *testing.T) {
+func TestErrorFormatter_FormatValidationError_PlainTextFormatting(t *testing.T) {
 	// RED: Test that will fail initially
 	validationErr := domain.NewValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required").
 		WithSuggestions([]string{"Provide a valid branch name"})
@@ -19,9 +19,9 @@ func TestErrorFormatter_FormatValidationError_EmojiFormatting(t *testing.T) {
 	output := formatter.Format(validationErr)
 
 	// These assertions should fail initially since we haven't implemented the formatter
-	assert.Contains(t, output, "❌")
+	assert.Contains(t, output, "Error:")
 	assert.Contains(t, output, "branch name is required")
-	assert.Contains(t, output, "💡")
+	assert.Contains(t, output, "Hint:")
 	assert.Contains(t, output, "Provide a valid branch name")
 }
 
@@ -33,9 +33,9 @@ func TestErrorFormatter_FormatValidationError_InvalidBranchName(t *testing.T) {
 	formatter := NewErrorFormatter()
 	output := formatter.Format(validationErr)
 
-	assert.Contains(t, output, "❌")
+	assert.Contains(t, output, "Error:")
 	assert.Contains(t, output, "branch name format is invalid")
-	assert.Contains(t, output, "💡")
+	assert.Contains(t, output, "Hint:")
 	assert.Contains(t, output, "Use only alphanumeric characters, dots, hyphens, and underscores")
 }
 
@@ -46,7 +46,7 @@ func TestErrorFormatter_FormatProjectNotFoundError(t *testing.T) {
 	formatter := NewErrorFormatter()
 	output := formatter.Format(projectErr)
 
-	assert.Contains(t, output, "❌")
+	assert.Contains(t, output, "Error:")
 	assert.Contains(t, output, "project 'nonexistent-project' not found")
 }
 
@@ -57,7 +57,7 @@ func TestErrorFormatter_FormatWorktreeNotFoundError(t *testing.T) {
 	formatter := NewErrorFormatter()
 	output := formatter.Format(worktreeErr)
 
-	assert.Contains(t, output, "❌")
+	assert.Contains(t, output, "Error:")
 	assert.Contains(t, output, "worktree 'feature-branch' not found")
 }
 
@@ -68,7 +68,7 @@ func TestErrorFormatter_FormatGenericError(t *testing.T) {
 	formatter := NewErrorFormatter()
 	output := formatter.Format(genericErr)
 
-	assert.Contains(t, output, "❌")
+	assert.Contains(t, output, "Error:")
 	assert.Contains(t, output, "failed to detect context")
 }
 
@@ -83,10 +83,10 @@ func TestErrorFormatter_MultipleSuggestions(t *testing.T) {
 	formatter := NewErrorFormatter()
 	output := formatter.Format(validationErr)
 
-	assert.Contains(t, output, "❌")
+	assert.Contains(t, output, "Error:")
 	assert.Contains(t, output, "branch name is required")
-	assert.Contains(t, output, "💡 Provide a valid branch name")
-	assert.Contains(t, output, "💡 Branch names should follow git naming conventions")
+	assert.Contains(t, output, "Hint: Provide a valid branch name")
+	assert.Contains(t, output, "Hint: Branch names should follow git naming conventions")
 }
 
 func TestErrorFormatter_ContextInformation(t *testing.T) {
@@ -97,7 +97,7 @@ func TestErrorFormatter_ContextInformation(t *testing.T) {
 	formatter := NewErrorFormatter()
 	output := formatter.Format(validationErr)
 
-	assert.Contains(t, output, "❌")
+	assert.Contains(t, output, "Error:")
 	assert.Contains(t, output, "project name required when not in project context")
 	assert.Contains(t, output, "Current directory: /home/user/random-dir")
 }

@@ -70,7 +70,7 @@ func runSetupShell(cmd *cobra.Command, config *CommandConfig) error {
 
 func displaySetupResults(out io.Writer, result *domain.SetupShellResult, dryRun bool) error {
 	if result.Skipped {
-		_, _ = fmt.Fprintf(out, "✓ Shell wrapper already installed for %s\n", result.ShellType)
+		_, _ = fmt.Fprintf(out, "Shell wrapper already installed for %s\n", result.ShellType)
 		_, _ = fmt.Fprintf(out, "Use --force to reinstall\n")
 		return nil
 	}
@@ -82,8 +82,8 @@ func displaySetupResults(out io.Writer, result *domain.SetupShellResult, dryRun 
 	}
 
 	if result.Installed {
-		_, _ = fmt.Fprintf(out, "✓ Shell wrapper installed for %s\n", result.ShellType)
-		_, _ = fmt.Fprintf(out, "✓ %s\n", result.Message)
+		_, _ = fmt.Fprintf(out, "Shell wrapper installed for %s\n", result.ShellType)
+		_, _ = fmt.Fprintf(out, "%s\n", result.Message)
 
 		_, _ = fmt.Fprintf(out, "\nTo activate the wrapper:\n")
 		_, _ = fmt.Fprintf(out, "  1. Restart your shell, or\n")

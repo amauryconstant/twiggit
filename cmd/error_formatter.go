@@ -53,17 +53,17 @@ func formatValidationError(err error) string {
 	}()
 	var output strings.Builder
 
-	// Error message with emoji
-	output.WriteString(fmt.Sprintf("❌ %s\n", validationErr.Message()))
+	// Error message with plain text indicator
+	output.WriteString(fmt.Sprintf("Error: %s\n", validationErr.Message()))
 
 	// Add suggestions if available
 	for _, suggestion := range validationErr.Suggestions() {
-		output.WriteString(fmt.Sprintf("💡 %s\n", suggestion))
+		output.WriteString(fmt.Sprintf("Hint: %s\n", suggestion))
 	}
 
 	// Add context if available
 	if context := validationErr.Context(); context != "" {
-		output.WriteString(fmt.Sprintf("📍 %s\n", context))
+		output.WriteString(fmt.Sprintf("Context: %s\n", context))
 	}
 
 	return strings.TrimSpace(output.String())
@@ -79,13 +79,13 @@ func formatWorktreeError(err error) string {
 	var output strings.Builder
 
 	if worktreeErr.BranchName != "" {
-		output.WriteString(fmt.Sprintf("❌ worktree '%s' not found\n", worktreeErr.BranchName))
+		output.WriteString(fmt.Sprintf("Error: worktree '%s' not found\n", worktreeErr.BranchName))
 	} else {
-		output.WriteString(fmt.Sprintf("❌ %s\n", worktreeErr.Message))
+		output.WriteString(fmt.Sprintf("Error: %s\n", worktreeErr.Message))
 	}
 
 	// Add helpful suggestion
-	output.WriteString("💡 Use 'twiggit list' to see available worktrees\n")
+	output.WriteString("Hint: Use 'twiggit list' to see available worktrees\n")
 
 	return strings.TrimSpace(output.String())
 }
@@ -100,13 +100,13 @@ func formatProjectError(err error) string {
 	var output strings.Builder
 
 	if projectErr.ProjectName != "" {
-		output.WriteString(fmt.Sprintf("❌ project '%s' not found\n", projectErr.ProjectName))
+		output.WriteString(fmt.Sprintf("Error: project '%s' not found\n", projectErr.ProjectName))
 	} else {
-		output.WriteString(fmt.Sprintf("❌ %s\n", projectErr.Message))
+		output.WriteString(fmt.Sprintf("Error: %s\n", projectErr.Message))
 	}
 
 	// Add helpful suggestion
-	output.WriteString("💡 Use 'twiggit list --all' to see available projects\n")
+	output.WriteString("Hint: Use 'twiggit list --all' to see available projects\n")
 
 	return strings.TrimSpace(output.String())
 }
@@ -120,24 +120,24 @@ func formatServiceError(err error) string {
 	}()
 	var output strings.Builder
 
-	output.WriteString(fmt.Sprintf("❌ %s\n", serviceErr.Message))
+	output.WriteString(fmt.Sprintf("Error: %s\n", serviceErr.Message))
 
 	// Add contextual suggestions based on operation
 	switch serviceErr.Operation {
 	case "GetCurrentContext":
-		output.WriteString("💡 Make sure you're in a git repository or worktree directory\n")
+		output.WriteString("Hint: Make sure you're in a git repository or worktree directory\n")
 	case "DiscoverProject":
-		output.WriteString("💡 Check if the project exists and is accessible\n")
+		output.WriteString("Hint: Check if the project exists and is accessible\n")
 	case "ResolvePath":
-		output.WriteString("💡 Verify the target worktree or project exists\n")
+		output.WriteString("Hint: Verify the target worktree or project exists\n")
 	default:
-		output.WriteString("💡 Check your configuration and try again\n")
+		output.WriteString("Hint: Check your configuration and try again\n")
 	}
 
 	return strings.TrimSpace(output.String())
 }
 
-// formatGenericError formats any error with basic emoji formatting
+// formatGenericError formats any error with basic plain text formatting
 func formatGenericError(err error) string {
-	return "❌ " + err.Error()
+	return "Error: " + err.Error()
 }
