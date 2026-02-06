@@ -41,12 +41,14 @@ var _ = Describe("delete command", func() {
 	It("deletes worktree from project context", func() {
 		result := fixture.CreateWorktreeSetup("test")
 
+		// Update both CLI and ContextHelper after CreateWorktreeSetup rebuilt config
+		configDir := fixture.GetConfigHelper().GetConfigDir()
+		cli = cli.WithConfigDir(configDir)
+		ctxHelper = fixtures.NewContextHelper(fixture, cli)
+
 		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 
 		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch)
-		GinkgoT().Logf("Session output: %s", string(session.Out.Contents()))
-		GinkgoT().Logf("Session error: %s", string(session.Err.Contents()))
-		GinkgoT().Logf("Session exit code: %d", session.ExitCode())
 		cli.ShouldSucceed(session)
 
 		if session.ExitCode() != 0 {
@@ -229,13 +231,13 @@ var _ = Describe("delete command", func() {
 		Expect(err).NotTo(HaveOccurred())
 
 		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch)
-		cli.ShouldSucceed(session)
+		cli.ShouldFailWithExit(session, 1)
 
-		if session.ExitCode() != 0 {
+		if session.ExitCode() != 1 {
 			GinkgoT().Log(fixture.Inspect())
 		}
 
-		cli.ShouldOutput(session, "already removed")
+		cli.ShouldErrorOutput(session, "worktree not found")
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
 })
