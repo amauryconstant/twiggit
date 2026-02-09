@@ -207,7 +207,7 @@ goreleaser-dry-run:
   variables:
     GIT_DEPTH: 0
   script:
-    - goreleaser release --snapshot --skip-publish --clean
+    - goreleaser release --snapshot --clean
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:

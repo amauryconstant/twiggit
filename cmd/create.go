@@ -87,7 +87,7 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source, _ st
 	}
 
 	// Debug logging
-	fmt.Fprintf(cmd.ErrOrStderr(), "DEBUG: Creating worktree - project: %s, branch: %s, source: %s, projectPath: %s, gitRepoPath: %s\n",
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "DEBUG: Creating worktree - project: %s, branch: %s, source: %s, projectPath: %s, gitRepoPath: %s\n",
 		project.Name, branchName, source, project.Path, project.GitRepoPath)
 
 	// Create worktree
@@ -97,7 +97,7 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source, _ st
 	}
 
 	// Debug logging
-	fmt.Fprintf(cmd.ErrOrStderr(), "DEBUG: Worktree created at: %s\n", worktree.Path)
+	_, _ = fmt.Fprintf(cmd.ErrOrStderr(), "DEBUG: Worktree created at: %s\n", worktree.Path)
 
 	// Display success message
 	if err := displayCreateSuccess(cmd.OutOrStdout(), worktree); err != nil {

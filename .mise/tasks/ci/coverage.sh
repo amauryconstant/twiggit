@@ -9,7 +9,8 @@ elif [ -n "${MISE_ORIGINAL_CWD:-}" ]; then
   cd "$MISE_ORIGINAL_CWD"
 else
   # Fallback: navigate to project root from script location
-  cd "$(dirname "$0")/../.."
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  cd "$SCRIPT_DIR/../../../"
 fi
 
 echo "🧪 Running unit tests with coverage..."
@@ -28,7 +29,7 @@ fi
 
 echo "🔍 Calculating coverage for core packages only (excluding cmd/, test/, main.go)..."
 # Extract coverage for internal packages only
-go tool cover -func=coverage.out | grep "^github.com/amaury/twiggit/internal/" > coverage_filtered.txt
+go tool cover -func=coverage.out | grep "^twiggit/internal/" > coverage_filtered.txt
 
 if [ ! -s coverage_filtered.txt ]; then
   echo "❌ No internal packages found in coverage report"
@@ -81,6 +82,14 @@ echo "   - Excluded packages: cmd/, test/, main.go"
  else
    echo "✅ Coverage meets recommended threshold: ${TOTAL_COVERAGE}% (minimum recommended: 60.0%)"
  fi
+
+  # Generate HTML report
+  go tool cover -html=coverage.out -o coverage.html
+  echo "📄 Generated coverage report: coverage.html"
+
+  # Generate Cobertura XML for CI
+  gocover-cobertura < coverage.out > coverage.xml
+  echo "📄 Generated Cobertura XML: coverage.xml"
 
 # Clean up temporary file
 rm -f coverage_filtered.txt
