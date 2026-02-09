@@ -1,20 +1,91 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Domain: Pragmatic git worktree management tool with context-aware operations
+  optimized for rebase workflows across multiple projects.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  Architecture:
+  - Domain-driven design with clear separation (internal/domain/, internal/infrastructure/, internal/services/)
+  - Context-aware navigation system (project/worktree/outside git detection)
+  - CLI commands in cmd/ using Cobra framework
+  - Dependency injection via constructors with interface contracts
+
+  Key Concepts:
+  - Context types: ContextProject, ContextWorktree, ContextOutsideGit
+  - Context detection priority: worktree folder > project folder > outside git
+  - Identifier resolution based on current context
+  - Default paths: $HOME/Projects/<project>/ and $HOME/Worktrees/<project>/<branch>/
+  - Rebase workflow optimization (delete command removes worktree + branch by default)
+
+  Tech stack: Go 1.21+, Cobra, go-git, Koanf, Testify, Ginkgo/Gomega, Carapace
+  Tooling: mise, golangci-lint, pre-commit, GoReleaser
+
+  Code conventions:
+  - NO comments in code unless explicitly requested
+  - Tests written AFTER implementation to anchor behavior and specs
+  - Table-driven tests with fixtures
+  - Domain logic separate from infrastructure
+  - Constructor injection with interfaces
+  - Wrap errors with context using fmt.Errorf
+  - Table-driven test patterns
+
+  Architecture patterns:
+  - Shell wrapper functions for cd command (outputs absolute path to stdout)
+  - Context detection with priority-based resolution
+  - XDG Base Directory specification for config ($HOME/.config/twiggit/)
+  - Configuration priority: defaults → config file → environment → flags
+  - Carapace for shell completion generation
+
+  Performance targets:
+  - Startup: <100ms
+  - List operations: <500ms for <100 worktrees
+  - Create/Delete: <2s/<1s for typical repos
+  - Memory: <50MB during operations
+
+  Testing approach:
+  - Write tests after implementation to anchor code to specs
+  - Unit tests (Testify) for business logic and algorithms
+  - Integration tests (Testify) for component interactions with real git repos
+  - E2E tests (Ginkgo/Gomega) for CLI commands and user workflows
+  - cmd/ package tested via E2E only
+  - >80% coverage enforced in CI
+  - Happy paths and critical business logic: 100% coverage
+
+  Development workflow:
+  - Use mise run <task> for all operations
+  - Run mise run check before committing (includes lint, tests)
+  - Pre-commit hooks: whitespace, YAML/TOML validation, merge conflict detection
+
+rules:
+  proposal:
+    - Typically include: Why, What Changes, Capabilities, Impact
+    - Focus on user value and problem statement first
+    - Include "Non-goals" section to constrain scope
+    - List all affected files organized by category
+    - Document breaking changes explicitly when applicable
+    - Keep proposals concise and actionable
+
+  specs:
+    - Use SHALL for mandatory requirements (testable)
+    - Scenarios use WHEN/THEN/AND format only
+    - Ensure scenarios are concrete with specific inputs and expected outputs
+    - Include both positive and negative scenarios
+    - Requirements grouped logically with clear purpose statements
+
+  design:
+    - Include Context (current state, constraints, assumptions)
+    - Goals state what will be achieved; Non-Goals state what is out of scope
+    - Decisions are numbered with Choice, Rationale, Alternatives considered
+    - Use SHALL/SHOULD for architectural constraints
+    - Include Risks/Trade-offs section with specific mitigations
+    - Reference related specs, proposals, or design decisions
+
+  tasks:
+    - Group into logical sections (Setup, Implementation, Testing, Verification, Documentation)
+    - Use checkbox format for items
+    - Tasks are small, clear, and independently verifiable
+    - Tests written AFTER implementation to anchor code to specs
+    - Include specific file paths and function/method names where applicable
+    - Add verification steps: mise run check, mise run lint:fix, mise run test, mise run test:coverage
+    - Mark completed items with [x]
+    - Tasks are ordered logically with dependencies clear
