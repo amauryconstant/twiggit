@@ -29,6 +29,7 @@ var _ = Describe("feature lifecycle", func() {
 	BeforeEach(func() {
 		fixture = fixtures.NewE2ETestFixture()
 		cli = e2ehelpers.NewTwiggitCLI()
+		cli = cli.WithConfigDir(fixture.Build())
 		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		gitHelper = twiggithelpers.NewGitTestHelper(&testing.T{})
 	})
@@ -43,8 +44,6 @@ var _ = Describe("feature lifecycle", func() {
 	It("completes full feature lifecycle: create, modify, commit, merge, and delete worktree", func() {
 		projectName := "lifecycle-project"
 		fixture.SetupSingleProject(projectName)
-		cli = cli.WithConfigDir(fixture.Build())
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		testID := fixture.GetTestID()
 
 		featureBranch := testID.BranchName("new-feature")

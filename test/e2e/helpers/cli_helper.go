@@ -86,7 +86,7 @@ func (cli *TwiggitCLI) Run(args ...string) *gexec.Session {
 	}
 	command.Env = env
 
-	// Create and start the session
+	// Create and start session
 	session, err := gexec.Start(command, nil, nil)
 	Expect(err).NotTo(HaveOccurred())
 

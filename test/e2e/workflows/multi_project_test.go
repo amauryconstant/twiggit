@@ -24,6 +24,7 @@ var _ = Describe("multi project workflow", func() {
 	BeforeEach(func() {
 		fixture = fixtures.NewE2ETestFixture()
 		cli = e2ehelpers.NewTwiggitCLI()
+		cli = cli.WithConfigDir(fixture.Build())
 		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 	})
 
@@ -40,8 +41,6 @@ var _ = Describe("multi project workflow", func() {
 		project2Name := testID.ProjectNameWithSuffix("2")
 
 		fixture.SetupMultiProject()
-		cli = cli.WithConfigDir(fixture.Build())
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 
 		worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 		project1WorktreesDir := filepath.Join(worktreesDir, project1Name)

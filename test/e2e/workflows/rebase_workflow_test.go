@@ -29,6 +29,7 @@ var _ = Describe("rebase workflow", func() {
 	BeforeEach(func() {
 		fixture = fixtures.NewE2ETestFixture()
 		cli = e2ehelpers.NewTwiggitCLI()
+		cli = cli.WithConfigDir(fixture.Build())
 		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		gitHelper = helpers.NewGitTestHelper(&testing.T{})
 	})
@@ -43,8 +44,6 @@ var _ = Describe("rebase workflow", func() {
 	It("completes rebase workflow: create worktree, commit changes, switch worktree, delete original", func() {
 		projectName := "rebase-project"
 		fixture.SetupSingleProject(projectName)
-		cli = cli.WithConfigDir(fixture.Build())
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		testID := fixture.GetTestID()
 
 		feature1Branch := testID.BranchName("feature-1")

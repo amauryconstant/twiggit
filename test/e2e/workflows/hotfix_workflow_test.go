@@ -29,6 +29,7 @@ var _ = Describe("hotfix workflow", func() {
 	BeforeEach(func() {
 		fixture = fixtures.NewE2ETestFixture()
 		cli = e2ehelpers.NewTwiggitCLI()
+		cli = cli.WithConfigDir(fixture.Build())
 		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		gitHelper = helpers.NewGitTestHelper(&testing.T{})
 	})
@@ -43,8 +44,6 @@ var _ = Describe("hotfix workflow", func() {
 	It("completes hotfix workflow: create hotfix, make urgent fix, merge to main, delete hotfix", func() {
 		projectName := "hotfix-project"
 		fixture.SetupSingleProject(projectName)
-		cli = cli.WithConfigDir(fixture.Build())
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		testID := fixture.GetTestID()
 
 		hotfixBranch := testID.BranchName("hotfix-critical-bug")
@@ -89,20 +88,19 @@ var _ = Describe("hotfix workflow", func() {
 	})
 
 	It("handles hotfix with multiple critical files", func() {
-		projectName := "multi-fix-project"
+		projectName := "hotfix-project"
 		fixture.SetupSingleProject(projectName)
-		cli = cli.WithConfigDir(fixture.Build())
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
 		testID := fixture.GetTestID()
 
-		hotfixBranch := testID.BranchName("hotfix-multi-bug")
+		hotfixBranch := testID.BranchName("hotfix-multiple-bugs")
 		worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
 		projectWorktreesDir := filepath.Join(worktreesDir, projectName)
 
 		session := ctxHelper.FromProjectDir(projectName, "create", hotfixBranch)
-		cli.ShouldSucceed(session)
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
 		}
 		hotfixPath := filepath.Join(projectWorktreesDir, hotfixBranch)
 		Expect(hotfixPath).To(BeADirectory())

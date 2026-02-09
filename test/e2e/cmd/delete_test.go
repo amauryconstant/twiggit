@@ -51,12 +51,6 @@ var _ = Describe("delete command", func() {
 		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch)
 		cli.ShouldSucceed(session)
 
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-			GinkgoT().Log("Output:", string(session.Out.Contents()))
-			GinkgoT().Log("Error:", string(session.Err.Contents()))
-		}
-
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
 
