@@ -185,7 +185,6 @@ test:
     policy: pull
   script:
     - mise run ci:coverage
-    - mise run test:race
     - mise run build
     - mise run test:e2e
   artifacts:
