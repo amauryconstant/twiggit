@@ -16,6 +16,18 @@ import (
 	"github.com/onsi/gomega/gexec"
 )
 
+// getProjectRoot returns the project root directory by normalizing the current working directory
+func getProjectRoot() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	if strings.HasSuffix(cwd, "test/e2e") {
+		cwd = filepath.Dir(filepath.Dir(cwd))
+	}
+	return cwd, nil
+}
+
 // TwiggitCLI provides CLI execution utilities for E2E tests
 type TwiggitCLI struct {
 	binaryPath string
@@ -24,18 +36,8 @@ type TwiggitCLI struct {
 
 // NewTwiggitCLI creates a new TwiggitCLI instance
 func NewTwiggitCLI() *TwiggitCLI {
-	cwd, err := os.Getwd()
+	cwd, err := getProjectRoot()
 	Expect(err).NotTo(HaveOccurred())
-
-	if strings.HasSuffix(cwd, "test/e2e") {
-		cwd = filepath.Dir(filepath.Dir(cwd))
-	} else if strings.HasSuffix(cwd, "test/e2e/cmd") {
-		cwd = filepath.Dir(filepath.Dir(filepath.Dir(cwd)))
-	} else if strings.HasSuffix(cwd, "test/e2e/context") {
-		cwd = filepath.Dir(filepath.Dir(filepath.Dir(cwd)))
-	} else if strings.HasSuffix(cwd, "test/e2e/workflows") {
-		cwd = filepath.Dir(filepath.Dir(filepath.Dir(cwd)))
-	}
 
 	binaryPath := filepath.Join(cwd, "bin", "twiggit-e2e")
 
@@ -117,31 +119,10 @@ func (cli *TwiggitCLI) GetOutput(session *gexec.Session) string {
 	return strings.TrimSpace(string(session.Out.Contents()))
 }
 
-// GetError returns the stderr output from a session as a string
-func (cli *TwiggitCLI) GetError(session *gexec.Session) string {
-	return strings.TrimSpace(string(session.Err.Contents()))
-}
-
-// Reset clears all environment variables
-func (cli *TwiggitCLI) Reset() *TwiggitCLI {
-	cli.env = make(map[string]string)
-	return cli
-}
-
 // BuildBinary builds the twiggit binary for E2E tests
 func BuildBinary() {
-	cwd, err := os.Getwd()
+	cwd, err := getProjectRoot()
 	Expect(err).NotTo(HaveOccurred())
-
-	if strings.HasSuffix(cwd, "test/e2e") {
-		cwd = filepath.Dir(filepath.Dir(cwd))
-	} else if strings.HasSuffix(cwd, "test/e2e/cmd") {
-		cwd = filepath.Dir(filepath.Dir(filepath.Dir(cwd)))
-	} else if strings.HasSuffix(cwd, "test/e2e/context") {
-		cwd = filepath.Dir(filepath.Dir(filepath.Dir(cwd)))
-	} else if strings.HasSuffix(cwd, "test/e2e/workflows") {
-		cwd = filepath.Dir(filepath.Dir(filepath.Dir(cwd)))
-	}
 
 	cmd := exec.Command("go", "build", "-tags=e2e", "-o", filepath.Join(cwd, "bin", "twiggit-e2e"), "main.go")
 	cmd.Dir = cwd
@@ -168,16 +149,6 @@ func (cli *TwiggitCLI) ShouldOutput(session *gexec.Session, expected string) {
 // ShouldErrorOutput asserts stderr contains expected text
 func (cli *TwiggitCLI) ShouldErrorOutput(session *gexec.Session, expected string) {
 	Eventually(session.Err).Should(gbytes.Say(expected))
-}
-
-// ShouldOutputMatch asserts stdout matches regex pattern
-func (cli *TwiggitCLI) ShouldOutputMatch(session *gexec.Session, pattern string) {
-	Eventually(session.Out).Should(gbytes.Say(pattern))
-}
-
-// ShouldErrorOutputMatch asserts stderr matches regex pattern
-func (cli *TwiggitCLI) ShouldErrorOutputMatch(session *gexec.Session, pattern string) {
-	Eventually(session.Err).Should(gbytes.Say(pattern))
 }
 
 // DebugSession logs session details and fixture state for debugging

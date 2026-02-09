@@ -104,10 +104,7 @@ func (c *CLIClientImpl) CreateWorktree(ctx context.Context, repoPath, branchName
 	args := buildWorktreeAddArgs(branchExists, branchName, worktreePath, sourceBranch)
 
 	// Execute command
-	fmt.Fprintf(os.Stderr, "DEBUG: Executing git worktree add in dir=%s with args=%v\n", repoPath, args)
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, args...)
-	fmt.Fprintf(os.Stderr, "DEBUG: git command completed - exitCode=%d, stdout=%q, stderr=%q, err=%v\n",
-		result.ExitCode, result.Stdout, result.Stderr, err)
 	if err != nil {
 		return domain.NewGitWorktreeError(worktreePath, branchName, "failed to create worktree", err)
 	}
@@ -119,7 +116,6 @@ func (c *CLIClientImpl) CreateWorktree(ctx context.Context, repoPath, branchName
 
 	// Check if worktree was actually created
 	if _, err := os.Stat(worktreePath); err != nil {
-		fmt.Fprintf(os.Stderr, "DEBUG: Worktree path does not exist after git command: %v\n", err)
 		return domain.NewGitWorktreeError(worktreePath, branchName,
 			"git worktree add succeeded but worktree directory not found: "+err.Error(), nil)
 	}

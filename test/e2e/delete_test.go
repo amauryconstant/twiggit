@@ -1,0 +1,104 @@
+//go:build e2e
+// +build e2e
+
+// Package e2e provides end-to-end tests for twiggit delete command.
+// Tests validate worktree deletion with force, keep-branch, and merged-only flags.
+package e2e
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"twiggit/test/e2e/fixtures"
+	"twiggit/test/e2e/helpers"
+)
+
+var _ = Describe("delete command", func() {
+	var fixture *fixtures.E2ETestFixture
+	var cli *helpers.TwiggitCLI
+	var ctxHelper *fixtures.ContextHelper
+
+	BeforeEach(func() {
+		fixture = fixtures.NewE2ETestFixture()
+		cli = helpers.NewTwiggitCLI()
+		cli = cli.WithConfigDir(fixture.Build())
+		ctxHelper = fixtures.NewContextHelper(fixture, cli)
+	})
+
+	AfterEach(func() {
+		if CurrentSpecReport().Failed() {
+			GinkgoT().Log(fixture.Inspect())
+		}
+		fixture.Cleanup()
+	})
+
+	It("deletes worktree from project context", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch)
+		cli.ShouldSucceed(session)
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("deletes other worktree from worktree context", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktree2Path := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature2Branch)
+
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature2Branch)
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, result.Feature2Branch)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktree2Path).NotTo(BeADirectory())
+	})
+
+	It("deletes with --force flag despite uncommitted changes", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		testFile := filepath.Join(worktreePath, "test.txt")
+		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
+		Expect(err).NotTo(HaveOccurred())
+
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "--force")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, result.Feature1Branch)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("changes to main project with -C flag", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "-C")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := cli.GetOutput(session)
+		lines := strings.Split(output, "\n")
+		Expect(len(lines)).To(BeNumerically(">=", 2))
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+})

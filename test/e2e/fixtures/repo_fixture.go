@@ -10,8 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
-	. "github.com/onsi/ginkgo/v2"
 )
 
 func findFixtureArchive(name string) string {
@@ -21,9 +19,6 @@ func findFixtureArchive(name string) string {
 		filepath.Join(wd, "test", "e2e", "fixtures", "repos", name+".tar.gz"),
 		filepath.Join(wd, "fixtures", "repos", name+".tar.gz"),
 		filepath.Join(wd, "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
-		filepath.Join(wd, "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
-		filepath.Join(wd, "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
-		filepath.Join(wd, "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
 		filepath.Join(wd, "..", "..", "test", "e2e", "fixtures", "repos", name+".tar.gz"),
 		filepath.Join("test", "e2e", "fixtures", "repos", name+".tar.gz"),
 		filepath.Join("fixtures", "repos", name+".tar.gz"),
@@ -42,39 +37,6 @@ func findFixtureArchive(name string) string {
 	}
 
 	return ""
-}
-
-type RepoFixture struct {
-	name     string
-	repoPath string
-	tempDir  string
-}
-
-func ExtractRepoFixture(name string) (*RepoFixture, error) {
-	archivePath := findFixtureArchive(name)
-
-	if archivePath == "" {
-		wd, _ := os.Getwd()
-		return nil, fmt.Errorf("repo fixture '%s' not found (working dir: %s, tried: test/e2e/fixtures/repos/%s.tar.gz, fixtures/repos/%s.tar.gz)",
-			name, wd, name, name)
-	}
-
-	tempDir := GinkgoT().TempDir()
-	repoPath := filepath.Join(tempDir, name)
-
-	if err := os.MkdirAll(repoPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create repo directory: %w", err)
-	}
-
-	if err := extractTarGz(archivePath, repoPath); err != nil {
-		return nil, fmt.Errorf("failed to extract repo fixture: %w", err)
-	}
-
-	return &RepoFixture{
-		name:     name,
-		repoPath: repoPath,
-		tempDir:  tempDir,
-	}, nil
 }
 
 func extractTarGz(src, dst string) error {
@@ -123,18 +85,6 @@ func extractTarGz(src, dst string) error {
 		}
 	}
 	return nil
-}
-
-func (rf *RepoFixture) Path() string {
-	return rf.repoPath
-}
-
-func (rf *RepoFixture) TempDir() string {
-	return rf.tempDir
-}
-
-func (rf *RepoFixture) Name() string {
-	return rf.name
 }
 
 // extractRepoFixtureToDir extracts a fixture archive to a specific destination directory

@@ -3,7 +3,7 @@
 
 // Package e2e provides end-to-end tests for twiggit setup-shell command.
 // Tests validate shell wrapper installation for bash, zsh, and fish.
-package cmde2e
+package e2e
 
 import (
 	"os"
@@ -24,7 +24,6 @@ var _ = Describe("setup-shell command", func() {
 		cli = helpers.NewTwiggitCLI()
 		configDir := fixture.Build()
 		cli = cli.WithConfigDir(configDir)
-		_ = helpers.NewTwiggitAssertions()
 	})
 
 	AfterEach(func() {

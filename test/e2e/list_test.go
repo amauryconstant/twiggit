@@ -3,7 +3,7 @@
 
 // Package e2e provides end-to-end tests for twiggit list command.
 // Tests validate context-aware listing behavior across project, worktree, and outside git contexts.
-package cmde2e
+package e2e
 
 import (
 	. "github.com/onsi/ginkgo/v2"
@@ -113,18 +113,5 @@ var _ = Describe("list command", func() {
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
 		}
-	})
-
-	PIt("shows error when listing from outside git without --all flag", func() {
-		fixture.SetupMultiProject()
-
-		session := ctxHelper.FromOutsideGit("list")
-		cli.ShouldFailWithExit(session, 1)
-
-		if session.ExitCode() != 1 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		cli.ShouldErrorOutput(session, "not in a git repository")
 	})
 })

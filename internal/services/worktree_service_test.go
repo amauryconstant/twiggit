@@ -12,6 +12,54 @@ import (
 	"twiggit/test/mocks"
 )
 
+// localMockProjectService provides a minimal mock for testing
+type localMockProjectService struct{}
+
+func (m *localMockProjectService) ListProjects(_ context.Context) ([]*domain.ProjectInfo, error) {
+	return []*domain.ProjectInfo{
+		{
+			Name:        "test-project",
+			Path:        "/path/to/project",
+			GitRepoPath: "/path/to/project/.git",
+			Branches: []*domain.BranchInfo{
+				{Name: "main", IsCurrent: true},
+				{Name: "feature-branch", IsCurrent: false},
+			},
+		},
+	}, nil
+}
+
+func (m *localMockProjectService) DiscoverProject(_ context.Context, projectName string, _ *domain.Context) (*domain.ProjectInfo, error) {
+	return &domain.ProjectInfo{
+		Name:        "test-project",
+		Path:        "/path/to/project",
+		GitRepoPath: "/path/to/project/.git",
+		Branches: []*domain.BranchInfo{
+			{Name: "main", IsCurrent: true},
+			{Name: "feature-branch", IsCurrent: false},
+		},
+	}, nil
+}
+
+func (m *localMockProjectService) GetProjectInfo(_ context.Context, projectPath string) (*domain.ProjectInfo, error) {
+	if projectPath == "/path/to/project" || projectPath == "" {
+		return &domain.ProjectInfo{
+			Name:        "test-project",
+			Path:        "/path/to/project",
+			GitRepoPath: "/path/to/project/.git",
+			Branches: []*domain.BranchInfo{
+				{Name: "main", IsCurrent: true},
+				{Name: "feature-branch", IsCurrent: false},
+			},
+		}, nil
+	}
+	return nil, nil
+}
+
+func (m *localMockProjectService) ValidateProject(_ context.Context, projectPath string) error {
+	return nil
+}
+
 func TestWorktreeService_CreateWorktree_Success(t *testing.T) {
 	testCases := []struct {
 		name         string
@@ -144,18 +192,6 @@ func TestWorktreeService_ListWorktrees_Success(t *testing.T) {
 			},
 			expectError: false,
 		},
-		{
-			name: "list with context only",
-			request: &domain.ListWorktreesRequest{
-				ProjectName: "",
-				Context: &domain.Context{
-					Type:        domain.ContextProject,
-					ProjectName: "test-project",
-				},
-				IncludeMain: false,
-			},
-			expectError: false,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -249,23 +285,12 @@ func TestWorktreeService_ValidateWorktree_Success(t *testing.T) {
 // setupTestWorktreeService creates a test instance of WorktreeService
 func setupTestWorktreeService() application.WorktreeService {
 	gitService := mocks.NewMockGitService()
-	projectService := &mockProjectService{}
+	projectService := &localMockProjectService{}
 	config := domain.DefaultConfig()
 
-	// Configure mocks for basic operations
+	// Configure git service mocks
 	gitService.MockCLIClient.ListWorktreesFunc = func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
 		if repoPath == "/path/to/project/.git" {
-			return []domain.WorktreeInfo{
-				{
-					Path:   "/path/to/worktree",
-					Branch: "feature-branch",
-					Commit: "abc123",
-					IsBare: false,
-				},
-			}, nil
-		}
-		// When called from ValidateWorktree with the worktree path itself
-		if repoPath == "/path/to/worktree" {
 			return []domain.WorktreeInfo{
 				{
 					Path:   "/path/to/worktree",

@@ -3,7 +3,7 @@
 
 // Package e2e provides end-to-end tests for twiggit version command.
 // Tests validate version information display and formatting.
-package cmde2e
+package e2e
 
 import (
 	. "github.com/onsi/ginkgo/v2"

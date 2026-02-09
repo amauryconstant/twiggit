@@ -19,8 +19,6 @@ import (
 	"twiggit/internal/infrastructure"
 	e2ehelpers "twiggit/test/e2e/helpers"
 	"twiggit/test/helpers"
-
-	git "github.com/go-git/go-git/v5"
 )
 
 const (
@@ -34,7 +32,6 @@ type E2ETestFixture struct {
 	tempDir          string
 	configHelper     *e2ehelpers.ConfigHelper
 	gitHelper        *helpers.GitTestHelper
-	repoHelper       *helpers.RepoTestHelper
 	gitExecutor      infrastructure.CommandExecutor
 	projects         map[string]*ProjectInfo
 	testID           *e2ehelpers.TestIDGenerator
@@ -44,9 +41,8 @@ type E2ETestFixture struct {
 }
 
 type ProjectInfo struct {
-	Name    string
-	Path    string
-	Fixture *RepoFixture
+	Name string
+	Path string
 }
 
 // CreateWorktreeSetupResult contains branch names created by CreateWorktreeSetup
@@ -63,19 +59,12 @@ func NewE2ETestFixture() *E2ETestFixture {
 		tempDir:          tempDir,
 		configHelper:     e2ehelpers.NewConfigHelper().WithTempDir(tempDir),
 		gitHelper:        helpers.NewGitTestHelper(&testing.T{}),
-		repoHelper:       helpers.NewRepoTestHelper(&testing.T{}),
 		gitExecutor:      infrastructure.NewDefaultCommandExecutor(30 * time.Second),
 		projects:         make(map[string]*ProjectInfo),
 		testID:           e2ehelpers.NewTestIDGenerator(),
 		createdWorktrees: make([]string, 0),
 		worktreeOwners:   make(map[string]string),
 	}
-}
-
-// WithConfig sets up the configuration with custom settings
-func (f *E2ETestFixture) WithConfig(configFunc func(*e2ehelpers.ConfigHelper)) *E2ETestFixture {
-	configFunc(f.configHelper)
-	return f
 }
 
 // SetupMultiProject creates multiple test projects with different configurations
@@ -91,9 +80,8 @@ func (f *E2ETestFixture) SetupMultiProject() *E2ETestFixture {
 	err = extractRepoFixtureToDir("single-branch", project1Path)
 	Expect(err).NotTo(HaveOccurred(), "Failed to extract project 1")
 	f.projects[project1Name] = &ProjectInfo{
-		Name:    project1Name,
-		Path:    project1Path,
-		Fixture: nil,
+		Name: project1Name,
+		Path: project1Path,
 	}
 
 	// Project 2: Project with feature branches using fixture
@@ -102,9 +90,8 @@ func (f *E2ETestFixture) SetupMultiProject() *E2ETestFixture {
 	err = extractRepoFixtureToDir("multi-branch", project2Path)
 	Expect(err).NotTo(HaveOccurred(), "Failed to extract project 2")
 	f.projects[project2Name] = &ProjectInfo{
-		Name:    project2Name,
-		Path:    project2Path,
-		Fixture: nil,
+		Name: project2Name,
+		Path: project2Path,
 	}
 
 	// Project 3: Project with develop as default branch using fixture
@@ -113,9 +100,8 @@ func (f *E2ETestFixture) SetupMultiProject() *E2ETestFixture {
 	err = extractRepoFixtureToDir("single-branch", project3Path)
 	Expect(err).NotTo(HaveOccurred(), "Failed to extract project 3")
 	f.projects[project3Name] = &ProjectInfo{
-		Name:    project3Name,
-		Path:    project3Path,
-		Fixture: nil,
+		Name: project3Name,
+		Path: project3Path,
 	}
 
 	// Rename default branch to develop in project3
@@ -141,9 +127,8 @@ func (f *E2ETestFixture) SetupSingleProject(name string) *E2ETestFixture {
 	Expect(err).NotTo(HaveOccurred(), "Failed to extract fixture to project directory")
 
 	f.projects[name] = &ProjectInfo{
-		Name:    name,
-		Path:    projectPath,
-		Fixture: nil,
+		Name: name,
+		Path: projectPath,
 	}
 
 	worktreesDir := filepath.Join(f.tempDir, "worktrees")
@@ -222,13 +207,6 @@ func (f *E2ETestFixture) Cleanup() {
 			}
 		}
 	}
-
-	if f.repoHelper != nil {
-		f.repoHelper.Cleanup()
-	}
-	if f.configHelper != nil {
-		f.configHelper.Cleanup()
-	}
 }
 
 // TrackWorktree registers a worktree with its owning repository
@@ -249,9 +227,8 @@ func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *CreateWorktree
 	Expect(err).NotTo(HaveOccurred(), "Failed to extract fixture to project directory")
 
 	f.projects[projectName] = &ProjectInfo{
-		Name:    projectName,
-		Path:    projectPath,
-		Fixture: nil,
+		Name: projectName,
+		Path: projectPath,
 	}
 
 	worktreesDir := filepath.Join(f.tempDir, "worktrees")
@@ -286,13 +263,14 @@ func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *CreateWorktree
 	f.createdWorktrees = append(f.createdWorktrees, worktree2Path)
 	f.TrackWorktree(worktree2Path, projectPath)
 
+	// Rebuild config file to ensure worktrees directory is configured
+	f.configHelper.Build()
+
 	return &CreateWorktreeSetupResult{
 		Feature1Branch: feature1Branch,
 		Feature2Branch: feature2Branch,
 	}
 }
-
-// CreateCustomBranchSetup creates a project with custom default branch
 
 // CreateCustomBranchSetup creates a project with custom default branch
 func (f *E2ETestFixture) CreateCustomBranchSetup(projectName, defaultBranch string) *E2ETestFixture {
@@ -306,15 +284,6 @@ func (f *E2ETestFixture) CreateCustomBranchSetup(projectName, defaultBranch stri
 	f.configHelper.WithDefaultSourceBranch(defaultBranch)
 
 	return f
-}
-
-// GetProjects returns all created project names
-func (f *E2ETestFixture) GetProjects() []string {
-	var names []string
-	for name := range f.projects {
-		names = append(names, name)
-	}
-	return names
 }
 
 // GetCreatedWorktrees returns all created worktree paths
@@ -361,14 +330,6 @@ func (f *E2ETestFixture) Inspect() string {
 	return sb.String()
 }
 
-// WithDebugLogging enables debug logging for this fixture
-func (f *E2ETestFixture) WithDebugLogging(enabled bool) *E2ETestFixture {
-	if enabled {
-		GinkgoT().Log("Debug mode enabled\n", f.Inspect())
-	}
-	return f
-}
-
 // ValidateCleanup verifies that cleanup was successful
 func (f *E2ETestFixture) ValidateCleanup() error {
 	var validationErrors []error
@@ -387,78 +348,4 @@ func (f *E2ETestFixture) ValidateCleanup() error {
 	}
 
 	return nil
-}
-
-// CreateWorktree creates a new worktree manually using git CLI
-func (f *E2ETestFixture) CreateWorktree(projectPath, worktreePath, branch string) error {
-	result, err := f.gitExecutor.Execute(
-		context.Background(),
-		projectPath,
-		"git", "worktree", "add", "-b", branch, worktreePath,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create worktree: %w, output: %s", err, result.Stdout)
-	}
-	f.createdWorktrees = append(f.createdWorktrees, worktreePath)
-	return nil
-}
-
-// RemoveWorktree removes a worktree using git CLI
-func (f *E2ETestFixture) RemoveWorktree(worktreePath string) error {
-	// Find owning repository
-	var repoPath string
-	for _, info := range f.projects {
-		if info != nil && info.Path != "" {
-			repoPath = info.Path
-			break
-		}
-	}
-
-	if repoPath == "" {
-		return fmt.Errorf("no main repo found")
-	}
-
-	result, err := f.gitExecutor.Execute(
-		context.Background(),
-		repoPath,
-		"git", "worktree", "remove", worktreePath,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to remove worktree: %w, output: %s", err, result.Stdout)
-	}
-	return nil
-}
-
-// CreateFileAndCommit creates a file with content, adds it to the worktree, and commits with the given message
-func (f *E2ETestFixture) CreateFileAndCommit(worktreePath, filename, content, commitMsg string) error {
-	filePath := filepath.Join(worktreePath, filename)
-	if err := os.WriteFile(filePath, []byte(content), FilePermReadWrite); err != nil {
-		return fmt.Errorf("failed to write file %s: %w", filePath, err)
-	}
-
-	repo, err := f.gitHelper.PlainOpen(worktreePath)
-	if err != nil {
-		return fmt.Errorf("failed to open repo at %s: %w", worktreePath, err)
-	}
-
-	wt, err := repo.Worktree()
-	if err != nil {
-		return fmt.Errorf("failed to get worktree: %w", err)
-	}
-
-	if _, err := wt.Add(filename); err != nil {
-		return fmt.Errorf("failed to add file %s: %w", filename, err)
-	}
-
-	if _, err := wt.Commit(commitMsg, &git.CommitOptions{}); err != nil {
-		return fmt.Errorf("failed to commit: %w", err)
-	}
-
-	return nil
-}
-
-// GetWorktreePath returns the full worktree path for a given project and branch
-func (f *E2ETestFixture) GetWorktreePath(projectName, branch string) string {
-	worktreesDir := f.configHelper.GetWorktreesDir()
-	return filepath.Join(worktreesDir, projectName, branch)
 }

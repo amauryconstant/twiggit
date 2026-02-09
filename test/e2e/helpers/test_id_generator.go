@@ -15,11 +15,9 @@ import (
 )
 
 type TestIDGenerator struct {
-	timestamp    string
-	counter      int32
-	shortName    string
-	branchCache  map[string]string
-	projectCache map[string]string
+	timestamp string
+	counter   int32
+	shortName string
 }
 
 func NewTestIDGenerator() *TestIDGenerator {
@@ -34,11 +32,9 @@ func NewTestIDGenerator() *TestIDGenerator {
 	}
 
 	return &TestIDGenerator{
-		timestamp:    time.Now().Format("20060102-150405"),
-		counter:      1,
-		shortName:    shortName,
-		branchCache:  make(map[string]string),
-		projectCache: make(map[string]string),
+		timestamp: time.Now().Format("20060102-150405"),
+		counter:   1,
+		shortName: shortName,
 	}
 }
 
@@ -59,24 +55,9 @@ func (g *TestIDGenerator) ProjectName() string {
 }
 
 func (g *TestIDGenerator) ProjectNameWithSuffix(suffix string) string {
-	if cached, ok := g.projectCache[suffix]; ok {
-		return cached
-	}
-	result := fmt.Sprintf("%s-%s-%s", suffix, g.shortName, g.generateRandomID())
-	g.projectCache[suffix] = result
-	return result
+	return fmt.Sprintf("%s-%s-%s", suffix, g.shortName, g.generateRandomID())
 }
 
 func (g *TestIDGenerator) BranchName(branch string) string {
-	// Use cache to ensure same branch name is returned for repeated calls
-	if cached, ok := g.branchCache[branch]; ok {
-		return cached
-	}
-	result := fmt.Sprintf("%s-%s", branch, g.generateRandomID())
-	g.branchCache[branch] = result
-	return result
-}
-
-func (g *TestIDGenerator) WorktreeName(branch string) string {
-	return g.BranchName(branch)
+	return fmt.Sprintf("%s-%s", branch, g.generateRandomID())
 }

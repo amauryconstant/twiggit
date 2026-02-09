@@ -150,21 +150,43 @@ func (c *GoGitClientImpl) GetRepositoryStatus(_ context.Context, repoPath string
 		return domain.RepositoryStatus{}, domain.NewGitRepositoryError(repoPath, "failed to get repository status", err)
 	}
 
+	// Workaround for go-git worktree issue:
+	// Filter out files that only appear in index (staged) but not in working tree.
+	// These are baseline files from HEAD, not actual changes.
+	filteredStatus := make(map[string]git.StatusCode)
+	for file, entry := range status {
+		if entry.Staging == git.Added && entry.Worktree == git.Unmodified {
+			// File is only in index (staged), not modified in working tree
+			// This is a go-git bug for worktrees - skip it
+			continue
+		}
+		filteredStatus[file] = entry.Worktree
+	}
+
 	// Get current branch
 	headRef, err := repo.Head()
 	if err != nil {
-		return domain.RepositoryStatus{}, domain.NewGitRepositoryError(repoPath, "failed to get HEAD reference", err)
+		// Workaround for go-git worktree issue:
+		// In worktrees, repo.Head() may fail with "reference not found"
+		// even though HEAD file exists. We can still return a valid status
+		// without branch/commit info.
+		repoStatus := domain.RepositoryStatus{
+			IsClean: len(filteredStatus) == 0,
+			Branch:  "unknown",
+			Commit:  "",
+		}
+		return repoStatus, nil
 	}
 
 	repoStatus := domain.RepositoryStatus{
-		IsClean: status.IsClean(),
+		IsClean: len(filteredStatus) == 0,
 		Branch:  headRef.Name().Short(),
 		Commit:  headRef.Hash().String(),
 	}
 
-	// Categorize files
-	for file, entry := range status {
-		switch entry.Worktree {
+	// Categorize files (using filtered status)
+	for file, worktreeStatus := range filteredStatus {
+		switch worktreeStatus {
 		case git.Modified:
 			repoStatus.Modified = append(repoStatus.Modified, file)
 		case git.Added:
@@ -173,7 +195,7 @@ func (c *GoGitClientImpl) GetRepositoryStatus(_ context.Context, repoPath string
 			repoStatus.Deleted = append(repoStatus.Deleted, file)
 		}
 
-		if entry.Staging == git.Untracked {
+		if status[file].Staging == git.Untracked {
 			repoStatus.Untracked = append(repoStatus.Untracked, file)
 		}
 	}

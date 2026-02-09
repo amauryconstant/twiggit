@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -140,50 +141,52 @@ func (s *CLIClientTestSuite) TestBuildWorktreeRemoveArgs() {
 }
 
 func TestCLIClient_CreateWorktree(t *testing.T) {
+	worktreeDir := t.TempDir()
 	callCount := 0
-	// Create mock command executor
 	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
 		assert.Equal(t, "/test/repo", dir)
 		assert.Equal(t, "git", cmd)
 
 		callCount++
 		if callCount == 1 {
-			// First call: check if branch exists (it doesn't)
 			assert.Equal(t, []string{"show-ref", "--verify", "--quiet", "refs/heads/feature"}, args)
 			return &CommandResult{ExitCode: 1, Stdout: ""}, nil
 		} else {
-			// Second call: create worktree with new branch from sourceBranch
-			assert.Equal(t, []string{"worktree", "add", "-b", "feature", "/path/to/worktree", "main"}, args)
+			assert.Equal(t, []string{"worktree", "add", "-b", "feature", worktreeDir, "main"}, args)
+			if err := os.MkdirAll(worktreeDir, 0755); err != nil {
+				return nil, err
+			}
 			return &CommandResult{ExitCode: 0, Stdout: ""}, nil
 		}
 	})
 	client := NewCLIClient(mockExecutor)
 
-	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
+	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", worktreeDir)
 	assert.NoError(t, err)
 }
 
 func TestCLIClient_CreateWorktree_WithExistingBranch(t *testing.T) {
+	worktreeDir := t.TempDir()
 	callCount := 0
-	// Create mock command executor
 	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
 		assert.Equal(t, "/test/repo", dir)
 		assert.Equal(t, "git", cmd)
 
 		callCount++
 		if callCount == 1 {
-			// First call: check if branch exists (it does)
 			assert.Equal(t, []string{"show-ref", "--verify", "--quiet", "refs/heads/existing-branch"}, args)
 			return &CommandResult{ExitCode: 0, Stdout: ""}, nil
 		} else {
-			// Second call: create worktree with existing branch
-			assert.Equal(t, []string{"worktree", "add", "/path/to/worktree", "existing-branch"}, args)
+			assert.Equal(t, []string{"worktree", "add", worktreeDir, "existing-branch"}, args)
+			if err := os.MkdirAll(worktreeDir, 0755); err != nil {
+				return nil, err
+			}
 			return &CommandResult{ExitCode: 0, Stdout: ""}, nil
 		}
 	})
 	client := NewCLIClient(mockExecutor)
 
-	err := client.CreateWorktree(context.Background(), "/test/repo", "existing-branch", "", "/path/to/worktree")
+	err := client.CreateWorktree(context.Background(), "/test/repo", "existing-branch", "", worktreeDir)
 	assert.NoError(t, err)
 }
 

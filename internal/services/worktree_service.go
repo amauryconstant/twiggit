@@ -206,8 +206,14 @@ func (s *worktreeService) GetWorktreeStatus(ctx context.Context, worktreePath st
 		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to get repository status", err)
 	}
 
+	// Find the project that contains this worktree to list worktrees from main repo
+	project, err := s.findProjectByWorktree(ctx, worktreePath)
+	if err != nil {
+		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to find parent project", err)
+	}
+
 	// Get worktree info to determine branch
-	worktrees, err := s.gitService.ListWorktrees(ctx, worktreePath)
+	worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath)
 	if err != nil {
 		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to get worktree info", err)
 	}
@@ -256,8 +262,14 @@ func (s *worktreeService) ValidateWorktree(ctx context.Context, worktreePath str
 		return domain.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "invalid git repository", err)
 	}
 
-	// Check if it's a worktree (not the main repository)
-	worktrees, err := s.gitService.ListWorktrees(ctx, worktreePath)
+	// Find the project that contains this worktree to list worktrees from main repo
+	project, err := s.findProjectByWorktree(ctx, worktreePath)
+	if err != nil {
+		return domain.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "failed to find parent project", err)
+	}
+
+	// List worktrees from main repository
+	worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath)
 	if err != nil {
 		return domain.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "failed to list worktrees", err)
 	}

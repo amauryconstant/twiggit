@@ -186,36 +186,3 @@ func (c *ConfigHelper) GetWorktreesDir() string {
 func (c *ConfigHelper) GetTempDir() string {
 	return c.tempDir
 }
-
-func (c *ConfigHelper) Cleanup() {
-	if c.tempDir != "" {
-		os.RemoveAll(c.tempDir)
-	}
-}
-
-// CreateTestConfig creates a basic test configuration with default values
-func CreateTestConfig() *ConfigHelper {
-	return NewConfigHelper()
-}
-
-// CreateMultiProjectConfig creates a configuration suitable for multi-project tests
-func CreateMultiProjectConfig() *ConfigHelper {
-	return NewConfigHelper().
-		WithDefaultSourceBranch("main").
-		WithCustomConfig(`
-# Multi-project test configuration
-[projects]
-auto_discovery = true
-max_depth = 3
-
-[worktrees]
-auto_cleanup = true
-naming_pattern = "{branch}"
-`)
-}
-
-// CreateCustomBranchConfig creates a configuration with custom default branch
-func CreateCustomBranchConfig(branch string) *ConfigHelper {
-	return NewConfigHelper().
-		WithDefaultSourceBranch(branch)
-}
