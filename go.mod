@@ -11,6 +11,7 @@ require (
 	github.com/knadh/koanf/v2 v2.1.1
 	github.com/onsi/ginkgo/v2 v2.26.0
 	github.com/onsi/gomega v1.38.2
+	github.com/pelletier/go-toml v1.9.5
 	github.com/spf13/cobra v1.10.1
 )
 
@@ -38,7 +39,6 @@ require (
 	github.com/knadh/koanf/maps v0.1.1 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect

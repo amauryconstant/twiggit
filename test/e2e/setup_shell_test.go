@@ -24,6 +24,7 @@ var _ = Describe("setup-shell command", func() {
 		cli = helpers.NewTwiggitCLI()
 		configDir := fixture.Build()
 		cli = cli.WithConfigDir(configDir)
+		cli = cli.WithEnvironment("HOME", fixture.GetTempDir())
 	})
 
 	AfterEach(func() {

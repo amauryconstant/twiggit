@@ -1,6 +1,7 @@
 package shell
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -114,6 +115,11 @@ func TestShellService_DetectConfigFile_Success(t *testing.T) {
 }
 
 func TestShellService_ValidateInstallation_Success(t *testing.T) {
+	originalHome := os.Getenv("HOME")
+	tempHome := t.TempDir()
+	os.Setenv("HOME", tempHome)
+	defer os.Setenv("HOME", originalHome)
+
 	testCases := []struct {
 		name        string
 		shellType   domain.ShellType
