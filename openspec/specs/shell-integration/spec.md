@@ -4,82 +4,77 @@
 
 The system SHALL install shell wrapper functions for bash, zsh, and fish to enable seamless directory navigation between worktrees and projects via the `twiggit cd` command.
 
-#### Scenario: Install shell wrapper for bash
+#### Scenario: Install shell wrapper with inferred shell type
 
-- **WHEN** user runs `twiggit setup-shell --shell=bash`
+- **WHEN** user runs `twiggit init ~/.bashrc`
 - **AND** bash is a supported shell
 - **AND** wrapper is not already installed
-- **THEN** system SHALL generate bash-specific wrapper function
-- **AND** wrapper SHALL be added to `~/.bashrc` configuration file
+- **THEN** system SHALL infer shell type as bash from config file name
+- **AND** system SHALL generate bash-specific wrapper function
+- **AND** wrapper SHALL be added to specified configuration file (~/.bashrc)
+- **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
 - **AND** wrapper SHALL intercept `twiggit cd` calls and change directories
 - **AND** wrapper SHALL provide `builtin cd` escape hatch
 - **AND** success message SHALL indicate shell wrapper installed
-- **AND** user SHALL be instructed to restart shell or source `~/.bashrc`
+- **AND** success message SHALL include config file path
+- **AND** user SHALL be instructed to restart shell or source config file
 
-#### Scenario: Install shell wrapper for zsh
+#### Scenario: Install shell wrapper with explicit shell override
 
-- **WHEN** user runs `twiggit setup-shell --shell=zsh`
+- **WHEN** user runs `twiggit init /custom/config --shell=zsh`
 - **AND** zsh is a supported shell
 - **AND** wrapper is not already installed
-- **THEN** system SHALL generate zsh-specific wrapper function
-- **AND** wrapper SHALL be added to `~/.zshrc` configuration file
+- **THEN** system SHALL use explicit shell type (zsh) instead of inference
+- **AND** system SHALL generate zsh-specific wrapper function
+- **AND** wrapper SHALL be added to specified configuration file (/custom/config)
+- **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
 - **AND** wrapper SHALL intercept `twiggit cd` calls and change directories
 - **AND** wrapper SHALL provide `builtin cd` escape hatch
 - **AND** success message SHALL indicate shell wrapper installed
-- **AND** user SHALL be instructed to restart shell or source `~/.zshrc`
-
-#### Scenario: Install shell wrapper for fish
-
-- **WHEN** user runs `twiggit setup-shell --shell=fish`
-- **AND** fish is a supported shell
-- **AND** wrapper is not already installed
-- **THEN** system SHALL generate fish-specific wrapper function
-- **AND** wrapper SHALL be added to appropriate fish configuration file
-- **AND** wrapper SHALL intercept `twiggit cd` calls and change directories
-- **AND** wrapper SHALL provide `builtin cd` escape hatch
-- **AND** success message SHALL indicate shell wrapper installed
+- **AND** success message SHALL include config file path
 - **AND** user SHALL be instructed to restart shell or source config file
 
 #### Scenario: Skip installation if wrapper already exists
 
-- **WHEN** user runs `twiggit setup-shell --shell=<type>`
-- **AND** wrapper is already installed for that shell
+- **WHEN** user runs `twiggit init <config-file>`
+- **AND** wrapper is already installed in specified config file
 - **AND** --force flag is not provided
 - **THEN** system SHALL skip installation
 - **AND** message SHALL indicate "Shell wrapper already installed"
+- **AND** message SHALL include config file path
 - **AND** system SHALL suggest using --force to reinstall
 - **AND** no changes SHALL be made to shell configuration
 
 #### Scenario: Force reinstall shell wrapper
 
-- **WHEN** user runs `twiggit setup-shell --shell=<type> --force`
-- **AND** wrapper is already installed for that shell
-- **THEN** system SHALL regenerate and reinstall wrapper
-- **AND** existing wrapper SHALL be replaced in shell configuration file
+- **WHEN** user runs `twiggit init <config-file> --force`
+- **AND** wrapper is already installed in specified config file
+- **THEN** system SHALL remove existing wrapper block using delimiters
+- **AND** system SHALL regenerate and reinstall wrapper
+- **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
 - **AND** success message SHALL indicate shell wrapper installed (not skipped)
+- **AND** success message SHALL include config file path
 - **AND** user SHALL be instructed to restart shell or source config file
 
 #### Scenario: Dry run shell wrapper installation
 
-- **WHEN** user runs `twiggit setup-shell --shell=<type> --dry-run`
+- **WHEN** user runs `twiggit init <config-file> --dry-run`
 - **THEN** system SHALL generate wrapper content without installing
+- **AND** generated wrapper SHALL include block delimiters
 - **AND** generated wrapper SHALL be displayed to stdout
 - **AND** message SHALL indicate "Would install wrapper for <shell>"
+- **AND** message SHALL include config file path
 - **AND** no changes SHALL be made to shell configuration
 - **AND** wrapper SHALL not be written to any file
 
-#### Scenario: Return error for unsupported shell type
+#### Scenario: Return error when shell type inference fails
 
-- **WHEN** user runs `twiggit setup-shell --shell=unsupported`
-- **THEN** system SHALL return error indicating unsupported shell type
-- **AND** error message SHALL list supported shells (bash, zsh, fish)
-- **AND** installation SHALL not proceed
-
-#### Scenario: Return error when --shell flag is missing
-
-- **WHEN** user runs `twiggit setup-shell` without --shell flag
-- **THEN** system SHALL return error indicating shell type is required
-- **AND** error SHALL provide example usage with --shell flag
+- **WHEN** user runs `twiggit init /custom/config.txt`
+- **AND** shell type cannot be inferred from config file name
+- **AND** --shell flag is not provided
+- **THEN** system SHALL return error indicating cannot infer shell type
+- **AND** error SHALL include config file path
+- **AND** error SHALL suggest using --shell to specify shell type
 - **AND** installation SHALL not proceed
 
 ---
@@ -133,19 +128,21 @@ The system SHALL validate whether shell integration is properly installed for a 
 
 #### Scenario: Validate shell wrapper installation
 
-- **WHEN** user checks if shell wrapper is installed
-- **AND** wrapper is present in appropriate shell configuration file
+- **WHEN** user runs `twiggit init --check ~/.bashrc`
+- **AND** wrapper is present in ~/.bashrc file
 - **THEN** validation SHALL succeed
 - **AND** result SHALL indicate "Shell wrapper is installed"
-- **AND** configuration file path SHALL be included in result
+- **AND** configuration file path (~/.bashrc) SHALL be included in result
+- **AND** validation SHALL check for block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
 
 #### Scenario: Return not installed when wrapper missing
 
-- **WHEN** user checks if shell wrapper is installed
-- **AND** wrapper is not present in appropriate shell configuration file
+- **WHEN** user runs `twiggit init --check ~/.bashrc`
+- **AND** wrapper is not present in ~/.bashrc file
 - **THEN** validation SHALL fail
 - **AND** result SHALL indicate "Shell wrapper not installed"
-- **AND** configuration file path SHALL be included in result
+- **AND** configuration file path (~/.bashrc) SHALL be included in result
+- **AND** validation SHALL check for block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
 
 #### Scenario: Detect configuration file location with fallback
 
