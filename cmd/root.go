@@ -48,7 +48,7 @@ across multiple projects.`,
 	cmd.AddCommand(NewCreateCommand(config))
 	cmd.AddCommand(NewDeleteCommand(config))
 	cmd.AddCommand(NewCDCommand(config))
-	cmd.AddCommand(NewSetupShellCmd(config))
+	cmd.AddCommand(NewInitCmd(config))
 	cmd.AddCommand(NewVersionCommand(config))
 
 	return cmd

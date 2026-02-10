@@ -59,6 +59,46 @@ detect_shell() {
     fi
 }
 
+detect_config_file() {
+    local shell="$1"
+    local config_file=""
+
+    case "$shell" in
+        zsh)
+            for file in "$HOME/.zshrc" "$HOME/.zprofile"; do
+                if [ -r "$file" ]; then
+                    config_file="$file"
+                    break
+                fi
+            done
+            if [ -z "$config_file" ]; then
+                config_file="$HOME/.zshrc"
+            fi
+            ;;
+        bash)
+            for file in "$HOME/.bashrc" "$HOME/.bash_profile"; do
+                if [ -r "$file" ]; then
+                    config_file="$file"
+                    break
+                fi
+            done
+            if [ -z "$config_file" ]; then
+                config_file="$HOME/.bashrc"
+            fi
+            ;;
+        fish)
+            config_file="$HOME/.config/fish/config.fish"
+            ;;
+        *)
+            echo "Unsupported shell: $shell"
+            return 1
+            ;;
+    esac
+
+    echo "$config_file"
+    return 0
+}
+
 install_completions() {
     local shell="$1"
     local completions_dir
@@ -218,15 +258,51 @@ main() {
     read -p "Install shell wrapper for directory navigation (twiggit cd)? [Y/n] " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]] || [ -z "$REPLY" ]; then
-        if "${BIN_DIR}/twiggit" setup-shell --shell="${SHELL:-bash}" 2>/dev/null; then
+        config_file=$(detect_config_file "${SHELL:-bash}")
+
+        if [ -z "$config_file" ]; then
+            echo "⚠️  Could not detect config file for shell: ${SHELL:-bash}"
+            echo "  You can run manually: twiggit init <config-file>"
+            return
+        fi
+
+        echo "Detected config file: $config_file"
+
+        if grep -q "### BEGIN TWIGGIT WRAPPER" "$config_file" 2>/dev/null; then
             echo ""
+            echo "⚠️  Wrapper already installed in $config_file"
+            read -p "Reinstall with --force? [y/N] " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                echo "Reinstalling wrapper..."
+                if "${BIN_DIR}/twiggit" init "$config_file" --force 2>/dev/null; then
+                    echo "✓ Wrapper reinstalled successfully"
+                else
+                    echo "⚠️  Failed to reinstall shell wrapper"
+                    echo "  You can run manually: twiggit init $config_file --force"
+                fi
+            else
+                echo "Skipped reinstall."
+            fi
         else
-            echo "✗ Failed to install shell wrapper"
-            echo "  You can run manually: twiggit setup-shell --shell=<zsh|bash|fish>"
+            echo ""
+            read -p "Install wrapper to $config_file? [Y/n] " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]] || [ -z "$REPLY" ]; then
+                if "${BIN_DIR}/twiggit" init "$config_file" 2>/dev/null; then
+                    echo "✓ Wrapper installed successfully"
+                else
+                    echo "⚠️  Failed to install shell wrapper"
+                    echo "  You can run manually: twiggit init $config_file"
+                fi
+            else
+                echo "Skipped installation."
+                echo "  You can run manually: twiggit init $config_file"
+            fi
         fi
     else
         echo "Skipped shell wrapper installation."
-        echo "  You can run manually: twiggit setup-shell --shell=<zsh|bash|fish>"
+        echo "  You can run manually: twiggit init <config-file>"
     fi
 
     case ":$PATH:" in
