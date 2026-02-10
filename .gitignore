@@ -24,9 +24,6 @@ artifacts.json
 metadata.json
 dist/
 
-# Pre-commit
-.pre-commit-config.yaml
-
 # IDE
 .vscode/
 .idea/

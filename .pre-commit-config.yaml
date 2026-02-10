@@ -1,0 +1,27 @@
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        name: Remove Trailing Whitespace
+        exclude: '\.md$'
+
+      - id: end-of-file-fixer
+        name: Fix End of File
+
+      - id: check-yaml
+        name: Validate YAML Files
+
+      - id: check-toml
+        name: Validate TOML Files
+
+      - id: check-json
+        name: Validate JSON Files
+
+      - id: check-merge-conflict
+        name: Check for Merge Conflicts
+
+      - id: mixed-line-ending
+        name: Fix Mixed Line Endings
+        args: [--fix=lf]
