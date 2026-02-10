@@ -145,12 +145,14 @@ func TestShellService_ValidateInstallation_Success(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			service := NewShellService()
-			err := service.ValidateInstallation(tc.shellType)
+			configFile := tempHome + "/.bashrc"
+			err := service.ValidateInstallation(tc.shellType, configFile)
 
 			if tc.expectError {
 				require.Error(t, err)
-				// Should contain shell error information
-				assert.Contains(t, err.Error(), "shell error")
+				// Should be a ShellError
+				var shellErr *domain.ShellError
+				require.ErrorAs(t, err, &shellErr)
 			} else {
 				require.NoError(t, err)
 			}
@@ -160,8 +162,106 @@ func TestShellService_ValidateInstallation_Success(t *testing.T) {
 
 func TestShellService_ValidateInstallation_InvalidShellType(t *testing.T) {
 	service := NewShellService()
-	err := service.ValidateInstallation(domain.ShellType("invalid"))
+	err := service.ValidateInstallation(domain.ShellType("invalid"), "")
 
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to detect config file")
+	assert.Contains(t, err.Error(), "config file path is empty")
+}
+
+func TestShellService_HasWrapperBlock(t *testing.T) {
+	service := NewShellService()
+	shellServiceImpl := service.(*shellService)
+
+	testCases := []struct {
+		name           string
+		content        string
+		expectedResult bool
+	}{
+		{
+			name:           "has both delimiters",
+			content:        "# Some config\n### BEGIN TWIGGIT WRAPPER\ntwiggit() { echo test; }\n### END TWIGGIT WRAPPER\n# More config",
+			expectedResult: true,
+		},
+		{
+			name:           "only begin delimiter",
+			content:        "# Some config\n### BEGIN TWIGGIT WRAPPER\ntwiggit() { echo test; }\n",
+			expectedResult: false,
+		},
+		{
+			name:           "only end delimiter",
+			content:        "# Some config\ntwiggit() { echo test; }\n### END TWIGGIT WRAPPER\n# More config",
+			expectedResult: false,
+		},
+		{
+			name:           "no delimiters",
+			content:        "# Some config\ntwiggit() { echo test; }\n# More config",
+			expectedResult: false,
+		},
+		{
+			name:           "empty content",
+			content:        "",
+			expectedResult: false,
+		},
+		{
+			name:           "wrapper with whitespace",
+			content:        "# Some config\n  ### BEGIN TWIGGIT WRAPPER  \n twiggit() { echo test; }\n  ### END TWIGGIT WRAPPER  \n",
+			expectedResult: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := shellServiceImpl.hasWrapperBlock(tc.content)
+			assert.Equal(t, tc.expectedResult, result)
+		})
+	}
+}
+
+func TestShellService_RemoveWrapperBlock(t *testing.T) {
+	service := NewShellService()
+	shellServiceImpl := service.(*shellService)
+
+	testCases := []struct {
+		name           string
+		content        string
+		expectedResult string
+	}{
+		{
+			name:           "remove complete wrapper block",
+			content:        "# Some config\n### BEGIN TWIGGIT WRAPPER\ntwiggit() { echo test; }\n### END TWIGGIT WRAPPER\n# More config",
+			expectedResult: "# Some config\n# More config",
+		},
+		{
+			name:           "no delimiters returns original",
+			content:        "# Some config\ntwiggit() { echo test; }\n# More config",
+			expectedResult: "# Some config\ntwiggit() { echo test; }\n# More config",
+		},
+		{
+			name:           "only begin delimiter removes to end",
+			content:        "# Some config\n### BEGIN TWIGGIT WRAPPER\ntwiggit() { echo test; }\n# More config",
+			expectedResult: "# Some config\n### BEGIN TWIGGIT WRAPPER\ntwiggit() { echo test; }\n# More config",
+		},
+		{
+			name:           "empty content returns empty",
+			content:        "",
+			expectedResult: "",
+		},
+		{
+			name:           "wrapper at start",
+			content:        "### BEGIN TWIGGIT WRAPPER\ntwiggit() { echo test; }\n### END TWIGGIT WRAPPER\n# More config",
+			expectedResult: "# More config",
+		},
+		{
+			name:           "wrapper at end",
+			content:        "# Some config\n### BEGIN TWIGGIT WRAPPER\ntwiggit() { echo test; }\n### END TWIGGIT WRAPPER",
+			expectedResult: "# Some config\n",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := shellServiceImpl.removeWrapperBlock(tc.content)
+			assert.Equal(t, tc.expectedResult, result)
+		})
+	}
 }

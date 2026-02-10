@@ -206,3 +206,111 @@ func TestShellDomain_Validation(t *testing.T) {
 		})
 	}
 }
+
+func TestInferShellTypeFromPath(t *testing.T) {
+	testCases := []struct {
+		name          string
+		configPath    string
+		expectedShell ShellType
+		expectError   bool
+		errorContains string
+	}{
+		{
+			name:          "infer bash from .bashrc",
+			configPath:    "/home/user/.bashrc",
+			expectedShell: ShellBash,
+			expectError:   false,
+		},
+		{
+			name:          "infer bash from .bash_profile",
+			configPath:    "/home/user/.bash_profile",
+			expectedShell: ShellBash,
+			expectError:   false,
+		},
+		{
+			name:          "infer bash from .profile",
+			configPath:    "/home/user/.profile",
+			expectedShell: ShellBash,
+			expectError:   false,
+		},
+		{
+			name:          "infer bash from custom.bash",
+			configPath:    "/home/user/custom.bash",
+			expectedShell: ShellBash,
+			expectError:   false,
+		},
+		{
+			name:          "infer bash from my-bash-config",
+			configPath:    "/home/user/my-bash-config",
+			expectedShell: ShellBash,
+			expectError:   false,
+		},
+		{
+			name:          "infer zsh from .zshrc",
+			configPath:    "/home/user/.zshrc",
+			expectedShell: ShellZsh,
+			expectError:   false,
+		},
+		{
+			name:          "infer zsh from .zprofile",
+			configPath:    "/home/user/.zprofile",
+			expectedShell: ShellZsh,
+			expectError:   false,
+		},
+		{
+			name:          "infer zsh from custom.zsh",
+			configPath:    "/home/user/custom.zsh",
+			expectedShell: ShellZsh,
+			expectError:   false,
+		},
+		{
+			name:          "infer fish from config.fish",
+			configPath:    "/home/user/.config/fish/config.fish",
+			expectedShell: ShellFish,
+			expectError:   false,
+		},
+		{
+			name:          "infer fish from .fishrc",
+			configPath:    "/home/user/.fishrc",
+			expectedShell: ShellFish,
+			expectError:   false,
+		},
+		{
+			name:          "infer fish from path containing fish",
+			configPath:    "/home/user/fish/config",
+			expectedShell: ShellFish,
+			expectError:   false,
+		},
+		{
+			name:          "return error for unknown config file",
+			configPath:    "/home/user/config.txt",
+			expectedShell: "",
+			expectError:   true,
+			errorContains: "cannot infer shell type from path",
+		},
+		{
+			name:          "return error for path without shell indicator",
+			configPath:    "/home/user/myconfig",
+			expectedShell: "",
+			expectError:   true,
+			errorContains: "cannot infer shell type from path",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			shellType, err := InferShellTypeFromPath(tc.configPath)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Equal(t, ShellType(""), shellType)
+				if tc.errorContains != "" {
+					assert.Contains(t, err.Error(), tc.errorContains)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectedShell, shellType)
+			}
+		})
+	}
+}

@@ -69,8 +69,8 @@ type ShellInfrastructure interface {
 	DetectConfigFile(shellType domain.ShellType) (string, error)
 
 	// InstallWrapper installs the wrapper to the shell config file
-	InstallWrapper(shellType domain.ShellType, wrapper string) error
+	InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error
 
 	// ValidateInstallation validates whether the wrapper is installed
-	ValidateInstallation(shellType domain.ShellType) error
+	ValidateInstallation(shellType domain.ShellType, configFile string) error
 }

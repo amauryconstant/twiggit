@@ -24,6 +24,9 @@ const (
 
 	// ErrWrapperInstallation indicates wrapper installation failed
 	ErrWrapperInstallation = "WRAPPER_INSTALLATION_FAILED"
+
+	// ErrInferenceFailed indicates shell type inference from path failed
+	ErrInferenceFailed = "INFERENCE_FAILED"
 )
 
 // ShellError represents a shell service error with context
@@ -37,9 +40,21 @@ type ShellError struct {
 // Error implements the error interface
 func (e *ShellError) Error() string {
 	if e.Context != "" {
-		return fmt.Sprintf("shell error [%s] for %s: %s", e.Code, e.ShellType, e.Context)
+		if e.Cause != nil {
+			return fmt.Sprintf("%s: %s", e.Context, e.Cause.Error())
+		}
+		if e.ShellType != "" {
+			return fmt.Sprintf("%s: %s", e.Context, e.ShellType)
+		}
+		return e.Context
 	}
-	return fmt.Sprintf("shell error [%s] for %s", e.Code, e.ShellType)
+	if e.Cause != nil {
+		return e.Cause.Error()
+	}
+	if e.ShellType != "" {
+		return fmt.Sprintf("%s: %s", e.Code, e.ShellType)
+	}
+	return fmt.Sprintf("shell error [%s]", e.Code)
 }
 
 // Unwrap returns the underlying cause

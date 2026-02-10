@@ -1,7 +1,6 @@
 package shell
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -54,14 +53,24 @@ func (s *shellService) DetectConfigFile(shellType domain.ShellType) (string, err
 }
 
 // InstallWrapper installs the wrapper to the shell config file
-func (s *shellService) InstallWrapper(shellType domain.ShellType, wrapper string) error {
-	configFile, err := s.DetectConfigFile(shellType)
-	if err != nil {
-		return fmt.Errorf("failed to detect config file: %w", err)
+func (s *shellService) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
+	if configFile == "" {
+		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "config file path is empty", nil)
 	}
 
-	// Check if file exists and is writable
+	// Check if parent directory exists
+	parentDir := filepath.Dir(configFile)
+	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "parent directory does not exist", err)
+	}
+
+	// Check if file exists
+	fileExists := true
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		fileExists = false
+	}
+
+	if !fileExists {
 		// Create the file if it doesn't exist
 		if err := os.WriteFile(configFile, []byte(wrapper), 0644); err != nil {
 			return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to create config file", err)
@@ -69,26 +78,26 @@ func (s *shellService) InstallWrapper(shellType domain.ShellType, wrapper string
 		return nil
 	}
 
-	// Check if file is writable
-	file, err := os.OpenFile(configFile, os.O_WRONLY|os.O_APPEND, 0600)
-	if err != nil {
-		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotWritable, string(shellType), "config file is not writable", err)
-	}
-	defer file.Close()
-
-	// Check if wrapper is already installed
+	// Read existing content
 	content, err := os.ReadFile(configFile)
 	if err != nil {
 		return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to read config file", err)
 	}
 
-	if strings.Contains(string(content), "twiggit()") || strings.Contains(string(content), "function twiggit") {
-		return domain.NewShellError(domain.ErrShellAlreadyInstalled, string(shellType), "wrapper already installed")
+	contentStr := string(content)
+
+	// Check if wrapper block exists
+	if s.hasWrapperBlock(contentStr) {
+		if !force {
+			return domain.NewShellError(domain.ErrShellAlreadyInstalled, string(shellType), "wrapper already installed")
+		}
+		// Remove existing wrapper block
+		contentStr = s.removeWrapperBlock(contentStr)
 	}
 
 	// Append wrapper to config file
-	wrapperWithNewline := wrapper + "\n"
-	if _, err := file.WriteString(wrapperWithNewline); err != nil {
+	updatedContent := s.appendWrapper(contentStr, wrapper)
+	if err := os.WriteFile(configFile, []byte(updatedContent), 0644); err != nil {
 		return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to write wrapper to config file", err)
 	}
 
@@ -96,10 +105,9 @@ func (s *shellService) InstallWrapper(shellType domain.ShellType, wrapper string
 }
 
 // ValidateInstallation validates whether the wrapper is installed
-func (s *shellService) ValidateInstallation(shellType domain.ShellType) error {
-	configFile, err := s.DetectConfigFile(shellType)
-	if err != nil {
-		return fmt.Errorf("failed to detect config file: %w", err)
+func (s *shellService) ValidateInstallation(shellType domain.ShellType, configFile string) error {
+	if configFile == "" {
+		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "config file path is empty", nil)
 	}
 
 	// Check if config file exists
@@ -113,27 +121,9 @@ func (s *shellService) ValidateInstallation(shellType domain.ShellType) error {
 		return domain.NewShellErrorWithCause(domain.ErrShellNotInstalled, string(shellType), "failed to read config file", err)
 	}
 
-	// Check for wrapper content
-	contentStr := string(content)
-	hasBashWrapper := strings.Contains(contentStr, "twiggit() {") && strings.Contains(contentStr, "# Twiggit bash wrapper")
-	hasZshWrapper := strings.Contains(contentStr, "twiggit() {") && strings.Contains(contentStr, "# Twiggit zsh wrapper")
-	hasFishWrapper := strings.Contains(contentStr, "function twiggit") && strings.Contains(contentStr, "# Twiggit fish wrapper")
-
-	switch shellType {
-	case domain.ShellBash:
-		if !hasBashWrapper {
-			return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "bash wrapper not found")
-		}
-	case domain.ShellZsh:
-		if !hasZshWrapper {
-			return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "zsh wrapper not found")
-		}
-	case domain.ShellFish:
-		if !hasFishWrapper {
-			return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "fish wrapper not found")
-		}
-	default:
-		return domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
+	// Check for wrapper block delimiters
+	if !s.hasWrapperBlock(string(content)) {
+		return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "wrapper block not found")
 	}
 
 	return nil
@@ -185,7 +175,8 @@ func (s *shellService) getConfigFiles(shellType domain.ShellType) []string {
 
 // bashWrapperTemplate returns the bash wrapper template
 func (s *shellService) bashWrapperTemplate() string {
-	return `# Twiggit bash wrapper - Generated on {{TIMESTAMP}}
+	return `### BEGIN TWIGGIT WRAPPER
+# Twiggit bash wrapper - Generated on {{TIMESTAMP}}
 twiggit() {
     if [ "$1" = "cd" ]; then
         # Handle cd command with directory change
@@ -197,12 +188,14 @@ twiggit() {
         # Pass through all other commands
         command twiggit "$@"
     fi
-}`
+}
+### END TWIGGIT WRAPPER`
 }
 
 // zshWrapperTemplate returns the zsh wrapper template
 func (s *shellService) zshWrapperTemplate() string {
-	return `# Twiggit zsh wrapper - Generated on {{TIMESTAMP}}
+	return `### BEGIN TWIGGIT WRAPPER
+# Twiggit zsh wrapper - Generated on {{TIMESTAMP}}
 twiggit() {
     if [ "$1" = "cd" ]; then
         # Handle cd command with directory change
@@ -214,12 +207,14 @@ twiggit() {
         # Pass through all other commands
         command twiggit "$@"
     fi
-}`
+}
+### END TWIGGIT WRAPPER`
 }
 
 // fishWrapperTemplate returns the fish wrapper template
 func (s *shellService) fishWrapperTemplate() string {
-	return `# Twiggit fish wrapper - Generated on {{TIMESTAMP}}
+	return `### BEGIN TWIGGIT WRAPPER
+# Twiggit fish wrapper - Generated on {{TIMESTAMP}}
 function twiggit
     if test "$argv[1]" = "cd"
         # Handle cd command with directory change
@@ -231,5 +226,52 @@ function twiggit
         # Pass through all other commands
         command twiggit $argv
     end
-end`
+end
+### END TWIGGIT WRAPPER`
+}
+
+const (
+	beginDelimiter = "### BEGIN TWIGGIT WRAPPER"
+	endDelimiter   = "### END TWIGGIT WRAPPER"
+)
+
+func (s *shellService) hasWrapperBlock(content string) bool {
+	return strings.Contains(content, beginDelimiter) && strings.Contains(content, endDelimiter)
+}
+
+func (s *shellService) removeWrapperBlock(content string) string {
+	beginIdx := strings.Index(content, beginDelimiter)
+	if beginIdx == -1 {
+		return content
+	}
+
+	endIdx := strings.Index(content, endDelimiter)
+	if endIdx == -1 {
+		return content
+	}
+
+	newlineBefore := strings.LastIndex(content[:beginIdx], "\n")
+	if newlineBefore == -1 {
+		newlineBefore = 0
+	} else {
+		newlineBefore++
+	}
+
+	endAfter := endIdx + len(endDelimiter)
+	contentAfter := ""
+	if endAfter < len(content) {
+		nextNewline := strings.Index(content[endAfter:], "\n")
+		if nextNewline != -1 {
+			contentAfter = content[endAfter+nextNewline+1:]
+		}
+	}
+
+	return content[:newlineBefore] + contentAfter
+}
+
+func (s *shellService) appendWrapper(content, wrapper string) string {
+	if content == "" {
+		return wrapper + "\n"
+	}
+	return content + "\n" + wrapper + "\n"
 }

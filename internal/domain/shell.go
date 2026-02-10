@@ -1,6 +1,11 @@
 package domain
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
+)
 
 // ShellType represents the type of shell
 type ShellType string
@@ -97,7 +102,8 @@ func isValidShellType(shellType ShellType) bool {
 
 // bashWrapperTemplate returns the bash wrapper template
 func (s *shell) bashWrapperTemplate() string {
-	return `# Twiggit bash wrapper
+	return `### BEGIN TWIGGIT WRAPPER
+# Twiggit bash wrapper
 twiggit() {
     if [ "$1" = "cd" ]; then
         # Handle cd command with directory change
@@ -109,12 +115,14 @@ twiggit() {
         # Pass through all other commands
         command twiggit "$@"
     fi
-}`
+}
+### END TWIGGIT WRAPPER`
 }
 
 // zshWrapperTemplate returns the zsh wrapper template
 func (s *shell) zshWrapperTemplate() string {
-	return `# Twiggit zsh wrapper
+	return `### BEGIN TWIGGIT WRAPPER
+# Twiggit zsh wrapper
 twiggit() {
     if [ "$1" = "cd" ]; then
         # Handle cd command with directory change
@@ -126,12 +134,14 @@ twiggit() {
         # Pass through all other commands
         command twiggit "$@"
     fi
-}`
+}
+### END TWIGGIT WRAPPER`
 }
 
 // fishWrapperTemplate returns the fish wrapper template
 func (s *shell) fishWrapperTemplate() string {
-	return `# Twiggit fish wrapper
+	return `### BEGIN TWIGGIT WRAPPER
+# Twiggit fish wrapper
 function twiggit
     if test "$argv[1]" = "cd"
         # Handle cd command with directory change
@@ -143,5 +153,37 @@ function twiggit
         # Pass through all other commands
         command twiggit $argv
     end
-end`
+end
+### END TWIGGIT WRAPPER`
+}
+
+// InferShellTypeFromPath infers shell type from config file path
+func InferShellTypeFromPath(configPath string) (ShellType, error) {
+	filename := filepath.Base(configPath)
+	lowerFilename := strings.ToLower(filename)
+	lowerPath := strings.ToLower(configPath)
+
+	switch {
+	case strings.HasPrefix(lowerFilename, ".bash") || strings.HasPrefix(lowerFilename, "bash") ||
+		strings.HasSuffix(lowerFilename, ".bash") || lowerFilename == ".bash_profile" ||
+		lowerFilename == ".profile" || strings.Contains(lowerFilename, "-bash-"):
+		return ShellBash, nil
+
+	case strings.HasPrefix(lowerFilename, ".zsh") || strings.HasPrefix(lowerFilename, "zsh") ||
+		strings.HasSuffix(lowerFilename, ".zsh") || lowerFilename == ".zprofile" ||
+		strings.Contains(lowerFilename, "-zsh-"):
+		return ShellZsh, nil
+
+	case strings.Contains(lowerFilename, "fish") || lowerFilename == "config.fish" ||
+		lowerFilename == ".fishrc" || strings.Contains(lowerPath, "fish"):
+		return ShellFish, nil
+
+	default:
+		return "", NewShellErrorWithCause(
+			ErrInferenceFailed,
+			"",
+			"cannot infer shell type from path: "+configPath,
+			errors.New("use --shell to specify shell type (bash, zsh, fish)"),
+		)
+	}
 }

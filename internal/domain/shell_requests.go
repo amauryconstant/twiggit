@@ -54,7 +54,7 @@ type GenerateWrapperRequest struct {
 // ValidateGenerateWrapperRequest validates the generate wrapper request
 func (r *GenerateWrapperRequest) ValidateGenerateWrapperRequest() error {
 	if !isValidShellType(r.ShellType) {
-		return NewShellError(ErrInvalidShellType, string(r.ShellType), "shell type validation failed")
+		return NewShellError(ErrInvalidShellType, string(r.ShellType), "unsupported shell type")
 	}
 
 	return nil

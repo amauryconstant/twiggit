@@ -111,7 +111,7 @@ func TestShellService_SetupShell_Validation(t *testing.T) {
 				DryRun:    true,
 			},
 			expectError:  true,
-			errorMessage: "validation failed",
+			errorMessage: "unsupported shell type",
 		},
 		{
 			name: "empty shell type",
@@ -121,7 +121,7 @@ func TestShellService_SetupShell_Validation(t *testing.T) {
 				DryRun:    true,
 			},
 			expectError:  true,
-			errorMessage: "validation failed",
+			errorMessage: "unsupported shell type",
 		},
 	}
 
@@ -204,7 +204,7 @@ func TestShellService_ValidateInstallation_Validation(t *testing.T) {
 				ShellType: domain.ShellType("invalid"),
 			},
 			expectError:  true,
-			errorMessage: "validation failed",
+			errorMessage: "unsupported shell type",
 		},
 		{
 			name: "empty shell type",
@@ -212,7 +212,7 @@ func TestShellService_ValidateInstallation_Validation(t *testing.T) {
 				ShellType: domain.ShellType(""),
 			},
 			expectError:  true,
-			errorMessage: "validation failed",
+			errorMessage: "unsupported shell type",
 		},
 	}
 
@@ -313,7 +313,7 @@ func TestShellService_GenerateWrapper_Validation(t *testing.T) {
 				ShellType: domain.ShellType("invalid"),
 			},
 			expectError:  true,
-			errorMessage: "validation failed",
+			errorMessage: "unsupported shell type",
 		},
 		{
 			name: "empty shell type",
@@ -321,7 +321,7 @@ func TestShellService_GenerateWrapper_Validation(t *testing.T) {
 				ShellType: domain.ShellType(""),
 			},
 			expectError:  true,
-			errorMessage: "validation failed",
+			errorMessage: "unsupported shell type",
 		},
 	}
 
@@ -367,12 +367,12 @@ func (m *mockShellIntegration) DetectConfigFile(shellType domain.ShellType) (str
 	return "/home/user/.bashrc", nil
 }
 
-func (m *mockShellIntegration) InstallWrapper(shellType domain.ShellType, wrapper string) error {
+func (m *mockShellIntegration) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
 	// Always fail installation in tests to avoid actual file system changes
 	return domain.NewShellError(domain.ErrWrapperInstallation, string(shellType), "mock installation failure")
 }
 
-func (m *mockShellIntegration) ValidateInstallation(shellType domain.ShellType) error {
+func (m *mockShellIntegration) ValidateInstallation(shellType domain.ShellType, configFile string) error {
 	// Always fail validation in tests since wrapper not installed
 	return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "mock validation failure")
 }
