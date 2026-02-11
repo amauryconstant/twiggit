@@ -203,10 +203,13 @@ goreleaser-dry-run:
   image:
     name: goreleaser/goreleaser
     entrypoint: [""]
+  cache:
+    <<: *cache_config
+    policy: pull
   variables:
-    GIT_DEPTH: 0
+    GIT_DEPTH: 10
   script:
-    - goreleaser release --snapshot --clean
+    - goreleaser release --snapshot --clean --skip=archive,sbom,before
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
