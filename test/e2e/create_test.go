@@ -85,4 +85,59 @@ var _ = Describe("create command", func() {
 		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "external-project", "new-feature")
 		Expect(worktreePath).To(BeADirectory())
 	})
+
+	It("shows level 1 verbose output with -v flag", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("verbose-test")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName, "-v")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, branchName)
+		cli.ShouldVerboseOutput(session, "Creating worktree for test-project/"+branchName)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test-project", branchName)
+		Expect(worktreePath).To(BeADirectory())
+	})
+
+	It("shows level 2 verbose output with -vv flag", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("verbose-vv-test")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName, "-vv")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, branchName)
+		cli.ShouldVerboseOutput(session, "Creating worktree for test-project/"+branchName)
+		cli.ShouldVerboseOutput(session, "  from branch: main")
+		cli.ShouldVerboseOutput(session, "  to path: test-project/"+branchName)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test-project", branchName)
+		Expect(worktreePath).To(BeADirectory())
+	})
+
+	It("shows no verbose output by default", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("no-verbose-test")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName)
+		cli.ShouldSucceed(session)
+		cli.ShouldNotHaveVerboseOutput(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
 })

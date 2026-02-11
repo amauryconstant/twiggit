@@ -98,10 +98,12 @@ var _ = Describe("init command", func() {
 	})
 
 	It("infers shell type from .zshrc filename", func() {
-		zshrcPath := filepath.Join(fixture.GetTempDir(), ".zshrc")
-		Expect(os.WriteFile(zshrcPath, []byte("# Zsh config\n"), 0644)).To(Succeed())
+		configDir := filepath.Join(fixture.GetTempDir(), ".config", "fish")
+		Expect(os.MkdirAll(configDir, 0755)).To(Succeed())
+		fishConfigPath := filepath.Join(configDir, "config.fish")
+		Expect(os.WriteFile(fishConfigPath, []byte("# Fish config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", zshrcPath, "--dry-run")
+		session := cli.Run("init", fishConfigPath, "--dry-run")
 		cli.ShouldSucceed(session)
 
 		if session.ExitCode() != 0 {
@@ -109,8 +111,8 @@ var _ = Describe("init command", func() {
 		}
 
 		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Would install wrapper for zsh"))
-		Expect(output).To(ContainSubstring("Config file: " + zshrcPath))
+		Expect(output).To(ContainSubstring("Would install wrapper for fish"))
+		Expect(output).To(ContainSubstring("Config file: " + fishConfigPath))
 	})
 
 	It("infers shell type from config.fish filename", func() {
@@ -343,5 +345,45 @@ var _ = Describe("init command", func() {
 		output := string(session.Err.Contents())
 		Expect(output).To(ContainSubstring("shell auto-detection failed"))
 		Expect(output).To(ContainSubstring("unsupported shell detected"))
+	})
+
+	It("shows level 1 verbose output with -v flag", func() {
+		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+
+		session := cli.Run("init", bashrcPath, "-v")
+		cli.ShouldSucceed(session)
+		cli.ShouldVerboseOutput(session, "Setting up shell wrapper")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
+
+	It("shows level 2 verbose output with -vv flag", func() {
+		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+
+		session := cli.Run("init", bashrcPath, "-vv")
+		cli.ShouldSucceed(session)
+		cli.ShouldVerboseOutput(session, "Setting up shell wrapper")
+		cli.ShouldVerboseOutput(session, "  shell type: bash")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
+
+	It("shows no verbose output by default", func() {
+		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+
+		session := cli.Run("init", bashrcPath)
+		cli.ShouldSucceed(session)
+		cli.ShouldNotHaveVerboseOutput(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
 	})
 })

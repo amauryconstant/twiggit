@@ -101,4 +101,55 @@ var _ = Describe("delete command", func() {
 
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
+
+	It("shows level 1 verbose output with -v flag", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch, "-v")
+		cli.ShouldSucceed(session)
+		cli.ShouldVerboseOutput(session, "Deleting worktree at "+worktreePath)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("shows level 2 verbose output with -vv flag", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch, "-vv")
+		cli.ShouldSucceed(session)
+		cli.ShouldVerboseOutput(session, "Deleting worktree at "+worktreePath)
+		cli.ShouldVerboseOutput(session, "  project: test")
+		cli.ShouldVerboseOutput(session, "  branch: "+result.Feature1Branch)
+		cli.ShouldVerboseOutput(session, "  force: false")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("shows no verbose output by default", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch)
+		cli.ShouldSucceed(session)
+		cli.ShouldNotHaveVerboseOutput(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
 })

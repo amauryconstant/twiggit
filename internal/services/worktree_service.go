@@ -49,11 +49,6 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 	// Calculate worktree path
 	worktreePath := s.calculateWorktreePath(project.Name, req.BranchName)
 
-	// Debug logging
-	fmt.Fprintf(os.Stderr, "DEBUG: calculateWorktreePath(%s, %s) = %s\n", project.Name, req.BranchName, worktreePath)
-	fmt.Fprintf(os.Stderr, "DEBUG: project.GitRepoPath = %s\n", project.GitRepoPath)
-	fmt.Fprintf(os.Stderr, "DEBUG: Creating parent dir: %s\n", filepath.Dir(worktreePath))
-
 	// Ensure parent directories exist
 	parentDir := filepath.Dir(worktreePath)
 	if err := os.MkdirAll(parentDir, 0755); err != nil {
@@ -61,10 +56,7 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 	}
 
 	// Create worktree using CLI client
-	fmt.Fprintf(os.Stderr, "DEBUG: Calling gitService.CreateWorktree(repoPath=%s, branch=%s, source=%s, worktreePath=%s)\n",
-		project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)
 	err = s.gitService.CreateWorktree(ctx, project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)
-	fmt.Fprintf(os.Stderr, "DEBUG: CreateWorktree returned: %v\n", err)
 	if err != nil {
 		return nil, domain.NewWorktreeServiceError(worktreePath, req.BranchName, "CreateWorktree", "failed to create worktree", err)
 	}

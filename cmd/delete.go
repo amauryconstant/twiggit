@@ -21,8 +21,8 @@ func NewDeleteCommand(config *CommandConfig) *cobra.Command {
 By default, prevents deletion of worktrees with uncommitted changes.
 Use --force to override safety checks.`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(_ *cobra.Command, args []string) error {
-			return executeDelete(config, args[0], force, mergedOnly, changeDir)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return executeDelete(config, cmd, args[0], force, mergedOnly, changeDir)
 		},
 	}
 
@@ -34,7 +34,7 @@ Use --force to override safety checks.`,
 }
 
 // executeDelete executes the delete command with the given configuration
-func executeDelete(config *CommandConfig, target string, force, mergedOnly, changeDir bool) error {
+func executeDelete(config *CommandConfig, cmd *cobra.Command, target string, force, mergedOnly, changeDir bool) error {
 	ctx := context.Background()
 
 	currentCtx, worktreePath, err := resolveWorktreeTarget(config, target)
@@ -52,7 +52,7 @@ func executeDelete(config *CommandConfig, target string, force, mergedOnly, chan
 		return err
 	}
 
-	return deleteWorktree(ctx, config, worktreePath, force, changeDir, currentCtx)
+	return deleteWorktree(ctx, config, cmd, worktreePath, force, changeDir, currentCtx)
 }
 
 func resolveWorktreeTarget(config *CommandConfig, target string) (*domain.Context, string, error) {
@@ -135,7 +135,20 @@ func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath
 	return nil
 }
 
-func deleteWorktree(ctx context.Context, config *CommandConfig, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
+func deleteWorktree(ctx context.Context, config *CommandConfig, cmd *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
+	logv(cmd, 1, "Deleting worktree at %s", worktreePath)
+
+	logv(cmd, 2, "  project: %s", currentCtx.ProjectName)
+
+	worktrees, _ := config.Services.GitClient.ListWorktrees(ctx, worktreePath)
+	for _, wt := range worktrees {
+		if wt.Path == worktreePath {
+			logv(cmd, 2, "  branch: %s", wt.Branch)
+			break
+		}
+	}
+	logv(cmd, 2, "  force: %t", force)
+
 	req := &domain.DeleteWorktreeRequest{
 		WorktreePath: worktreePath,
 		Force:        force,

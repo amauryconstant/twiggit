@@ -35,7 +35,7 @@ The system SHALL provide level 1 verbose messages that describe the high-level f
 
 #### Scenario: List command level 1 output
 - **WHEN** user runs `twiggit list -v`
-- **THEN** output includes "Listing worktrees for <project>" message
+- **THEN** output includes "Listing worktrees" message
 - **AND** message is displayed before the operation completes
 
 #### Scenario: Cd command level 1 output
@@ -43,8 +43,8 @@ The system SHALL provide level 1 verbose messages that describe the high-level f
 - **THEN** output includes "Navigating to worktree" message
 - **AND** message is displayed before the operation completes
 
-#### Scenario: Setup-shell command level 1 output
-- **WHEN** user runs `twiggit setup-shell -v`
+#### Scenario: Init command level 1 output
+- **WHEN** user runs `twiggit init -v`
 - **THEN** output includes "Setting up shell wrapper" message
 - **AND** message is displayed before the operation completes
 
@@ -57,7 +57,8 @@ The system SHALL provide level 2 verbose messages that display detailed paramete
   - "  from branch: <source-branch>"
   - "  to path: <worktree-path>"
   - "  in repo: <repo-path>"
-  - "  creating parent directory: <parent-dir>"
+  - "  creating parent dir: <parent-dir>"
+  - "  created worktree at: <worktree-path>"
 
 #### Scenario: Delete command level 2 output
 - **WHEN** user runs `twiggit delete test-branch -vv`
@@ -79,11 +80,11 @@ The system SHALL provide level 2 verbose messages that display detailed paramete
   - "  worktree path: <worktree-path>"
   - "  resolved project: <project-name>"
 
-#### Scenario: Setup-shell command level 2 output
-- **WHEN** user runs `twiggit setup-shell -vv`
+#### Scenario: Init command level 2 output
+- **WHEN** user runs `twiggit init -vv`
 - **THEN** output includes indented level 2 messages showing:
   - "  shell type: <bash|zsh|fish>"
-  - "  config file path: <config-file-path>"
+  - "  config file: <config-file-path>"
 
 ### Requirement: Verbose output uses plain text format
 The system SHALL format all verbose output as plain text with no color, no prefix, and no formatting characters.

@@ -72,6 +72,13 @@ func executeCD(cmd *cobra.Command, config *CommandConfig, target string) error {
 		return fmt.Errorf("failed to resolve path for %s: %w", target, err)
 	}
 
+	logv(cmd, 1, "Navigating to worktree")
+	logv(cmd, 2, "  target: %s", target)
+	logv(cmd, 2, "  worktree path: %s", result.ResolvedPath)
+	if currentCtx.ProjectName != "" {
+		logv(cmd, 2, "  resolved project: %s", currentCtx.ProjectName)
+	}
+
 	// Validate that the resolved path exists
 	if err := config.Services.NavigationService.ValidatePath(ctx, result.ResolvedPath); err != nil {
 		if result.Type == domain.PathTypeWorktree {

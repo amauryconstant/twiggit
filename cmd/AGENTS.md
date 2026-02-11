@@ -62,3 +62,41 @@ Optional: `[config-file]` (auto-detected if omitted)
 Flags: `--shell <bash|zsh|fish>` (overrides auto-detection)
 Behavior: Auto-detects shell/config file from SHELL env var, generates wrapper, adds to shell config
 Usage: `twiggit init` | `twiggit init ~/.bashrc` | `twiggit init --shell=zsh`
+
+## Verbose Output
+
+Commands use `logv()` helper function for verbose output. See `cmd/util.go`.
+
+**Verbosity levels:**
+- `-v`: Level 1 - High-level operation flow
+- `-vv`: Level 2 - Detailed parameters and intermediate steps
+- No flag: Normal output only
+
+**Output format:**
+- Plain text, no color, no "DEBUG:" or "[VERBOSE]" prefixes
+- Level 2 details indented with "  " prefix
+- All verbose output goes to stderr, normal output to stdout
+
+**logv() usage:**
+```go
+import "twiggit/cmd"
+
+logv(cmd, 1, "Creating worktree for %s/%s", project, branch)
+logv(cmd, 2, "  from branch: %s", source)
+logv(cmd, 2, "  to path: %s", path)
+```
+
+**When to use level 1:**
+- Major operation announcements (Creating, Deleting, Listing)
+- High-level flow messages
+
+**When to use level 2:**
+- Detailed parameters (paths, branches, flags)
+- Intermediate steps
+- Configuration values
+
+**Constraints:**
+- Verbose output SHALL only appear in command layer (`cmd/*.go`)
+- SHALL NOT add verbose output to service layer
+- SHALL use user-focused language, not developer-focused
+- SHALL NOT use "DEBUG:" prefix

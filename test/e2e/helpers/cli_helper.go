@@ -151,6 +151,22 @@ func (cli *TwiggitCLI) ShouldErrorOutput(session *gexec.Session, expected string
 	Eventually(session.Err).Should(gbytes.Say(expected))
 }
 
+// ShouldVerboseOutput asserts stderr contains expected verbose text
+// Used for testing -v and -vv flag behavior
+func (cli *TwiggitCLI) ShouldVerboseOutput(session *gexec.Session, expected string) {
+	Eventually(session.Err).Should(gbytes.Say(expected))
+}
+
+// ShouldNotHaveVerboseOutput asserts stderr does NOT contain verbose output
+// Used for verifying commands don't output verbose messages by default
+func (cli *TwiggitCLI) ShouldNotHaveVerboseOutput(session *gexec.Session) {
+	Eventually(session.Err).ShouldNot(gbytes.Say("Creating worktree"))
+	Eventually(session.Err).ShouldNot(gbytes.Say("Deleting worktree"))
+	Eventually(session.Err).ShouldNot(gbytes.Say("Listing worktrees"))
+	Eventually(session.Err).ShouldNot(gbytes.Say("Navigating to worktree"))
+	Eventually(session.Err).ShouldNot(gbytes.Say("Setting up shell wrapper"))
+}
+
 // DebugSession logs session details and fixture state for debugging
 // Logs if session.ExitCode() != 0, otherwise does nothing
 func (cli *TwiggitCLI) DebugSession(session *gexec.Session, fixtureInfo string) {

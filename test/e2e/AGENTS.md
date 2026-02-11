@@ -67,3 +67,30 @@ ginkgo.It("fails with invalid project", func() {
 mise run test:e2e      # All E2E tests
 mise run build:e2e     # Build CLI for E2E testing
 ```
+
+## Testing Verbose Output
+
+The `--verbose` flag (`-v`, `-vv`) outputs to stderr. Use `ShouldVerboseOutput()` and `ShouldNotHaveVerboseOutput()` helpers.
+
+**Example:**
+```go
+// Test no verbose output by default
+session := cli.Run("create", "feature-1")
+cli.ShouldSucceed(session)
+cli.ShouldNotHaveVerboseOutput(session)
+
+// Test level 1 verbose output
+session := cli.Run("create", "feature-1", "-v")
+cli.ShouldSucceed(session)
+cli.ShouldVerboseOutput(session, "Creating worktree")
+
+// Test level 2 verbose output
+session := cli.Run("create", "feature-1", "-vv")
+cli.ShouldSucceed(session)
+cli.ShouldVerboseOutput(session, "Creating worktree")
+cli.ShouldVerboseOutput(session, "  from branch: main")
+```
+
+**Helper Methods:**
+- `ShouldVerboseOutput(session, expected)` - Asserts stderr contains expected verbose text
+- `ShouldNotHaveVerboseOutput(session)` - Asserts no verbose messages in stderr

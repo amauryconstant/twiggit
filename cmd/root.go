@@ -43,6 +43,9 @@ across multiple projects.`,
 		},
 	}
 
+	// Add persistent verbose flag
+	cmd.PersistentFlags().CountP("verbose", "v", "Increase verbosity (can be used multiple times: -v, -vv)")
+
 	// Add subcommands
 	cmd.AddCommand(NewListCommand(config))
 	cmd.AddCommand(NewCreateCommand(config))

@@ -109,4 +109,41 @@ var _ = Describe("cd command", func() {
 		Eventually(session).Should(gexec.Exit(1))
 		cli.ShouldErrorOutput(session, "worktree 'nonexistent' not found")
 	})
+
+	It("shows level 1 verbose output with -v flag", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "cd", result.Feature1Branch, "-v")
+		Eventually(session).Should(gexec.Exit(0))
+		cli.ShouldVerboseOutput(session, "Navigating to worktree")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
+
+	It("shows level 2 verbose output with -vv flag", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "cd", result.Feature1Branch, "-vv")
+		Eventually(session).Should(gexec.Exit(0))
+		cli.ShouldVerboseOutput(session, "Navigating to worktree")
+		cli.ShouldVerboseOutput(session, "  target: "+result.Feature1Branch)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
+
+	It("shows no verbose output by default", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "cd", result.Feature1Branch)
+		Eventually(session).Should(gexec.Exit(0))
+		cli.ShouldNotHaveVerboseOutput(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
 })

@@ -77,6 +77,10 @@ func runInit(cmd *cobra.Command, config *CommandConfig, configFile string) error
 		return fmt.Errorf("init failed: %w", err)
 	}
 
+	logv(cmd, 1, "Setting up shell wrapper")
+	logv(cmd, 2, "  shell type: %s", result.ShellType)
+	logv(cmd, 2, "  config file: %s", configFile)
+
 	return displayInitResults(cmd.OutOrStdout(), result, dryRun)
 }
 

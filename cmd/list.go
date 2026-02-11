@@ -52,6 +52,14 @@ func executeList(cmd *cobra.Command, config *CommandConfig, all bool) error {
 		req.ProjectName = currentCtx.ProjectName
 	}
 
+	logv(cmd, 1, "Listing worktrees")
+	if all {
+		logv(cmd, 2, "  repository: all projects")
+	} else if currentCtx.ProjectName != "" {
+		logv(cmd, 2, "  project: %s", currentCtx.ProjectName)
+	}
+	logv(cmd, 2, "  including main worktree: %t", req.IncludeMain)
+
 	// List worktrees
 	worktrees, err := config.Services.WorktreeService.ListWorktrees(ctx, req)
 	if err != nil {

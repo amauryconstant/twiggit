@@ -114,4 +114,42 @@ var _ = Describe("list command", func() {
 			GinkgoT().Log(fixture.Inspect())
 		}
 	})
+
+	It("shows level 1 verbose output with -v flag", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "list", "-v")
+		cli.ShouldSucceed(session)
+		cli.ShouldVerboseOutput(session, "Listing worktrees")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
+
+	It("shows level 2 verbose output with -vv flag", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "list", "-vv")
+		cli.ShouldSucceed(session)
+		cli.ShouldVerboseOutput(session, "Listing worktrees")
+		cli.ShouldVerboseOutput(session, "  project: test")
+		cli.ShouldVerboseOutput(session, "  including main worktree: false")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
+
+	It("shows no verbose output by default", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "list")
+		cli.ShouldSucceed(session)
+		cli.ShouldNotHaveVerboseOutput(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
 })
