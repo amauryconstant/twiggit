@@ -16,22 +16,38 @@ func TestNewInitCmd(t *testing.T) {
 
 	assert.NotNil(t, cmd)
 	assert.Contains(t, cmd.Use, "init")
-	assert.Equal(t, "Install shell wrapper to config file", cmd.Short)
+	assert.Equal(t, "Install shell wrapper", cmd.Short)
 	assert.NotNil(t, cmd.Flags().Lookup("shell"))
 	assert.NotNil(t, cmd.Flags().Lookup("force"))
 	assert.NotNil(t, cmd.Flags().Lookup("dry-run"))
 	assert.NotNil(t, cmd.Flags().Lookup("check"))
 }
 
-func TestNewInitCmd_RequiresConfigFileArg(t *testing.T) {
+func TestNewInitCmd_AcceptsOptionalConfigFile(t *testing.T) {
 	config := &CommandConfig{}
 	cmd := NewInitCmd(config)
 
+	// Test with no args (should be valid now)
 	err := cmd.Args(cmd, []string{})
-	require.Error(t, err)
+	require.NoError(t, err)
 
+	// Test with one arg (should be valid)
 	err = cmd.Args(cmd, []string{"/home/user/.bashrc"})
 	require.NoError(t, err)
+
+	// Test with two args (should be invalid)
+	err = cmd.Args(cmd, []string{"/home/user/.bashrc", "extra"})
+	require.Error(t, err)
+}
+
+func TestNewInitCmd_ShellFlagPrecedence(t *testing.T) {
+	config := &CommandConfig{}
+	cmd := NewInitCmd(config)
+
+	// Verify --shell flag exists
+	flag := cmd.Flags().Lookup("shell")
+	require.NotNil(t, flag)
+	assert.Equal(t, "shell", flag.Name)
 }
 
 func TestDisplayInitResults_Skipped(t *testing.T) {

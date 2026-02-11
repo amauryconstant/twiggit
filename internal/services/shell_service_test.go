@@ -100,6 +100,8 @@ func TestShellService_SetupShell_Validation(t *testing.T) {
 	testCases := []struct {
 		name         string
 		request      *domain.SetupShellRequest
+		setEnv       func()
+		unsetEnv     func()
 		expectError  bool
 		errorMessage string
 	}{
@@ -114,19 +116,32 @@ func TestShellService_SetupShell_Validation(t *testing.T) {
 			errorMessage: "unsupported shell type",
 		},
 		{
-			name: "empty shell type",
+			name: "empty shell type with unsupported SHELL",
 			request: &domain.SetupShellRequest{
 				ShellType: domain.ShellType(""),
 				Force:     false,
 				DryRun:    true,
 			},
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/sh")
+			},
+			unsetEnv:     func() {},
 			expectError:  true,
-			errorMessage: "unsupported shell type",
+			errorMessage: "shell auto-detection failed",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.setEnv != nil {
+				tc.setEnv()
+				defer func() {
+					if tc.unsetEnv != nil {
+						tc.unsetEnv()
+					}
+				}()
+			}
+
 			service := setupTestShellService()
 			result, err := service.SetupShell(context.Background(), tc.request)
 
@@ -195,6 +210,8 @@ func TestShellService_ValidateInstallation_Validation(t *testing.T) {
 	testCases := []struct {
 		name         string
 		request      *domain.ValidateInstallationRequest
+		setEnv       func()
+		unsetEnv     func()
 		expectError  bool
 		errorMessage string
 	}{
@@ -207,17 +224,30 @@ func TestShellService_ValidateInstallation_Validation(t *testing.T) {
 			errorMessage: "unsupported shell type",
 		},
 		{
-			name: "empty shell type",
+			name: "empty shell type with unsupported SHELL",
 			request: &domain.ValidateInstallationRequest{
 				ShellType: domain.ShellType(""),
 			},
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/sh")
+			},
+			unsetEnv:     func() {},
 			expectError:  true,
-			errorMessage: "unsupported shell type",
+			errorMessage: "shell auto-detection failed",
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.setEnv != nil {
+				tc.setEnv()
+				defer func() {
+					if tc.unsetEnv != nil {
+						tc.unsetEnv()
+					}
+				}()
+			}
+
 			service := setupTestShellService()
 			result, err := service.ValidateInstallation(context.Background(), tc.request)
 
@@ -229,7 +259,7 @@ func TestShellService_ValidateInstallation_Validation(t *testing.T) {
 				}
 			} else {
 				require.NoError(t, err)
-				assert.NotNil(t, result)
+				require.NotNil(t, result)
 			}
 		})
 	}
@@ -363,8 +393,17 @@ func (m *mockShellIntegration) GenerateWrapper(shellType domain.ShellType) (stri
 }
 
 func (m *mockShellIntegration) DetectConfigFile(shellType domain.ShellType) (string, error) {
-	// Return a mock config file path
-	return "/home/user/.bashrc", nil
+	// Return a mock config file path based on shell type
+	switch shellType {
+	case domain.ShellBash:
+		return "/home/user/.bashrc", nil
+	case domain.ShellZsh:
+		return "/home/user/.zshrc", nil
+	case domain.ShellFish:
+		return "/home/user/.config/fish/config.fish", nil
+	default:
+		return "/home/user/.bashrc", nil
+	}
 }
 
 func (m *mockShellIntegration) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
@@ -444,6 +483,170 @@ func TestShellService_composeWrapper(t *testing.T) {
 			result := service.composeWrapper(tc.template, tc.shellType)
 
 			assert.Equal(t, tc.expected, result)
+		})
+	}
+}
+
+func TestShellService_SetupShell_AutoDetection(t *testing.T) {
+	testCases := []struct {
+		name        string
+		request     *domain.SetupShellRequest
+		setEnv      func()
+		unsetEnv    func()
+		expectError bool
+		validate    func(t *testing.T, result *domain.SetupShellResult)
+	}{
+		{
+			name: "auto-detect bash when no args provided",
+			request: &domain.SetupShellRequest{
+				ShellType:  "",
+				ConfigFile: "",
+				DryRun:     true,
+			},
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/bash")
+			},
+			unsetEnv:    func() {},
+			expectError: false,
+			validate: func(t *testing.T, result *domain.SetupShellResult) {
+				t.Helper()
+				assert.Equal(t, domain.ShellBash, result.ShellType)
+				assert.Contains(t, result.ConfigFile, ".bashrc")
+			},
+		},
+		{
+			name: "auto-detect zsh when no args provided",
+			request: &domain.SetupShellRequest{
+				ShellType:  "",
+				ConfigFile: "",
+				DryRun:     true,
+			},
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/zsh")
+			},
+			unsetEnv:    func() {},
+			expectError: false,
+			validate: func(t *testing.T, result *domain.SetupShellResult) {
+				t.Helper()
+				assert.Equal(t, domain.ShellZsh, result.ShellType)
+				assert.Contains(t, result.ConfigFile, ".zshrc")
+			},
+		},
+		{
+			name: "auto-detect fish when no args provided",
+			request: &domain.SetupShellRequest{
+				ShellType:  "",
+				ConfigFile: "",
+				DryRun:     true,
+			},
+			setEnv: func() {
+				t.Setenv("SHELL", "/usr/local/bin/fish")
+			},
+			unsetEnv:    func() {},
+			expectError: false,
+			validate: func(t *testing.T, result *domain.SetupShellResult) {
+				t.Helper()
+				assert.Equal(t, domain.ShellFish, result.ShellType)
+				assert.Contains(t, result.ConfigFile, "config.fish")
+			},
+		},
+		{
+			name: "error when SHELL not set",
+			request: &domain.SetupShellRequest{
+				ShellType:  "",
+				ConfigFile: "",
+				DryRun:     true,
+			},
+			setEnv: func() {
+				t.Setenv("SHELL", "")
+			},
+			unsetEnv:    func() {},
+			expectError: true,
+		},
+		{
+			name: "error when SHELL is unsupported",
+			request: &domain.SetupShellRequest{
+				ShellType:  "",
+				ConfigFile: "",
+				DryRun:     true,
+			},
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/sh")
+			},
+			unsetEnv:    func() {},
+			expectError: true,
+		},
+		{
+			name: "explicit --shell flag overrides auto-detection",
+			request: &domain.SetupShellRequest{
+				ShellType:  domain.ShellZsh,
+				ConfigFile: "",
+				DryRun:     true,
+			},
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/bash")
+			},
+			unsetEnv:    func() {},
+			expectError: false,
+			validate: func(t *testing.T, result *domain.SetupShellResult) {
+				t.Helper()
+				assert.Equal(t, domain.ShellZsh, result.ShellType)
+				assert.Contains(t, result.ConfigFile, ".zshrc")
+			},
+		},
+		{
+			name: "explicit config file overrides auto-detection",
+			request: &domain.SetupShellRequest{
+				ShellType:  "",
+				ConfigFile: "/custom/zshrc",
+				DryRun:     true,
+			},
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/bash")
+			},
+			unsetEnv:    func() {},
+			expectError: false,
+			validate: func(t *testing.T, result *domain.SetupShellResult) {
+				t.Helper()
+				assert.Equal(t, "/custom/zshrc", result.ConfigFile)
+			},
+		},
+		{
+			name: "both explicit shell and config file specified",
+			request: &domain.SetupShellRequest{
+				ShellType:  domain.ShellBash,
+				ConfigFile: "/custom/bashrc",
+				DryRun:     true,
+			},
+			setEnv:      func() {},
+			unsetEnv:    func() {},
+			expectError: false,
+			validate: func(t *testing.T, result *domain.SetupShellResult) {
+				t.Helper()
+				assert.Equal(t, domain.ShellBash, result.ShellType)
+				assert.Equal(t, "/custom/bashrc", result.ConfigFile)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.setEnv()
+			defer tc.unsetEnv()
+
+			service := setupTestShellService()
+			result, err := service.SetupShell(context.Background(), tc.request)
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Nil(t, result)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, result)
+				if tc.validate != nil {
+					tc.validate(t, result)
+				}
+			}
 		})
 	}
 }

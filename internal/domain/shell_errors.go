@@ -27,6 +27,9 @@ const (
 
 	// ErrInferenceFailed indicates shell type inference from path failed
 	ErrInferenceFailed = "INFERENCE_FAILED"
+
+	// ErrShellDetectionFailed indicates automatic shell detection failed
+	ErrShellDetectionFailed = "SHELL_DETECTION_FAILED"
 )
 
 // ShellError represents a shell service error with context

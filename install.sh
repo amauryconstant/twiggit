@@ -257,52 +257,17 @@ main() {
     echo ""
     read -p "Install shell wrapper for directory navigation (twiggit cd)? [Y/n] " -n 1 -r
     echo
-    if [[ $REPLY =~ ^[Yy]$ ]] || [ -z "$REPLY" ]; then
-        config_file=$(detect_config_file "${SHELL:-bash}")
-
-        if [ -z "$config_file" ]; then
-            echo "⚠️  Could not detect config file for shell: ${SHELL:-bash}"
-            echo "  You can run manually: twiggit init <config-file>"
-            return
-        fi
-
-        echo "Detected config file: $config_file"
-
-        if grep -q "### BEGIN TWIGGIT WRAPPER" "$config_file" 2>/dev/null; then
-            echo ""
-            echo "⚠️  Wrapper already installed in $config_file"
-            read -p "Reinstall with --force? [y/N] " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                echo "Reinstalling wrapper..."
-                if "${BIN_DIR}/twiggit" init "$config_file" --force 2>/dev/null; then
-                    echo "✓ Wrapper reinstalled successfully"
-                else
-                    echo "⚠️  Failed to reinstall shell wrapper"
-                    echo "  You can run manually: twiggit init $config_file --force"
-                fi
-            else
-                echo "Skipped reinstall."
-            fi
+    if [[ $REPLY =~ ^[Yy]$ ]] || [ -z "$REPLY" ]]; then
+        echo "Installing shell wrapper..."
+        if "${BIN_DIR}/twiggit" init 2>/dev/null; then
+            echo "✓ Wrapper installed successfully"
         else
-            echo ""
-            read -p "Install wrapper to $config_file? [Y/n] " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]] || [ -z "$REPLY" ]; then
-                if "${BIN_DIR}/twiggit" init "$config_file" 2>/dev/null; then
-                    echo "✓ Wrapper installed successfully"
-                else
-                    echo "⚠️  Failed to install shell wrapper"
-                    echo "  You can run manually: twiggit init $config_file"
-                fi
-            else
-                echo "Skipped installation."
-                echo "  You can run manually: twiggit init $config_file"
-            fi
+            echo "⚠️  Failed to install shell wrapper"
+            echo "  You can run manually: twiggit init"
         fi
     else
         echo "Skipped shell wrapper installation."
-        echo "  You can run manually: twiggit init <config-file>"
+        echo "  You can run manually: twiggit init"
     fi
 
     case ":$PATH:" in

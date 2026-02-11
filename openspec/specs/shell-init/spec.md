@@ -52,23 +52,25 @@ The system SHALL infer shell type from configuration file path using pattern mat
 
 ### Requirement: Install to Explicit Config File
 
-The system SHALL install shell wrapper to explicitly specified configuration file path.
+The system SHALL install shell wrapper to explicitly specified configuration file path, or auto-detect config file when not provided.
 
 #### Scenario: Install to existing config file
 
-- **WHEN** user runs `twiggit init /custom/path/config` with existing config file
+- **WHEN** user runs `twiggit init /custom/path/config` with explicit config file
+- **OR** user runs `twiggit init` without arguments for auto-detection
 - **AND** shell type is inferred or specified
 - **AND** wrapper is not already installed
 - **THEN** system SHALL generate shell-specific wrapper
-- **AND** system SHALL append wrapper to specified config file
+- **AND** system SHALL append wrapper to specified or auto-detected config file
 - **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
 - **AND** system SHALL not modify existing file content
 - **AND** success message SHALL indicate installation completed
-- **AND** success message SHALL include config file path
+- **AND** success message SHALL include config file path (either specified or auto-detected)
 
 #### Scenario: Install to missing config file
 
-- **WHEN** user runs `twiggit init /custom/path/config` with missing config file
+- **WHEN** user runs `twiggit init /custom/path/config` with explicit missing config file
+- **OR** user runs `twiggit init` without arguments where auto-detected config file does not exist
 - **AND** parent directory exists and is writable
 - **THEN** system SHALL create empty config file with permissions 0644
 - **AND** system SHALL append wrapper to new config file
@@ -128,3 +130,19 @@ The system SHALL remove existing wrapper blocks before reinstalling when --force
 - **AND** system SHALL remove orphaned delimiter
 - **AND** system SHALL append complete wrapper block
 - **AND** warning message SHALL indicate orphaned delimiter was removed
+
+---
+
+### Requirement: Auto-Detect Shell and Config File
+
+The system SHALL automatically detect shell type from SHELL environment variable and config file location when neither are specified, enabling simplest possible usage.
+
+#### Scenario: Auto-detect both shell and config file
+
+- **WHEN** user runs `twiggit init` without arguments
+- **AND** SHELL environment variable is set to supported shell (bash, zsh, or fish)
+- **AND** no config file path is provided
+- **THEN** system SHALL detect shell type from SHELL environment variable
+- **AND** system SHALL auto-detect appropriate config file path for detected shell
+- **AND** system SHALL proceed with installation using detected values
+- **AND** success message SHALL indicate detected shell type and config file path

@@ -68,6 +68,8 @@ func (s *WorktreeService) CreateWorktree(
 - Generate shell-specific wrapper functions
 - Include escape hatch for builtin cd
 - Write to shell-specific config file
+- Auto-detect shell from SHELL environment variable when not specified
+- Auto-detect config file location when not specified
 
 ## Quality Requirements
 - All golangci-lint checks SHALL pass

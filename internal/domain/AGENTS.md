@@ -78,6 +78,13 @@ func (e *ContextDetectionError) Unwrap() error {
 }
 ```
 
+## Shell Detection
+
+**Function**: `DetectShellFromEnv()` reads SHELL environment variable
+**Returns**: ShellType (bash/zsh/fish) or error
+**Error**: `ErrShellDetectionFailed` when SHELL not set or unsupported
+**Pattern**: Case-insensitive path parsing (e.g., `/bin/BASH`, `/usr/local/Zsh/bin/zsh`)
+
 ## Testing
 - **Unit tests**: Table-driven tests with Testify
 - **Mocking**: Inline mocks (keep tests self-contained)

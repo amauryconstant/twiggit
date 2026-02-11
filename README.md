@@ -17,16 +17,20 @@ The install script will prompt you to:
 ### Manual Install
 Download from: https://gitlab.com/amoconst/twiggit/-/releases
 
-After manual installation, run:
-```bash
-# Enable completions
-twiggit completion zsh > ~/.local/share/zsh/site-functions/_twiggit  # zsh
-# or
-echo 'source <(twiggit completion bash)' >> ~/.bashrc  # bash
+ After manual installation, run:
+ ```bash
+ # Enable completions
+ twiggit completion zsh > ~/.local/share/zsh/site-functions/_twiggit  # zsh
+ # or
+ echo 'source <(twiggit completion bash)' >> ~/.bashrc  # bash
 
-# Enable directory navigation
-twiggit setup-shell --shell=zsh  # or bash, fish
-```
+ # Enable directory navigation
+ twiggit init                    # Auto-detects shell and config file
+ # or
+ twiggit init ~/.zshrc           # Specify config file explicitly
+ # or
+ twiggit init --shell=zsh        # Specify shell explicitly
+ ```
 
 ## Setup
 
@@ -60,7 +64,11 @@ twiggit completion fish > ~/.config/fish/completions/twiggit.fish
 The `twiggit cd` command requires a shell wrapper to change directories:
 
 ```bash
-twiggit setup-shell --shell=zsh  # or bash, fish
+twiggit init                    # Auto-detect shell and config file
+# or
+twiggit init ~/.zshrc           # Specify config file explicitly
+# or
+twiggit init --shell=zsh        # Specify shell explicitly
 ```
 
 This installs a wrapper that:
@@ -68,7 +76,7 @@ This installs a wrapper that:
 - Preserves `builtin cd` for normal navigation
 - Passes through all other twiggit commands
 
-Restart your shell after running `setup-shell`.
+Restart your shell after running `init`.
 
 ## Quick Start
 
@@ -106,8 +114,9 @@ For development and usage documentation, see [AGENTS.md](AGENTS.md).
 - Restart your shell after installing completions
 
 **twiggit cd doesn't change directory**
-- Run: `twiggit setup-shell --shell=<your-shell>`
-- Restart your shell after running setup-shell
+- Run: `twiggit init` (auto-detects shell)
+- Or run: `twiggit init --shell=<your-shell>` (explicit)
+- Restart your shell after running init
 
 **Permission denied during installation**
 - Try with sudo: `sudo bash <(curl -fsSL https://gitlab.com/amoconst/twiggit/-/raw/main/install.sh)`

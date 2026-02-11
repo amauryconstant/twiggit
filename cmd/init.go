@@ -14,8 +14,8 @@ import (
 // NewInitCmd creates a new init command
 func NewInitCmd(config *CommandConfig) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "init <config-file>",
-		Short: "Install shell wrapper to config file",
+		Use:   "init [config-file]",
+		Short: "Install shell wrapper",
 		Long: `Install shell wrapper functions that intercept 'twiggit cd' calls
 and enable seamless directory navigation between worktrees and projects.
 
@@ -24,12 +24,20 @@ The wrapper provides:
 - Escape hatch with 'builtin cd' for shell built-in
 - Pass-through for all other commands
 
-Supported shells: bash, zsh, fish (inferred from config file path)
+Supported shells: bash, zsh, fish
 
-Usage: twiggit init ~/.bashrc`,
-		Args: cobra.ExactArgs(1),
+Usage:
+  twiggit init                    # Auto-detect shell and config file
+  twiggit init ~/.bashrc          # Install to specific config file
+  twiggit init --shell=zsh        # Explicit shell, auto-detect config file
+  twiggit init ~/.config/my-zsh --shell=zsh  # Explicit config and shell`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runInit(cmd, config, args[0])
+			configFile := ""
+			if len(args) > 0 {
+				configFile = args[0]
+			}
+			return runInit(cmd, config, configFile)
 		},
 	}
 

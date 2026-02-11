@@ -6,12 +6,14 @@ The system SHALL install shell wrapper functions for bash, zsh, and fish to enab
 
 #### Scenario: Install shell wrapper with inferred shell type
 
-- **WHEN** user runs `twiggit init ~/.bashrc`
+- **WHEN** user runs `twiggit init ~/.bashrc` with explicit config file
+- **OR** user runs `twiggit init` without arguments for auto-detection
 - **AND** bash is a supported shell
 - **AND** wrapper is not already installed
-- **THEN** system SHALL infer shell type as bash from config file name
+- **THEN** system SHALL infer shell type as bash from config file name (if provided)
+- **OR** system SHALL detect shell type from SHELL environment variable (if no config file)
 - **AND** system SHALL generate bash-specific wrapper function
-- **AND** wrapper SHALL be added to specified configuration file (~/.bashrc)
+- **AND** wrapper SHALL be added to specified or auto-detected configuration file
 - **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
 - **AND** wrapper SHALL intercept `twiggit cd` calls and change directories
 - **AND** wrapper SHALL provide `builtin cd` escape hatch
@@ -21,12 +23,13 @@ The system SHALL install shell wrapper functions for bash, zsh, and fish to enab
 
 #### Scenario: Install shell wrapper with explicit shell override
 
-- **WHEN** user runs `twiggit init /custom/config --shell=zsh`
+- **WHEN** user runs `twiggit init /custom/config --shell=zsh` with both shell and config
+- **OR** user runs `twiggit init --shell=zsh` with explicit shell only
 - **AND** zsh is a supported shell
 - **AND** wrapper is not already installed
-- **THEN** system SHALL use explicit shell type (zsh) instead of inference
+- **THEN** system SHALL use explicit shell type (zsh) instead of inference or auto-detection
 - **AND** system SHALL generate zsh-specific wrapper function
-- **AND** wrapper SHALL be added to specified configuration file (/custom/config)
+- **AND** wrapper SHALL be added to specified or auto-detected configuration file
 - **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
 - **AND** wrapper SHALL intercept `twiggit cd` calls and change directories
 - **AND** wrapper SHALL provide `builtin cd` escape hatch
@@ -128,7 +131,8 @@ The system SHALL validate whether shell integration is properly installed for a 
 
 #### Scenario: Validate shell wrapper installation
 
-- **WHEN** user runs `twiggit init --check ~/.bashrc`
+- **WHEN** user runs `twiggit init --check ~/.bashrc` with explicit config file
+- **OR** user runs `twiggit init --check` without arguments for auto-detection
 - **AND** wrapper is present in ~/.bashrc file
 - **THEN** validation SHALL succeed
 - **AND** result SHALL indicate "Shell wrapper is installed"
@@ -137,7 +141,8 @@ The system SHALL validate whether shell integration is properly installed for a 
 
 #### Scenario: Return not installed when wrapper missing
 
-- **WHEN** user runs `twiggit init --check ~/.bashrc`
+- **WHEN** user runs `twiggit init --check ~/.bashrc` with explicit config file
+- **OR** user runs `twiggit init --check` without arguments for auto-detection
 - **AND** wrapper is not present in ~/.bashrc file
 - **THEN** validation SHALL fail
 - **AND** result SHALL indicate "Shell wrapper not installed"
@@ -170,3 +175,75 @@ The system SHALL validate whether shell integration is properly installed for a 
 - **AND** `{{TIMESTAMP}}` SHALL be replaced with generated timestamp
 - **AND** replacement SHALL be deterministic and side-effect free
 - **AND** all occurrences of each placeholder SHALL be replaced
+
+---
+
+### Requirement: Shell Auto-Detection
+
+The system SHALL detect shell type from the SHELL environment variable when neither shell type nor config file are specified.
+
+#### Scenario: Auto-detect bash from SHELL environment variable
+
+- **WHEN** user runs `twiggit init` without arguments
+- **AND** SHELL environment variable is set to `/bin/bash` (or any path containing "bash")
+- **AND** wrapper is not already installed
+- **THEN** system SHALL detect shell type as bash
+- **AND** system SHALL auto-detect config file path for bash
+- **AND** system SHALL install bash-specific wrapper
+- **AND** success message SHALL indicate shell wrapper installed
+- **AND** config file path SHALL be included in message
+
+#### Scenario: Auto-detect zsh from SHELL environment variable
+
+- **WHEN** user runs `twiggit init` without arguments
+- **AND** SHELL environment variable is set to `/bin/zsh` (or any path containing "zsh")
+- **AND** wrapper is not already installed
+- **THEN** system SHALL detect shell type as zsh
+- **AND** system SHALL auto-detect config file path for zsh
+- **AND** system SHALL install zsh-specific wrapper
+- **AND** success message SHALL indicate shell wrapper installed
+- **AND** config file path SHALL be included in message
+
+#### Scenario: Auto-detect fish from SHELL environment variable
+
+- **WHEN** user runs `twiggit init` without arguments
+- **AND** SHELL environment variable is set to `/usr/local/bin/fish` (or any path containing "fish")
+- **AND** wrapper is not already installed
+- **THEN** system SHALL detect shell type as fish
+- **AND** system SHALL auto-detect config file path for fish
+- **AND** system SHALL install fish-specific wrapper
+- **AND** success message SHALL indicate shell wrapper installed
+- **AND** config file path SHALL be included in message
+
+#### Scenario: Explicit --shell flag takes precedence over auto-detection
+
+- **WHEN** user runs `twiggit init --shell=zsh`
+- **AND** SHELL environment variable is set to `/bin/bash`
+- **AND** wrapper is not already installed
+- **THEN** system SHALL use explicit shell type (zsh) from --shell flag
+- **THEN** system SHALL NOT use shell type from SHELL environment variable
+- **AND** system SHALL auto-detect config file path for zsh
+- **AND** system SHALL install zsh-specific wrapper
+- **AND** success message SHALL indicate shell wrapper installed for zsh
+
+#### Scenario: Return error when SHELL environment variable is not set
+
+- **WHEN** user runs `twiggit init` without arguments
+- **AND** SHELL environment variable is not set
+- **AND** --shell flag is not provided
+- **THEN** system SHALL return shell detection failed error
+- **AND** error message SHALL indicate "SHELL environment variable not set"
+- **AND** error message SHALL suggest using --shell flag to specify shell type
+- **AND** installation SHALL not proceed
+
+#### Scenario: Return error when SHELL is unsupported shell
+
+- **WHEN** user runs `twiggit init` without arguments
+- **AND** SHELL environment variable is set to `/bin/sh` (or other unsupported shell)
+- **AND** --shell flag is not provided
+- **THEN** system SHALL return shell detection failed error
+- **AND** error message SHALL indicate "unsupported shell detected"
+- **AND** error message SHALL include detected shell path
+- **AND** error message SHALL suggest using --shell flag to specify shell type
+- **AND** error message SHALL list supported shells (bash, zsh, fish)
+- **AND** installation SHALL not proceed

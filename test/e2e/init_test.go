@@ -295,4 +295,53 @@ var _ = Describe("init command", func() {
 
 		cli.ShouldErrorOutput(session, "unsupported shell type: invalid")
 	})
+
+	It("auto-detects shell and config file when no arguments provided", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
+		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+
+		session := cli.Run("init")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("Shell wrapper installed for bash"))
+		Expect(output).To(ContainSubstring("Config file: " + bashrcPath))
+	})
+
+	It("uses explicit --shell flag over auto-detection", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
+		zshrcPath := filepath.Join(fixture.GetTempDir(), ".zshrc")
+		Expect(os.WriteFile(zshrcPath, []byte("# Zsh config\n"), 0644)).To(Succeed())
+
+		session := cli.Run("init", "--shell=zsh")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("Shell wrapper installed for zsh"))
+		Expect(output).To(ContainSubstring("Config file: " + zshrcPath))
+	})
+
+	It("errors when auto-detection fails without explicit shell", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/sh")
+
+		session := cli.Run("init")
+		cli.ShouldFailWithExit(session, 1)
+
+		if session.ExitCode() != 1 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := string(session.Err.Contents())
+		Expect(output).To(ContainSubstring("shell auto-detection failed"))
+		Expect(output).To(ContainSubstring("unsupported shell detected"))
+	})
 })

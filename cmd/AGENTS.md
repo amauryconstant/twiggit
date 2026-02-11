@@ -57,6 +57,8 @@ Output: Absolute path to worktree (for shell wrapper)
 Flags: None (target required)
 Behavior: Navigation via shell wrapper, escape hatch for builtin cd
 
-### setup-shell
-Required: `--shell <bash|zsh|fish>`
-Behavior: Generate wrapper, add to shell config, warn about builtin override
+### init
+Optional: `[config-file]` (auto-detected if omitted)
+Flags: `--shell <bash|zsh|fish>` (overrides auto-detection)
+Behavior: Auto-detects shell/config file from SHELL env var, generates wrapper, adds to shell config
+Usage: `twiggit init` | `twiggit init ~/.bashrc` | `twiggit init --shell=zsh`

@@ -75,21 +75,6 @@ type CLIClient interface {
 | Outside | `<project>` | Project main directory |
 | Outside | `<project>/<branch>` | Cross-project worktree |
 
-## Context Resolution
-
-**Identifier Resolution:**
-
-| Context | Input | Target |
-|---------|-------|--------|
-| Project | `<branch>` | Current project worktree |
-| Project | `<project>` | Different project main |
-| Project | `<project>/<branch>` | Cross-project worktree |
-| Worktree | `<branch>` | Different worktree same project |
-| Worktree | `main` | Current project main |
-| Worktree | `<project>` | Different project main |
-| Outside | `<project>` | Project main directory |
-| Outside | `<project>/<branch>` | Cross-project worktree |
-
 ## Configuration Management
 
 **Location:** `$HOME/.config/twiggit/config.toml` (XDG standard)

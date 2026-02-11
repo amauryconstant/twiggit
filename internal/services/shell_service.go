@@ -29,29 +29,44 @@ func NewShellService(
 
 // SetupShell sets up shell integration for the specified shell type
 func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellRequest) (*domain.SetupShellResult, error) {
-	// Infer shell type from config file if not specified
 	shellType := req.ShellType
-	if shellType == "" && req.ConfigFile != "" {
-		inferredType, err := domain.InferShellTypeFromPath(req.ConfigFile)
+	configFile := req.ConfigFile
+
+	// NEW: Auto-detect shell and config file when both are empty
+	if shellType == "" && configFile == "" {
+		var err error
+		shellType, err = domain.DetectShellFromEnv()
 		if err != nil {
-			return nil, fmt.Errorf("failed to infer shell type: %w", err)
+			return nil, fmt.Errorf("shell auto-detection failed: %w", err)
 		}
-		shellType = inferredType
+
+		configFile, err = s.integration.DetectConfigFile(shellType)
+		if err != nil {
+			return nil, fmt.Errorf("config file detection failed: %w", err)
+		}
+	} else {
+		// EXISTING: Infer shell type from config file if not specified
+		if shellType == "" && configFile != "" {
+			inferredType, err := domain.InferShellTypeFromPath(configFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to infer shell type: %w", err)
+			}
+			shellType = inferredType
+		}
+
+		// EXISTING: Use provided config file or detect one
+		if configFile == "" {
+			var err error
+			configFile, err = s.integration.DetectConfigFile(shellType)
+			if err != nil {
+				return nil, fmt.Errorf("failed to detect config file: %w", err)
+			}
+		}
 	}
 
 	// Validate shell type
 	if !s.isValidShellType(shellType) {
 		return nil, domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
-	}
-
-	// Use provided config file or detect one
-	configFile := req.ConfigFile
-	if configFile == "" {
-		var err error
-		configFile, err = s.integration.DetectConfigFile(shellType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect config file: %w", err)
-		}
 	}
 
 	// Check existing installation
@@ -111,29 +126,44 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 
 // ValidateInstallation validates whether shell integration is installed
 func (s *shellService) ValidateInstallation(_ context.Context, req *domain.ValidateInstallationRequest) (*domain.ValidateInstallationResult, error) {
-	// Infer shell type from config file if not specified
 	shellType := req.ShellType
-	if shellType == "" && req.ConfigFile != "" {
-		inferredType, err := domain.InferShellTypeFromPath(req.ConfigFile)
+	configFile := req.ConfigFile
+
+	// Auto-detect shell and config file when both are empty
+	if shellType == "" && configFile == "" {
+		var err error
+		shellType, err = domain.DetectShellFromEnv()
 		if err != nil {
-			return nil, fmt.Errorf("failed to infer shell type: %w", err)
+			return nil, fmt.Errorf("shell auto-detection failed: %w", err)
 		}
-		shellType = inferredType
+
+		configFile, err = s.integration.DetectConfigFile(shellType)
+		if err != nil {
+			return nil, fmt.Errorf("config file detection failed: %w", err)
+		}
+	} else {
+		// Infer shell type from config file if not specified
+		if shellType == "" && configFile != "" {
+			inferredType, err := domain.InferShellTypeFromPath(configFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to infer shell type: %w", err)
+			}
+			shellType = inferredType
+		}
+
+		// Use provided config file or detect one
+		if configFile == "" {
+			var err error
+			configFile, err = s.integration.DetectConfigFile(shellType)
+			if err != nil {
+				return nil, fmt.Errorf("failed to detect config file: %w", err)
+			}
+		}
 	}
 
 	// Validate shell type
 	if !s.isValidShellType(shellType) {
 		return nil, domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
-	}
-
-	// Use provided config file or detect one
-	configFile := req.ConfigFile
-	if configFile == "" {
-		var err error
-		configFile, err = s.integration.DetectConfigFile(shellType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect config file: %w", err)
-		}
 	}
 
 	// Validate installation

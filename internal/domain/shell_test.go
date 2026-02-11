@@ -314,3 +314,128 @@ func TestInferShellTypeFromPath(t *testing.T) {
 		})
 	}
 }
+
+func TestDetectShellFromEnv(t *testing.T) {
+	testCases := []struct {
+		name          string
+		setEnv        func()
+		unsetEnv      func()
+		expectedShell ShellType
+		expectError   bool
+		errorMsg      string
+	}{
+		{
+			name: "detect bash from /bin/bash",
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/bash")
+			},
+			unsetEnv:      func() {},
+			expectedShell: ShellBash,
+			expectError:   false,
+		},
+		{
+			name: "detect bash from /usr/local/bin/bash",
+			setEnv: func() {
+				t.Setenv("SHELL", "/usr/local/bin/bash")
+			},
+			unsetEnv:      func() {},
+			expectedShell: ShellBash,
+			expectError:   false,
+		},
+		{
+			name: "detect zsh from /bin/zsh",
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/zsh")
+			},
+			unsetEnv:      func() {},
+			expectedShell: ShellZsh,
+			expectError:   false,
+		},
+		{
+			name: "detect zsh from /usr/bin/zsh",
+			setEnv: func() {
+				t.Setenv("SHELL", "/usr/bin/zsh")
+			},
+			unsetEnv:      func() {},
+			expectedShell: ShellZsh,
+			expectError:   false,
+		},
+		{
+			name: "detect fish from /usr/local/bin/fish",
+			setEnv: func() {
+				t.Setenv("SHELL", "/usr/local/bin/fish")
+			},
+			unsetEnv:      func() {},
+			expectedShell: ShellFish,
+			expectError:   false,
+		},
+		{
+			name: "detect fish from /bin/fish",
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/fish")
+			},
+			unsetEnv:      func() {},
+			expectedShell: ShellFish,
+			expectError:   false,
+		},
+		{
+			name: "fail when SHELL not set",
+			setEnv: func() {
+				t.Setenv("SHELL", "")
+			},
+			unsetEnv:      func() {},
+			expectedShell: "",
+			expectError:   true,
+			errorMsg:      "SHELL environment variable not set",
+		},
+		{
+			name: "fail with unknown shell /bin/sh",
+			setEnv: func() {
+				t.Setenv("SHELL", "/bin/sh")
+			},
+			unsetEnv:      func() {},
+			expectedShell: "",
+			expectError:   true,
+			errorMsg:      "unsupported shell detected",
+		},
+		{
+			name: "fail with unknown shell /usr/bin/tcsh",
+			setEnv: func() {
+				t.Setenv("SHELL", "/usr/bin/tcsh")
+			},
+			unsetEnv:      func() {},
+			expectedShell: "",
+			expectError:   true,
+			errorMsg:      "unsupported shell detected",
+		},
+		{
+			name: "case insensitivity for bash path",
+			setEnv: func() {
+				t.Setenv("SHELL", "/usr/local/BASH/Bin/bash")
+			},
+			unsetEnv:      func() {},
+			expectedShell: ShellBash,
+			expectError:   false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.setEnv()
+			defer tc.unsetEnv()
+
+			shellType, err := DetectShellFromEnv()
+
+			if tc.expectError {
+				require.Error(t, err)
+				assert.Equal(t, ShellType(""), shellType)
+				if tc.errorMsg != "" {
+					assert.Contains(t, err.Error(), tc.errorMsg)
+				}
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectedShell, shellType)
+			}
+		})
+	}
+}

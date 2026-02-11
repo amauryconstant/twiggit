@@ -3,6 +3,7 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -183,6 +184,33 @@ func InferShellTypeFromPath(configPath string) (ShellType, error) {
 			ErrInferenceFailed,
 			"",
 			"cannot infer shell type from path: "+configPath,
+			errors.New("use --shell to specify shell type (bash, zsh, fish)"),
+		)
+	}
+}
+
+// DetectShellFromEnv detects shell type from SHELL environment variable
+func DetectShellFromEnv() (ShellType, error) {
+	shellPath := os.Getenv("SHELL")
+	if shellPath == "" {
+		return "", NewShellError(ErrShellDetectionFailed, "", "SHELL environment variable not set")
+	}
+
+	shellName := filepath.Base(shellPath)
+	lowerName := strings.ToLower(shellName)
+
+	switch {
+	case strings.Contains(lowerName, "bash"):
+		return ShellBash, nil
+	case strings.Contains(lowerName, "zsh"):
+		return ShellZsh, nil
+	case strings.Contains(lowerName, "fish"):
+		return ShellFish, nil
+	default:
+		return "", NewShellErrorWithCause(
+			ErrShellDetectionFailed,
+			"",
+			"unsupported shell detected: "+shellName,
 			errors.New("use --shell to specify shell type (bash, zsh, fish)"),
 		)
 	}
