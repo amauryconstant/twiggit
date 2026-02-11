@@ -99,31 +99,38 @@ Assumptions:
    - Subprocess all commands: Overkill, performance impact
    - Require user to opt-in to wrapper capture: Burdens user
 
-5. **Init flag ordering: Alphabetical**
+5. **Init flag ordering: Alphabetical by long flag name**
 
-   **Choice:** Order init command flags: `-C, --cd` → `--check` → `--dry-run` → `-f, --force` → `--shell`
+    **Choice:** Order init command flags: `--check` → `--dry-run` → `-f, --force` → `--shell`
 
-   **Rationale:**
-   - Consistent with common CLI flag conventions (man pages list alphabetically)
-   - Easier to find flags in help output
-   - Matches user expectation from other tools
+    **Rationale:**
+    - Consistent with common CLI flag conventions (man pages list alphabetically by long name)
+    - Easier to find flags in help output
+    - Matches user expectation from other tools
 
-   **Alternatives considered:**
-   - Keep existing order (based on addition date): Arbitrary, hard to navigate
-   - Logical grouping (related flags together): Subjective, harder to maintain
+    **Alternatives considered:**
+    - Keep existing order (based on addition date): Arbitrary, hard to navigate
+    - Logical grouping (related flags together): Subjective, harder to maintain
+    - Order by short form (`-f`, `-c`, `-s`): Confusing when flags have no short form
 
-6. **Flag registration: Use VarP instead of GetBool/GetString**
+6. **Flag registration: Use *Var/*VarP for command-specific flags, Get*() for global flags**
 
-   **Choice:** Change init command to use `cmd.Flags().BoolVarP(&force, "force", "f", ...)` instead of `cmd.Flags().Bool("force", ...)` and later `cmd.Flags().GetBool("force")`
+    **Choice:** Use `*Var` and `*VarP` for command-specific flags, use `Get*()` for global persistent flags
 
-   **Rationale:**
-   - Consistent with create and delete commands (use VarP pattern)
-   - Single declaration point, easier to maintain
-   - Direct variable access, no string-based flag lookups
+    **Rationale:**
+    - Command-specific flags: Type-safe, compile-time checked, direct variable access, single declaration point
+    - Global persistent flags: Runtime lookup appropriate for flags accessed globally (e.g., verbose in util.go)
+    - Consistent with create/delete commands for command-specific flags
+    - Consistent with root/util for global flags
 
-   **Alternatives considered:**
-   - Keep GetBool pattern: Works but inconsistent with other commands
-   - Use Var for init (no short form): Inconsistent with add short form requirement
+    **Examples:**
+    - Command-specific: `cmd.Flags().BoolVar(&check, "check", false, "...")` ✓
+    - Command-specific: `cmd.Flags().BoolVarP(&force, "force", "f", false, "...")` ✓
+    - Global persistent: `cmd.Flags().GetCount("verbose")` in util.go ✓
+
+    **Alternatives considered:**
+    - Use GetBool for all flags: Runtime-only type safety, string lookups, less robust
+    - Use *Var for all flags: Forces passing global flags through all functions (verbose parameter everywhere)
 
 ## Risks / Trade-offs
 

@@ -19,22 +19,25 @@ func NewDeleteCommand(config *CommandConfig) *cobra.Command {
 		Short: "Delete a worktree",
 		Long: `Delete a worktree with safety checks.
 By default, prevents deletion of worktrees with uncommitted changes.
-Use --force to override safety checks.`,
+
+Flags:
+  -f, --force      Force deletion even with uncommitted changes
+  --merged-only    Only delete if branch is merged
+  -C, --cd         Output navigation target path to stdout (for shell wrapper)`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeDelete(config, cmd, args[0], force, mergedOnly, changeDir)
+		RunE: func(c *cobra.Command, args []string) error {
+			return executeDelete(c, config, args[0], force, mergedOnly, changeDir)
 		},
 	}
 
-	cmd.Flags().BoolVar(&force, "force", false, "Force deletion even with uncommitted changes")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion even with uncommitted changes")
 	cmd.Flags().BoolVar(&mergedOnly, "merged-only", false, "Only delete if branch is merged")
-	cmd.Flags().BoolVarP(&changeDir, "change-dir", "C", false, "Change directory after deletion (outputs path to stdout)")
+	cmd.Flags().BoolVarP(&changeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
 
 	return cmd
 }
 
-// executeDelete executes the delete command with the given configuration
-func executeDelete(config *CommandConfig, cmd *cobra.Command, target string, force, mergedOnly, changeDir bool) error {
+func executeDelete(c *cobra.Command, config *CommandConfig, target string, force, mergedOnly, changeDir bool) error {
 	ctx := context.Background()
 
 	currentCtx, worktreePath, err := resolveWorktreeTarget(config, target)
@@ -42,7 +45,7 @@ func executeDelete(config *CommandConfig, cmd *cobra.Command, target string, for
 		return err
 	}
 
-	err = validateWorktreeStatus(ctx, config, worktreePath, force, changeDir, currentCtx)
+	err = validateWorktreeStatus(ctx, config, c, worktreePath, force, changeDir, currentCtx)
 	if err != nil {
 		return err
 	}
@@ -52,7 +55,7 @@ func executeDelete(config *CommandConfig, cmd *cobra.Command, target string, for
 		return err
 	}
 
-	return deleteWorktree(ctx, config, cmd, worktreePath, force, changeDir, currentCtx)
+	return deleteWorktree(ctx, config, c, worktreePath, force, changeDir, currentCtx)
 }
 
 func resolveWorktreeTarget(config *CommandConfig, target string) (*domain.Context, string, error) {
@@ -73,7 +76,7 @@ func resolveWorktreeTarget(config *CommandConfig, target string) (*domain.Contex
 	return currentCtx, resolution.ResolvedPath, nil
 }
 
-func validateWorktreeStatus(ctx context.Context, config *CommandConfig, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
+func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
 	if force {
 		return nil
 	}
@@ -85,9 +88,13 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, worktree
 			strings.Contains(errStr, "invalid git repository") ||
 			strings.Contains(errStr, "repository does not exist") ||
 			strings.Contains(errStr, "no such file or directory") {
-			fmt.Printf("Deleted worktree: %s (already removed)\n", worktreePath)
 			if changeDir {
-				fmt.Println(currentCtx.Path)
+				navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
+				if navigationTarget != "" {
+					_, _ = fmt.Fprintln(c.OutOrStdout(), navigationTarget)
+				}
+			} else {
+				_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s (already removed)\n", worktreePath)
 			}
 			return fmt.Errorf("worktree not found: %s", worktreePath)
 		}
@@ -135,19 +142,33 @@ func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath
 	return nil
 }
 
-func deleteWorktree(ctx context.Context, config *CommandConfig, cmd *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
-	logv(cmd, 1, "Deleting worktree at %s", worktreePath)
+func getDeleteNavigationTarget(ctx context.Context, config *CommandConfig, _ string, currentCtx *domain.Context) string {
+	if currentCtx.Type == domain.ContextWorktree {
+		req := &domain.ResolvePathRequest{
+			Target:  "main",
+			Context: currentCtx,
+		}
+		resolution, err := config.Services.NavigationService.ResolvePath(ctx, req)
+		if err == nil && resolution.ResolvedPath != "" {
+			return resolution.ResolvedPath
+		}
+	}
+	return ""
+}
 
-	logv(cmd, 2, "  project: %s", currentCtx.ProjectName)
+func deleteWorktree(ctx context.Context, config *CommandConfig, c *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
+	logv(c, 1, "Deleting worktree at %s", worktreePath)
+
+	logv(c, 2, "  project: %s", currentCtx.ProjectName)
 
 	worktrees, _ := config.Services.GitClient.ListWorktrees(ctx, worktreePath)
 	for _, wt := range worktrees {
 		if wt.Path == worktreePath {
-			logv(cmd, 2, "  branch: %s", wt.Branch)
+			logv(c, 2, "  branch: %s", wt.Branch)
 			break
 		}
 	}
-	logv(cmd, 2, "  force: %t", force)
+	logv(c, 2, "  force: %t", force)
 
 	req := &domain.DeleteWorktreeRequest{
 		WorktreePath: worktreePath,
@@ -160,10 +181,13 @@ func deleteWorktree(ctx context.Context, config *CommandConfig, cmd *cobra.Comma
 		return fmt.Errorf("failed to delete worktree: %w", err)
 	}
 
-	fmt.Printf("Deleted worktree: %s\n", worktreePath)
-
 	if changeDir {
-		fmt.Println(currentCtx.Path)
+		navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
+		if navigationTarget != "" {
+			_, _ = fmt.Fprintln(c.OutOrStdout(), navigationTarget)
+		}
+	} else {
+		_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s\n", worktreePath)
 	}
 
 	return nil

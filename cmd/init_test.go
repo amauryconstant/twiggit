@@ -17,10 +17,36 @@ func TestNewInitCmd(t *testing.T) {
 	assert.NotNil(t, cmd)
 	assert.Contains(t, cmd.Use, "init")
 	assert.Equal(t, "Install shell wrapper", cmd.Short)
-	assert.NotNil(t, cmd.Flags().Lookup("shell"))
-	assert.NotNil(t, cmd.Flags().Lookup("force"))
-	assert.NotNil(t, cmd.Flags().Lookup("dry-run"))
-	assert.NotNil(t, cmd.Flags().Lookup("check"))
+
+	checkFlag := cmd.Flags().Lookup("check")
+	assert.NotNil(t, checkFlag)
+
+	forceFlag := cmd.Flags().Lookup("force")
+	assert.NotNil(t, forceFlag)
+	assert.Equal(t, "f", forceFlag.Shorthand)
+
+	dryRunFlag := cmd.Flags().Lookup("dry-run")
+	assert.NotNil(t, dryRunFlag)
+
+	shellFlag := cmd.Flags().Lookup("shell")
+	assert.NotNil(t, shellFlag)
+}
+
+func TestNewInitCmd_FShortForm(t *testing.T) {
+	config := &CommandConfig{}
+	cmd := NewInitCmd(config)
+
+	flag := cmd.Flags().Lookup("force")
+	assert.NotNil(t, flag)
+	assert.Equal(t, "f", flag.Shorthand)
+
+	err := cmd.Flags().Set("force", "true")
+	require.NoError(t, err)
+	require.True(t, flag.Changed)
+
+	force, err := cmd.Flags().GetBool("force")
+	require.NoError(t, err)
+	require.True(t, force)
 }
 
 func TestNewInitCmd_AcceptsOptionalConfigFile(t *testing.T) {
@@ -64,9 +90,9 @@ func TestDisplayInitResults_Skipped(t *testing.T) {
 	require.NoError(t, err)
 
 	output := out.String()
-	assert.Contains(t, output, "Shell wrapper already installed for bash")
-	assert.Contains(t, output, "Config file: /home/user/.bashrc")
-	assert.Contains(t, output, "Use --force to reinstall")
+	require.Contains(t, output, "Shell wrapper already installed for bash")
+	require.Contains(t, output, "Config file: /home/user/.bashrc")
+	require.Contains(t, output, "Use --force to reinstall")
 }
 
 func TestDisplayInitResults_DryRun(t *testing.T) {
@@ -84,10 +110,10 @@ func TestDisplayInitResults_DryRun(t *testing.T) {
 	require.NoError(t, err)
 
 	output := out.String()
-	assert.Contains(t, output, "Would install wrapper for zsh")
-	assert.Contains(t, output, "Config file: /home/user/.zshrc")
-	assert.Contains(t, output, "Wrapper function:")
-	assert.Contains(t, output, "# Twiggit wrapper")
+	require.Contains(t, output, "Would install wrapper for zsh")
+	require.Contains(t, output, "Config file: /home/user/.zshrc")
+	require.Contains(t, output, "Wrapper function:")
+	require.Contains(t, output, "# Twiggit wrapper")
 }
 
 func TestDisplayInitResults_Installed(t *testing.T) {

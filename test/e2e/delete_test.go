@@ -8,7 +8,6 @@ package e2e
 import (
 	"os"
 	"path/filepath"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -87,6 +86,7 @@ var _ = Describe("delete command", func() {
 		result := fixture.CreateWorktreeSetup("test")
 
 		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+		projectPath := fixture.GetProjectPath("test")
 
 		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "-C")
 		cli.ShouldSucceed(session)
@@ -96,8 +96,82 @@ var _ = Describe("delete command", func() {
 		}
 
 		output := cli.GetOutput(session)
-		lines := strings.Split(output, "\n")
-		Expect(len(lines)).To(BeNumerically(">=", 2))
+
+		Expect(output).To(Equal(projectPath), "Should output only the project path for navigation")
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("with -C flag from worktree context outputs project path", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+		projectPath := fixture.GetProjectPath("test")
+
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "-C")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := cli.GetOutput(session)
+
+		Expect(output).To(Equal(projectPath), "Should output only the project path, not 'Deleted worktree' message")
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("with -C flag from project context outputs no navigation path", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch, "-C")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := cli.GetOutput(session)
+
+		Expect(output).To(BeEmpty(), "Should output nothing when deleting from project context with -C")
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("with -C flag from outside git context outputs no navigation path", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromOutsideGit("delete", "test/"+result.Feature1Branch, "-C")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := cli.GetOutput(session)
+
+		Expect(output).To(BeEmpty(), "Should output nothing when deleting from outside git context with -C")
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
+
+	It("with -f short form flag works correctly", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		testFile := filepath.Join(worktreePath, "test.txt")
+		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
+		Expect(err).NotTo(HaveOccurred())
+
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "-f")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, result.Feature1Branch)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
 
 		Expect(worktreePath).NotTo(BeADirectory())
 	})

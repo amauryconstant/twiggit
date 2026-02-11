@@ -44,13 +44,14 @@ Flags: `--all` (show all projects, override context)
 
 ### create
 Required: Project name (inferred), branch name, source branch (default: main)
-Flags: `--source <branch>`, `-C / --change-dir`
-Behavior: Create worktree, maintain current dir (unless -C)
+Flags: `--source <branch>`, `-C, --cd`
+Behavior: Create worktree, maintain current dir (unless -C outputs path to stdout)
 
 ### delete
 Safety checks: Uncommitted changes, current worktree status
-Flags: `--keep-branch`, `--force`, `--merged-only`, `-C / --change-dir`
+Flags: `-f, --force`, `--merged-only`, `-C, --cd`
 Default behavior: Remove worktree + delete branch
+Navigation: With -C from worktree context, outputs project root path; from project or outside git, outputs nothing
 
 ### cd
 Output: Absolute path to worktree (for shell wrapper)
@@ -59,7 +60,7 @@ Behavior: Navigation via shell wrapper, escape hatch for builtin cd
 
 ### init
 Optional: `[config-file]` (auto-detected if omitted)
-Flags: `--shell <bash|zsh|fish>` (overrides auto-detection)
+Flags: `--check`, `-f, --force`, `--dry-run`, `--shell <bash|zsh|fish>` (alphabetical)
 Behavior: Auto-detects shell/config file from SHELL env var, generates wrapper, adds to shell config
 Usage: `twiggit init` | `twiggit init ~/.bashrc` | `twiggit init --shell=zsh`
 

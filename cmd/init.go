@@ -13,52 +13,55 @@ import (
 
 // NewInitCmd creates a new init command
 func NewInitCmd(config *CommandConfig) *cobra.Command {
+	var check, dryRun, force bool
+	var shellTypeStr string
+
 	cmd := &cobra.Command{
 		Use:   "init [config-file]",
 		Short: "Install shell wrapper",
 		Long: `Install shell wrapper functions that intercept 'twiggit cd' calls
-and enable seamless directory navigation between worktrees and projects.
+		and enable seamless directory navigation between worktrees and projects.
 
-The wrapper provides:
-- Automatic directory change on 'twiggit cd'
-- Escape hatch with 'builtin cd' for shell built-in
-- Pass-through for all other commands
+		The wrapper provides:
+		- Automatic directory change on 'twiggit cd'
+		- Escape hatch with 'builtin cd' for shell built-in
+		- Pass-through for all other commands
 
-Supported shells: bash, zsh, fish
+		Supported shells: bash, zsh, fish
 
-Usage:
-  twiggit init                    # Auto-detect shell and config file
-  twiggit init ~/.bashrc          # Install to specific config file
-  twiggit init --shell=zsh        # Explicit shell, auto-detect config file
-  twiggit init ~/.config/my-zsh --shell=zsh  # Explicit config and shell`,
+		Usage:
+		  twiggit init                    # Auto-detect shell and config file
+		  twiggit init ~/.bashrc          # Install to specific config file
+		  twiggit init --shell=zsh        # Explicit shell, auto-detect config file
+		  twiggit init ~/.config/my-zsh --shell=zsh  # Explicit config and shell
+
+		Flags:
+		  --check          Check if wrapper is installed
+		  --dry-run        Show what would be done without making changes
+		  -f, --force      Force reinstall even if already installed
+		  --shell <type>   Shell type (bash|zsh|fish) [optional, inferred from config file]`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			configFile := ""
 			if len(args) > 0 {
 				configFile = args[0]
 			}
-			return runInit(cmd, config, configFile)
+			return runInit(cmd, config, configFile, check, dryRun, force, shellTypeStr)
 		},
 	}
 
-	cmd.Flags().String("shell", "", "shell type (bash|zsh|fish) [optional, inferred from config file]")
-	cmd.Flags().Bool("force", false, "force reinstall even if already installed")
-	cmd.Flags().Bool("dry-run", false, "show what would be done without making changes")
-	cmd.Flags().Bool("check", false, "check if wrapper is installed")
+	cmd.Flags().BoolVar(&check, "check", false, "check if wrapper is installed")
+	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be done without making changes")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "force reinstall even if already installed")
+	cmd.Flags().StringVar(&shellTypeStr, "shell", "", "shell type (bash|zsh|fish) [optional, inferred from config file]")
 
 	return cmd
 }
 
-func runInit(cmd *cobra.Command, config *CommandConfig, configFile string) error {
-	check, _ := cmd.Flags().GetBool("check")
-
+func runInit(cmd *cobra.Command, config *CommandConfig, configFile string, check, dryRun, force bool, shellTypeStr string) error {
 	if check {
-		return runInitCheck(cmd, config, configFile)
+		return runInitCheck(cmd, config, configFile, shellTypeStr)
 	}
-
-	force, _ := cmd.Flags().GetBool("force")
-	dryRun, _ := cmd.Flags().GetBool("dry-run")
-	shellTypeStr, _ := cmd.Flags().GetString("shell")
 
 	var shellType domain.ShellType
 	if shellTypeStr != "" {
@@ -84,9 +87,7 @@ func runInit(cmd *cobra.Command, config *CommandConfig, configFile string) error
 	return displayInitResults(cmd.OutOrStdout(), result, dryRun)
 }
 
-func runInitCheck(cmd *cobra.Command, config *CommandConfig, configFile string) error {
-	shellTypeStr, _ := cmd.Flags().GetString("shell")
-
+func runInitCheck(cmd *cobra.Command, config *CommandConfig, configFile string, shellTypeStr string) error {
 	var shellType domain.ShellType
 	if shellTypeStr != "" {
 		shellType = domain.ShellType(shellTypeStr)

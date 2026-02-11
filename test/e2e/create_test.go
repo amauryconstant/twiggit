@@ -140,4 +140,44 @@ var _ = Describe("create command", func() {
 			GinkgoT().Log(fixture.Inspect())
 		}
 	})
+
+	It("with -C flag outputs path to stdout only", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("feature-path")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", "-C", branchName)
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := string(session.Out.Contents())
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test-project", branchName)
+
+		Expect(output).To(Equal(worktreePath+"\n"), "Should output path only")
+		Expect(output).NotTo(ContainSubstring("Created worktree"), "Should not include success message")
+		Expect(worktreePath).To(BeADirectory())
+	})
+
+	It("without -C flag outputs success message", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("feature-message")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName)
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := string(session.Out.Contents())
+
+		Expect(output).To(ContainSubstring("Created worktree"), "Should include success message")
+		Expect(output).To(ContainSubstring(branchName), "Should include branch name")
+	})
 })

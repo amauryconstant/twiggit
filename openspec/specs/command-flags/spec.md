@@ -88,6 +88,46 @@ Commands that support shell wrapper integration SHALL use consistent output patt
 - **WHEN** a command with `-C` flag is executed from outside git context
 - **THEN** the command SHALL output nothing (no sensible navigation target)
 
+### Requirement: Flag Registration Pattern
+
+Commands SHALL use appropriate flag registration patterns based on flag scope and access pattern.
+
+#### Scenario: Command-specific flags
+
+- **WHEN** a flag is specific to a single command
+- **THEN** flag SHALL be registered using `*Var` or `*VarP` pattern (e.g., `BoolVar`, `BoolVarP`, `StringVar`)
+- **THEN** flag SHALL be bound to a local variable at registration time
+- **THEN** flag value SHALL be accessed directly via the bound variable in RunE handler
+- **THEN** flag value SHALL be passed as a function parameter if needed in helper functions
+
+- **WHEN** a flag has a short form
+- **THEN** flag SHALL use `*VarP` variant (e.g., `BoolVarP(&force, "force", "f", ...)`)
+- **WHEN** a flag has no short form
+- **THEN** flag SHALL use `*Var` variant (e.g., `BoolVar(&check, "check", false, ...)`)
+- **THEN** flag SHALL NOT use `*VarP` with empty string for short form
+
+#### Scenario: Global persistent flags
+
+- **WHEN** a flag is a global persistent flag (defined in root command)
+- **THEN** flag SHALL be registered using `PersistentFlags()`
+- **WHEN** flag value is accessed from utility functions without direct access to command context
+- **THEN** flag value SHALL be retrieved using `Get*()` methods (e.g., `GetCount()`, `GetBool()`, `GetString()`)
+- **THEN** flag value retrieval SHALL use string-based flag name lookup
+
+#### Scenario: Type safety and compile-time checking
+
+- **WHEN** using `*Var` or `*VarP` pattern for command-specific flags
+- **THEN** flag type SHALL be enforced at compile time through variable type
+- **WHEN** using `Get*()` methods for global flags
+- **THEN** flag type SHALL be validated at runtime through Cobra's flag API
+
+#### Scenario: Code consistency across commands
+
+- **WHEN** multiple commands implement similar flag functionality
+- **THEN** all commands SHALL use consistent registration pattern (`*Var`/`*VarP`)
+- **WHEN** command-specific flags are used within command execution
+- **THEN** pattern SHALL NOT mix `*Var` registration with `Get*()` retrieval in the same command
+
 ### Requirement: Output Format Conventions
 
 Commands SHALL follow consistent output format patterns.

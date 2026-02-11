@@ -13,14 +13,18 @@ import (
 
 // NewCreateCommand creates a new create command
 func NewCreateCommand(config *CommandConfig) *cobra.Command {
-	var source, cdFlag string
+	var source string
+	var cdFlag bool
 
 	cmd := &cobra.Command{
 		Use:   "create <project>/<branch> | <branch>",
 		Short: "Create a new worktree",
 		Long: `Create a new worktree for the specified project and branch.
 If only a branch name is provided, the project is inferred from the current context.
-The source branch defaults to 'main' unless specified with --source.`,
+
+Flags:
+  --source <branch>  Source branch to create from (default: main)
+  -C, --cd          Output worktree path to stdout (for shell wrapper)`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeCreate(cmd, config, args[0], source, cdFlag)
@@ -28,7 +32,7 @@ The source branch defaults to 'main' unless specified with --source.`,
 	}
 
 	cmd.Flags().StringVar(&source, "source", "main", "Source branch to create from")
-	cmd.Flags().StringVar(&cdFlag, "cd", "", "Change directory after creation (optional)")
+	cmd.Flags().BoolVarP(&cdFlag, "cd", "C", false, "Output worktree path to stdout (for shell wrapper)")
 
 	// Silence usage to prevent double error printing
 	cmd.SilenceUsage = true
@@ -38,7 +42,7 @@ The source branch defaults to 'main' unless specified with --source.`,
 }
 
 // executeCreate executes the create command with the given configuration
-func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source, _ string) error {
+func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source string, cdFlag bool) error {
 	ctx := context.Background()
 
 	// Extract branch name for validation first (before any context detection)
@@ -100,9 +104,13 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source, _ st
 
 	logv(cmd, 2, "  created worktree at: %s", worktree.Path)
 
-	// Display success message
-	if err := displayCreateSuccess(cmd.OutOrStdout(), worktree); err != nil {
-		return err
+	// Display output based on cdFlag
+	if cdFlag {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), worktree.Path)
+	} else {
+		if err := displayCreateSuccess(cmd.OutOrStdout(), worktree); err != nil {
+			return err
+		}
 	}
 
 	return nil

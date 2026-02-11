@@ -88,6 +88,70 @@ func TestCreateCommand_Execute(t *testing.T) {
 			},
 			expectError: false,
 		},
+		{
+			name:  "create worktree with -C flag outputs path only",
+			args:  []string{"test-project/feature-branch"},
+			flags: map[string]string{"cd": "true"},
+			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockPS *mocks.MockProjectService) {
+				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
+					return &domain.Context{Type: domain.ContextOutsideGit}, nil
+				}
+				mockPS.DiscoverProjectFunc = func(ctx context.Context, projectName string, context *domain.Context) (*domain.ProjectInfo, error) {
+					return &domain.ProjectInfo{
+						Name:        "test-project",
+						GitRepoPath: "/home/user/Projects/test-project",
+					}, nil
+				}
+				mockWS.CreateWorktreeFunc = func(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error) {
+					return &domain.WorktreeInfo{
+						Path:   "/home/user/Worktrees/test-project/feature-branch",
+						Branch: "feature-branch",
+					}, nil
+				}
+			},
+			setupGitClient: func(mockGit *mocks.MockGitService) {
+				mockGit.BranchExistsFunc = func(ctx context.Context, repoPath, branchName string) (bool, error) {
+					return true, nil
+				}
+			},
+			expectError: false,
+			validateOut: func(output string) bool {
+				return output == "/home/user/Worktrees/test-project/feature-branch\n" &&
+					!strings.Contains(output, "Created worktree")
+			},
+		},
+		{
+			name:  "create worktree without -C flag outputs success message",
+			args:  []string{"test-project/feature-branch"},
+			flags: map[string]string{"source": "main"},
+			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockPS *mocks.MockProjectService) {
+				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
+					return &domain.Context{Type: domain.ContextOutsideGit}, nil
+				}
+				mockPS.DiscoverProjectFunc = func(ctx context.Context, projectName string, context *domain.Context) (*domain.ProjectInfo, error) {
+					return &domain.ProjectInfo{
+						Name:        "test-project",
+						GitRepoPath: "/home/user/Projects/test-project",
+					}, nil
+				}
+				mockWS.CreateWorktreeFunc = func(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error) {
+					return &domain.WorktreeInfo{
+						Path:   "/home/user/Worktrees/test-project/feature-branch",
+						Branch: "feature-branch",
+					}, nil
+				}
+			},
+			setupGitClient: func(mockGit *mocks.MockGitService) {
+				mockGit.BranchExistsFunc = func(ctx context.Context, repoPath, branchName string) (bool, error) {
+					return true, nil
+				}
+			},
+			expectError: false,
+			validateOut: func(output string) bool {
+				return strings.Contains(output, "Created worktree") &&
+					!strings.HasPrefix(output, "/")
+			},
+		},
 	}
 
 	for _, tc := range testCases {

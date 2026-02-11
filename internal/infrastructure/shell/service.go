@@ -178,16 +178,41 @@ func (s *shellService) bashWrapperTemplate() string {
 	return `### BEGIN TWIGGIT WRAPPER
 # Twiggit bash wrapper - Generated on {{TIMESTAMP}}
 twiggit() {
-    if [ "$1" = "cd" ]; then
-        # Handle cd command with directory change
-        target_dir=$(command twiggit "$@")
-        if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-            builtin cd "$target_dir"
-        fi
-    else
-        # Pass through all other commands
-        command twiggit "$@"
-    fi
+    case "$1" in
+        cd)
+            # Handle cd command with directory change
+            target_dir=$(command twiggit "$@")
+            if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+                builtin cd "$target_dir"
+            fi
+            ;;
+        create)
+            # Handle create command with -C flag
+            if [[ " $@ " == *" -C "* ]] || [[ " $@ " == *" --cd "* ]]; then
+                target_dir=$(command twiggit "$@")
+                if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+                    builtin cd "$target_dir"
+                fi
+            else
+                command twiggit "$@"
+            fi
+            ;;
+        delete)
+            # Handle delete command with -C flag
+            if [[ " $@ " == *" -C "* ]] || [[ " $@ " == *" --cd "* ]]; then
+                target_dir=$(command twiggit "$@")
+                if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+                    builtin cd "$target_dir"
+                fi
+            else
+                command twiggit "$@"
+            fi
+            ;;
+        *)
+            # Pass through all other commands
+            command twiggit "$@"
+            ;;
+    esac
 }
 ### END TWIGGIT WRAPPER`
 }
@@ -197,16 +222,41 @@ func (s *shellService) zshWrapperTemplate() string {
 	return `### BEGIN TWIGGIT WRAPPER
 # Twiggit zsh wrapper - Generated on {{TIMESTAMP}}
 twiggit() {
-    if [ "$1" = "cd" ]; then
-        # Handle cd command with directory change
-        target_dir=$(command twiggit "$@")
-        if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-            builtin cd "$target_dir"
-        fi
-    else
-        # Pass through all other commands
-        command twiggit "$@"
-    fi
+    case "$1" in
+        cd)
+            # Handle cd command with directory change
+            target_dir=$(command twiggit "$@")
+            if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+                builtin cd "$target_dir"
+            fi
+            ;;
+        create)
+            # Handle create command with -C flag
+            if [[ " $@ " == *" -C "* ]] || [[ " $@ " == *" --cd "* ]]; then
+                target_dir=$(command twiggit "$@")
+                if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+                    builtin cd "$target_dir"
+                fi
+            else
+                command twiggit "$@"
+            fi
+            ;;
+        delete)
+            # Handle delete command with -C flag
+            if [[ " $@ " == *" -C "* ]] || [[ " $@ " == *" --cd "* ]]; then
+                target_dir=$(command twiggit "$@")
+                if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+                    builtin cd "$target_dir"
+                fi
+            else
+                command twiggit "$@"
+            fi
+            ;;
+        *)
+            # Pass through all other commands
+            command twiggit "$@"
+            ;;
+    esac
 }
 ### END TWIGGIT WRAPPER`
 }
@@ -216,15 +266,36 @@ func (s *shellService) fishWrapperTemplate() string {
 	return `### BEGIN TWIGGIT WRAPPER
 # Twiggit fish wrapper - Generated on {{TIMESTAMP}}
 function twiggit
-    if test "$argv[1]" = "cd"
-        # Handle cd command with directory change
-        set target_dir (command twiggit $argv)
-        if test $status -eq 0 -a -n "$target_dir"
-            builtin cd "$target_dir"
-        end
-    else
-        # Pass through all other commands
-        command twiggit $argv
+    switch "$argv[1]"
+        case cd
+            # Handle cd command with directory change
+            set target_dir (command twiggit $argv)
+            if test $status -eq 0 -a -n "$target_dir"
+                builtin cd "$target_dir"
+            end
+        case create
+            # Handle create command with -C flag
+            if string match -q "* -C *" " $argv "; or string match -q "* --cd *" " $argv "
+                set target_dir (command twiggit $argv)
+                if test $status -eq 0 -a -n "$target_dir"
+                    builtin cd "$target_dir"
+                end
+            else
+                command twiggit $argv
+            end
+        case delete
+            # Handle delete command with -C flag
+            if string match -q "* -C *" " $argv "; or string match -q "* --cd *" " $argv "
+                set target_dir (command twiggit $argv)
+                if test $status -eq 0 -a -n "$target_dir"
+                    builtin cd "$target_dir"
+                end
+            else
+                command twiggit $argv
+            end
+        case '*'
+            # Pass through all other commands
+            command twiggit $argv
     end
 end
 ### END TWIGGIT WRAPPER`
