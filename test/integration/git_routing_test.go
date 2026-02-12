@@ -13,7 +13,6 @@ import (
 
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
-	"twiggit/internal/service"
 	"twiggit/test/mocks"
 
 	"github.com/stretchr/testify/assert"
@@ -60,7 +59,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 		// Use real CLI client but verify GoGit is used for branch operations
 		cliClient := infrastructure.NewCLIClient(executor, 30)
 		goGitClient := infrastructure.NewGoGitClient(true)
-		gitService := service.NewGitService(goGitClient, cliClient, nil)
+		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
 		// Test branch listing - should use GoGit only
 		branches, err := gitService.ListBranches(context.Background(), repoPath)
@@ -82,7 +81,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 		// Use real GoGit client but verify CLI is used for worktree operations
 		goGitClient := infrastructure.NewGoGitClient(true)
 		cliClient := infrastructure.NewCLIClient(executor, 30)
-		gitService := service.NewGitService(goGitClient, cliClient, nil)
+		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
 		// Create a feature branch first
 		_, err := executor.Execute(context.Background(), repoPath, "git", "checkout", "-b", "feature-test")
@@ -112,7 +111,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 		// Use real CLI client but verify GoGit is used for repository operations
 		cliClient := infrastructure.NewCLIClient(executor, 30)
 		goGitClient := infrastructure.NewGoGitClient(true)
-		gitService := service.NewGitService(goGitClient, cliClient, nil)
+		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
 		// Test repository validation - should use GoGit only
 		err := gitService.ValidateRepository(repoPath)
@@ -138,7 +137,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 		// Create CLI client (should not be called)
 		cliClient := infrastructure.NewCLIClient(executor, 30)
 
-		gitService := service.NewGitService(mockGoGit, cliClient, nil)
+		gitService := infrastructure.NewCompositeGitClient(mockGoGit, cliClient)
 
 		// Test that branch operation fails when GoGit fails
 		_, err := gitService.ListBranches(context.Background(), repoPath)

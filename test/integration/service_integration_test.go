@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/domain"
-	"twiggit/internal/infrastructure/shell"
+	"twiggit/internal/infrastructure"
 	"twiggit/internal/services"
 )
 
@@ -71,7 +71,7 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, ".bashrc")
 
-		shellInfra := shell.NewShellService()
+		shellInfra := infrastructure.NewShellInfrastructure()
 		shellService := services.NewShellService(shellInfra, &domain.Config{})
 
 		initialContent := `# Bash config
@@ -112,7 +112,7 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, ".bashrc")
 
-		shellInfra := shell.NewShellService()
+		shellInfra := infrastructure.NewShellInfrastructure()
 		shellService := services.NewShellService(shellInfra, &domain.Config{})
 
 		initialContent := "# Bash config"
@@ -149,7 +149,7 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, ".bashrc")
 
-		shellInfra := shell.NewShellService()
+		shellInfra := infrastructure.NewShellInfrastructure()
 		shellService := services.NewShellService(shellInfra, &domain.Config{})
 
 		initialContent := `# Bash config
@@ -182,7 +182,7 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		tempDir := t.TempDir()
 		configFile := filepath.Join(tempDir, ".bashrc")
 
-		shellInfra := shell.NewShellService()
+		shellInfra := infrastructure.NewShellInfrastructure()
 		shellService := services.NewShellService(shellInfra, &domain.Config{})
 
 		initialContent := "# Bash config"

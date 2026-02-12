@@ -1,4 +1,4 @@
-package shell
+package infrastructure
 
 import (
 	"os"
@@ -10,7 +10,7 @@ import (
 	"twiggit/internal/domain"
 )
 
-func TestShellService_GenerateWrapper_Success(t *testing.T) {
+func TestShellInfrastructure_GenerateWrapper_Success(t *testing.T) {
 	testCases := []struct {
 		name        string
 		shellType   domain.ShellType
@@ -54,7 +54,7 @@ func TestShellService_GenerateWrapper_Success(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			service := NewShellService()
+			service := NewShellInfrastructure()
 			wrapper, err := service.GenerateWrapper(tc.shellType)
 
 			if tc.expectError {
@@ -68,8 +68,8 @@ func TestShellService_GenerateWrapper_Success(t *testing.T) {
 	}
 }
 
-func TestShellService_GenerateWrapper_InvalidShellType(t *testing.T) {
-	service := NewShellService()
+func TestShellInfrastructure_GenerateWrapper_InvalidShellType(t *testing.T) {
+	service := NewShellInfrastructure()
 	wrapper, err := service.GenerateWrapper(domain.ShellType("invalid"))
 
 	require.Error(t, err)
@@ -77,7 +77,7 @@ func TestShellService_GenerateWrapper_InvalidShellType(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported shell type")
 }
 
-func TestShellService_DetectConfigFile_Success(t *testing.T) {
+func TestShellInfrastructure_DetectConfigFile_Success(t *testing.T) {
 	testCases := []struct {
 		name        string
 		shellType   domain.ShellType
@@ -99,7 +99,7 @@ func TestShellService_DetectConfigFile_Success(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			service := NewShellService()
+			service := NewShellInfrastructure()
 			configFile, err := service.DetectConfigFile(tc.shellType)
 
 			if tc.expectError {
@@ -114,7 +114,7 @@ func TestShellService_DetectConfigFile_Success(t *testing.T) {
 	}
 }
 
-func TestShellService_ValidateInstallation_Success(t *testing.T) {
+func TestShellInfrastructure_ValidateInstallation_Success(t *testing.T) {
 	originalHome := os.Getenv("HOME")
 	tempHome := t.TempDir()
 	os.Setenv("HOME", tempHome)
@@ -144,7 +144,7 @@ func TestShellService_ValidateInstallation_Success(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			service := NewShellService()
+			service := NewShellInfrastructure()
 			configFile := tempHome + "/.bashrc"
 			err := service.ValidateInstallation(tc.shellType, configFile)
 
@@ -160,17 +160,17 @@ func TestShellService_ValidateInstallation_Success(t *testing.T) {
 	}
 }
 
-func TestShellService_ValidateInstallation_InvalidShellType(t *testing.T) {
-	service := NewShellService()
+func TestShellInfrastructure_ValidateInstallation_InvalidShellType(t *testing.T) {
+	service := NewShellInfrastructure()
 	err := service.ValidateInstallation(domain.ShellType("invalid"), "")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config file path is empty")
 }
 
-func TestShellService_HasWrapperBlock(t *testing.T) {
-	service := NewShellService()
-	shellServiceImpl := service.(*shellService)
+func TestShellInfrastructure_HasWrapperBlock(t *testing.T) {
+	service := NewShellInfrastructure()
+	shellInfraImpl := service.(*shellInfrastructure)
 
 	testCases := []struct {
 		name           string
@@ -211,15 +211,15 @@ func TestShellService_HasWrapperBlock(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := shellServiceImpl.hasWrapperBlock(tc.content)
+			result := shellInfraImpl.hasWrapperBlock(tc.content)
 			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
 }
 
-func TestShellService_RemoveWrapperBlock(t *testing.T) {
-	service := NewShellService()
-	shellServiceImpl := service.(*shellService)
+func TestShellInfrastructure_RemoveWrapperBlock(t *testing.T) {
+	service := NewShellInfrastructure()
+	shellInfraImpl := service.(*shellInfrastructure)
 
 	testCases := []struct {
 		name           string
@@ -260,7 +260,7 @@ func TestShellService_RemoveWrapperBlock(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := shellServiceImpl.removeWrapperBlock(tc.content)
+			result := shellInfraImpl.removeWrapperBlock(tc.content)
 			assert.Equal(t, tc.expectedResult, result)
 		})
 	}

@@ -2,6 +2,7 @@
 Layer: Application services orchestrate domain logic + infrastructure
 
 **Services:**
+- ContextService: Context detection and identifier resolution
 - WorktreeService: Worktree CRUD operations
 - ProjectService: Project discovery/management
 - NavigationService: Context-aware navigation
@@ -58,6 +59,12 @@ func (s *WorktreeService) CreateWorktree(
 - Discover projects by name or from context
 - Validate project directories contain valid git repos
 - Use ContextDetector for context-aware discovery
+
+### ContextService
+- Detect context from current working directory
+- Resolve identifiers based on current context
+- Provide completion suggestions for context-aware operations
+- Delegate to ContextDetector and ContextResolver
 
 ### NavigationService
 - Delegate to ContextResolver for identifier resolution

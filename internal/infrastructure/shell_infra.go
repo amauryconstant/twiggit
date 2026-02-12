@@ -1,4 +1,4 @@
-package shell
+package infrastructure
 
 import (
 	"os"
@@ -7,18 +7,17 @@ import (
 	"time"
 
 	"twiggit/internal/domain"
-	"twiggit/internal/infrastructure"
 )
 
-type shellService struct{}
+type shellInfrastructure struct{}
 
-// NewShellService creates a new shell service instance
-func NewShellService() infrastructure.ShellInfrastructure {
-	return &shellService{}
+// NewShellInfrastructure creates a new shell infrastructure instance
+func NewShellInfrastructure() ShellInfrastructure {
+	return &shellInfrastructure{}
 }
 
 // GenerateWrapper generates a shell wrapper for the specified shell type
-func (s *shellService) GenerateWrapper(shellType domain.ShellType) (string, error) {
+func (s *shellInfrastructure) GenerateWrapper(shellType domain.ShellType) (string, error) {
 	template := s.getWrapperTemplate(shellType)
 	if template == "" {
 		return "", domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
@@ -29,7 +28,7 @@ func (s *shellService) GenerateWrapper(shellType domain.ShellType) (string, erro
 }
 
 // DetectConfigFile detects the appropriate config file for the shell type
-func (s *shellService) DetectConfigFile(shellType domain.ShellType) (string, error) {
+func (s *shellInfrastructure) DetectConfigFile(shellType domain.ShellType) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "failed to get home directory", err)
@@ -53,7 +52,7 @@ func (s *shellService) DetectConfigFile(shellType domain.ShellType) (string, err
 }
 
 // InstallWrapper installs the wrapper to the shell config file
-func (s *shellService) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
+func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
 	if configFile == "" {
 		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "config file path is empty", nil)
 	}
@@ -105,7 +104,7 @@ func (s *shellService) InstallWrapper(shellType domain.ShellType, wrapper, confi
 }
 
 // ValidateInstallation validates whether the wrapper is installed
-func (s *shellService) ValidateInstallation(shellType domain.ShellType, configFile string) error {
+func (s *shellInfrastructure) ValidateInstallation(shellType domain.ShellType, configFile string) error {
 	if configFile == "" {
 		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "config file path is empty", nil)
 	}
@@ -130,7 +129,7 @@ func (s *shellService) ValidateInstallation(shellType domain.ShellType, configFi
 }
 
 // getWrapperTemplate returns the wrapper template for the specified shell type
-func (s *shellService) getWrapperTemplate(shellType domain.ShellType) string {
+func (s *shellInfrastructure) getWrapperTemplate(shellType domain.ShellType) string {
 	switch shellType {
 	case domain.ShellBash:
 		return s.bashWrapperTemplate()
@@ -144,7 +143,7 @@ func (s *shellService) getWrapperTemplate(shellType domain.ShellType) string {
 }
 
 // composeWrapper composes the wrapper with template replacements (pure function)
-func (s *shellService) composeWrapper(template string, shellType domain.ShellType) string {
+func (s *shellInfrastructure) composeWrapper(template string, shellType domain.ShellType) string {
 	// Pure function: no side effects, deterministic output
 	replacements := map[string]string{
 		"{{SHELL_TYPE}}": string(shellType),
@@ -160,7 +159,7 @@ func (s *shellService) composeWrapper(template string, shellType domain.ShellTyp
 }
 
 // getConfigFiles returns the list of config files for the shell type
-func (s *shellService) getConfigFiles(shellType domain.ShellType) []string {
+func (s *shellInfrastructure) getConfigFiles(shellType domain.ShellType) []string {
 	switch shellType {
 	case domain.ShellBash:
 		return []string{".bashrc", ".bash_profile", ".profile"}
@@ -174,7 +173,7 @@ func (s *shellService) getConfigFiles(shellType domain.ShellType) []string {
 }
 
 // bashWrapperTemplate returns the bash wrapper template
-func (s *shellService) bashWrapperTemplate() string {
+func (s *shellInfrastructure) bashWrapperTemplate() string {
 	return `### BEGIN TWIGGIT WRAPPER
 # Twiggit bash wrapper - Generated on {{TIMESTAMP}}
 twiggit() {
@@ -218,7 +217,7 @@ twiggit() {
 }
 
 // zshWrapperTemplate returns the zsh wrapper template
-func (s *shellService) zshWrapperTemplate() string {
+func (s *shellInfrastructure) zshWrapperTemplate() string {
 	return `### BEGIN TWIGGIT WRAPPER
 # Twiggit zsh wrapper - Generated on {{TIMESTAMP}}
 twiggit() {
@@ -262,7 +261,7 @@ twiggit() {
 }
 
 // fishWrapperTemplate returns the fish wrapper template
-func (s *shellService) fishWrapperTemplate() string {
+func (s *shellInfrastructure) fishWrapperTemplate() string {
 	return `### BEGIN TWIGGIT WRAPPER
 # Twiggit fish wrapper - Generated on {{TIMESTAMP}}
 function twiggit
@@ -306,11 +305,11 @@ const (
 	endDelimiter   = "### END TWIGGIT WRAPPER"
 )
 
-func (s *shellService) hasWrapperBlock(content string) bool {
+func (s *shellInfrastructure) hasWrapperBlock(content string) bool {
 	return strings.Contains(content, beginDelimiter) && strings.Contains(content, endDelimiter)
 }
 
-func (s *shellService) removeWrapperBlock(content string) string {
+func (s *shellInfrastructure) removeWrapperBlock(content string) string {
 	beginIdx := strings.Index(content, beginDelimiter)
 	if beginIdx == -1 {
 		return content
@@ -340,7 +339,7 @@ func (s *shellService) removeWrapperBlock(content string) string {
 	return content[:newlineBefore] + contentAfter
 }
 
-func (s *shellService) appendWrapper(content, wrapper string) string {
+func (s *shellInfrastructure) appendWrapper(content, wrapper string) string {
 	if content == "" {
 		return wrapper + "\n"
 	}

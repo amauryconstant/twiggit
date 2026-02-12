@@ -95,6 +95,32 @@ default_source_branch = "main"
 - Output capture
 - Error handling with exit codes
 
+## ShellInfrastructure Interface
+
+**Location:** `shell_infra.go`
+
+```go
+type ShellInfrastructure interface {
+    GenerateWrapper(shellType domain.ShellType) (string, error)
+    DetectConfigFile(shellType domain.ShellType) (string, error)
+    InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error
+    ValidateInstallation(shellType domain.ShellType, configFile string) error
+}
+```
+
+**Operations:**
+- Generate shell-specific wrapper functions (bash, zsh, fish)
+- Detect config file location based on shell type
+- Install wrapper to shell config file (idempotent with force flag)
+- Validate wrapper installation
+
+**Supported Shells:**
+- Bash: `.bashrc`, `.bash_profile`, `.profile`
+- Zsh: `.zshrc`, `.zprofile`, `.profile`
+- Fish: `.config/fish/config.fish`, `config.fish`, `.fishrc`
+
+**Methods SHALL be idempotent.**
+
 ## Testing
 - **Unit tests**: Testify suites with mocks
 - **Integration tests**: Real git repos in temp dirs

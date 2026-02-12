@@ -9,6 +9,7 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
+	"twiggit/test/mocks"
 )
 
 func TestNavigationService_ResolvePath_Success(t *testing.T) {
@@ -122,7 +123,34 @@ func TestNavigationService_GetNavigationSuggestions_Success(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			service := setupTestNavigationService()
+			projectService := mocks.NewMockProjectService()
+			contextService := mocks.NewMockContextService()
+			config := domain.DefaultConfig()
+
+			contextService.GetCompletionSuggestionsFromContextFunc = func(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+				return []*domain.ResolutionSuggestion{
+					{
+						Text:        "feature-branch",
+						Description: "Feature branch",
+						Type:        domain.PathTypeWorktree,
+						ProjectName: "test-project",
+						BranchName:  "feature-branch",
+					},
+				}, nil
+			}
+
+			contextService.GetCompletionSuggestionsFunc = func(partial string) ([]*domain.ResolutionSuggestion, error) {
+				return []*domain.ResolutionSuggestion{
+					{
+						Text:        "test-project",
+						Description: "Test project",
+						Type:        domain.PathTypeProject,
+						ProjectName: "test-project",
+					},
+				}, nil
+			}
+
+			service := NewNavigationService(projectService, contextService, config)
 			result, err := service.GetNavigationSuggestions(context.Background(), tc.context, tc.partial)
 
 			if tc.expectError {
@@ -138,8 +166,8 @@ func TestNavigationService_GetNavigationSuggestions_Success(t *testing.T) {
 
 // setupTestNavigationService creates a test instance of NavigationService
 func setupTestNavigationService() application.NavigationService {
-	projectService := &mockProjectService{}
-	contextService := &mockContextService{}
+	projectService := mocks.NewMockProjectService()
+	contextService := mocks.NewMockContextService()
 	config := domain.DefaultConfig()
 
 	return NewNavigationService(projectService, contextService, config)

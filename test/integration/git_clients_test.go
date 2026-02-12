@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"twiggit/internal/infrastructure"
-	"twiggit/internal/service"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -128,8 +127,7 @@ func TestGitOperations_Integration(t *testing.T) {
 		goGitClient := infrastructure.NewGoGitClient(true)
 		cliClient := infrastructure.NewCLIClient(executor, 30)
 
-		config := service.DefaultGitServiceConfig()
-		gitService := service.NewGitService(goGitClient, cliClient, config)
+		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
 		// Test that branch operations use GoGit
 		branches, err := gitService.ListBranches(context.Background(), repoPath)

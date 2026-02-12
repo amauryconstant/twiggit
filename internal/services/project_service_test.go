@@ -178,7 +178,7 @@ func TestProjectService_GetProjectInfo_Success(t *testing.T) {
 // setupTestProjectService creates a test instance of ProjectService
 func setupTestProjectService() application.ProjectService {
 	gitService := mocks.NewMockGitService()
-	contextService := &mockContextService{}
+	contextService := mocks.NewMockContextService()
 	config := domain.DefaultConfig()
 
 	// Configure git service mock
@@ -203,63 +203,6 @@ func setupTestProjectService() application.ProjectService {
 	}
 
 	return NewProjectService(gitService, contextService, config)
-}
-
-// mockContextService implements service.ContextService for testing
-type mockContextService struct{}
-
-func (m *mockContextService) GetCurrentContext() (*domain.Context, error) {
-	return &domain.Context{
-		Type: domain.ContextOutsideGit,
-	}, nil
-}
-
-func (m *mockContextService) DetectContextFromPath(path string) (*domain.Context, error) {
-	return &domain.Context{
-		Type: domain.ContextOutsideGit,
-	}, nil
-}
-
-func (m *mockContextService) ResolveIdentifier(identifier string) (*domain.ResolutionResult, error) {
-	return &domain.ResolutionResult{
-		ResolvedPath: "/path/to/project",
-		Type:         domain.PathTypeProject,
-		ProjectName:  "test-project",
-		Explanation:  "mock resolution",
-	}, nil
-}
-
-func (m *mockContextService) ResolveIdentifierFromContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
-	return &domain.ResolutionResult{
-		ResolvedPath: "/path/to/project",
-		Type:         domain.PathTypeProject,
-		ProjectName:  "test-project",
-		Explanation:  "mock resolution",
-	}, nil
-}
-
-func (m *mockContextService) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
-	return []*domain.ResolutionSuggestion{
-		{
-			Text:        "feature-branch",
-			Description: "Feature branch",
-			Type:        domain.PathTypeWorktree,
-			ProjectName: "test-project",
-			BranchName:  "feature-branch",
-		},
-	}, nil
-}
-
-func (m *mockContextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
-	return []*domain.ResolutionSuggestion{
-		{
-			Text:        "feature-branch",
-			Description: "Feature branch",
-			Type:        domain.PathTypeWorktree,
-			ProjectName: "test-project",
-			BranchName:  "feature-branch",
-		},
-	}, nil
 }
 
 func TestProjectService_searchProjectByName(t *testing.T) {

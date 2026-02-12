@@ -149,11 +149,12 @@ type MockContextService struct {
 	domain.ContextService
 
 	// Configurable functions for testing
-	GetCurrentContextFunc            func() (*domain.Context, error)
-	DetectContextFromPathFunc        func(path string) (*domain.Context, error)
-	ResolveIdentifierFunc            func(identifier string) (*domain.ResolutionResult, error)
-	ResolveIdentifierFromContextFunc func(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error)
-	GetCompletionSuggestionsFunc     func(partial string) ([]*domain.ResolutionSuggestion, error)
+	GetCurrentContextFunc                   func() (*domain.Context, error)
+	DetectContextFromPathFunc               func(path string) (*domain.Context, error)
+	ResolveIdentifierFunc                   func(identifier string) (*domain.ResolutionResult, error)
+	ResolveIdentifierFromContextFunc        func(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error)
+	GetCompletionSuggestionsFunc            func(partial string) ([]*domain.ResolutionSuggestion, error)
+	GetCompletionSuggestionsFromContextFunc func(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error)
 }
 
 // NewMockContextService creates a new MockContextService with default behavior
@@ -197,6 +198,14 @@ func (m *MockContextService) ResolveIdentifierFromContext(ctx *domain.Context, i
 func (m *MockContextService) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
 	if m.GetCompletionSuggestionsFunc != nil {
 		return m.GetCompletionSuggestionsFunc(partial)
+	}
+	return nil, nil
+}
+
+// GetCompletionSuggestionsFromContext calls the mock function or returns default
+func (m *MockContextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+	if m.GetCompletionSuggestionsFromContextFunc != nil {
+		return m.GetCompletionSuggestionsFromContextFunc(ctx, partial)
 	}
 	return nil, nil
 }

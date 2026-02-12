@@ -9,7 +9,7 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
-	"twiggit/internal/infrastructure/shell"
+	"twiggit/internal/infrastructure"
 )
 
 func TestShellService_SetupShell_Success(t *testing.T) {
@@ -388,7 +388,7 @@ type mockShellIntegration struct{}
 
 func (m *mockShellIntegration) GenerateWrapper(shellType domain.ShellType) (string, error) {
 	// Use the real shell infrastructure service for wrapper generation
-	realService := shell.NewShellService()
+	realService := infrastructure.NewShellInfrastructure()
 	return realService.GenerateWrapper(shellType)
 }
 

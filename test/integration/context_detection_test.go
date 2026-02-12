@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
-	"twiggit/internal/service"
+	"twiggit/internal/services"
 )
 
 func TestContextDetector_Integration(t *testing.T) {
@@ -154,7 +154,7 @@ func TestContextResolver_Integration(t *testing.T) {
 
 	// Test resolver from project context
 	detector := infrastructure.NewContextDetector(config)
-	gitService := service.NewGitService(nil, nil, nil) // Mock service for integration test
+	gitService := infrastructure.NewCompositeGitClient(nil, nil) // Mock service for integration test
 	resolver := infrastructure.NewContextResolver(config, gitService)
 
 	projectCtx, err := detector.DetectContext(mainRepo)
@@ -282,10 +282,10 @@ func TestContextService_Integration(t *testing.T) {
 	executor := infrastructure.NewDefaultCommandExecutor(30 * time.Second)
 	goGitClient := infrastructure.NewGoGitClient(true)
 	cliClient := infrastructure.NewCLIClient(executor, 30)
-	gitService := service.NewGitService(goGitClient, cliClient, nil)
+	gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
 	resolver := infrastructure.NewContextResolver(config, gitService)
-	contextService := service.NewContextService(detector, resolver, config)
+	contextService := services.NewContextService(detector, resolver, config)
 
 	// Change to the repository directory
 	originalWd, err := os.Getwd()
