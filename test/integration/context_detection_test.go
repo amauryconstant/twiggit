@@ -187,66 +187,6 @@ func TestContextResolver_Integration(t *testing.T) {
 	assert.Equal(t, mainRepo, result.ResolvedPath)
 }
 
-func TestContextDetector_CacheNormalizationWithSymlinks_Integration(t *testing.T) {
-	if _, err := exec.LookPath("git"); err != nil {
-		t.Skip("git not available for integration tests")
-	}
-
-	tempDir := t.TempDir()
-	config := &domain.Config{
-		ProjectsDirectory:  filepath.Join(tempDir, "Projects"),
-		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
-	}
-
-	// Setup a real git repository
-	repoDir := filepath.Join(config.ProjectsDirectory, "symlink-test")
-	require.NoError(t, os.MkdirAll(repoDir, 0755))
-
-	cmd := exec.Command("git", "init")
-	cmd.Dir = repoDir
-	require.NoError(t, cmd.Run())
-
-	// Configure git user
-	cmd = exec.Command("git", "config", "user.email", "test@example.com")
-	cmd.Dir = repoDir
-	require.NoError(t, cmd.Run())
-
-	cmd = exec.Command("git", "config", "user.name", "Test User")
-	cmd.Dir = repoDir
-	require.NoError(t, cmd.Run())
-
-	// Create a symlink to the repository
-	symlinkPath := filepath.Join(tempDir, "symlink-repo")
-	require.NoError(t, os.Symlink(repoDir, symlinkPath))
-
-	detector := infrastructure.NewContextDetector(config)
-
-	// Detect context using original path
-	ctx1, err := detector.DetectContext(repoDir)
-	require.NoError(t, err)
-	assert.Equal(t, domain.ContextProject, ctx1.Type)
-	assert.Equal(t, "symlink-test", ctx1.ProjectName)
-
-	// Detect context using symlink - should hit cache due to normalized path
-	ctx2, err := detector.DetectContext(symlinkPath)
-	require.NoError(t, err)
-	assert.Equal(t, domain.ContextProject, ctx2.Type)
-	assert.Equal(t, "symlink-test", ctx2.ProjectName)
-
-	// Both contexts should be the same object (from cache)
-	assert.Same(t, ctx1, ctx2)
-	assert.Equal(t, ctx1.Path, ctx2.Path)
-
-	// Invalidate cache using original path
-	detector.InvalidateCacheForRepo(repoDir)
-
-	// Detect again using symlink - should create new object
-	ctx3, err := detector.DetectContext(symlinkPath)
-	require.NoError(t, err)
-	assert.Equal(t, domain.ContextProject, ctx3.Type)
-	assert.NotSame(t, ctx1, ctx3) // Different object from cache
-}
-
 func TestContextService_Integration(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available for integration tests")

@@ -19,13 +19,3 @@ func (m *ContextDetectorMock) DetectContext(dir string) (*domain.Context, error)
 	}
 	return args.Get(0).(*domain.Context), args.Error(1)
 }
-
-// InvalidateCacheForRepo provides a mock function with given fields: repoPath
-func (m *ContextDetectorMock) InvalidateCacheForRepo(repoPath string) {
-	m.Called(repoPath)
-}
-
-// ClearCache provides a mock function
-func (m *ContextDetectorMock) ClearCache() {
-	m.Called()
-}

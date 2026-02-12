@@ -83,12 +83,6 @@ type ResolutionSuggestion struct {
 type ContextDetector interface {
 	// DetectContext detects the context from the given directory
 	DetectContext(dir string) (*Context, error)
-
-	// InvalidateCacheForRepo removes all cache entries related to a repository path
-	InvalidateCacheForRepo(repoPath string)
-
-	// ClearCache empties the entire context cache
-	ClearCache()
 }
 
 // ContextResolver resolves target identifiers based on current context

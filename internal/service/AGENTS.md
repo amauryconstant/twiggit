@@ -11,29 +11,28 @@ Layer: Application services orchestrate domain logic + infrastructure
 ## Service Implementation Pattern
 
 ```go
-type WorktreeService struct {
-    gitClient   infrastructure.GitClient
-    projectRepo domain.ProjectRepository
-    config      *domain.Config
-    logger      Logger
+type worktreeService struct {
+    gitService     infrastructure.GitClient
+    projectService application.ProjectService
+    config         *domain.Config
 }
 
-func (s *WorktreeService) CreateWorktree(
+func (s *worktreeService) CreateWorktree(
     ctx context.Context,
-    req *service_requests.CreateWorktreeRequest,
-) (*service_results.WorktreeInfo, error) {
-    if err := validateCreateRequest(req); err != nil {
+    req *domain.CreateWorktreeRequest,
+) (*domain.WorktreeInfo, error) {
+    if err := s.validateCreateRequest(req); err != nil {
         return nil, fmt.Errorf("validation failed: %w", err)
     }
-    project, err := s.projectRepo.FindByName(ctx, req.ProjectName)
+    project, err := s.projectService.DiscoverProject(ctx, req.ProjectName, req.Context)
     if err != nil {
-        return nil, fmt.Errorf("project not found: %w", err)
+        return nil, fmt.Errorf("failed to resolve project: %w", err)
     }
-    worktree, err := s.gitClient.CreateWorktree(ctx, project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)
+    worktree, err := s.gitService.CreateWorktree(ctx, project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)
     if err != nil {
         return nil, fmt.Errorf("create failed: %w", err)
     }
-    return &service_results.WorktreeInfo{Path: worktreePath, Branch: req.BranchName}, nil
+    return &domain.WorktreeInfo{Path: worktreePath, Branch: req.BranchName}, nil
 }
 ```
 

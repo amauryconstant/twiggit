@@ -5,15 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"twiggit/internal/domain"
 )
 
 type contextDetector struct {
-	config  *domain.Config
-	cache   map[string]*domain.Context
-	cacheMu sync.RWMutex
+	config *domain.Config
 }
 
 // NewContextDetector creates a new context detector
@@ -35,33 +32,17 @@ func (cd *contextDetector) DetectContext(dir string) (*domain.Context, error) {
 		return nil, domain.NewContextDetectionError(dir, "cannot access directory", err)
 	}
 
-	// Normalize path and resolve symlinks first for consistent cache keys
+	// Normalize path and resolve symlinks
 	normalizedDir, err := NormalizePath(dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to normalize directory: %w", err)
 	}
-
-	// Check cache first using normalized path as key
-	cd.cacheMu.RLock()
-	if cached, exists := cd.cache[normalizedDir]; exists {
-		cd.cacheMu.RUnlock()
-		return cached, nil
-	}
-	cd.cacheMu.RUnlock()
 
 	// Perform detection
 	ctx := cd.detectContextInternal(normalizedDir)
 	if ctx == nil {
 		return nil, fmt.Errorf("failed to detect context for directory: %s", normalizedDir)
 	}
-
-	// Cache result using normalized path as key
-	cd.cacheMu.Lock()
-	if cd.cache == nil {
-		cd.cache = make(map[string]*domain.Context)
-	}
-	cd.cache[normalizedDir] = ctx
-	cd.cacheMu.Unlock()
 
 	return ctx, nil
 }
@@ -183,38 +164,4 @@ func (cd *contextDetector) extractProjectName(dir string) string {
 	// Extract project name from directory path
 	// Use the directory name as project name
 	return filepath.Base(dir)
-}
-
-// InvalidateCacheForRepo removes all cache entries related to a repository path
-func (cd *contextDetector) InvalidateCacheForRepo(repoPath string) {
-	// Normalize the repo path first
-	normalizedRepoPath, err := NormalizePath(repoPath)
-	if err != nil {
-		return // If we can't normalize, skip invalidation
-	}
-
-	cd.cacheMu.Lock()
-	defer cd.cacheMu.Unlock()
-
-	// Remove cache entries that are under the repository path
-	keysToDelete := make([]string, 0)
-	for cacheKey := range cd.cache {
-		// Check if the cached path is under the repository
-		if isPathUnder, err := IsPathUnder(normalizedRepoPath, cacheKey); err == nil && isPathUnder {
-			keysToDelete = append(keysToDelete, cacheKey)
-		}
-	}
-
-	// Delete the identified keys
-	for _, key := range keysToDelete {
-		delete(cd.cache, key)
-	}
-}
-
-// ClearCache empties the entire context cache
-func (cd *contextDetector) ClearCache() {
-	cd.cacheMu.Lock()
-	defer cd.cacheMu.Unlock()
-
-	cd.cache = make(map[string]*domain.Context)
 }
