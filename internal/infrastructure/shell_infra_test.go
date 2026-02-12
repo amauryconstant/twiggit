@@ -4,81 +4,85 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/domain"
 )
 
-func TestShellInfrastructure_GenerateWrapper_Success(t *testing.T) {
-	testCases := []struct {
+type ShellInfrastructureTestSuite struct {
+	suite.Suite
+}
+
+func TestShellInfrastructure(t *testing.T) {
+	suite.Run(t, new(ShellInfrastructureTestSuite))
+}
+
+func (s *ShellInfrastructureTestSuite) TestGenerateWrapper() {
+	tests := []struct {
 		name        string
 		shellType   domain.ShellType
 		expectError bool
-		validate    func(t *testing.T, wrapper string)
+		validate    func(wrapper string)
 	}{
 		{
 			name:      "generate bash wrapper",
 			shellType: domain.ShellBash,
-			validate: func(t *testing.T, wrapper string) {
-				t.Helper()
-				assert.Contains(t, wrapper, "twiggit() {")
-				assert.Contains(t, wrapper, "builtin cd")
-				assert.Contains(t, wrapper, "command twiggit")
-				assert.Contains(t, wrapper, "# Twiggit bash wrapper")
+			validate: func(wrapper string) {
+				s.Contains(wrapper, "twiggit() {")
+				s.Contains(wrapper, "builtin cd")
+				s.Contains(wrapper, "command twiggit")
+				s.Contains(wrapper, "# Twiggit bash wrapper")
 			},
 		},
 		{
 			name:      "generate zsh wrapper",
 			shellType: domain.ShellZsh,
-			validate: func(t *testing.T, wrapper string) {
-				t.Helper()
-				assert.Contains(t, wrapper, "twiggit() {")
-				assert.Contains(t, wrapper, "builtin cd")
-				assert.Contains(t, wrapper, "command twiggit")
-				assert.Contains(t, wrapper, "# Twiggit zsh wrapper")
+			validate: func(wrapper string) {
+				s.Contains(wrapper, "twiggit() {")
+				s.Contains(wrapper, "builtin cd")
+				s.Contains(wrapper, "command twiggit")
+				s.Contains(wrapper, "# Twiggit zsh wrapper")
 			},
 		},
 		{
 			name:      "generate fish wrapper",
 			shellType: domain.ShellFish,
-			validate: func(t *testing.T, wrapper string) {
-				t.Helper()
-				assert.Contains(t, wrapper, "function twiggit")
-				assert.Contains(t, wrapper, "builtin cd")
-				assert.Contains(t, wrapper, "command twiggit")
-				assert.Contains(t, wrapper, "# Twiggit fish wrapper")
+			validate: func(wrapper string) {
+				s.Contains(wrapper, "function twiggit")
+				s.Contains(wrapper, "builtin cd")
+				s.Contains(wrapper, "command twiggit")
+				s.Contains(wrapper, "# Twiggit fish wrapper")
 			},
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
 			service := NewShellInfrastructure()
 			wrapper, err := service.GenerateWrapper(tc.shellType)
 
 			if tc.expectError {
-				require.Error(t, err)
+				s.Require().Error(err)
 			} else {
-				require.NoError(t, err)
-				assert.NotEmpty(t, wrapper)
-				tc.validate(t, wrapper)
+				s.Require().NoError(err)
+				s.NotEmpty(wrapper)
+				tc.validate(wrapper)
 			}
 		})
 	}
 }
 
-func TestShellInfrastructure_GenerateWrapper_InvalidShellType(t *testing.T) {
+func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_InvalidShellType() {
 	service := NewShellInfrastructure()
 	wrapper, err := service.GenerateWrapper(domain.ShellType("invalid"))
 
-	require.Error(t, err)
-	assert.Empty(t, wrapper)
-	assert.Contains(t, err.Error(), "unsupported shell type")
+	s.Require().Error(err)
+	s.Empty(wrapper)
+	s.Contains(err.Error(), "unsupported shell type")
 }
 
-func TestShellInfrastructure_DetectConfigFile_Success(t *testing.T) {
-	testCases := []struct {
+func (s *ShellInfrastructureTestSuite) TestDetectConfigFile() {
+	tests := []struct {
 		name        string
 		shellType   domain.ShellType
 		expectError bool
@@ -97,30 +101,29 @@ func TestShellInfrastructure_DetectConfigFile_Success(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
 			service := NewShellInfrastructure()
 			configFile, err := service.DetectConfigFile(tc.shellType)
 
 			if tc.expectError {
-				require.Error(t, err)
+				s.Require().Error(err)
 			} else {
-				require.NoError(t, err)
-				assert.NotEmpty(t, configFile)
-				// Should contain home directory and a valid config file name
-				assert.Contains(t, configFile, "/")
+				s.Require().NoError(err)
+				s.NotEmpty(configFile)
+				s.Contains(configFile, "/")
 			}
 		})
 	}
 }
 
-func TestShellInfrastructure_ValidateInstallation_Success(t *testing.T) {
+func (s *ShellInfrastructureTestSuite) TestValidateInstallation() {
 	originalHome := os.Getenv("HOME")
-	tempHome := t.TempDir()
+	tempHome := s.T().TempDir()
 	os.Setenv("HOME", tempHome)
 	defer os.Setenv("HOME", originalHome)
 
-	testCases := []struct {
+	tests := []struct {
 		name        string
 		shellType   domain.ShellType
 		expectError bool
@@ -128,51 +131,50 @@ func TestShellInfrastructure_ValidateInstallation_Success(t *testing.T) {
 		{
 			name:        "validate bash installation",
 			shellType:   domain.ShellBash,
-			expectError: true, // Will fail since wrapper not installed
+			expectError: true,
 		},
 		{
 			name:        "validate zsh installation",
 			shellType:   domain.ShellZsh,
-			expectError: true, // Will fail since wrapper not installed
+			expectError: true,
 		},
 		{
 			name:        "validate fish installation",
 			shellType:   domain.ShellFish,
-			expectError: true, // Will fail since wrapper not installed
+			expectError: true,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
 			service := NewShellInfrastructure()
 			configFile := tempHome + "/.bashrc"
 			err := service.ValidateInstallation(tc.shellType, configFile)
 
 			if tc.expectError {
-				require.Error(t, err)
-				// Should be a ShellError
+				s.Require().Error(err)
 				var shellErr *domain.ShellError
-				require.ErrorAs(t, err, &shellErr)
+				s.Require().ErrorAs(err, &shellErr)
 			} else {
-				require.NoError(t, err)
+				s.Require().NoError(err)
 			}
 		})
 	}
 }
 
-func TestShellInfrastructure_ValidateInstallation_InvalidShellType(t *testing.T) {
+func (s *ShellInfrastructureTestSuite) TestValidateInstallation_InvalidShellType() {
 	service := NewShellInfrastructure()
 	err := service.ValidateInstallation(domain.ShellType("invalid"), "")
 
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "config file path is empty")
+	s.Require().Error(err)
+	s.Contains(err.Error(), "config file path is empty")
 }
 
-func TestShellInfrastructure_HasWrapperBlock(t *testing.T) {
+func (s *ShellInfrastructureTestSuite) TestHasWrapperBlock() {
 	service := NewShellInfrastructure()
 	shellInfraImpl := service.(*shellInfrastructure)
 
-	testCases := []struct {
+	tests := []struct {
 		name           string
 		content        string
 		expectedResult bool
@@ -209,19 +211,19 @@ func TestShellInfrastructure_HasWrapperBlock(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
 			result := shellInfraImpl.hasWrapperBlock(tc.content)
-			assert.Equal(t, tc.expectedResult, result)
+			s.Equal(tc.expectedResult, result)
 		})
 	}
 }
 
-func TestShellInfrastructure_RemoveWrapperBlock(t *testing.T) {
+func (s *ShellInfrastructureTestSuite) TestRemoveWrapperBlock() {
 	service := NewShellInfrastructure()
 	shellInfraImpl := service.(*shellInfrastructure)
 
-	testCases := []struct {
+	tests := []struct {
 		name           string
 		content        string
 		expectedResult string
@@ -258,10 +260,10 @@ func TestShellInfrastructure_RemoveWrapperBlock(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
 			result := shellInfraImpl.removeWrapperBlock(tc.content)
-			assert.Equal(t, tc.expectedResult, result)
+			s.Equal(tc.expectedResult, result)
 		})
 	}
 }

@@ -4,20 +4,66 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
+	"twiggit/test/mocks"
 )
 
-func TestShellService_SetupShell_Success(t *testing.T) {
-	testCases := []struct {
+type ShellServiceTestSuite struct {
+	suite.Suite
+	service          application.ShellService
+	shellIntegration *mocks.MockShellInfrastructure
+	config           *domain.Config
+}
+
+func (s *ShellServiceTestSuite) SetupTest() {
+	s.config = domain.DefaultConfig()
+	s.shellIntegration = mocks.NewMockShellInfrastructure()
+	s.configureShellMock()
+	s.service = NewShellService(s.shellIntegration, s.config)
+}
+
+func (s *ShellServiceTestSuite) configureShellMock() {
+	s.shellIntegration.GenerateWrapperFunc = func(shellType domain.ShellType) (string, error) {
+		realService := infrastructure.NewShellInfrastructure()
+		return realService.GenerateWrapper(shellType)
+	}
+
+	s.shellIntegration.DetectConfigFileFunc = func(shellType domain.ShellType) (string, error) {
+		switch shellType {
+		case domain.ShellBash:
+			return "/home/user/.bashrc", nil
+		case domain.ShellZsh:
+			return "/home/user/.zshrc", nil
+		case domain.ShellFish:
+			return "/home/user/.config/fish/config.fish", nil
+		default:
+			return "/home/user/.bashrc", nil
+		}
+	}
+
+	s.shellIntegration.InstallWrapperFunc = func(shellType domain.ShellType, wrapper, configFile string, force bool) error {
+		return domain.NewShellError(domain.ErrWrapperInstallation, string(shellType), "mock installation failure")
+	}
+
+	s.shellIntegration.ValidateInstallationFunc = func(shellType domain.ShellType, configFile string) error {
+		return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "mock validation failure")
+	}
+}
+
+func TestShellService(t *testing.T) {
+	suite.Run(t, new(ShellServiceTestSuite))
+}
+
+func (s *ShellServiceTestSuite) TestSetupShell() {
+	tests := []struct {
 		name        string
 		request     *domain.SetupShellRequest
 		expectError bool
-		validate    func(t *testing.T, result *domain.SetupShellResult)
+		validate    func(*domain.SetupShellResult)
 	}{
 		{
 			name: "dry run setup for bash",
@@ -26,13 +72,12 @@ func TestShellService_SetupShell_Success(t *testing.T) {
 				Force:     false,
 				DryRun:    true,
 			},
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.True(t, result.DryRun)
-				assert.False(t, result.Installed)
-				assert.NotEmpty(t, result.WrapperContent)
-				assert.Contains(t, result.WrapperContent, "twiggit() {")
-				assert.Contains(t, result.WrapperContent, "# Twiggit bash wrapper")
+			validate: func(result *domain.SetupShellResult) {
+				s.True(result.DryRun)
+				s.False(result.Installed)
+				s.NotEmpty(result.WrapperContent)
+				s.Contains(result.WrapperContent, "twiggit() {")
+				s.Contains(result.WrapperContent, "# Twiggit bash wrapper")
 			},
 		},
 		{
@@ -42,13 +87,12 @@ func TestShellService_SetupShell_Success(t *testing.T) {
 				Force:     false,
 				DryRun:    true,
 			},
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.True(t, result.DryRun)
-				assert.False(t, result.Installed)
-				assert.NotEmpty(t, result.WrapperContent)
-				assert.Contains(t, result.WrapperContent, "twiggit() {")
-				assert.Contains(t, result.WrapperContent, "# Twiggit zsh wrapper")
+			validate: func(result *domain.SetupShellResult) {
+				s.True(result.DryRun)
+				s.False(result.Installed)
+				s.NotEmpty(result.WrapperContent)
+				s.Contains(result.WrapperContent, "twiggit() {")
+				s.Contains(result.WrapperContent, "# Twiggit zsh wrapper")
 			},
 		},
 		{
@@ -58,13 +102,12 @@ func TestShellService_SetupShell_Success(t *testing.T) {
 				Force:     false,
 				DryRun:    true,
 			},
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.True(t, result.DryRun)
-				assert.False(t, result.Installed)
-				assert.NotEmpty(t, result.WrapperContent)
-				assert.Contains(t, result.WrapperContent, "function twiggit")
-				assert.Contains(t, result.WrapperContent, "# Twiggit fish wrapper")
+			validate: func(result *domain.SetupShellResult) {
+				s.True(result.DryRun)
+				s.False(result.Installed)
+				s.NotEmpty(result.WrapperContent)
+				s.Contains(result.WrapperContent, "function twiggit")
+				s.Contains(result.WrapperContent, "# Twiggit fish wrapper")
 			},
 		},
 		{
@@ -74,30 +117,29 @@ func TestShellService_SetupShell_Success(t *testing.T) {
 				Force:     true,
 				DryRun:    false,
 			},
-			expectError: true, // Will fail since we can't actually install in tests
+			expectError: true,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			service := setupTestShellService()
-			result, err := service.SetupShell(context.Background(), tc.request)
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			result, err := s.service.SetupShell(context.Background(), tc.request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Nil(t, result)
+				s.Require().Error(err)
+				s.Nil(result)
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, result)
-				assert.Equal(t, tc.request.ShellType, result.ShellType)
-				tc.validate(t, result)
+				s.Require().NoError(err)
+				s.Require().NotNil(result)
+				s.Equal(tc.request.ShellType, result.ShellType)
+				tc.validate(result)
 			}
 		})
 	}
 }
 
-func TestShellService_SetupShell_Validation(t *testing.T) {
-	testCases := []struct {
+func (s *ShellServiceTestSuite) TestSetupShellValidation() {
+	tests := []struct {
 		name         string
 		request      *domain.SetupShellRequest
 		setEnv       func()
@@ -123,7 +165,7 @@ func TestShellService_SetupShell_Validation(t *testing.T) {
 				DryRun:    true,
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/sh")
+				s.T().Setenv("SHELL", "/bin/sh")
 			},
 			unsetEnv:     func() {},
 			expectError:  true,
@@ -131,8 +173,8 @@ func TestShellService_SetupShell_Validation(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
 			if tc.setEnv != nil {
 				tc.setEnv()
 				defer func() {
@@ -142,25 +184,24 @@ func TestShellService_SetupShell_Validation(t *testing.T) {
 				}()
 			}
 
-			service := setupTestShellService()
-			result, err := service.SetupShell(context.Background(), tc.request)
+			result, err := s.service.SetupShell(context.Background(), tc.request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Nil(t, result)
+				s.Require().Error(err)
+				s.Nil(result)
 				if tc.errorMessage != "" {
-					assert.Contains(t, err.Error(), tc.errorMessage)
+					s.Contains(err.Error(), tc.errorMessage)
 				}
 			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, result)
+				s.Require().NoError(err)
+				s.NotNil(result)
 			}
 		})
 	}
 }
 
-func TestShellService_ValidateInstallation_Success(t *testing.T) {
-	testCases := []struct {
+func (s *ShellServiceTestSuite) TestValidateInstallation() {
+	tests := []struct {
 		name        string
 		request     *domain.ValidateInstallationRequest
 		expectError bool
@@ -170,44 +211,43 @@ func TestShellService_ValidateInstallation_Success(t *testing.T) {
 			request: &domain.ValidateInstallationRequest{
 				ShellType: domain.ShellBash,
 			},
-			expectError: false, // Should succeed with result showing not installed
+			expectError: false,
 		},
 		{
 			name: "validate zsh installation",
 			request: &domain.ValidateInstallationRequest{
 				ShellType: domain.ShellZsh,
 			},
-			expectError: false, // Should succeed with result showing not installed
+			expectError: false,
 		},
 		{
 			name: "validate fish installation",
 			request: &domain.ValidateInstallationRequest{
 				ShellType: domain.ShellFish,
 			},
-			expectError: false, // Should succeed with result showing not installed
+			expectError: false,
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			service := setupTestShellService()
-			result, err := service.ValidateInstallation(context.Background(), tc.request)
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			result, err := s.service.ValidateInstallation(context.Background(), tc.request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Nil(t, result)
+				s.Require().Error(err)
+				s.Nil(result)
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, result)
-				assert.False(t, result.Installed) // Should show not installed
-				assert.Equal(t, tc.request.ShellType, result.ShellType)
+				s.Require().NoError(err)
+				s.Require().NotNil(result)
+				s.False(result.Installed)
+				s.Equal(tc.request.ShellType, result.ShellType)
 			}
 		})
 	}
 }
 
-func TestShellService_ValidateInstallation_Validation(t *testing.T) {
-	testCases := []struct {
+func (s *ShellServiceTestSuite) TestValidateInstallationValidation() {
+	tests := []struct {
 		name         string
 		request      *domain.ValidateInstallationRequest
 		setEnv       func()
@@ -229,7 +269,7 @@ func TestShellService_ValidateInstallation_Validation(t *testing.T) {
 				ShellType: domain.ShellType(""),
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/sh")
+				s.T().Setenv("SHELL", "/bin/sh")
 			},
 			unsetEnv:     func() {},
 			expectError:  true,
@@ -237,8 +277,8 @@ func TestShellService_ValidateInstallation_Validation(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
 			if tc.setEnv != nil {
 				tc.setEnv()
 				defer func() {
@@ -248,41 +288,39 @@ func TestShellService_ValidateInstallation_Validation(t *testing.T) {
 				}()
 			}
 
-			service := setupTestShellService()
-			result, err := service.ValidateInstallation(context.Background(), tc.request)
+			result, err := s.service.ValidateInstallation(context.Background(), tc.request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Nil(t, result)
+				s.Require().Error(err)
+				s.Nil(result)
 				if tc.errorMessage != "" {
-					assert.Contains(t, err.Error(), tc.errorMessage)
+					s.Contains(err.Error(), tc.errorMessage)
 				}
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, result)
+				s.Require().NoError(err)
+				s.NotNil(result)
 			}
 		})
 	}
 }
 
-func TestShellService_GenerateWrapper_Success(t *testing.T) {
-	testCases := []struct {
+func (s *ShellServiceTestSuite) TestGenerateWrapper() {
+	tests := []struct {
 		name        string
 		request     *domain.GenerateWrapperRequest
 		expectError bool
-		validate    func(t *testing.T, result *domain.GenerateWrapperResult)
+		validate    func(*domain.GenerateWrapperResult)
 	}{
 		{
 			name: "generate bash wrapper",
 			request: &domain.GenerateWrapperRequest{
 				ShellType: domain.ShellBash,
 			},
-			validate: func(t *testing.T, result *domain.GenerateWrapperResult) {
-				t.Helper()
-				assert.Equal(t, domain.ShellBash, result.ShellType)
-				assert.NotEmpty(t, result.WrapperContent)
-				assert.Contains(t, result.WrapperContent, "twiggit() {")
-				assert.Contains(t, result.WrapperContent, "# Twiggit bash wrapper")
+			validate: func(result *domain.GenerateWrapperResult) {
+				s.Equal(domain.ShellBash, result.ShellType)
+				s.NotEmpty(result.WrapperContent)
+				s.Contains(result.WrapperContent, "twiggit() {")
+				s.Contains(result.WrapperContent, "# Twiggit bash wrapper")
 			},
 		},
 		{
@@ -290,12 +328,11 @@ func TestShellService_GenerateWrapper_Success(t *testing.T) {
 			request: &domain.GenerateWrapperRequest{
 				ShellType: domain.ShellZsh,
 			},
-			validate: func(t *testing.T, result *domain.GenerateWrapperResult) {
-				t.Helper()
-				assert.Equal(t, domain.ShellZsh, result.ShellType)
-				assert.NotEmpty(t, result.WrapperContent)
-				assert.Contains(t, result.WrapperContent, "twiggit() {")
-				assert.Contains(t, result.WrapperContent, "# Twiggit zsh wrapper")
+			validate: func(result *domain.GenerateWrapperResult) {
+				s.Equal(domain.ShellZsh, result.ShellType)
+				s.NotEmpty(result.WrapperContent)
+				s.Contains(result.WrapperContent, "twiggit() {")
+				s.Contains(result.WrapperContent, "# Twiggit zsh wrapper")
 			},
 		},
 		{
@@ -303,35 +340,33 @@ func TestShellService_GenerateWrapper_Success(t *testing.T) {
 			request: &domain.GenerateWrapperRequest{
 				ShellType: domain.ShellFish,
 			},
-			validate: func(t *testing.T, result *domain.GenerateWrapperResult) {
-				t.Helper()
-				assert.Equal(t, domain.ShellFish, result.ShellType)
-				assert.NotEmpty(t, result.WrapperContent)
-				assert.Contains(t, result.WrapperContent, "function twiggit")
-				assert.Contains(t, result.WrapperContent, "# Twiggit fish wrapper")
+			validate: func(result *domain.GenerateWrapperResult) {
+				s.Equal(domain.ShellFish, result.ShellType)
+				s.NotEmpty(result.WrapperContent)
+				s.Contains(result.WrapperContent, "function twiggit")
+				s.Contains(result.WrapperContent, "# Twiggit fish wrapper")
 			},
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			service := setupTestShellService()
-			result, err := service.GenerateWrapper(context.Background(), tc.request)
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			result, err := s.service.GenerateWrapper(context.Background(), tc.request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Nil(t, result)
+				s.Require().Error(err)
+				s.Nil(result)
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, result)
-				tc.validate(t, result)
+				s.Require().NoError(err)
+				s.Require().NotNil(result)
+				tc.validate(result)
 			}
 		})
 	}
 }
 
-func TestShellService_GenerateWrapper_Validation(t *testing.T) {
-	testCases := []struct {
+func (s *ShellServiceTestSuite) TestGenerateWrapperValidation() {
+	tests := []struct {
 		name         string
 		request      *domain.GenerateWrapperRequest
 		expectError  bool
@@ -355,69 +390,26 @@ func TestShellService_GenerateWrapper_Validation(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			service := setupTestShellService()
-			result, err := service.GenerateWrapper(context.Background(), tc.request)
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			result, err := s.service.GenerateWrapper(context.Background(), tc.request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Nil(t, result)
+				s.Require().Error(err)
+				s.Nil(result)
 				if tc.errorMessage != "" {
-					assert.Contains(t, err.Error(), tc.errorMessage)
+					s.Contains(err.Error(), tc.errorMessage)
 				}
 			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, result)
+				s.Require().NoError(err)
+				s.NotNil(result)
 			}
 		})
 	}
 }
 
-// setupTestShellService creates a test instance of ShellService
-func setupTestShellService() application.ShellService {
-	// Create a mock shell integration service
-	shellIntegration := &mockShellIntegration{}
-	config := domain.DefaultConfig()
-
-	return NewShellService(shellIntegration, config)
-}
-
-// mockShellIntegration is a mock implementation of shell integration
-type mockShellIntegration struct{}
-
-func (m *mockShellIntegration) GenerateWrapper(shellType domain.ShellType) (string, error) {
-	// Use the real shell infrastructure service for wrapper generation
-	realService := infrastructure.NewShellInfrastructure()
-	return realService.GenerateWrapper(shellType)
-}
-
-func (m *mockShellIntegration) DetectConfigFile(shellType domain.ShellType) (string, error) {
-	// Return a mock config file path based on shell type
-	switch shellType {
-	case domain.ShellBash:
-		return "/home/user/.bashrc", nil
-	case domain.ShellZsh:
-		return "/home/user/.zshrc", nil
-	case domain.ShellFish:
-		return "/home/user/.config/fish/config.fish", nil
-	default:
-		return "/home/user/.bashrc", nil
-	}
-}
-
-func (m *mockShellIntegration) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
-	// Always fail installation in tests to avoid actual file system changes
-	return domain.NewShellError(domain.ErrWrapperInstallation, string(shellType), "mock installation failure")
-}
-
-func (m *mockShellIntegration) ValidateInstallation(shellType domain.ShellType, configFile string) error {
-	// Always fail validation in tests since wrapper not installed
-	return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "mock validation failure")
-}
-
-func TestShellService_composeWrapper(t *testing.T) {
-	testCases := []struct {
+func (s *ShellServiceTestSuite) TestComposeWrapper() {
+	tests := []struct {
 		name      string
 		template  string
 		shellType domain.ShellType
@@ -473,8 +465,8 @@ func TestShellService_composeWrapper(t *testing.T) {
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
 			config := domain.DefaultConfig()
 			service := &shellService{
 				config: config,
@@ -482,19 +474,19 @@ func TestShellService_composeWrapper(t *testing.T) {
 
 			result := service.composeWrapper(tc.template, tc.shellType)
 
-			assert.Equal(t, tc.expected, result)
+			s.Equal(tc.expected, result)
 		})
 	}
 }
 
-func TestShellService_SetupShell_AutoDetection(t *testing.T) {
-	testCases := []struct {
+func (s *ShellServiceTestSuite) TestSetupShellAutoDetection() {
+	tests := []struct {
 		name        string
 		request     *domain.SetupShellRequest
 		setEnv      func()
 		unsetEnv    func()
 		expectError bool
-		validate    func(t *testing.T, result *domain.SetupShellResult)
+		validate    func(*domain.SetupShellResult)
 	}{
 		{
 			name: "auto-detect bash when no args provided",
@@ -504,14 +496,13 @@ func TestShellService_SetupShell_AutoDetection(t *testing.T) {
 				DryRun:     true,
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/bash")
+				s.T().Setenv("SHELL", "/bin/bash")
 			},
 			unsetEnv:    func() {},
 			expectError: false,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.Equal(t, domain.ShellBash, result.ShellType)
-				assert.Contains(t, result.ConfigFile, ".bashrc")
+			validate: func(result *domain.SetupShellResult) {
+				s.Equal(domain.ShellBash, result.ShellType)
+				s.Contains(result.ConfigFile, ".bashrc")
 			},
 		},
 		{
@@ -522,14 +513,13 @@ func TestShellService_SetupShell_AutoDetection(t *testing.T) {
 				DryRun:     true,
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/zsh")
+				s.T().Setenv("SHELL", "/bin/zsh")
 			},
 			unsetEnv:    func() {},
 			expectError: false,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.Equal(t, domain.ShellZsh, result.ShellType)
-				assert.Contains(t, result.ConfigFile, ".zshrc")
+			validate: func(result *domain.SetupShellResult) {
+				s.Equal(domain.ShellZsh, result.ShellType)
+				s.Contains(result.ConfigFile, ".zshrc")
 			},
 		},
 		{
@@ -540,14 +530,13 @@ func TestShellService_SetupShell_AutoDetection(t *testing.T) {
 				DryRun:     true,
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "/usr/local/bin/fish")
+				s.T().Setenv("SHELL", "/usr/local/bin/fish")
 			},
 			unsetEnv:    func() {},
 			expectError: false,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.Equal(t, domain.ShellFish, result.ShellType)
-				assert.Contains(t, result.ConfigFile, "config.fish")
+			validate: func(result *domain.SetupShellResult) {
+				s.Equal(domain.ShellFish, result.ShellType)
+				s.Contains(result.ConfigFile, "config.fish")
 			},
 		},
 		{
@@ -558,7 +547,7 @@ func TestShellService_SetupShell_AutoDetection(t *testing.T) {
 				DryRun:     true,
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "")
+				s.T().Setenv("SHELL", "")
 			},
 			unsetEnv:    func() {},
 			expectError: true,
@@ -571,7 +560,7 @@ func TestShellService_SetupShell_AutoDetection(t *testing.T) {
 				DryRun:     true,
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/sh")
+				s.T().Setenv("SHELL", "/bin/sh")
 			},
 			unsetEnv:    func() {},
 			expectError: true,
@@ -584,14 +573,13 @@ func TestShellService_SetupShell_AutoDetection(t *testing.T) {
 				DryRun:     true,
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/bash")
+				s.T().Setenv("SHELL", "/bin/bash")
 			},
 			unsetEnv:    func() {},
 			expectError: false,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.Equal(t, domain.ShellZsh, result.ShellType)
-				assert.Contains(t, result.ConfigFile, ".zshrc")
+			validate: func(result *domain.SetupShellResult) {
+				s.Equal(domain.ShellZsh, result.ShellType)
+				s.Contains(result.ConfigFile, ".zshrc")
 			},
 		},
 		{
@@ -602,13 +590,12 @@ func TestShellService_SetupShell_AutoDetection(t *testing.T) {
 				DryRun:     true,
 			},
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/bash")
+				s.T().Setenv("SHELL", "/bin/bash")
 			},
 			unsetEnv:    func() {},
 			expectError: false,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.Equal(t, "/custom/zshrc", result.ConfigFile)
+			validate: func(result *domain.SetupShellResult) {
+				s.Equal("/custom/zshrc", result.ConfigFile)
 			},
 		},
 		{
@@ -621,30 +608,30 @@ func TestShellService_SetupShell_AutoDetection(t *testing.T) {
 			setEnv:      func() {},
 			unsetEnv:    func() {},
 			expectError: false,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
-				t.Helper()
-				assert.Equal(t, domain.ShellBash, result.ShellType)
-				assert.Equal(t, "/custom/bashrc", result.ConfigFile)
+			validate: func(result *domain.SetupShellResult) {
+				s.Equal(domain.ShellBash, result.ShellType)
+				s.Equal("/custom/bashrc", result.ConfigFile)
 			},
 		},
 	}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.setEnv()
-			defer tc.unsetEnv()
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			if tc.setEnv != nil {
+				tc.setEnv()
+				defer tc.unsetEnv()
+			}
 
-			service := setupTestShellService()
-			result, err := service.SetupShell(context.Background(), tc.request)
+			result, err := s.service.SetupShell(context.Background(), tc.request)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Nil(t, result)
+				s.Require().Error(err)
+				s.Nil(result)
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, result)
+				s.Require().NoError(err)
+				s.Require().NotNil(result)
 				if tc.validate != nil {
-					tc.validate(t, result)
+					tc.validate(result)
 				}
 			}
 		})

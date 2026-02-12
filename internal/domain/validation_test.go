@@ -3,109 +3,105 @@ package domain
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestValidateBranchName_EmptyBranch(t *testing.T) {
-	// RED: Test that will fail initially
+type ValidationTestSuite struct {
+	suite.Suite
+}
+
+func TestValidationSuite(t *testing.T) {
+	suite.Run(t, new(ValidationTestSuite))
+}
+
+func (s *ValidationTestSuite) TestValidateBranchName_EmptyBranch() {
 	result := ValidateBranchName("")
 
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "branch name is required")
-	assert.Contains(t, result.Error.Error(), "💡 Provide a valid branch name")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "branch name is required")
+	s.Contains(result.Error.Error(), "💡 Provide a valid branch name")
 }
 
-func TestValidateBranchName_InvalidCharacters(t *testing.T) {
-	// RED: Test invalid branch name characters
+func (s *ValidationTestSuite) TestValidateBranchName_InvalidCharacters() {
 	result := ValidateBranchName("feature@branch#name")
 
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "branch name format is invalid")
-	assert.Contains(t, result.Error.Error(), "💡 Use only alphanumeric characters, dots, hyphens, and underscores")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "branch name format is invalid")
+	s.Contains(result.Error.Error(), "💡 Use only alphanumeric characters, dots, hyphens, and underscores")
 }
 
-func TestValidateBranchName_ValidBranch(t *testing.T) {
-	// RED: Test valid branch name (this should pass once implemented)
+func (s *ValidationTestSuite) TestValidateBranchName_ValidBranch() {
 	result := ValidateBranchName("feature-branch")
 
-	assert.True(t, result.IsSuccess())
-	assert.True(t, result.Value)
+	s.True(result.IsSuccess())
+	s.True(result.Value)
 }
 
-func TestValidateBranchName_WhitespaceOnly(t *testing.T) {
-	// RED: Test whitespace-only branch name
+func (s *ValidationTestSuite) TestValidateBranchName_WhitespaceOnly() {
 	result := ValidateBranchName("   ")
 
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "branch name is required")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "branch name is required")
 }
 
-func TestValidateProjectName_EmptyProject(t *testing.T) {
-	// RED: Test empty project name
+func (s *ValidationTestSuite) TestValidateProjectName_EmptyProject() {
 	result := ValidateProjectName("")
 
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "project name is required")
-	assert.Contains(t, result.Error.Error(), "💡 Provide a valid project name")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "project name is required")
+	s.Contains(result.Error.Error(), "💡 Provide a valid project name")
 }
 
-func TestValidateProjectName_InvalidCharacters(t *testing.T) {
-	// RED: Test invalid project name characters
+func (s *ValidationTestSuite) TestValidateProjectName_InvalidCharacters() {
 	result := ValidateProjectName("project@invalid")
 
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "project name format is invalid")
-	assert.Contains(t, result.Error.Error(), "💡 Use only alphanumeric characters, hyphens, and underscores")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "project name format is invalid")
+	s.Contains(result.Error.Error(), "💡 Use only alphanumeric characters, hyphens, and underscores")
 }
 
-func TestValidateProjectName_ValidProject(t *testing.T) {
-	// RED: Test valid project name
+func (s *ValidationTestSuite) TestValidateProjectName_ValidProject() {
 	result := ValidateProjectName("my-project")
 
-	assert.True(t, result.IsSuccess())
-	assert.True(t, result.Value)
+	s.True(result.IsSuccess())
+	s.True(result.Value)
 }
 
-func TestValidateShellType_EmptyShell(t *testing.T) {
-	// RED: Test empty shell type
+func (s *ValidationTestSuite) TestValidateShellType_EmptyShell() {
 	result := ValidateShellType("")
 
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "shell type is required")
-	assert.Contains(t, result.Error.Error(), "💡 Provide a valid shell type (bash, zsh, fish)")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "shell type is required")
+	s.Contains(result.Error.Error(), "💡 Provide a valid shell type (bash, zsh, fish)")
 }
 
-func TestValidateShellType_UnsupportedShell(t *testing.T) {
-	// RED: Test unsupported shell type
+func (s *ValidationTestSuite) TestValidateShellType_UnsupportedShell() {
 	result := ValidateShellType("powershell")
 
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "unsupported shell type")
-	assert.Contains(t, result.Error.Error(), "💡 Supported shells: bash, zsh, fish")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "unsupported shell type")
+	s.Contains(result.Error.Error(), "💡 Supported shells: bash, zsh, fish")
 }
 
-func TestValidateShellType_ValidShell(t *testing.T) {
-	// RED: Test valid shell types
+func (s *ValidationTestSuite) TestValidateShellType_ValidShell() {
 	validShells := []string{"bash", "zsh", "fish"}
 
 	for _, shell := range validShells {
 		result := ValidateShellType(shell)
-		assert.True(t, result.IsSuccess(), "Shell %s should be valid", shell)
-		assert.True(t, result.Value)
+		s.True(result.IsSuccess(), "Shell %s should be valid", shell)
+		s.True(result.Value)
 	}
 }
 
-func TestValidateShellType_WhitespaceHandling(t *testing.T) {
-	// RED: Test shell type with extra whitespace
+func (s *ValidationTestSuite) TestValidateShellType_WhitespaceHandling() {
 	result := ValidateShellType("  bash  ")
 
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "shell type format is invalid")
-	assert.Contains(t, result.Error.Error(), "💡 Shell type should not contain leading or trailing whitespace")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "shell type format is invalid")
+	s.Contains(result.Error.Error(), "💡 Shell type should not contain leading or trailing whitespace")
 }
 
-func TestValidationPipeline_ComposeValidations(t *testing.T) {
-	// RED: Test validation pipeline composition
+func (s *ValidationTestSuite) TestValidationPipeline_ComposeValidations() {
 	pipeline := NewValidationPipeline(
 		ValidateBranchNameNotEmpty,
 		ValidateBranchNameFormat,
@@ -113,29 +109,28 @@ func TestValidationPipeline_ComposeValidations(t *testing.T) {
 
 	// Test valid input
 	result := pipeline.Validate("valid-branch")
-	assert.True(t, result.IsSuccess())
+	s.True(result.IsSuccess())
 
 	// Test invalid input (should fail on first validation)
 	result = pipeline.Validate("")
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "branch name is required")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "branch name is required")
 
 	// Test invalid format (should fail on second validation)
 	result = pipeline.Validate("invalid@branch")
-	assert.False(t, result.IsSuccess())
-	assert.Contains(t, result.Error.Error(), "branch name format is invalid")
+	s.False(result.IsSuccess())
+	s.Contains(result.Error.Error(), "branch name format is invalid")
 }
 
-func TestValidationPipeline_EmptyPipeline(t *testing.T) {
-	// RED: Test empty validation pipeline
+func (s *ValidationTestSuite) TestValidationPipeline_EmptyPipeline() {
 	pipeline := NewValidationPipeline[string]()
 
 	result := pipeline.Validate("any-input")
-	assert.True(t, result.IsSuccess())
-	assert.True(t, result.Value)
+	s.True(result.IsSuccess())
+	s.True(result.Value)
 }
 
-func TestValidateBranchName_InvalidTrailingChars(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateBranchName_InvalidTrailingChars() {
 	invalidCases := []string{
 		"branch-",
 		"branch.",
@@ -149,16 +144,16 @@ func TestValidateBranchName_InvalidTrailingChars(t *testing.T) {
 	}
 
 	for _, branchName := range invalidCases {
-		t.Run(branchName, func(t *testing.T) {
+		s.Run(branchName, func() {
 			result := ValidateBranchName(branchName)
 
-			assert.False(t, result.IsSuccess())
-			assert.Contains(t, result.Error.Error(), "cannot end with")
+			s.False(result.IsSuccess())
+			s.Contains(result.Error.Error(), "cannot end with")
 		})
 	}
 }
 
-func TestValidateBranchName_ValidEndingChars(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateBranchName_ValidEndingChars() {
 	validCases := []string{
 		"branch-1",
 		"branch_a",
@@ -172,16 +167,16 @@ func TestValidateBranchName_ValidEndingChars(t *testing.T) {
 	}
 
 	for _, branchName := range validCases {
-		t.Run(branchName, func(t *testing.T) {
+		s.Run(branchName, func() {
 			result := ValidateBranchName(branchName)
 
-			assert.True(t, result.IsSuccess())
-			assert.True(t, result.Value)
+			s.True(result.IsSuccess())
+			s.True(result.Value)
 		})
 	}
 }
 
-func TestValidateBranchName_ReservedNames(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateBranchName_ReservedNames() {
 	reservedCases := []struct {
 		name       string
 		branchName string
@@ -209,16 +204,16 @@ func TestValidateBranchName_ReservedNames(t *testing.T) {
 	}
 
 	for _, tc := range reservedCases {
-		t.Run(tc.name, func(t *testing.T) {
+		s.Run(tc.name, func() {
 			result := ValidateBranchName(tc.branchName)
 
-			assert.False(t, result.IsSuccess(), "Reserved branch name %q should fail validation", tc.branchName)
-			assert.Contains(t, result.Error.Error(), "reserved branch name")
+			s.False(result.IsSuccess(), "Reserved branch name %q should fail validation", tc.branchName)
+			s.Contains(result.Error.Error(), "reserved branch name")
 		})
 	}
 }
 
-func TestValidateBranchName_NotReserved(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateBranchName_NotReserved() {
 	validCases := []string{
 		"main-fix",
 		"master-branch",
@@ -235,16 +230,16 @@ func TestValidateBranchName_NotReserved(t *testing.T) {
 	}
 
 	for _, branchName := range validCases {
-		t.Run(branchName, func(t *testing.T) {
+		s.Run(branchName, func() {
 			result := ValidateBranchName(branchName)
 
-			assert.True(t, result.IsSuccess(), "Branch name %q should pass validation", branchName)
-			assert.True(t, result.Value)
+			s.True(result.IsSuccess(), "Branch name %q should pass validation", branchName)
+			s.True(result.Value)
 		})
 	}
 }
 
-func TestValidateBranchName_InvalidLeadingChars(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateBranchName_InvalidLeadingChars() {
 	invalidCases := []string{
 		"-branch",
 		".branch",
@@ -259,16 +254,16 @@ func TestValidateBranchName_InvalidLeadingChars(t *testing.T) {
 	}
 
 	for _, branchName := range invalidCases {
-		t.Run(branchName, func(t *testing.T) {
+		s.Run(branchName, func() {
 			result := ValidateBranchName(branchName)
 
-			assert.False(t, result.IsSuccess(), "Branch name %q should fail validation", branchName)
-			assert.Contains(t, result.Error.Error(), "cannot start with")
+			s.False(result.IsSuccess(), "Branch name %q should fail validation", branchName)
+			s.Contains(result.Error.Error(), "cannot start with")
 		})
 	}
 }
 
-func TestValidateBranchName_ValidLeadingChars(t *testing.T) {
+func (s *ValidationTestSuite) TestValidateBranchName_ValidLeadingChars() {
 	validCases := []string{
 		"branch-1",
 		"branch-a",
@@ -285,11 +280,11 @@ func TestValidateBranchName_ValidLeadingChars(t *testing.T) {
 	}
 
 	for _, branchName := range validCases {
-		t.Run(branchName, func(t *testing.T) {
+		s.Run(branchName, func() {
 			result := ValidateBranchName(branchName)
 
-			assert.True(t, result.IsSuccess(), "Branch name %q should pass validation", branchName)
-			assert.True(t, result.Value)
+			s.True(result.IsSuccess(), "Branch name %q should pass validation", branchName)
+			s.True(result.Value)
 		})
 	}
 }

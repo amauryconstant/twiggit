@@ -3,11 +3,18 @@ package domain
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestProject_NewProject(t *testing.T) {
+type ProjectTestSuite struct {
+	suite.Suite
+}
+
+func TestProjectSuite(t *testing.T) {
+	suite.Run(t, new(ProjectTestSuite))
+}
+
+func (s *ProjectTestSuite) TestNewProject() {
 	testCases := []struct {
 		name         string
 		projectName  string
@@ -38,18 +45,18 @@ func TestProject_NewProject(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		s.Run(tc.name, func() {
 			project, err := NewProject(tc.projectName, tc.path)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errorMessage)
-				assert.Nil(t, project)
+				s.Require().Error(err)
+				s.Contains(err.Error(), tc.errorMessage)
+				s.Nil(project)
 			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, project)
-				assert.Equal(t, tc.projectName, project.Name())
-				assert.Equal(t, tc.path, project.Path())
+				s.Require().NoError(err)
+				s.NotNil(project)
+				s.Equal(tc.projectName, project.Name())
+				s.Equal(tc.path, project.Path())
 			}
 		})
 	}

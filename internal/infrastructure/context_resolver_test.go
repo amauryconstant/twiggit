@@ -5,14 +5,29 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
 )
 
-func TestContextResolver_ResolveIdentifier(t *testing.T) {
+type ContextResolverTestSuite struct {
+	suite.Suite
+	config *domain.Config
+}
+
+func (s *ContextResolverTestSuite) SetupTest() {
+	s.config = &domain.Config{
+		ProjectsDirectory:  "/home/user/Projects",
+		WorktreesDirectory: "/home/user/Worktrees",
+	}
+}
+
+func TestContextResolver(t *testing.T) {
+	suite.Run(t, new(ContextResolverTestSuite))
+}
+
+func (s *ContextResolverTestSuite) TestResolveIdentifier() {
 	tests := []struct {
 		name           string
 		context        *domain.Context
@@ -116,33 +131,28 @@ func TestContextResolver_ResolveIdentifier(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := &domain.Config{
-				ProjectsDirectory:  "/home/user/Projects",
-				WorktreesDirectory: "/home/user/Worktrees",
-			}
-
-			resolver := NewContextResolver(config, nil)
+		s.Run(tt.name, func() {
+			resolver := NewContextResolver(s.config, nil)
 			result, err := resolver.ResolveIdentifier(tt.context, tt.identifier)
 
 			if tt.expectError {
-				assert.Error(t, err)
+				s.Require().Error(err)
 				return
 			}
 
-			require.NoError(t, err)
-			assert.Equal(t, tt.expectedType, result.Type)
-			assert.Equal(t, tt.expectedProj, result.ProjectName)
+			s.Require().NoError(err)
+			s.Equal(tt.expectedType, result.Type)
+			s.Equal(tt.expectedProj, result.ProjectName)
 			if tt.expectedBranch != "" {
-				assert.Equal(t, tt.expectedBranch, result.BranchName)
+				s.Equal(tt.expectedBranch, result.BranchName)
 			}
-			assert.Equal(t, tt.expectedPath, result.ResolvedPath)
-			assert.NotEmpty(t, result.Explanation)
+			s.Equal(tt.expectedPath, result.ResolvedPath)
+			s.NotEmpty(result.Explanation)
 		})
 	}
 }
 
-func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
+func (s *ContextResolverTestSuite) TestGetResolutionSuggestions() {
 	tests := []struct {
 		name          string
 		context       *domain.Context
@@ -186,38 +196,27 @@ func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := &domain.Config{
-				ProjectsDirectory:  "/home/user/Projects",
-				WorktreesDirectory: "/home/user/Worktrees",
-			}
-
-			resolver := NewContextResolver(config, nil)
+		s.Run(tt.name, func() {
+			resolver := NewContextResolver(s.config, nil)
 			suggestions, err := resolver.GetResolutionSuggestions(tt.context, tt.partial)
 
-			require.NoError(t, err)
-			assert.Len(t, suggestions, tt.expectedCount)
+			s.Require().NoError(err)
+			s.Len(suggestions, tt.expectedCount)
 
 			if len(tt.expectedTexts) > 0 {
 				suggestionTexts := make([]string, len(suggestions))
 				for i, suggestion := range suggestions {
 					suggestionTexts[i] = suggestion.Text
 				}
-				assert.Equal(t, tt.expectedTexts, suggestionTexts)
+				s.Equal(tt.expectedTexts, suggestionTexts)
 			}
 		})
 	}
 }
 
-func TestContextResolver_WorktreeContextResolution(t *testing.T) {
-	config := &domain.Config{
-		ProjectsDirectory:  "/home/user/Projects",
-		WorktreesDirectory: "/home/user/Worktrees",
-	}
+func (s *ContextResolverTestSuite) TestWorktreeContextResolution() {
+	resolver := NewContextResolver(s.config, nil)
 
-	resolver := NewContextResolver(config, nil)
-
-	// Test worktree context resolving to different branch
 	ctx := &domain.Context{
 		Type:        domain.ContextWorktree,
 		ProjectName: "my-project",
@@ -226,24 +225,18 @@ func TestContextResolver_WorktreeContextResolution(t *testing.T) {
 	}
 
 	result, err := resolver.ResolveIdentifier(ctx, "other-branch")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	assert.Equal(t, domain.PathTypeWorktree, result.Type)
-	assert.Equal(t, "my-project", result.ProjectName)
-	assert.Equal(t, "other-branch", result.BranchName)
-	assert.Equal(t, "/home/user/Worktrees/my-project/other-branch", result.ResolvedPath)
-	assert.Contains(t, result.Explanation, "my-project")
+	s.Equal(domain.PathTypeWorktree, result.Type)
+	s.Equal("my-project", result.ProjectName)
+	s.Equal("other-branch", result.BranchName)
+	s.Equal("/home/user/Worktrees/my-project/other-branch", result.ResolvedPath)
+	s.Contains(result.Explanation, "my-project")
 }
 
-func TestContextResolver_CrossProjectReference(t *testing.T) {
-	config := &domain.Config{
-		ProjectsDirectory:  "/home/user/Projects",
-		WorktreesDirectory: "/home/user/Worktrees",
-	}
+func (s *ContextResolverTestSuite) TestCrossProjectReference() {
+	resolver := NewContextResolver(s.config, nil)
 
-	resolver := NewContextResolver(config, nil)
-
-	// Test from project context
 	ctx := &domain.Context{
 		Type:        domain.ContextProject,
 		ProjectName: "current-project",
@@ -251,18 +244,16 @@ func TestContextResolver_CrossProjectReference(t *testing.T) {
 	}
 
 	result, err := resolver.ResolveIdentifier(ctx, "other-project/feature-branch")
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	assert.Equal(t, domain.PathTypeWorktree, result.Type)
-	assert.Equal(t, "other-project", result.ProjectName)
-	assert.Equal(t, "feature-branch", result.BranchName)
-	assert.Equal(t, "/home/user/Worktrees/other-project/feature-branch", result.ResolvedPath)
-	assert.Contains(t, result.Explanation, "other-project")
+	s.Equal(domain.PathTypeWorktree, result.Type)
+	s.Equal("other-project", result.ProjectName)
+	s.Equal("feature-branch", result.BranchName)
+	s.Equal("/home/user/Worktrees/other-project/feature-branch", result.ResolvedPath)
+	s.Contains(result.Explanation, "other-project")
 }
 
-// Pure function tests for extracted functions
-
-func TestParseCrossProjectReference(t *testing.T) {
+func (s *ContextResolverTestSuite) TestParseCrossProjectReference() {
 	tests := []struct {
 		name           string
 		identifier     string
@@ -315,16 +306,16 @@ func TestParseCrossProjectReference(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			project, branch, valid := parseCrossProjectReference(tt.identifier)
-			assert.Equal(t, tt.expectedProj, project)
-			assert.Equal(t, tt.expectedBranch, branch)
-			assert.Equal(t, tt.expectedValid, valid)
+			s.Equal(tt.expectedProj, project)
+			s.Equal(tt.expectedBranch, branch)
+			s.Equal(tt.expectedValid, valid)
 		})
 	}
 }
 
-func TestBuildWorktreePath(t *testing.T) {
+func (s *ContextResolverTestSuite) TestBuildWorktreePath() {
 	tests := []struct {
 		name         string
 		worktreesDir string
@@ -356,14 +347,14 @@ func TestBuildWorktreePath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			path := buildWorktreePath(tt.worktreesDir, tt.project, tt.branch)
-			assert.Equal(t, tt.expectedPath, path)
+			s.Equal(tt.expectedPath, path)
 		})
 	}
 }
 
-func TestBuildProjectPath(t *testing.T) {
+func (s *ContextResolverTestSuite) TestBuildProjectPath() {
 	tests := []struct {
 		name         string
 		projectsDir  string
@@ -391,14 +382,14 @@ func TestBuildProjectPath(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			path := buildProjectPath(tt.projectsDir, tt.project)
-			assert.Equal(t, tt.expectedPath, path)
+			s.Equal(tt.expectedPath, path)
 		})
 	}
 }
 
-func TestFilterSuggestions(t *testing.T) {
+func (s *ContextResolverTestSuite) TestFilterSuggestions() {
 	tests := []struct {
 		name           string
 		suggestions    []string
@@ -444,14 +435,14 @@ func TestFilterSuggestions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			result := filterSuggestions(tt.suggestions, tt.partial)
-			assert.Equal(t, tt.expectedResult, result)
+			s.Equal(tt.expectedResult, result)
 		})
 	}
 }
 
-func TestContextResolver_PathTraversalProtection(t *testing.T) {
+func (s *ContextResolverTestSuite) TestPathTraversalProtection() {
 	tests := []struct {
 		name          string
 		context       *domain.Context
@@ -598,28 +589,23 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			config := &domain.Config{
-				ProjectsDirectory:  "/home/user/Projects",
-				WorktreesDirectory: "/home/user/Worktrees",
-			}
-
-			resolver := NewContextResolver(config, nil)
+		s.Run(tt.name, func() {
+			resolver := NewContextResolver(s.config, nil)
 			result, err := resolver.ResolveIdentifier(tt.context, tt.identifier)
 
 			if tt.expectError {
-				require.Error(t, err, tt.description)
-				assert.Contains(t, err.Error(), tt.errorContains, tt.description)
-				assert.Nil(t, result, tt.description)
+				s.Require().Error(err, tt.description)
+				s.Contains(err.Error(), tt.errorContains, tt.description)
+				s.Nil(result, tt.description)
 			} else {
-				require.NoError(t, err, tt.description)
-				assert.NotNil(t, result, tt.description)
+				s.Require().NoError(err, tt.description)
+				s.NotNil(result, tt.description)
 			}
 		})
 	}
 }
 
-func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
+func (s *ContextResolverTestSuite) TestGetOutsideGitContextSuggestions() {
 	tests := []struct {
 		name          string
 		projectsDir   string
@@ -644,9 +630,8 @@ func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 		},
 		{
 			name:        "projects directory with git repositories",
-			projectsDir: t.TempDir(),
+			projectsDir: s.T().TempDir(),
 			setupProjects: func(dir string) error {
-				// Create project directories
 				if err := os.MkdirAll(filepath.Join(dir, "project1"), 0755); err != nil {
 					return err
 				}
@@ -657,9 +642,8 @@ func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 					return err
 				}
 
-				// Initialize git repositories in project1 and project2
-				setupTestRepo(t, filepath.Join(dir, "project1"))
-				setupTestRepo(t, filepath.Join(dir, "project2"))
+				s.setupTestRepo(filepath.Join(dir, "project1"))
+				s.setupTestRepo(filepath.Join(dir, "project2"))
 				return nil
 			},
 			partial:       "proj",
@@ -668,7 +652,7 @@ func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 		},
 		{
 			name:        "partial matching with 'test'",
-			projectsDir: t.TempDir(),
+			projectsDir: s.T().TempDir(),
 			setupProjects: func(dir string) error {
 				if err := os.MkdirAll(filepath.Join(dir, "test-project"), 0755); err != nil {
 					return err
@@ -677,8 +661,8 @@ func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 					return err
 				}
 
-				setupTestRepo(t, filepath.Join(dir, "test-project"))
-				setupTestRepo(t, filepath.Join(dir, "other-project"))
+				s.setupTestRepo(filepath.Join(dir, "test-project"))
+				s.setupTestRepo(filepath.Join(dir, "other-project"))
 				return nil
 			},
 			partial:       "test",
@@ -687,7 +671,7 @@ func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 		},
 		{
 			name:        "empty partial matches all",
-			projectsDir: t.TempDir(),
+			projectsDir: s.T().TempDir(),
 			setupProjects: func(dir string) error {
 				if err := os.MkdirAll(filepath.Join(dir, "project1"), 0755); err != nil {
 					return err
@@ -696,8 +680,8 @@ func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 					return err
 				}
 
-				setupTestRepo(t, filepath.Join(dir, "project1"))
-				setupTestRepo(t, filepath.Join(dir, "project2"))
+				s.setupTestRepo(filepath.Join(dir, "project1"))
+				s.setupTestRepo(filepath.Join(dir, "project2"))
 				return nil
 			},
 			partial:       "",
@@ -707,11 +691,10 @@ func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			// Setup projects directory
+		s.Run(tt.name, func() {
 			if tt.setupProjects != nil {
 				if err := tt.setupProjects(tt.projectsDir); err != nil {
-					t.Fatalf("Failed to setup test projects: %v", err)
+					s.T().Fatalf("Failed to setup test projects: %v", err)
 				}
 			}
 
@@ -720,32 +703,47 @@ func TestContextResolver_getOutsideGitContextSuggestions(t *testing.T) {
 				WorktreesDirectory: "/home/user/Worktrees",
 			}
 
-			// Create mock git service
 			mockGitService := mocks.NewMockGitService()
 			mockGitService.ValidateRepositoryFunc = func(path string) error {
-				return nil // Assume all directories are valid repos for testing
+				return nil
 			}
 
 			resolver := NewContextResolver(config, mockGitService)
 			suggestions := resolver.(*contextResolver).getOutsideGitContextSuggestions(tt.partial)
 
-			assert.Len(t, suggestions, tt.expectedCount, "Expected %d suggestions", tt.expectedCount)
+			s.Len(suggestions, tt.expectedCount, "Expected %d suggestions", tt.expectedCount)
 
 			if len(tt.expectedTexts) > 0 {
 				suggestionTexts := make([]string, len(suggestions))
 				for i, suggestion := range suggestions {
 					suggestionTexts[i] = suggestion.Text
 				}
-				assert.Equal(t, tt.expectedTexts, suggestionTexts, "Suggestion texts don't match")
+				s.Equal(tt.expectedTexts, suggestionTexts, "Suggestion texts don't match")
 			}
 
-			// Verify suggestion properties
 			for _, suggestion := range suggestions {
-				assert.NotEmpty(t, suggestion.Text, "Suggestion text should not be empty")
-				assert.Equal(t, domain.PathTypeProject, suggestion.Type, "Suggestion type should be project")
-				assert.Equal(t, suggestion.Text, suggestion.ProjectName, "Project name should match text")
-				assert.Equal(t, "Project directory", suggestion.Description, "Description should be consistent")
+				s.NotEmpty(suggestion.Text, "Suggestion text should not be empty")
+				s.Equal(domain.PathTypeProject, suggestion.Type, "Suggestion type should be project")
+				s.Equal(suggestion.Text, suggestion.ProjectName, "Project name should match text")
+				s.Equal("Project directory", suggestion.Description, "Description should be consistent")
 			}
 		})
 	}
+}
+
+func (s *ContextResolverTestSuite) setupTestRepo(path string) {
+	s.T().Helper()
+
+	err := os.MkdirAll(filepath.Join(path, ".git"), 0755)
+	s.Require().NoError(err)
+
+	gitDir := filepath.Join(path, ".git", "refs", "heads")
+	err = os.MkdirAll(gitDir, 0755)
+	s.Require().NoError(err)
+
+	err = os.WriteFile(filepath.Join(path, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0644)
+	s.Require().NoError(err)
+
+	err = os.WriteFile(filepath.Join(gitDir, "main"), []byte("0000000000000000000000000000000000000000\n"), 0644)
+	s.Require().NoError(err)
 }

@@ -3,11 +3,18 @@ package domain
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestShellDomain_ContractCompliance(t *testing.T) {
+type ShellTestSuite struct {
+	suite.Suite
+}
+
+func TestShellSuite(t *testing.T) {
+	suite.Run(t, new(ShellTestSuite))
+}
+
+func (s *ShellTestSuite) TestContractCompliance() {
 	testCases := []struct {
 		name        string
 		shellType   ShellType
@@ -36,25 +43,25 @@ func TestShellDomain_ContractCompliance(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		s.Run(tc.name, func() {
 			shell, err := NewShell(tc.shellType, "/bin/test", "1.0")
 
 			if tc.expectValid {
-				require.NoError(t, err)
-				require.NotNil(t, shell)
-				assert.Equal(t, tc.shellType, shell.Type())
-				assert.Equal(t, "/bin/test", shell.Path())
-				assert.Equal(t, "1.0", shell.Version())
+				s.Require().NoError(err)
+				s.Require().NotNil(shell)
+				s.Equal(tc.shellType, shell.Type())
+				s.Equal("/bin/test", shell.Path())
+				s.Equal("1.0", shell.Version())
 			} else {
-				require.Error(t, err)
-				assert.Nil(t, shell)
-				assert.Contains(t, err.Error(), "unsupported shell type")
+				s.Require().Error(err)
+				s.Nil(shell)
+				s.Contains(err.Error(), "unsupported shell type")
 			}
 		})
 	}
 }
 
-func TestShellDomain_Validation(t *testing.T) {
+func (s *ShellTestSuite) TestValidation() {
 	testCases := []struct {
 		name        string
 		shellType   ShellType
@@ -95,27 +102,27 @@ func TestShellDomain_Validation(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		s.Run(tc.name, func() {
 			shell, err := NewShell(tc.shellType, tc.path, tc.version)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Nil(t, shell)
+				s.Require().Error(err)
+				s.Nil(shell)
 				if tc.errorMsg != "" {
-					assert.Contains(t, err.Error(), tc.errorMsg)
+					s.Contains(err.Error(), tc.errorMsg)
 				}
 			} else {
-				require.NoError(t, err)
-				require.NotNil(t, shell)
-				assert.Equal(t, tc.shellType, shell.Type())
-				assert.Equal(t, tc.path, shell.Path())
-				assert.Equal(t, tc.version, shell.Version())
+				s.Require().NoError(err)
+				s.Require().NotNil(shell)
+				s.Equal(tc.shellType, shell.Type())
+				s.Equal(tc.path, shell.Path())
+				s.Equal(tc.version, shell.Version())
 			}
 		})
 	}
 }
 
-func TestInferShellTypeFromPath(t *testing.T) {
+func (s *ShellTestSuite) TestInferShellTypeFromPath() {
 	testCases := []struct {
 		name          string
 		configPath    string
@@ -206,24 +213,24 @@ func TestInferShellTypeFromPath(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		s.Run(tc.name, func() {
 			shellType, err := InferShellTypeFromPath(tc.configPath)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Equal(t, ShellType(""), shellType)
+				s.Require().Error(err)
+				s.Equal(ShellType(""), shellType)
 				if tc.errorContains != "" {
-					assert.Contains(t, err.Error(), tc.errorContains)
+					s.Contains(err.Error(), tc.errorContains)
 				}
 			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tc.expectedShell, shellType)
+				s.Require().NoError(err)
+				s.Equal(tc.expectedShell, shellType)
 			}
 		})
 	}
 }
 
-func TestDetectShellFromEnv(t *testing.T) {
+func (s *ShellTestSuite) TestDetectShellFromEnv() {
 	testCases := []struct {
 		name          string
 		setEnv        func()
@@ -235,7 +242,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "detect bash from /bin/bash",
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/bash")
+				s.T().Setenv("SHELL", "/bin/bash")
 			},
 			unsetEnv:      func() {},
 			expectedShell: ShellBash,
@@ -244,7 +251,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "detect bash from /usr/local/bin/bash",
 			setEnv: func() {
-				t.Setenv("SHELL", "/usr/local/bin/bash")
+				s.T().Setenv("SHELL", "/usr/local/bin/bash")
 			},
 			unsetEnv:      func() {},
 			expectedShell: ShellBash,
@@ -253,7 +260,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "detect zsh from /bin/zsh",
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/zsh")
+				s.T().Setenv("SHELL", "/bin/zsh")
 			},
 			unsetEnv:      func() {},
 			expectedShell: ShellZsh,
@@ -262,7 +269,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "detect zsh from /usr/bin/zsh",
 			setEnv: func() {
-				t.Setenv("SHELL", "/usr/bin/zsh")
+				s.T().Setenv("SHELL", "/usr/bin/zsh")
 			},
 			unsetEnv:      func() {},
 			expectedShell: ShellZsh,
@@ -271,7 +278,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "detect fish from /usr/local/bin/fish",
 			setEnv: func() {
-				t.Setenv("SHELL", "/usr/local/bin/fish")
+				s.T().Setenv("SHELL", "/usr/local/bin/fish")
 			},
 			unsetEnv:      func() {},
 			expectedShell: ShellFish,
@@ -280,7 +287,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "detect fish from /bin/fish",
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/fish")
+				s.T().Setenv("SHELL", "/bin/fish")
 			},
 			unsetEnv:      func() {},
 			expectedShell: ShellFish,
@@ -289,7 +296,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "fail when SHELL not set",
 			setEnv: func() {
-				t.Setenv("SHELL", "")
+				s.T().Setenv("SHELL", "")
 			},
 			unsetEnv:      func() {},
 			expectedShell: "",
@@ -299,7 +306,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "fail with unknown shell /bin/sh",
 			setEnv: func() {
-				t.Setenv("SHELL", "/bin/sh")
+				s.T().Setenv("SHELL", "/bin/sh")
 			},
 			unsetEnv:      func() {},
 			expectedShell: "",
@@ -309,7 +316,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "fail with unknown shell /usr/bin/tcsh",
 			setEnv: func() {
-				t.Setenv("SHELL", "/usr/bin/tcsh")
+				s.T().Setenv("SHELL", "/usr/bin/tcsh")
 			},
 			unsetEnv:      func() {},
 			expectedShell: "",
@@ -319,7 +326,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		{
 			name: "case insensitivity for bash path",
 			setEnv: func() {
-				t.Setenv("SHELL", "/usr/local/BASH/Bin/bash")
+				s.T().Setenv("SHELL", "/usr/local/BASH/Bin/bash")
 			},
 			unsetEnv:      func() {},
 			expectedShell: ShellBash,
@@ -328,21 +335,21 @@ func TestDetectShellFromEnv(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		s.Run(tc.name, func() {
 			tc.setEnv()
 			defer tc.unsetEnv()
 
 			shellType, err := DetectShellFromEnv()
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Equal(t, ShellType(""), shellType)
+				s.Require().Error(err)
+				s.Equal(ShellType(""), shellType)
 				if tc.errorMsg != "" {
-					assert.Contains(t, err.Error(), tc.errorMsg)
+					s.Contains(err.Error(), tc.errorMsg)
 				}
 			} else {
-				require.NoError(t, err)
-				assert.Equal(t, tc.expectedShell, shellType)
+				s.Require().NoError(err)
+				s.Equal(tc.expectedShell, shellType)
 			}
 		})
 	}

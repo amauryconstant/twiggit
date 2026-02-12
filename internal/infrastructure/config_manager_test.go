@@ -5,86 +5,83 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/domain"
 )
 
-func TestConfigManager_Load_Defaults(t *testing.T) {
-	// Set up a clean environment for this test
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	tempDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer func() {
-		if originalXDG != "" {
-			os.Setenv("XDG_CONFIG_HOME", originalXDG)
-		} else {
-			os.Unsetenv("XDG_CONFIG_HOME")
-		}
-	}()
+type ConfigManagerTestSuite struct {
+	suite.Suite
+	manager     domain.ConfigManager
+	tempDir     string
+	originalXDG string
+}
 
-	manager := NewConfigManager()
+func (s *ConfigManagerTestSuite) SetupTest() {
+	s.originalXDG = os.Getenv("XDG_CONFIG_HOME")
+	s.tempDir = s.T().TempDir()
+	os.Setenv("XDG_CONFIG_HOME", s.tempDir)
+	s.manager = NewConfigManager()
+}
 
-	config, err := manager.Load()
-	require.NoError(t, err)
-	require.NotNil(t, config)
+func (s *ConfigManagerTestSuite) TearDownTest() {
+	if s.originalXDG != "" {
+		os.Setenv("XDG_CONFIG_HOME", s.originalXDG)
+	} else {
+		os.Unsetenv("XDG_CONFIG_HOME")
+	}
+}
 
-	// Verify defaults are loaded - test behavior not specific paths
+func TestConfigManager(t *testing.T) {
+	suite.Run(t, new(ConfigManagerTestSuite))
+}
+
+func (s *ConfigManagerTestSuite) TestLoadDefaults() {
+	config, err := s.manager.Load()
+	s.Require().NoError(err)
+	s.Require().NotNil(config)
+
 	defaultConfig := domain.DefaultConfig()
 
-	// Test that paths follow expected pattern
-	assert.Contains(t, config.ProjectsDirectory, "Projects", "ProjectsDirectory should contain 'Projects'")
-	assert.Contains(t, config.WorktreesDirectory, "Worktrees", "WorktreesDirectory should contain 'Worktrees'")
+	s.Contains(config.ProjectsDirectory, "Projects", "ProjectsDirectory should contain 'Projects'")
+	s.Contains(config.WorktreesDirectory, "Worktrees", "WorktreesDirectory should contain 'Worktrees'")
 
-	// Test basic defaults that work correctly
-	assert.Equal(t, defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
-	assert.Equal(t, defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
-	assert.Equal(t, defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
+	s.Equal(defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
+	s.Equal(defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
+	s.Equal(defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
 
-	assert.Equal(t, defaultConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
+	s.Equal(defaultConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
 }
 
-func TestConfigManager_GetConfig_Immutable(t *testing.T) {
-	manager := NewConfigManager()
+func (s *ConfigManagerTestSuite) TestGetConfigImmutable() {
+	config, err := s.manager.Load()
+	s.Require().NoError(err)
 
-	config, err := manager.Load()
-	require.NoError(t, err)
-
-	// Try to modify returned config
 	config.ProjectsDirectory = "/modified/path"
 
-	// Get config again - should not be modified
-	newConfig := manager.GetConfig()
-	assert.NotEqual(t, "/modified/path", newConfig.ProjectsDirectory)
+	newConfig := s.manager.GetConfig()
+	s.NotEqual("/modified/path", newConfig.ProjectsDirectory)
 }
 
-func TestConfigManager_GetConfig_DeepCopy(t *testing.T) {
-	manager := NewConfigManager()
+func (s *ConfigManagerTestSuite) TestGetConfigDeepCopy() {
+	config, err := s.manager.Load()
+	s.Require().NoError(err)
 
-	config, err := manager.Load()
-	require.NoError(t, err)
-
-	// Store original values for comparison
 	originalProjectsDir := config.ProjectsDirectory
 	originalWorktreesDir := config.WorktreesDirectory
 	originalSourceBranch := config.DefaultSourceBranch
 
-	// Modify the returned config
 	config.ProjectsDirectory = "/modified/path"
 	config.WorktreesDirectory = "/another/path"
 	config.DefaultSourceBranch = "modified"
 
-	// Get config again - should be original values (immutable)
-	originalConfig := manager.GetConfig()
-	assert.Equal(t, originalProjectsDir, originalConfig.ProjectsDirectory)
-	assert.Equal(t, originalWorktreesDir, originalConfig.WorktreesDirectory)
-	assert.Equal(t, originalSourceBranch, originalConfig.DefaultSourceBranch)
+	originalConfig := s.manager.GetConfig()
+	s.Equal(originalProjectsDir, originalConfig.ProjectsDirectory)
+	s.Equal(originalWorktreesDir, originalConfig.WorktreesDirectory)
+	s.Equal(originalSourceBranch, originalConfig.DefaultSourceBranch)
 }
 
-// Pure function tests for extracted functions
-
-func TestResolveConfigPath(t *testing.T) {
+func (s *ConfigManagerTestSuite) TestResolveConfigPath() {
 	tests := []struct {
 		name          string
 		xdgConfigHome string
@@ -111,55 +108,47 @@ func TestResolveConfigPath(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			path := resolveConfigPath(tt.xdgConfigHome, tt.homeDir)
-			assert.Equal(t, tt.expectedPath, path)
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			path := resolveConfigPath(tc.xdgConfigHome, tc.homeDir)
+			s.Equal(tc.expectedPath, path)
 		})
 	}
 }
 
-func TestBuildDefaultConfig(t *testing.T) {
+func (s *ConfigManagerTestSuite) TestBuildDefaultConfig() {
 	config := buildDefaultConfig()
 
-	require.NotNil(t, config)
+	s.Require().NotNil(config)
 
-	// Verify it matches domain.DefaultConfig() behavior
 	expectedConfig := domain.DefaultConfig()
 
-	// Test that paths follow expected pattern rather than exact values
-	assert.Contains(t, config.ProjectsDirectory, "Projects")
-	assert.Contains(t, config.WorktreesDirectory, "Worktrees")
-	assert.Equal(t, expectedConfig.DefaultSourceBranch, config.DefaultSourceBranch)
+	s.Contains(config.ProjectsDirectory, "Projects")
+	s.Contains(config.WorktreesDirectory, "Worktrees")
+	s.Equal(expectedConfig.DefaultSourceBranch, config.DefaultSourceBranch)
 
-	// Test other config values
-	assert.Equal(t, expectedConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
-	assert.Equal(t, expectedConfig.Git.CLITimeout, config.Git.CLITimeout)
+	s.Equal(expectedConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
+	s.Equal(expectedConfig.Git.CLITimeout, config.Git.CLITimeout)
 
-	// Verify immutability - modifying returned config shouldn't affect future calls
 	originalProjectsDir := config.ProjectsDirectory
 	config.ProjectsDirectory = "/modified"
 	newConfig := buildDefaultConfig()
-	assert.NotEqual(t, "/modified", newConfig.ProjectsDirectory)
-	assert.Equal(t, originalProjectsDir, newConfig.ProjectsDirectory)
+	s.NotEqual("/modified", newConfig.ProjectsDirectory)
+	s.Equal(originalProjectsDir, newConfig.ProjectsDirectory)
 }
 
-func TestConfigFileExists(t *testing.T) {
-	// Test with a file that doesn't exist
+func (s *ConfigManagerTestSuite) TestConfigFileExists() {
 	exists := configFileExists("/nonexistent/path/config.toml")
-	assert.False(t, exists)
+	s.False(exists)
 
-	// Test with absolute path to go.mod (should exist in this project)
-	// Use the correct relative path from the project root
 	goModPath := "../../go.mod"
 	absPath, err := filepath.Abs(goModPath)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 	exists = configFileExists(absPath)
-	assert.True(t, exists)
+	s.True(exists)
 }
 
-func TestValidateConfig(t *testing.T) {
-	// Test with valid config
+func (s *ConfigManagerTestSuite) TestValidateConfig() {
 	validConfig := &domain.Config{
 		ProjectsDirectory:   "/home/user/Projects",
 		WorktreesDirectory:  "/home/user/Worktrees",
@@ -167,9 +156,8 @@ func TestValidateConfig(t *testing.T) {
 	}
 
 	err := validateConfig(validConfig)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	// Test with invalid config (empty directories)
 	invalidConfig := &domain.Config{
 		ProjectsDirectory:   "",
 		WorktreesDirectory:  "",
@@ -177,51 +165,37 @@ func TestValidateConfig(t *testing.T) {
 	}
 
 	err = validateConfig(invalidConfig)
-	assert.Error(t, err)
+	s.Error(err)
 }
 
-func TestCopyConfig(t *testing.T) {
+func (s *ConfigManagerTestSuite) TestCopyConfig() {
 	originalConfig := &domain.Config{
 		ProjectsDirectory:   "/home/user/Projects",
 		WorktreesDirectory:  "/home/user/Worktrees",
 		DefaultSourceBranch: "main",
 	}
 
-	// Copy the config
 	copiedConfig := copyConfig(originalConfig)
 
-	require.NotNil(t, copiedConfig)
-	assert.Equal(t, originalConfig.ProjectsDirectory, copiedConfig.ProjectsDirectory)
-	assert.Equal(t, originalConfig.WorktreesDirectory, copiedConfig.WorktreesDirectory)
-	assert.Equal(t, originalConfig.DefaultSourceBranch, copiedConfig.DefaultSourceBranch)
+	s.Require().NotNil(copiedConfig)
+	s.Equal(originalConfig.ProjectsDirectory, copiedConfig.ProjectsDirectory)
+	s.Equal(originalConfig.WorktreesDirectory, copiedConfig.WorktreesDirectory)
+	s.Equal(originalConfig.DefaultSourceBranch, copiedConfig.DefaultSourceBranch)
 
-	// Verify immutability - modifying copy shouldn't affect original
 	copiedConfig.ProjectsDirectory = "/modified/path"
-	assert.NotEqual(t, "/modified/path", originalConfig.ProjectsDirectory)
-	assert.Equal(t, "/home/user/Projects", originalConfig.ProjectsDirectory)
+	s.NotEqual("/modified/path", originalConfig.ProjectsDirectory)
+	s.Equal("/home/user/Projects", originalConfig.ProjectsDirectory)
 }
 
-func TestConfigManager_LoadDefaults_ErrorHandling(t *testing.T) {
-	// Test that errors in loadDefaults are properly propagated to caller.
-	// Note: This is a defensive coding pattern. Koanf Set only returns errors
-	// for invalid keys, which shouldn't happen with our hardcoded keys.
-	// This test verifies the error path exists and is correctly structured.
-	//
-	// In practice, this error path protects against:
-	// 1. Future changes to default keys that might be invalid
-	// 2. Koanf library behavior changes
-	// 3. Unexpected runtime conditions
-
+func (s *ConfigManagerTestSuite) TestLoadDefaultsErrorHandling() {
 	manager := NewConfigManager()
 	config, err := manager.Load()
 
-	// With valid keys (current code), Load should succeed
-	require.NoError(t, err, "Load() should succeed with valid default keys")
-	require.NotNil(t, config, "Config should be loaded successfully")
+	s.Require().NoError(err, "Load() should succeed with valid default keys")
+	s.Require().NotNil(config, "Config should be loaded successfully")
 
-	// Verify all defaults are set correctly (8 values)
 	defaultConfig := domain.DefaultConfig()
-	assert.Equal(t, defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
-	assert.Equal(t, defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
-	assert.Equal(t, defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
+	s.Equal(defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
+	s.Equal(defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
+	s.Equal(defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
 }

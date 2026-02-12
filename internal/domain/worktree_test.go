@@ -3,11 +3,18 @@ package domain
 import (
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestWorktree_NewWorktree(t *testing.T) {
+type WorktreeTestSuite struct {
+	suite.Suite
+}
+
+func TestWorktreeSuite(t *testing.T) {
+	suite.Run(t, new(WorktreeTestSuite))
+}
+
+func (s *WorktreeTestSuite) TestNewWorktree() {
 	testCases := []struct {
 		name         string
 		path         string
@@ -38,18 +45,18 @@ func TestWorktree_NewWorktree(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+		s.Run(tc.name, func() {
 			worktree, err := NewWorktree(tc.path, tc.branch)
 
 			if tc.expectError {
-				require.Error(t, err)
-				assert.Contains(t, err.Error(), tc.errorMessage)
-				assert.Nil(t, worktree)
+				s.Require().Error(err)
+				s.Contains(err.Error(), tc.errorMessage)
+				s.Nil(worktree)
 			} else {
-				require.NoError(t, err)
-				assert.NotNil(t, worktree)
-				assert.Equal(t, tc.path, worktree.Path())
-				assert.Equal(t, tc.branch, worktree.Branch())
+				s.Require().NoError(err)
+				s.NotNil(worktree)
+				s.Equal(tc.path, worktree.Path())
+				s.Equal(tc.branch, worktree.Branch())
 			}
 		})
 	}

@@ -5,11 +5,18 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestNormalizePath_Unit(t *testing.T) {
+type PathUtilsTestSuite struct {
+	suite.Suite
+}
+
+func TestPathUtils(t *testing.T) {
+	suite.Run(t, new(PathUtilsTestSuite))
+}
+
+func (s *PathUtilsTestSuite) TestNormalizePath() {
 	tests := []struct {
 		name        string
 		input       string
@@ -19,7 +26,7 @@ func TestNormalizePath_Unit(t *testing.T) {
 		{
 			name:        "empty path",
 			input:       "",
-			expectError: false, // filepath.Abs on empty string returns current directory
+			expectError: false,
 			description: "Empty path should resolve to current directory",
 		},
 		{
@@ -73,28 +80,26 @@ func TestNormalizePath_Unit(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			result, err := NormalizePath(tt.input)
 
 			if tt.expectError {
-				require.Error(t, err, tt.description)
-				assert.Empty(t, result, tt.description)
+				s.Require().Error(err, tt.description)
+				s.Empty(result, tt.description)
 			} else {
-				require.NoError(t, err, tt.description)
-				assert.NotEmpty(t, result, tt.description)
+				s.Require().NoError(err, tt.description)
+				s.NotEmpty(result, tt.description)
 
-				// Result should be absolute
-				assert.True(t, filepath.IsAbs(result), "Result should be absolute path")
+				s.True(filepath.IsAbs(result), "Result should be absolute path")
 
-				// Result should be cleaned (no . or .. components)
-				assert.NotContains(t, result, string(filepath.Separator)+".", "Result should not contain '.' components")
-				assert.NotContains(t, result, ".."+string(filepath.Separator), "Result should not contain '..' components")
+				s.NotContains(result, string(filepath.Separator)+".", "Result should not contain '.' components")
+				s.NotContains(result, ".."+string(filepath.Separator), "Result should not contain '..' components")
 			}
 		})
 	}
 }
 
-func TestIsPathUnder_Unit(t *testing.T) {
+func (s *PathUtilsTestSuite) TestIsPathUnder() {
 	tests := []struct {
 		name        string
 		base        string
@@ -131,7 +136,7 @@ func TestIsPathUnder_Unit(t *testing.T) {
 			name:        "target outside base - parent",
 			base:        "/foo/bar",
 			target:      "/foo",
-			expected:    true, // /foo is actually the parent, so /foo/bar is under /foo
+			expected:    true,
 			expectError: false,
 			description: "Target outside base (parent) should return false",
 		},
@@ -187,7 +192,7 @@ func TestIsPathUnder_Unit(t *testing.T) {
 			name:        "windows style paths - under",
 			base:        "C:\\foo",
 			target:      "C:\\foo\\bar",
-			expected:    runtime.GOOS == "windows", // Only works on Windows
+			expected:    runtime.GOOS == "windows",
 			expectError: false,
 			description: "Windows-style paths with target under base",
 		},
@@ -196,7 +201,7 @@ func TestIsPathUnder_Unit(t *testing.T) {
 			base:        "C:\\foo",
 			target:      "C:\\bar",
 			expected:    false,
-			expectError: false, // filepath.Rel handles this without error
+			expectError: false,
 			description: "Windows-style paths with target outside base",
 		},
 		{
@@ -212,14 +217,14 @@ func TestIsPathUnder_Unit(t *testing.T) {
 			base:        "/foo",
 			target:      "",
 			expected:    false,
-			expectError: true, // filepath.Rel returns error for empty target
+			expectError: true,
 			description: "Empty target should return error",
 		},
 		{
 			name:        "both empty",
 			base:        "",
 			target:      "",
-			expected:    true, // filepath.Rel("", "") returns ".", which is under ""
+			expected:    true,
 			expectError: false,
 			description: "Both empty should return true (relative path is '.')",
 		},
@@ -250,22 +255,22 @@ func TestIsPathUnder_Unit(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			result, err := IsPathUnder(tt.base, tt.target)
 
 			if tt.expectError {
-				require.Error(t, err, tt.description)
+				s.Require().Error(err, tt.description)
 			} else {
-				require.NoError(t, err, tt.description)
-				assert.Equal(t, tt.expected, result, tt.description)
+				s.Require().NoError(err, tt.description)
+				s.Equal(tt.expected, result, tt.description)
 			}
 		})
 	}
 }
 
-func TestIsPathUnder_CrossPlatform(t *testing.T) {
+func (s *PathUtilsTestSuite) TestIsPathUnder_CrossPlatform() {
 	if runtime.GOOS == "windows" {
-		t.Skip("Skipping cross-platform test on Windows")
+		s.T().Skip("Skipping cross-platform test on Windows")
 	}
 
 	tests := []struct {
@@ -288,59 +293,55 @@ func TestIsPathUnder_CrossPlatform(t *testing.T) {
 		},
 		{
 			name:     "mixed separators - under",
-			base:     "/home/user\\projects", // Mixed separators
+			base:     "/home/user\\projects",
 			target:   "/home/user/projects/twiggit",
-			expected: false, // Mixed separators don't work as expected
+			expected: false,
 		},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		s.Run(tt.name, func() {
 			result, err := IsPathUnder(tt.base, tt.target)
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			s.Require().NoError(err)
+			s.Equal(tt.expected, result)
 		})
 	}
 }
 
-func TestIsPathUnder_EdgeCases(t *testing.T) {
-	t.Run("case sensitivity", func(t *testing.T) {
+func (s *PathUtilsTestSuite) TestIsPathUnder_EdgeCases() {
+	s.Run("case sensitivity", func() {
 		if runtime.GOOS == "windows" {
-			t.Skip("Skipping case sensitivity test on Windows")
+			s.T().Skip("Skipping case sensitivity test on Windows")
 		}
 
-		// On case-sensitive systems, different cases should be treated as different paths
 		result, err := IsPathUnder("/Foo", "/foo/bar")
-		require.NoError(t, err)
-		// The behavior depends on the filesystem, but filepath.Rel is case-sensitive
-		// So this should return false on case-sensitive systems
-		assert.False(t, result)
+		s.Require().NoError(err)
+		s.False(result)
 	})
 
-	t.Run("root directory", func(t *testing.T) {
+	s.Run("root directory", func() {
 		if runtime.GOOS == "windows" {
-			t.Skip("Skipping root directory test on Windows")
+			s.T().Skip("Skipping root directory test on Windows")
 		}
 
-		// Test with root directory as base
 		result, err := IsPathUnder("/", "/foo/bar")
-		require.NoError(t, err)
-		assert.True(t, result) // Everything is under root
+		s.Require().NoError(err)
+		s.True(result)
 	})
 
-	t.Run("relative path edge cases", func(t *testing.T) {
+	s.Run("relative path edge cases", func() {
 		tests := []struct {
 			base     string
 			target   string
 			expected bool
 		}{
-			{"foo", "foo", true}, // Same relative directory
+			{"foo", "foo", true},
 		}
 
 		for _, tt := range tests {
 			result, err := IsPathUnder(tt.base, tt.target)
-			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			s.Require().NoError(err)
+			s.Equal(tt.expected, result)
 		}
 	})
 }

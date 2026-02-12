@@ -108,6 +108,6 @@ const (
 **Validation**: Use `IsValidShellType(shellType)` to validate shell types (exported function).
 
 ## Testing
-- **Unit tests**: Table-driven tests with Testify
-- **Mocking**: Inline mocks (keep tests self-contained)
+- **Unit tests**: Testify suites with table-driven tests
+- **Mocking**: Centralized mocks in test/mocks/
 - **Focus**: Business logic, validation rules, edge cases

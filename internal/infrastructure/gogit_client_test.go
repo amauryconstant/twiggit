@@ -6,165 +6,128 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"twiggit/internal/domain"
 )
 
-func TestGoGitClient_OpenRepository(t *testing.T) {
-	client := NewGoGitClient()
-
-	// Test with non-existent directory
-	repo, err := client.OpenRepository("/non/existent/path")
-	require.Error(t, err)
-	assert.Nil(t, repo)
-
-	// Test with non-git directory
-	tempDir := t.TempDir()
-	repo, err = client.OpenRepository(tempDir)
-	require.Error(t, err)
-	assert.Nil(t, repo)
+type GoGitClientTestSuite struct {
+	suite.Suite
+	client  GoGitClient
+	tempDir string
 }
 
-func TestGoGitClient_ValidateRepository(t *testing.T) {
-	client := NewGoGitClient()
-
-	// Test with non-existent directory
-	err := client.ValidateRepository("/non/existent/path")
-	require.Error(t, err)
-
-	// Test with non-git directory
-	tempDir := t.TempDir()
-	err = client.ValidateRepository(tempDir)
-	require.Error(t, err)
-
-	// Test with valid git repository
-	repoPath := setupTestRepo(t, tempDir)
-	err = client.ValidateRepository(repoPath)
-	assert.NoError(t, err)
+func (s *GoGitClientTestSuite) SetupTest() {
+	s.client = NewGoGitClient()
+	s.tempDir = s.T().TempDir()
 }
 
-func TestGoGitClient_ListBranches(t *testing.T) {
-	client := NewGoGitClient()
-
-	// Test with non-existent repository
-	branches, err := client.ListBranches(context.Background(), "/non/existent/path")
-	require.Error(t, err)
-	assert.Nil(t, branches)
-
-	// Test with valid repository
-	tempDir := t.TempDir()
-	repoPath := setupTestRepo(t, tempDir)
-
-	branches, err = client.ListBranches(context.Background(), repoPath)
-	require.NoError(t, err)
-	assert.NotEmpty(t, branches)
-
-	// Should have at least main branch
-	mainBranch := findBranch(branches, "main")
-	assert.NotNil(t, mainBranch)
-	assert.Equal(t, "main", mainBranch.Name)
+func TestGoGitClient(t *testing.T) {
+	suite.Run(t, new(GoGitClientTestSuite))
 }
 
-func TestGoGitClient_BranchExists(t *testing.T) {
-	client := NewGoGitClient()
+func (s *GoGitClientTestSuite) TestOpenRepository() {
+	repo, err := s.client.OpenRepository("/non/existent/path")
+	s.Require().Error(err)
+	s.Nil(repo)
 
-	// Test with non-existent repository
-	exists, err := client.BranchExists(context.Background(), "/non/existent/path", "main")
-	require.Error(t, err)
-	assert.False(t, exists)
-
-	// Test with valid repository
-	tempDir := t.TempDir()
-	repoPath := setupTestRepo(t, tempDir)
-
-	// Test existing branch
-	exists, err = client.BranchExists(context.Background(), repoPath, "main")
-	require.NoError(t, err)
-	assert.True(t, exists)
-
-	// Test non-existing branch
-	exists, err = client.BranchExists(context.Background(), repoPath, "non-existent")
-	require.NoError(t, err)
-	assert.False(t, exists)
+	repo, err = s.client.OpenRepository(s.tempDir)
+	s.Require().Error(err)
+	s.Nil(repo)
 }
 
-func TestGoGitClient_GetRepositoryStatus(t *testing.T) {
-	client := NewGoGitClient()
+func (s *GoGitClientTestSuite) TestValidateRepository() {
+	err := s.client.ValidateRepository("/non/existent/path")
+	s.Require().Error(err)
 
-	// Test with non-existent repository
-	status, err := client.GetRepositoryStatus(context.Background(), "/non/existent/path")
-	require.Error(t, err)
-	assert.Equal(t, domain.RepositoryStatus{}, status)
+	err = s.client.ValidateRepository(s.tempDir)
+	s.Require().Error(err)
 
-	// Test with clean repository
-	tempDir := t.TempDir()
-	repoPath := setupTestRepo(t, tempDir)
-
-	status, err = client.GetRepositoryStatus(context.Background(), repoPath)
-	require.NoError(t, err)
-	assert.True(t, status.IsClean)
-	assert.Equal(t, "main", status.Branch)
+	repoPath := s.setupTestRepo()
+	err = s.client.ValidateRepository(repoPath)
+	s.Require().NoError(err)
 }
 
-func TestGoGitClient_GetRepositoryInfo(t *testing.T) {
-	client := NewGoGitClient()
+func (s *GoGitClientTestSuite) TestListBranches() {
+	branches, err := s.client.ListBranches(context.Background(), "/non/existent/path")
+	s.Require().Error(err)
+	s.Nil(branches)
 
-	// Test with non-existent repository
-	info, err := client.GetRepositoryInfo(context.Background(), "/non/existent/path")
-	require.Error(t, err)
-	assert.Nil(t, info)
+	repoPath := s.setupTestRepo()
+	branches, err = s.client.ListBranches(context.Background(), repoPath)
+	s.Require().NoError(err)
+	s.NotEmpty(branches)
 
-	// Test with valid repository
-	tempDir := t.TempDir()
-	repoPath := setupTestRepo(t, tempDir)
-
-	info, err = client.GetRepositoryInfo(context.Background(), repoPath)
-	require.NoError(t, err)
-	assert.NotNil(t, info)
-	assert.Equal(t, repoPath, info.Path)
-	assert.False(t, info.IsBare)
-	assert.NotEmpty(t, info.Branches)
+	mainBranch := s.findBranch(branches, "main")
+	s.NotNil(mainBranch)
+	s.Equal("main", mainBranch.Name)
 }
 
-func TestGoGitClient_ListRemotes(t *testing.T) {
-	client := NewGoGitClient()
+func (s *GoGitClientTestSuite) TestBranchExists() {
+	exists, err := s.client.BranchExists(context.Background(), "/non/existent/path", "main")
+	s.Require().Error(err)
+	s.False(exists)
 
-	// Test with non-existent repository
-	remotes, err := client.ListRemotes(context.Background(), "/non/existent/path")
-	require.Error(t, err)
-	assert.Nil(t, remotes)
+	repoPath := s.setupTestRepo()
 
-	// Test with repository without remotes
-	tempDir := t.TempDir()
-	repoPath := setupTestRepo(t, tempDir)
+	exists, err = s.client.BranchExists(context.Background(), repoPath, "main")
+	s.Require().NoError(err)
+	s.True(exists)
 
-	remotes, err = client.ListRemotes(context.Background(), repoPath)
-	require.NoError(t, err)
-	assert.Empty(t, remotes)
+	exists, err = s.client.BranchExists(context.Background(), repoPath, "non-existent")
+	s.Require().NoError(err)
+	s.False(exists)
 }
 
-func TestGoGitClient_GetCommitInfo(t *testing.T) {
-	client := NewGoGitClient()
+func (s *GoGitClientTestSuite) TestGetRepositoryStatus() {
+	status, err := s.client.GetRepositoryStatus(context.Background(), "/non/existent/path")
+	s.Require().Error(err)
+	s.Equal(domain.RepositoryStatus{}, status)
 
-	// Test with non-existent repository
-	commit, err := client.GetCommitInfo(context.Background(), "/non/existent/path", "HEAD")
-	require.Error(t, err)
-	assert.Nil(t, commit)
-
-	// Test with valid repository (but no commits - this is expected for our minimal test repo)
-	tempDir := t.TempDir()
-	repoPath := setupTestRepo(t, tempDir)
-
-	commit, err = client.GetCommitInfo(context.Background(), repoPath, "HEAD")
-	// This should fail because our test repo doesn't have actual commits
-	require.Error(t, err)
-	assert.Nil(t, commit)
+	repoPath := s.setupTestRepo()
+	status, err = s.client.GetRepositoryStatus(context.Background(), repoPath)
+	s.Require().NoError(err)
+	s.True(status.IsClean)
+	s.Equal("main", status.Branch)
 }
 
-// Helper functions
+func (s *GoGitClientTestSuite) TestGetRepositoryInfo() {
+	info, err := s.client.GetRepositoryInfo(context.Background(), "/non/existent/path")
+	s.Require().Error(err)
+	s.Nil(info)
 
-func findBranch(branches []domain.BranchInfo, name string) *domain.BranchInfo {
+	repoPath := s.setupTestRepo()
+	info, err = s.client.GetRepositoryInfo(context.Background(), repoPath)
+	s.Require().NoError(err)
+	s.NotNil(info)
+	s.Equal(repoPath, info.Path)
+	s.False(info.IsBare)
+	s.NotEmpty(info.Branches)
+}
+
+func (s *GoGitClientTestSuite) TestListRemotes() {
+	remotes, err := s.client.ListRemotes(context.Background(), "/non/existent/path")
+	s.Require().Error(err)
+	s.Nil(remotes)
+
+	repoPath := s.setupTestRepo()
+	remotes, err = s.client.ListRemotes(context.Background(), repoPath)
+	s.Require().NoError(err)
+	s.Empty(remotes)
+}
+
+func (s *GoGitClientTestSuite) TestGetCommitInfo() {
+	commit, err := s.client.GetCommitInfo(context.Background(), "/non/existent/path", "HEAD")
+	s.Require().Error(err)
+	s.Nil(commit)
+
+	repoPath := s.setupTestRepo()
+	commit, err = s.client.GetCommitInfo(context.Background(), repoPath, "HEAD")
+	s.Require().Error(err)
+	s.Nil(commit)
+}
+
+func (s *GoGitClientTestSuite) findBranch(branches []domain.BranchInfo, name string) *domain.BranchInfo {
 	for _, branch := range branches {
 		if branch.Name == name {
 			return &branch
@@ -173,39 +136,32 @@ func findBranch(branches []domain.BranchInfo, name string) *domain.BranchInfo {
 	return nil
 }
 
-func setupTestRepo(t *testing.T, tempDir string) string {
-	t.Helper()
-	repoPath := filepath.Join(tempDir, "test-repo")
+func (s *GoGitClientTestSuite) setupTestRepo() string {
+	s.T().Helper()
 
-	// Create repository directory
+	repoPath := filepath.Join(s.tempDir, "test-repo")
+
 	err := os.MkdirAll(repoPath, 0755)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	// Initialize git repository
-	client := NewGoGitClient()
-	_, err = client.OpenRepository(repoPath)
+	_, err = s.client.OpenRepository(repoPath)
 	if err == nil {
-		// Repository already exists, return path
 		return repoPath
 	}
 
-	// For testing purposes, we'll create a minimal git repository structure
-	// In a real implementation, this would use go-git to initialize
 	gitDir := filepath.Join(repoPath, ".git")
 	err = os.MkdirAll(gitDir, 0755)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	// Create minimal git structure
 	err = os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0644)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	refsDir := filepath.Join(gitDir, "refs", "heads")
 	err = os.MkdirAll(refsDir, 0755)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
-	// Create main branch reference
 	err = os.WriteFile(filepath.Join(refsDir, "main"), []byte("0000000000000000000000000000000000000000\n"), 0644)
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	return repoPath
 }
