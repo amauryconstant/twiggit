@@ -65,7 +65,7 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 	}
 
 	// Validate shell type
-	if !s.isValidShellType(shellType) {
+	if !domain.IsValidShellType(shellType) {
 		return nil, domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
 	}
 
@@ -162,7 +162,7 @@ func (s *shellService) ValidateInstallation(_ context.Context, req *domain.Valid
 	}
 
 	// Validate shell type
-	if !s.isValidShellType(shellType) {
+	if !domain.IsValidShellType(shellType) {
 		return nil, domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
 	}
 
@@ -237,14 +237,4 @@ func (s *shellService) composeWrapper(template string, shellType domain.ShellTyp
 	}
 
 	return result
-}
-
-// isValidShellType checks if the shell type is supported
-func (s *shellService) isValidShellType(shellType domain.ShellType) bool {
-	switch shellType {
-	case domain.ShellBash, domain.ShellZsh, domain.ShellFish:
-		return true
-	default:
-		return false
-	}
 }

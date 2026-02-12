@@ -17,7 +17,7 @@ type SetupShellRequest struct {
 
 // ValidateShellSetupRequest validates the setup shell request
 func (r *SetupShellRequest) ValidateShellSetupRequest() error {
-	if !isValidShellType(r.ShellType) {
+	if !IsValidShellType(r.ShellType) {
 		return NewShellError(ErrInvalidShellType, string(r.ShellType), "shell type validation failed")
 	}
 
@@ -35,7 +35,7 @@ type ValidateInstallationRequest struct {
 
 // ValidateValidateInstallationRequest validates the validate installation request
 func (r *ValidateInstallationRequest) ValidateValidateInstallationRequest() error {
-	if !isValidShellType(r.ShellType) {
+	if !IsValidShellType(r.ShellType) {
 		return NewShellError(ErrInvalidShellType, string(r.ShellType), "shell type validation failed")
 	}
 
@@ -53,7 +53,7 @@ type GenerateWrapperRequest struct {
 
 // ValidateGenerateWrapperRequest validates the generate wrapper request
 func (r *GenerateWrapperRequest) ValidateGenerateWrapperRequest() error {
-	if !isValidShellType(r.ShellType) {
+	if !IsValidShellType(r.ShellType) {
 		return NewShellError(ErrInvalidShellType, string(r.ShellType), "unsupported shell type")
 	}
 

@@ -85,6 +85,28 @@ func (e *ContextDetectionError) Unwrap() error {
 **Error**: `ErrShellDetectionFailed` when SHELL not set or unsupported
 **Pattern**: Case-insensitive path parsing (e.g., `/bin/BASH`, `/usr/local/Zsh/bin/zsh`)
 
+## Shell Domain Model
+
+```go
+type Shell interface {
+    Type() ShellType
+    Path() string
+    Version() string
+}
+
+type ShellType string
+
+const (
+    ShellBash ShellType = "bash"
+    ShellZsh ShellType = "zsh"
+    ShellFish ShellType = "fish"
+)
+```
+
+**Design Rationale**: Shell domain model is minimal - only Type, Path, and Version. Wrapper template generation and config file detection are infrastructure concerns (see `internal/infrastructure/AGENTS.md`).
+
+**Validation**: Use `IsValidShellType(shellType)` to validate shell types (exported function).
+
 ## Testing
 - **Unit tests**: Table-driven tests with Testify
 - **Mocking**: Inline mocks (keep tests self-contained)

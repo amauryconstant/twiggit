@@ -12,6 +12,18 @@ import (
 
 // Pure functions extracted from ContextResolver
 
+// validatePathUnder validates that a target path is under a base directory
+// Returns an error if the validation fails or if the path is outside the base
+func validatePathUnder(base, target, targetType, baseDesc string) error {
+	if under, err := IsPathUnder(base, target); err != nil {
+		return fmt.Errorf("failed to validate %s path: %w", targetType, err)
+	} else if !under {
+		return domain.NewContextDetectionError(target,
+			fmt.Sprintf("%s path is outside configured %s directory", targetType, baseDesc), nil)
+	}
+	return nil
+}
+
 // parseCrossProjectReference parses a cross-project reference in the format "project/branch"
 func parseCrossProjectReference(identifier string) (project, branch string, valid bool) {
 	parts := strings.Split(identifier, "/")
@@ -130,10 +142,8 @@ func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identi
 	worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
 
 	// Validate the worktree path is under the worktrees directory to prevent path traversal
-	if under, err := IsPathUnder(cr.config.WorktreesDirectory, worktreePath); err != nil {
-		return nil, fmt.Errorf("failed to validate worktree path: %w", err)
-	} else if !under {
-		return nil, domain.NewContextDetectionError(worktreePath, "worktree path is outside configured worktrees directory", nil)
+	if err := validatePathUnder(cr.config.WorktreesDirectory, worktreePath, "worktree", "worktrees"); err != nil {
+		return nil, err
 	}
 
 	return &domain.ResolutionResult{
@@ -237,10 +247,8 @@ func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, ident
 		projectPath := filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
 
 		// Validate the project path is under the projects directory to prevent path traversal
-		if under, err := IsPathUnder(cr.config.ProjectsDirectory, projectPath); err != nil {
-			return nil, fmt.Errorf("failed to validate project path: %w", err)
-		} else if !under {
-			return nil, domain.NewContextDetectionError(projectPath, "project path is outside configured projects directory", nil)
+		if err := validatePathUnder(cr.config.ProjectsDirectory, projectPath, "project", "projects"); err != nil {
+			return nil, err
 		}
 
 		return &domain.ResolutionResult{
@@ -269,10 +277,8 @@ func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, ident
 	worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
 
 	// Validate the worktree path is under the worktrees directory to prevent path traversal
-	if under, err := IsPathUnder(cr.config.WorktreesDirectory, worktreePath); err != nil {
-		return nil, fmt.Errorf("failed to validate worktree path: %w", err)
-	} else if !under {
-		return nil, domain.NewContextDetectionError(worktreePath, "worktree path is outside configured worktrees directory", nil)
+	if err := validatePathUnder(cr.config.WorktreesDirectory, worktreePath, "worktree", "worktrees"); err != nil {
+		return nil, err
 	}
 
 	return &domain.ResolutionResult{
@@ -336,10 +342,8 @@ func (cr *contextResolver) resolveFromOutsideGitContext(_ *domain.Context, ident
 	projectPath := filepath.Join(cr.config.ProjectsDirectory, identifier)
 
 	// Validate the project path is under the projects directory to prevent path traversal
-	if under, err := IsPathUnder(cr.config.ProjectsDirectory, projectPath); err != nil {
-		return nil, fmt.Errorf("failed to validate project path: %w", err)
-	} else if !under {
-		return nil, domain.NewContextDetectionError(projectPath, "project path is outside configured projects directory", nil)
+	if err := validatePathUnder(cr.config.ProjectsDirectory, projectPath, "project", "projects"); err != nil {
+		return nil, err
 	}
 
 	return &domain.ResolutionResult{
@@ -348,51 +352,6 @@ func (cr *contextResolver) resolveFromOutsideGitContext(_ *domain.Context, ident
 		ProjectName:  identifier,
 		Explanation:  fmt.Sprintf("Resolved '%s' to project directory", identifier),
 	}, nil
-}
-
-// ProjectInfo represents information about a discovered project
-type ProjectInfo struct {
-	Name string
-	Path string
-}
-
-// discoverProjects scans the projects directory for git repositories
-func (cr *contextResolver) discoverProjects() ([]ProjectInfo, error) {
-	projectsDir := cr.config.ProjectsDirectory
-
-	// Check if directory exists
-	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("projects directory does not exist: %s", projectsDir)
-	}
-
-	// Read directory contents
-	entries, err := os.ReadDir(projectsDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read projects directory: %w", err)
-	}
-
-	projects := make([]ProjectInfo, 0, 10) // Pre-allocate with reasonable capacity
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		projectPath := filepath.Join(projectsDir, entry.Name())
-
-		// Validate it's a git repository if git service is available
-		if cr.gitService != nil {
-			if err := cr.gitService.ValidateRepository(projectPath); err != nil {
-				continue // Skip non-git directories
-			}
-		}
-
-		projects = append(projects, ProjectInfo{
-			Name: entry.Name(),
-			Path: projectPath,
-		})
-	}
-
-	return projects, nil
 }
 
 func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*domain.ResolutionSuggestion {
@@ -424,6 +383,53 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*do
 	return suggestions
 }
 
+// ProjectRef represents a lightweight project reference for internal use
+// This is distinct from domain.ProjectInfo which contains comprehensive project details
+type ProjectRef struct {
+	Name string
+	Path string
+}
+
+// discoverProjects scans the projects directory for git repositories
+// Returns lightweight project references for suggestion generation
+func (cr *contextResolver) discoverProjects() ([]ProjectRef, error) {
+	projectsDir := cr.config.ProjectsDirectory
+
+	// Check if directory exists
+	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
+		return nil, fmt.Errorf("projects directory does not exist: %s", projectsDir)
+	}
+
+	// Read directory contents
+	entries, err := os.ReadDir(projectsDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read projects directory: %w", err)
+	}
+
+	projects := make([]ProjectRef, 0, 10) // Pre-allocate with reasonable capacity
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		projectPath := filepath.Join(projectsDir, entry.Name())
+
+		// Validate it's a git repository if git service is available
+		if cr.gitService != nil {
+			if err := cr.gitService.ValidateRepository(projectPath); err != nil {
+				continue // Skip non-git directories
+			}
+		}
+
+		projects = append(projects, ProjectRef{
+			Name: entry.Name(),
+			Path: projectPath,
+		})
+	}
+
+	return projects, nil
+}
+
 func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*domain.ResolutionResult, error) {
 	// Check for path traversal before parsing
 	if containsPathTraversal(identifier) {
@@ -446,10 +452,8 @@ func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*dom
 	worktreePath := filepath.Join(cr.config.WorktreesDirectory, projectName, branchName)
 
 	// Validate the worktree path is under the worktrees directory to prevent path traversal
-	if under, err := IsPathUnder(cr.config.WorktreesDirectory, worktreePath); err != nil {
-		return nil, fmt.Errorf("failed to validate worktree path: %w", err)
-	} else if !under {
-		return nil, domain.NewContextDetectionError(worktreePath, "worktree path is outside configured worktrees directory", nil)
+	if err := validatePathUnder(cr.config.WorktreesDirectory, worktreePath, "worktree", "worktrees"); err != nil {
+		return nil, err
 	}
 
 	return &domain.ResolutionResult{

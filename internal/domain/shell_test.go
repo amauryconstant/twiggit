@@ -45,102 +45,10 @@ func TestShellDomain_ContractCompliance(t *testing.T) {
 				assert.Equal(t, tc.shellType, shell.Type())
 				assert.Equal(t, "/bin/test", shell.Path())
 				assert.Equal(t, "1.0", shell.Version())
-				assert.NotEmpty(t, shell.ConfigFiles())
-				assert.NotEmpty(t, shell.WrapperTemplate())
 			} else {
 				require.Error(t, err)
 				assert.Nil(t, shell)
 				assert.Contains(t, err.Error(), "unsupported shell type")
-			}
-		})
-	}
-}
-
-func TestShellDomain_ConfigFiles(t *testing.T) {
-	testCases := []struct {
-		name          string
-		shellType     ShellType
-		expectedFiles []string
-	}{
-		{
-			name:      "bash config files",
-			shellType: ShellBash,
-			expectedFiles: []string{
-				".bashrc", ".bash_profile", ".profile",
-			},
-		},
-		{
-			name:      "zsh config files",
-			shellType: ShellZsh,
-			expectedFiles: []string{
-				".zshrc", ".zprofile", ".profile",
-			},
-		},
-		{
-			name:      "fish config files",
-			shellType: ShellFish,
-			expectedFiles: []string{
-				"config.fish", ".fishrc",
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			shell, err := NewShell(tc.shellType, "/bin/test", "1.0")
-			require.NoError(t, err)
-
-			configFiles := shell.ConfigFiles()
-			assert.NotEmpty(t, configFiles)
-
-			// Verify expected files are present
-			for _, expectedFile := range tc.expectedFiles {
-				assert.Contains(t, configFiles, expectedFile)
-			}
-		})
-	}
-}
-
-func TestShellDomain_WrapperTemplate(t *testing.T) {
-	testCases := []struct {
-		name             string
-		shellType        ShellType
-		expectedContains []string
-	}{
-		{
-			name:      "bash wrapper template",
-			shellType: ShellBash,
-			expectedContains: []string{
-				"twiggit() {", "builtin cd", "command twiggit", "# Twiggit bash wrapper",
-			},
-		},
-		{
-			name:      "zsh wrapper template",
-			shellType: ShellZsh,
-			expectedContains: []string{
-				"twiggit() {", "builtin cd", "command twiggit", "# Twiggit zsh wrapper",
-			},
-		},
-		{
-			name:      "fish wrapper template",
-			shellType: ShellFish,
-			expectedContains: []string{
-				"function twiggit", "builtin cd", "command twiggit", "# Twiggit fish wrapper",
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			shell, err := NewShell(tc.shellType, "/bin/test", "1.0")
-			require.NoError(t, err)
-
-			template := shell.WrapperTemplate()
-			assert.NotEmpty(t, template)
-
-			// Verify expected content is present
-			for _, expectedContent := range tc.expectedContains {
-				assert.Contains(t, template, expectedContent)
 			}
 		})
 	}

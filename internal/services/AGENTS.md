@@ -72,11 +72,12 @@ func (s *WorktreeService) CreateWorktree(
 - Validate paths before returning
 
 ### ShellService
-- Generate shell-specific wrapper functions
+- Generate shell-specific wrapper functions (delegates to ShellInfrastructure)
 - Include escape hatch for builtin cd
 - Write to shell-specific config file
 - Auto-detect shell from SHELL environment variable when not specified
 - Auto-detect config file location when not specified
+- Validate shell types using `domain.IsValidShellType()` (domain-level validation)
 
 ## Quality Requirements
 - All golangci-lint checks SHALL pass

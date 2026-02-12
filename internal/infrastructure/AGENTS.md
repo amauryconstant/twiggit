@@ -41,6 +41,13 @@ type CLIClient interface {
 
 **Methods SHALL be idempotent (no-op if already deleted).**
 
+## Path Validation Helper
+
+**Function**: `validatePathUnder(base, target, targetType, baseDesc string) error`
+**Purpose**: Validates that a target path is under a base directory, preventing path traversal attacks
+**Returns**: Error if validation fails or path is outside base
+**Usage**: Used consistently across ContextResolver for path validation
+
 ## Context Detection Rules
 
 **Canonical location** for context detection logic.
@@ -74,6 +81,8 @@ type CLIClient interface {
 | Worktree | `<project>` | Different project main |
 | Outside | `<project>` | Project main directory |
 | Outside | `<project>/<branch>` | Cross-project worktree |
+
+**Note**: ContextResolver uses `ProjectRef` type internally for lightweight project references (name + path), distinct from `domain.ProjectInfo` which contains comprehensive details (worktrees, branches, remotes).
 
 ## Configuration Management
 

@@ -25,8 +25,6 @@ type Shell interface {
 	Type() ShellType
 	Path() string
 	Version() string
-	ConfigFiles() []string
-	WrapperTemplate() string
 }
 
 type shell struct {
@@ -37,7 +35,7 @@ type shell struct {
 
 // NewShell creates a new Shell instance with validation
 func NewShell(shellType ShellType, path, version string) (Shell, error) {
-	if !isValidShellType(shellType) {
+	if !IsValidShellType(shellType) {
 		return nil, fmt.Errorf("unsupported shell type: %s", shellType)
 	}
 
@@ -63,99 +61,14 @@ func (s *shell) Version() string {
 	return s.version
 }
 
-// ConfigFiles returns the list of configuration files for this shell
-func (s *shell) ConfigFiles() []string {
-	switch s.shellType {
-	case ShellBash:
-		return []string{".bashrc", ".bash_profile", ".profile"}
-	case ShellZsh:
-		return []string{".zshrc", ".zprofile", ".profile"}
-	case ShellFish:
-		return []string{"config.fish", ".fishrc"}
-	default:
-		return []string{}
-	}
-}
-
-// WrapperTemplate returns the wrapper template for this shell
-func (s *shell) WrapperTemplate() string {
-	switch s.shellType {
-	case ShellBash:
-		return s.bashWrapperTemplate()
-	case ShellZsh:
-		return s.zshWrapperTemplate()
-	case ShellFish:
-		return s.fishWrapperTemplate()
-	default:
-		return ""
-	}
-}
-
-// isValidShellType checks if the shell type is supported
-func isValidShellType(shellType ShellType) bool {
+// IsValidShellType checks if the shell type is supported
+func IsValidShellType(shellType ShellType) bool {
 	switch shellType {
 	case ShellBash, ShellZsh, ShellFish:
 		return true
 	default:
 		return false
 	}
-}
-
-// bashWrapperTemplate returns the bash wrapper template
-func (s *shell) bashWrapperTemplate() string {
-	return `### BEGIN TWIGGIT WRAPPER
-# Twiggit bash wrapper
-twiggit() {
-    if [ "$1" = "cd" ]; then
-        # Handle cd command with directory change
-        target_dir=$(command twiggit "$@")
-        if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-            builtin cd "$target_dir"
-        fi
-    else
-        # Pass through all other commands
-        command twiggit "$@"
-    fi
-}
-### END TWIGGIT WRAPPER`
-}
-
-// zshWrapperTemplate returns the zsh wrapper template
-func (s *shell) zshWrapperTemplate() string {
-	return `### BEGIN TWIGGIT WRAPPER
-# Twiggit zsh wrapper
-twiggit() {
-    if [ "$1" = "cd" ]; then
-        # Handle cd command with directory change
-        target_dir=$(command twiggit "$@")
-        if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-            builtin cd "$target_dir"
-        fi
-    else
-        # Pass through all other commands
-        command twiggit "$@"
-    fi
-}
-### END TWIGGIT WRAPPER`
-}
-
-// fishWrapperTemplate returns the fish wrapper template
-func (s *shell) fishWrapperTemplate() string {
-	return `### BEGIN TWIGGIT WRAPPER
-# Twiggit fish wrapper
-function twiggit
-    if test "$argv[1]" = "cd"
-        # Handle cd command with directory change
-        set target_dir (command twiggit $argv)
-        if test $status -eq 0 -a -n "$target_dir"
-            builtin cd "$target_dir"
-        end
-    else
-        # Pass through all other commands
-        command twiggit $argv
-    end
-end
-### END TWIGGIT WRAPPER`
 }
 
 // InferShellTypeFromPath infers shell type from config file path
