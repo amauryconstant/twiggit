@@ -1,22 +1,23 @@
-package services
+package service
 
 import (
 	"fmt"
 	"os"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-// ContextService provides context-aware operations
-type ContextService struct {
+// contextService provides context-aware operations
+type contextService struct {
 	detector domain.ContextDetector
 	resolver domain.ContextResolver
 	config   *domain.Config
 }
 
 // NewContextService creates a new context service
-func NewContextService(detector domain.ContextDetector, resolver domain.ContextResolver, cfg *domain.Config) *ContextService {
-	return &ContextService{
+func NewContextService(detector domain.ContextDetector, resolver domain.ContextResolver, cfg *domain.Config) application.ContextService {
+	return &contextService{
 		detector: detector,
 		resolver: resolver,
 		config:   cfg,
@@ -24,7 +25,7 @@ func NewContextService(detector domain.ContextDetector, resolver domain.ContextR
 }
 
 // GetCurrentContext detects context from current working directory
-func (cs *ContextService) GetCurrentContext() (*domain.Context, error) {
+func (cs *contextService) GetCurrentContext() (*domain.Context, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
@@ -38,7 +39,7 @@ func (cs *ContextService) GetCurrentContext() (*domain.Context, error) {
 }
 
 // DetectContextFromPath detects context from specified path
-func (cs *ContextService) DetectContextFromPath(path string) (*domain.Context, error) {
+func (cs *contextService) DetectContextFromPath(path string) (*domain.Context, error) {
 	ctx, err := cs.detector.DetectContext(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect context from path %s: %w", path, err)
@@ -47,7 +48,7 @@ func (cs *ContextService) DetectContextFromPath(path string) (*domain.Context, e
 }
 
 // ResolveIdentifier resolves identifier based on current context
-func (cs *ContextService) ResolveIdentifier(identifier string) (*domain.ResolutionResult, error) {
+func (cs *contextService) ResolveIdentifier(identifier string) (*domain.ResolutionResult, error) {
 	ctx, err := cs.GetCurrentContext()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current context: %w", err)
@@ -61,7 +62,7 @@ func (cs *ContextService) ResolveIdentifier(identifier string) (*domain.Resoluti
 }
 
 // ResolveIdentifierFromContext resolves identifier based on specified context
-func (cs *ContextService) ResolveIdentifierFromContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+func (cs *contextService) ResolveIdentifierFromContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
 	result, err := cs.resolver.ResolveIdentifier(ctx, identifier)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve identifier '%s': %w", identifier, err)
@@ -70,7 +71,7 @@ func (cs *ContextService) ResolveIdentifierFromContext(ctx *domain.Context, iden
 }
 
 // GetCompletionSuggestions provides completion suggestions based on current context
-func (cs *ContextService) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
+func (cs *contextService) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
 	ctx, err := cs.GetCurrentContext()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current context: %w", err)
@@ -84,7 +85,7 @@ func (cs *ContextService) GetCompletionSuggestions(partial string) ([]*domain.Re
 }
 
 // GetCompletionSuggestionsFromContext provides completion suggestions based on specified context
-func (cs *ContextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+func (cs *contextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
 	suggestions, err := cs.resolver.GetResolutionSuggestions(ctx, partial)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get completion suggestions: %w", err)

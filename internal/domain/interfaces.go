@@ -2,27 +2,6 @@ package domain
 
 import "context"
 
-// ContextService defines domain service operations for context detection and resolution
-type ContextService interface {
-	// GetCurrentContext returns the current working context
-	GetCurrentContext() (*Context, error)
-
-	// DetectContextFromPath detects context from a file system path
-	DetectContextFromPath(path string) (*Context, error)
-
-	// ResolveIdentifier resolves an identifier to a resolution result
-	ResolveIdentifier(identifier string) (*ResolutionResult, error)
-
-	// ResolveIdentifierFromContext resolves an identifier within a specific context
-	ResolveIdentifierFromContext(ctx *Context, identifier string) (*ResolutionResult, error)
-
-	// GetCompletionSuggestions provides completion suggestions for partial identifiers
-	GetCompletionSuggestions(partial string) ([]*ResolutionSuggestion, error)
-
-	// GetCompletionSuggestionsFromContext provides completion suggestions for partial identifiers within a specific context
-	GetCompletionSuggestionsFromContext(ctx *Context, partial string) ([]*ResolutionSuggestion, error)
-}
-
 // GitRepositoryInterface defines repository operations for git entities
 type GitRepositoryInterface interface {
 	// ValidateRepository checks if path contains valid git repository

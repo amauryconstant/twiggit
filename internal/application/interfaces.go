@@ -6,6 +6,27 @@ import (
 	"twiggit/internal/domain"
 )
 
+// ContextService provides context detection and resolution operations
+type ContextService interface {
+	// GetCurrentContext returns the current working context
+	GetCurrentContext() (*domain.Context, error)
+
+	// DetectContextFromPath detects context from a file system path
+	DetectContextFromPath(path string) (*domain.Context, error)
+
+	// ResolveIdentifier resolves an identifier to a resolution result
+	ResolveIdentifier(identifier string) (*domain.ResolutionResult, error)
+
+	// ResolveIdentifierFromContext resolves an identifier within a specific context
+	ResolveIdentifierFromContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error)
+
+	// GetCompletionSuggestions provides completion suggestions for partial identifiers
+	GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error)
+
+	// GetCompletionSuggestionsFromContext provides completion suggestions for partial identifiers within a specific context
+	GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error)
+}
+
 // WorktreeService provides high-level worktree management operations
 type WorktreeService interface {
 	// CreateWorktree creates a new worktree for the specified project and branch

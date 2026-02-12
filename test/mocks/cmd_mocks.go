@@ -3,6 +3,7 @@ package mocks
 import (
 	"context"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
@@ -144,9 +145,9 @@ func (m *MockNavigationService) GetNavigationSuggestions(ctx context.Context, co
 	return nil, nil
 }
 
-// MockContextService is a mock implementation of domain.ContextService
+// MockContextService is a mock implementation of application.ContextService
 type MockContextService struct {
-	domain.ContextService
+	application.ContextService
 
 	// Configurable functions for testing
 	GetCurrentContextFunc                   func() (*domain.Context, error)

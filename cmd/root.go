@@ -22,7 +22,7 @@ type ServiceContainer struct {
 	WorktreeService   application.WorktreeService
 	ProjectService    application.ProjectService
 	NavigationService application.NavigationService
-	ContextService    domain.ContextService
+	ContextService    application.ContextService
 	ShellService      application.ShellService
 	GitClient         infrastructure.GitClient
 }

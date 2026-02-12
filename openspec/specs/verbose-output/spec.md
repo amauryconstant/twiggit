@@ -113,7 +113,7 @@ The system SHALL format all verbose output as plain text with no color, no prefi
 - **AND** downstream command receives only normal output on stdin
 
 ### Requirement: Verbose output only appears in command layer
-The system SHALL only generate verbose output from the command layer (cmd/*.go), never from the service layer (internal/services/*.go).
+The system SHALL only generate verbose output from the command layer (cmd/*.go), never from the service layer (internal/service/*.go).
 
 #### Scenario: Service layer produces no verbose output
 - **WHEN** service layer code executes any operation

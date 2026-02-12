@@ -39,7 +39,7 @@ Skip: `git commit -m "msg" --no-verify`
 
 cmd/AGENTS.md # CLI commands, Cobra patterns
 internal/application/AGENTS.md # Interface definitions
-internal/services/AGENTS.md # Service implementation patterns
+internal/service/AGENTS.md # Service implementation patterns
 internal/domain/AGENTS.md # Domain model conventions
 internal/infrastructure/AGENTS.md # Git client routing, config
 test/integration/AGENTS.md # Testify suite patterns

@@ -11,7 +11,7 @@ import (
 
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
-	"twiggit/internal/services"
+	"twiggit/internal/service"
 )
 
 func TestShellIntegration_Inference(t *testing.T) {
@@ -72,7 +72,7 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := services.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &domain.Config{})
 
 		initialContent := `# Bash config
 ### BEGIN TWIGGIT WRAPPER
@@ -113,7 +113,7 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := services.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &domain.Config{})
 
 		initialContent := "# Bash config"
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
@@ -150,7 +150,7 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := services.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &domain.Config{})
 
 		initialContent := `# Bash config
 ### BEGIN TWIGGIT WRAPPER
@@ -183,7 +183,7 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := services.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &domain.Config{})
 
 		initialContent := "# Bash config"
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))

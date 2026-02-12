@@ -1,4 +1,4 @@
-package services
+package service
 
 import (
 	"context"
@@ -14,14 +14,14 @@ import (
 // projectService implements ProjectService interface
 type projectService struct {
 	gitService     infrastructure.GitClient
-	contextService domain.ContextService
+	contextService application.ContextService
 	config         *domain.Config
 }
 
 // NewProjectService creates a new ProjectService instance
 func NewProjectService(
 	gitService infrastructure.GitClient,
-	contextService domain.ContextService,
+	contextService application.ContextService,
 	config *domain.Config,
 ) application.ProjectService {
 	return &projectService{

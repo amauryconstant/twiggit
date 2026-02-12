@@ -1,4 +1,4 @@
-package services
+package service
 
 import (
 	"context"
@@ -14,14 +14,14 @@ import (
 // navigationService implements NavigationService interface
 type navigationService struct {
 	projectService application.ProjectService
-	contextService domain.ContextService
+	contextService application.ContextService
 	config         *domain.Config
 }
 
 // NewNavigationService creates a new NavigationService instance
 func NewNavigationService(
 	projectService application.ProjectService,
-	contextService domain.ContextService,
+	contextService application.ContextService,
 	config *domain.Config,
 ) application.NavigationService {
 	return &navigationService{

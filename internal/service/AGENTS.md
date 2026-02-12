@@ -43,7 +43,7 @@ func (s *WorktreeService) CreateWorktree(
 - Never panic in production code
 
 ## Testing
-- **Unit tests**: Testify suites with mocks from `test/mocks/services/`
+- **Unit tests**: Testify suites with mocks from `test/mocks/service/`
 - **Integration tests**: Real git repos in temp dirs
 - **Build tags**: `//go:build integration`
 - **Skip in short mode**: `if testing.Short() { t.Skip() }`

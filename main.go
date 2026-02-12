@@ -5,7 +5,7 @@ import (
 
 	"twiggit/cmd"
 	"twiggit/internal/infrastructure"
-	"twiggit/internal/services"
+	"twiggit/internal/service"
 )
 
 func main() {
@@ -30,12 +30,12 @@ func main() {
 	contextResolver := infrastructure.NewContextResolver(config, gitClient)
 
 	// Initialize application services (contextService first as others depend on it)
-	contextService := services.NewContextService(contextDetector, contextResolver, config)
-	projectService := services.NewProjectService(gitClient, contextService, config)
-	navigationService := services.NewNavigationService(projectService, contextService, config)
-	worktreeService := services.NewWorktreeService(gitClient, projectService, config)
+	contextService := service.NewContextService(contextDetector, contextResolver, config)
+	projectService := service.NewProjectService(gitClient, contextService, config)
+	navigationService := service.NewNavigationService(projectService, contextService, config)
+	worktreeService := service.NewWorktreeService(gitClient, projectService, config)
 	shellInfra := infrastructure.NewShellInfrastructure()
-	shellService := services.NewShellService(shellInfra, config)
+	shellService := service.NewShellService(shellInfra, config)
 
 	// Create command configuration
 	commandConfig := &cmd.CommandConfig{

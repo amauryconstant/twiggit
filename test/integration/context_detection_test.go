@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
-	"twiggit/internal/services"
+	"twiggit/internal/service"
 )
 
 func TestContextDetector_Integration(t *testing.T) {
@@ -285,7 +285,7 @@ func TestContextService_Integration(t *testing.T) {
 	gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
 	resolver := infrastructure.NewContextResolver(config, gitService)
-	contextService := services.NewContextService(detector, resolver, config)
+	contextService := service.NewContextService(detector, resolver, config)
 
 	// Change to the repository directory
 	originalWd, err := os.Getwd()
