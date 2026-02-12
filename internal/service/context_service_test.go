@@ -15,15 +15,15 @@ import (
 
 type ContextServiceTestSuite struct {
 	suite.Suite
-	detector *mocks.ContextDetectorMock
-	resolver *mocks.ContextResolverMock
+	detector *mocks.MockContextDetector
+	resolver *mocks.MockContextResolver
 	service  application.ContextService
 	config   *domain.Config
 }
 
 func (s *ContextServiceTestSuite) SetupTest() {
-	s.detector = &mocks.ContextDetectorMock{}
-	s.resolver = &mocks.ContextResolverMock{}
+	s.detector = mocks.NewMockContextDetector()
+	s.resolver = mocks.NewMockContextResolver()
 	s.config = fixtures.NewTestConfig()
 	s.service = NewContextService(s.detector, s.resolver, s.config)
 }
@@ -33,8 +33,8 @@ func TestContextService(t *testing.T) {
 }
 
 func (s *ContextServiceTestSuite) TestNewContextService() {
-	detector := &mocks.ContextDetectorMock{}
-	resolver := &mocks.ContextResolverMock{}
+	detector := mocks.NewMockContextDetector()
+	resolver := mocks.NewMockContextResolver()
 	config := fixtures.NewTestConfig()
 
 	service := NewContextService(detector, resolver, config)

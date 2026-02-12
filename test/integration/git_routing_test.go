@@ -16,6 +16,7 @@ import (
 	"twiggit/test/mocks"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -125,25 +126,16 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	})
 
 	t.Run("NoFallbackLogic", func(t *testing.T) {
-		// Test that there's no fallback - if GoGit fails, the operation fails
-		// (doesn't try CLI as fallback)
-
-		// Create GoGit client that will fail
 		mockGoGit := mocks.NewMockGoGitClient()
-		mockGoGit.ListBranchesFunc = func(ctx context.Context, repoPath string) ([]domain.BranchInfo, error) {
-			return nil, assert.AnError
-		}
+		mockGoGit.On("ListBranches", mock.Anything, mock.AnythingOfType("string")).Return([]domain.BranchInfo(nil), assert.AnError)
 
-		// Create CLI client (should not be called)
 		cliClient := infrastructure.NewCLIClient(executor, 30)
 
 		gitService := infrastructure.NewCompositeGitClient(mockGoGit, cliClient)
 
-		// Test that branch operation fails when GoGit fails
 		_, err := gitService.ListBranches(context.Background(), repoPath)
 		assert.Error(t, err)
 
-		// The error should be from GoGit, not CLI (proving no fallback)
 		assert.ErrorIs(t, err, assert.AnError)
 	})
 }

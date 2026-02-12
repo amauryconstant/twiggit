@@ -1,14 +1,14 @@
 package mocks
 
-import "twiggit/internal/domain"
+import (
+	"twiggit/internal/domain"
+
+	"github.com/stretchr/testify/mock"
+)
 
 // MockShellInfrastructure is a mock implementation of infrastructure.ShellInfrastructure for testing
 type MockShellInfrastructure struct {
-	// Mock functions
-	GenerateWrapperFunc      func(shellType domain.ShellType) (string, error)
-	DetectConfigFileFunc     func(shellType domain.ShellType) (string, error)
-	InstallWrapperFunc       func(shellType domain.ShellType, wrapper, configFile string, force bool) error
-	ValidateInstallationFunc func(shellType domain.ShellType, configFile string) error
+	mock.Mock
 }
 
 // NewMockShellInfrastructure creates a new MockShellInfrastructure for testing
@@ -18,32 +18,30 @@ func NewMockShellInfrastructure() *MockShellInfrastructure {
 
 // GenerateWrapper mocks generating shell wrapper functions
 func (m *MockShellInfrastructure) GenerateWrapper(shellType domain.ShellType) (string, error) {
-	if m.GenerateWrapperFunc != nil {
-		return m.GenerateWrapperFunc(shellType)
+	args := m.Called(shellType)
+	if args.Get(0) == nil {
+		return "", args.Error(1)
 	}
-	return "", nil
+	return args.String(0), args.Error(1)
 }
 
 // DetectConfigFile mocks detecting shell config file location
 func (m *MockShellInfrastructure) DetectConfigFile(shellType domain.ShellType) (string, error) {
-	if m.DetectConfigFileFunc != nil {
-		return m.DetectConfigFileFunc(shellType)
+	args := m.Called(shellType)
+	if args.Get(0) == nil {
+		return "", args.Error(1)
 	}
-	return "", nil
+	return args.String(0), args.Error(1)
 }
 
 // InstallWrapper mocks installing wrapper to config file
 func (m *MockShellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
-	if m.InstallWrapperFunc != nil {
-		return m.InstallWrapperFunc(shellType, wrapper, configFile, force)
-	}
-	return nil
+	args := m.Called(shellType, wrapper, configFile, force)
+	return args.Error(0)
 }
 
 // ValidateInstallation mocks validating wrapper installation
 func (m *MockShellInfrastructure) ValidateInstallation(shellType domain.ShellType, configFile string) error {
-	if m.ValidateInstallationFunc != nil {
-		return m.ValidateInstallationFunc(shellType, configFile)
-	}
-	return nil
+	args := m.Called(shellType, configFile)
+	return args.Error(0)
 }

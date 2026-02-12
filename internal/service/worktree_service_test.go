@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/application"
@@ -38,56 +39,42 @@ func (s *WorktreeServiceTestSuite) SetupTest() {
 }
 
 func (s *WorktreeServiceTestSuite) configureMocks() {
-	s.projectService.ListProjectsFunc = func(ctx context.Context) ([]*domain.ProjectInfo, error) {
-		return []*domain.ProjectInfo{s.testProject}, nil
-	}
+	s.projectService.On("ListProjects", mock.Anything).Return([]*domain.ProjectInfo{s.testProject}, nil)
 
-	s.projectService.DiscoverProjectFunc = func(ctx context.Context, projectName string, context *domain.Context) (*domain.ProjectInfo, error) {
-		return s.testProject, nil
-	}
+	s.projectService.On("DiscoverProject", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("*domain.Context")).Return(s.testProject, nil)
 
-	s.projectService.GetProjectInfoFunc = func(ctx context.Context, projectPath string) (*domain.ProjectInfo, error) {
-		if projectPath == "/path/to/project" || projectPath == "" {
-			return s.testProject, nil
-		}
-		return nil, nil
-	}
+	s.projectService.On("GetProjectInfo", mock.Anything, "/path/to/project").Return(s.testProject, nil)
+	s.projectService.On("GetProjectInfo", mock.Anything, "").Return(s.testProject, nil)
+	s.projectService.On("GetProjectInfo", mock.Anything, mock.AnythingOfType("string")).Return((*domain.ProjectInfo)(nil), nil).Maybe()
 
-	s.projectService.ValidateProjectFunc = func(ctx context.Context, projectPath string) error {
-		return nil
-	}
+	s.projectService.On("ValidateProject", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
-	s.gitService.MockCLIClient.ListWorktreesFunc = func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
-		if repoPath == "/path/to/project/.git" {
-			return []domain.WorktreeInfo{
-				{
-					Path:   "/path/to/worktree",
-					Branch: "feature-branch",
-					Commit: "abc123",
-					IsBare: false,
-				},
-			}, nil
-		}
-		return []domain.WorktreeInfo{}, nil
+	worktrees := []domain.WorktreeInfo{
+		{
+			Path:   "/path/to/worktree",
+			Branch: "feature-branch",
+			Commit: "abc123",
+			IsBare: false,
+		},
 	}
+	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project/.git").Return(worktrees, nil)
+	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil).Maybe()
+	s.gitService.MockCLIClient.On("CreateWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Maybe()
+	s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("bool")).Return(nil).Maybe()
+	s.gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
+	s.gitService.MockGoGitClient.On("BranchExists", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(false, nil).Maybe()
 
-	s.gitService.MockGoGitClient.ValidateRepositoryFunc = func(path string) error {
-		return nil
-	}
-
-	s.gitService.MockGoGitClient.GetRepositoryStatusFunc = func(ctx context.Context, repoPath string) (domain.RepositoryStatus, error) {
-		return domain.RepositoryStatus{
-			IsClean:   true,
-			Branch:    "feature-branch",
-			Commit:    "abc123",
-			Modified:  []string{},
-			Added:     []string{},
-			Deleted:   []string{},
-			Untracked: []string{},
-			Ahead:     0,
-			Behind:    0,
-		}, nil
-	}
+	s.gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, mock.AnythingOfType("string")).Return(domain.RepositoryStatus{
+		IsClean:   true,
+		Branch:    "feature-branch",
+		Commit:    "abc123",
+		Modified:  []string{},
+		Added:     []string{},
+		Deleted:   []string{},
+		Untracked: []string{},
+		Ahead:     0,
+		Behind:    0,
+	}, nil).Maybe()
 }
 
 func TestWorktreeService(t *testing.T) {

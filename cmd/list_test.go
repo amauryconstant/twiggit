@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
@@ -32,18 +32,14 @@ func TestListCommand_Execute(t *testing.T) {
 			name: "list worktrees in project context",
 			args: []string{},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
-				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
-					return &domain.Context{
-						Type:        domain.ContextProject,
-						ProjectName: "test-project",
-					}, nil
-				}
-				mockWS.ListWorktreesFunc = func(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
-					return []*domain.WorktreeInfo{
-						{Path: "/home/user/Worktrees/test-project/main", Branch: "main"},
-						{Path: "/home/user/Worktrees/test-project/feature", Branch: "feature"},
-					}, nil
-				}
+				mockCS.On("GetCurrentContext").Return(&domain.Context{
+					Type:        domain.ContextProject,
+					ProjectName: "test-project",
+				}, nil)
+				mockWS.On("ListWorktrees", mock.Anything, mock.AnythingOfType("*domain.ListWorktreesRequest")).Return([]*domain.WorktreeInfo{
+					{Path: "/home/user/Worktrees/test-project/main", Branch: "main"},
+					{Path: "/home/user/Worktrees/test-project/feature", Branch: "feature"},
+				}, nil)
 			},
 			expectError: false,
 			validateOut: func(output string) bool {
@@ -54,12 +50,8 @@ func TestListCommand_Execute(t *testing.T) {
 			name: "list all worktrees with --all flag",
 			args: []string{"--all"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
-				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
-					return &domain.Context{Type: domain.ContextOutsideGit}, nil
-				}
-				mockWS.ListWorktreesFunc = func(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
-					return []*domain.WorktreeInfo{}, nil
-				}
+				mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
+				mockWS.On("ListWorktrees", mock.Anything, mock.AnythingOfType("*domain.ListWorktreesRequest")).Return([]*domain.WorktreeInfo{}, nil)
 			},
 			expectError: false,
 		},

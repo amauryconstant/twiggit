@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"twiggit/internal/domain"
 )
 
@@ -151,33 +152,28 @@ func createCommandResult(_ string, _ []string, output []byte, err error, duratio
 
 // MockCommandExecutor implements CommandExecutor for testing
 type MockCommandExecutor struct {
-	// Mock function to call instead of executing real commands
-	ExecuteFunc func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error)
+	mock.Mock
 }
 
 // NewMockCommandExecutor creates a new MockCommandExecutor
-func NewMockCommandExecutor(executeFunc func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error)) *MockCommandExecutor {
-	return &MockCommandExecutor{
-		ExecuteFunc: executeFunc,
-	}
+func NewMockCommandExecutor() *MockCommandExecutor {
+	return &MockCommandExecutor{}
 }
 
 // Execute executes the mock command
 func (m *MockCommandExecutor) Execute(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-	if m.ExecuteFunc != nil {
-		return m.ExecuteFunc(ctx, dir, cmd, args...)
+	resultArgs := m.Called(ctx, dir, cmd, args)
+	if resultArgs.Get(0) == nil {
+		return nil, resultArgs.Error(1) //nolint:wrapcheck
 	}
-
-	// Default mock behavior
-	return &CommandResult{
-		ExitCode: 0,
-		Stdout:   "",
-		Stderr:   "",
-		Duration: 0,
-	}, nil
+	return resultArgs.Get(0).(*CommandResult), resultArgs.Error(1) //nolint:wrapcheck
 }
 
 // ExecuteWithTimeout executes the mock command with timeout
-func (m *MockCommandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd string, _ time.Duration, args ...string) (*CommandResult, error) {
-	return m.Execute(ctx, dir, cmd, args...)
+func (m *MockCommandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd string, timeout time.Duration, args ...string) (*CommandResult, error) {
+	resultArgs := m.Called(ctx, dir, cmd, timeout, args)
+	if resultArgs.Get(0) == nil {
+		return nil, resultArgs.Error(1) //nolint:wrapcheck
+	}
+	return resultArgs.Get(0).(*CommandResult), resultArgs.Error(1) //nolint:wrapcheck
 }

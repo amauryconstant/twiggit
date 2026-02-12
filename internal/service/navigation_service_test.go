@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/application"
@@ -38,6 +39,7 @@ func (s *NavigationServiceTestSuite) TestResolvePath() {
 		request      *domain.ResolvePathRequest
 		expectError  bool
 		errorMessage string
+		setupMocks   func()
 	}{
 		{
 			name: "valid branch resolution from project context",
@@ -49,6 +51,7 @@ func (s *NavigationServiceTestSuite) TestResolvePath() {
 				},
 			},
 			expectError: false,
+			setupMocks:  func() {},
 		},
 		{
 			name: "empty target",
@@ -60,12 +63,23 @@ func (s *NavigationServiceTestSuite) TestResolvePath() {
 			},
 			expectError:  true,
 			errorMessage: "validation failed for ResolvePathRequest.target: cannot be empty",
+			setupMocks:   func() {},
 		},
 	}
 
 	for _, tc := range tests {
 		s.Run(tc.name, func() {
-			result, err := s.service.ResolvePath(context.Background(), tc.request)
+			// Set up fresh mocks for each test case
+			projectService := mocks.NewMockProjectService()
+			contextService := mocks.NewMockContextService()
+			contextService.On("ResolveIdentifierFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
+				Type:         domain.PathTypeWorktree,
+				ResolvedPath: "/path/to/worktree",
+			}, nil)
+			tc.setupMocks()
+
+			service := NewNavigationService(projectService, contextService, s.config)
+			result, err := service.ResolvePath(context.Background(), tc.request)
 
 			if tc.expectError {
 				s.Require().Error(err)
@@ -144,28 +158,24 @@ func (s *NavigationServiceTestSuite) TestGetNavigationSuggestions() {
 			projectService := mocks.NewMockProjectService()
 			contextService := mocks.NewMockContextService()
 
-			contextService.GetCompletionSuggestionsFromContextFunc = func(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
-				return []*domain.ResolutionSuggestion{
-					{
-						Text:        "feature-branch",
-						Description: "Feature branch",
-						Type:        domain.PathTypeWorktree,
-						ProjectName: "test-project",
-						BranchName:  "feature-branch",
-					},
-				}, nil
-			}
+			contextService.On("GetCompletionSuggestionsFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string")).Return([]*domain.ResolutionSuggestion{
+				{
+					Text:        "feature-branch",
+					Description: "Feature branch",
+					Type:        domain.PathTypeWorktree,
+					ProjectName: "test-project",
+					BranchName:  "feature-branch",
+				},
+			}, nil)
 
-			contextService.GetCompletionSuggestionsFunc = func(partial string) ([]*domain.ResolutionSuggestion, error) {
-				return []*domain.ResolutionSuggestion{
-					{
-						Text:        "test-project",
-						Description: "Test project",
-						Type:        domain.PathTypeProject,
-						ProjectName: "test-project",
-					},
-				}, nil
-			}
+			contextService.On("GetCompletionSuggestions", mock.AnythingOfType("string")).Return([]*domain.ResolutionSuggestion{
+				{
+					Text:        "test-project",
+					Description: "Test project",
+					Type:        domain.PathTypeProject,
+					ProjectName: "test-project",
+				},
+			}, nil)
 
 			service := NewNavigationService(projectService, contextService, s.config)
 			result, err := service.GetNavigationSuggestions(context.Background(), tc.context, tc.partial)

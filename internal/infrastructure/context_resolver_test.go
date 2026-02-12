@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/domain"
@@ -704,9 +705,7 @@ func (s *ContextResolverTestSuite) TestGetOutsideGitContextSuggestions() {
 			}
 
 			mockGitService := mocks.NewMockGitService()
-			mockGitService.ValidateRepositoryFunc = func(path string) error {
-				return nil
-			}
+			mockGitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
 
 			resolver := NewContextResolver(config, mockGitService)
 			suggestions := resolver.(*contextResolver).getOutsideGitContextSuggestions(tt.partial)

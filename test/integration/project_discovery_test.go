@@ -53,16 +53,9 @@ func TestProjectDiscovery_Integration(t *testing.T) {
 
 	// Create mock git service that validates only the git repositories
 	mockGitService := mocks.NewMockGitService()
-	mockGitService.ValidateRepositoryFunc = func(path string) error {
-		switch path {
-		case project1Path, project2Path:
-			return nil // Valid git repositories
-		case nonRepoPath:
-			return assert.AnError // Not a git repository
-		default:
-			return assert.AnError
-		}
-	}
+	mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
+	mockGitService.MockGoGitClient.On("ValidateRepository", project2Path).Return(nil)
+	mockGitService.MockGoGitClient.On("ValidateRepository", nonRepoPath).Return(assert.AnError)
 
 	// Create context resolver
 	resolver := infrastructure.NewContextResolver(config, mockGitService)

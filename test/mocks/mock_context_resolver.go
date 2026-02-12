@@ -6,13 +6,18 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// ContextResolverMock is a mock implementation of domain.ContextResolver
-type ContextResolverMock struct {
+// MockContextResolver is a mock implementation of domain.ContextResolver
+type MockContextResolver struct {
 	mock.Mock
 }
 
+// NewMockContextResolver creates a new MockContextResolver
+func NewMockContextResolver() *MockContextResolver {
+	return &MockContextResolver{}
+}
+
 // ResolveIdentifier provides a mock function with given fields: ctx, identifier
-func (m *ContextResolverMock) ResolveIdentifier(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+func (m *MockContextResolver) ResolveIdentifier(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
 	args := m.Called(ctx, identifier)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -21,7 +26,7 @@ func (m *ContextResolverMock) ResolveIdentifier(ctx *domain.Context, identifier 
 }
 
 // GetResolutionSuggestions provides a mock function with given fields: ctx, partial
-func (m *ContextResolverMock) GetResolutionSuggestions(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+func (m *MockContextResolver) GetResolutionSuggestions(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
 	args := m.Called(ctx, partial)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

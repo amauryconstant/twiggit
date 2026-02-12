@@ -2,11 +2,11 @@ package cmd
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
@@ -31,17 +31,14 @@ func TestCDCommand_Execute(t *testing.T) {
 			name: "cd to worktree with branch name",
 			args: []string{"feature-branch"},
 			setupMocks: func(mockNS *mocks.MockNavigationService, mockCS *mocks.MockContextService) {
-				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
-					return &domain.Context{
-						Type:        domain.ContextProject,
-						ProjectName: "test-project",
-					}, nil
-				}
-				mockNS.ResolvePathFunc = func(ctx context.Context, req *domain.ResolvePathRequest) (*domain.ResolutionResult, error) {
-					return &domain.ResolutionResult{
-						ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
-					}, nil
-				}
+				mockCS.On("GetCurrentContext").Return(&domain.Context{
+					Type:        domain.ContextProject,
+					ProjectName: "test-project",
+				}, nil)
+				mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*domain.ResolvePathRequest")).Return(&domain.ResolutionResult{
+					ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
+				}, nil)
+				mockNS.On("ValidatePath", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 			},
 			expectError:  false,
 			expectedPath: "/home/user/Worktrees/test-project/feature-branch",
@@ -50,18 +47,15 @@ func TestCDCommand_Execute(t *testing.T) {
 			name: "cd to default worktree",
 			args: []string{},
 			setupMocks: func(mockNS *mocks.MockNavigationService, mockCS *mocks.MockContextService) {
-				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
-					return &domain.Context{
-						Type:        domain.ContextWorktree,
-						ProjectName: "test-project",
-						BranchName:  "main",
-					}, nil
-				}
-				mockNS.ResolvePathFunc = func(ctx context.Context, req *domain.ResolvePathRequest) (*domain.ResolutionResult, error) {
-					return &domain.ResolutionResult{
-						ResolvedPath: "/home/user/Worktrees/test-project/main",
-					}, nil
-				}
+				mockCS.On("GetCurrentContext").Return(&domain.Context{
+					Type:        domain.ContextWorktree,
+					ProjectName: "test-project",
+					BranchName:  "main",
+				}, nil)
+				mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*domain.ResolvePathRequest")).Return(&domain.ResolutionResult{
+					ResolvedPath: "/home/user/Worktrees/test-project/main",
+				}, nil)
+				mockNS.On("ValidatePath", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 			},
 			expectError:  false,
 			expectedPath: "/home/user/Worktrees/test-project/main",
@@ -70,9 +64,7 @@ func TestCDCommand_Execute(t *testing.T) {
 			name: "no target and no default",
 			args: []string{},
 			setupMocks: func(mockNS *mocks.MockNavigationService, mockCS *mocks.MockContextService) {
-				mockCS.GetCurrentContextFunc = func() (*domain.Context, error) {
-					return &domain.Context{Type: domain.ContextOutsideGit}, nil
-				}
+				mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
 			},
 			expectError:  true,
 			errorMessage: "no target specified and no default worktree in context",

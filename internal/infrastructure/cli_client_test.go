@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"twiggit/internal/domain"
@@ -142,23 +143,14 @@ func (s *CLIClientTestSuite) TestBuildWorktreeRemoveArgs() {
 
 func TestCLIClient_CreateWorktree(t *testing.T) {
 	worktreeDir := t.TempDir()
-	callCount := 0
-	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-		assert.Equal(t, "/test/repo", dir)
-		assert.Equal(t, "git", cmd)
-
-		callCount++
-		if callCount == 1 {
-			assert.Equal(t, []string{"show-ref", "--verify", "--quiet", "refs/heads/feature"}, args)
-			return &CommandResult{ExitCode: 1, Stdout: ""}, nil
-		} else {
-			assert.Equal(t, []string{"worktree", "add", "-b", "feature", worktreeDir, "main"}, args)
-			if err := os.MkdirAll(worktreeDir, 0755); err != nil {
-				return nil, err
-			}
-			return &CommandResult{ExitCode: 0, Stdout: ""}, nil
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"show-ref", "--verify", "--quiet", "refs/heads/feature"}).Return(&CommandResult{ExitCode: 1, Stdout: ""}, nil)
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "add", "-b", "feature", worktreeDir, "main"}).Return(func() (*CommandResult, error) {
+		if err := os.MkdirAll(worktreeDir, 0755); err != nil {
+			return nil, err
 		}
-	})
+		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
+	}())
 	client := NewCLIClient(mockExecutor)
 
 	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", worktreeDir)
@@ -167,23 +159,14 @@ func TestCLIClient_CreateWorktree(t *testing.T) {
 
 func TestCLIClient_CreateWorktree_WithExistingBranch(t *testing.T) {
 	worktreeDir := t.TempDir()
-	callCount := 0
-	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-		assert.Equal(t, "/test/repo", dir)
-		assert.Equal(t, "git", cmd)
-
-		callCount++
-		if callCount == 1 {
-			assert.Equal(t, []string{"show-ref", "--verify", "--quiet", "refs/heads/existing-branch"}, args)
-			return &CommandResult{ExitCode: 0, Stdout: ""}, nil
-		} else {
-			assert.Equal(t, []string{"worktree", "add", worktreeDir, "existing-branch"}, args)
-			if err := os.MkdirAll(worktreeDir, 0755); err != nil {
-				return nil, err
-			}
-			return &CommandResult{ExitCode: 0, Stdout: ""}, nil
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"show-ref", "--verify", "--quiet", "refs/heads/existing-branch"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "add", worktreeDir, "existing-branch"}).Return(func() (*CommandResult, error) {
+		if err := os.MkdirAll(worktreeDir, 0755); err != nil {
+			return nil, err
 		}
-	})
+		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
+	}())
 	client := NewCLIClient(mockExecutor)
 
 	err := client.CreateWorktree(context.Background(), "/test/repo", "existing-branch", "", worktreeDir)
@@ -191,23 +174,9 @@ func TestCLIClient_CreateWorktree_WithExistingBranch(t *testing.T) {
 }
 
 func TestCLIClient_CreateWorktree_Failure(t *testing.T) {
-	callCount := 0
-	// Create mock command executor
-	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-		assert.Equal(t, "/test/repo", dir)
-		assert.Equal(t, "git", cmd)
-
-		callCount++
-		if callCount == 1 {
-			// First call: check if branch exists (it doesn't)
-			assert.Equal(t, []string{"show-ref", "--verify", "--quiet", "refs/heads/feature"}, args)
-			return &CommandResult{ExitCode: 1, Stdout: ""}, nil
-		} else {
-			// Second call: worktree add fails
-			assert.Equal(t, []string{"worktree", "add", "-b", "feature", "/path/to/worktree", "main"}, args)
-			return &CommandResult{ExitCode: 1, Stderr: "fatal: Invalid path"}, nil
-		}
-	})
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"show-ref", "--verify", "--quiet", "refs/heads/feature"}).Return(&CommandResult{ExitCode: 1, Stdout: ""}, nil)
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "add", "-b", "feature", "/path/to/worktree", "main"}).Return(&CommandResult{ExitCode: 1, Stderr: "fatal: Invalid path"}, nil)
 	client := NewCLIClient(mockExecutor)
 
 	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
@@ -217,13 +186,8 @@ func TestCLIClient_CreateWorktree_Failure(t *testing.T) {
 }
 
 func TestCLIClient_DeleteWorktree(t *testing.T) {
-	// Create mock command executor
-	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-		assert.Equal(t, "/test/repo", dir)
-		assert.Equal(t, "git", cmd)
-		assert.Equal(t, []string{"worktree", "remove", "/path/to/worktree"}, args)
-		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
-	})
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "remove", "/path/to/worktree"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
 	client := NewCLIClient(mockExecutor)
 
 	err := client.DeleteWorktree(context.Background(), "/test/repo", "/path/to/worktree", false)
@@ -231,13 +195,8 @@ func TestCLIClient_DeleteWorktree(t *testing.T) {
 }
 
 func TestCLIClient_DeleteWorktree_WithForce(t *testing.T) {
-	// Create mock command executor
-	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-		assert.Equal(t, "/test/repo", dir)
-		assert.Equal(t, "git", cmd)
-		assert.Equal(t, []string{"worktree", "remove", "--force", "/path/to/worktree"}, args)
-		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
-	})
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "remove", "--force", "/path/to/worktree"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
 	client := NewCLIClient(mockExecutor)
 
 	err := client.DeleteWorktree(context.Background(), "/test/repo", "/path/to/worktree", true)
@@ -245,14 +204,8 @@ func TestCLIClient_DeleteWorktree_WithForce(t *testing.T) {
 }
 
 func TestCLIClient_ListWorktrees(t *testing.T) {
-	// Create mock command executor
-	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-		assert.Equal(t, "/test/repo", dir)
-		assert.Equal(t, "git", cmd)
-		assert.Equal(t, []string{"worktree", "list", "--porcelain"}, args)
-
-		// Mock git worktree list output
-		mockOutput := `worktree /path/to/repo
+	mockExecutor := NewMockCommandExecutor()
+	mockOutput := `worktree /path/to/repo
 HEAD abcdef1
 branch refs/heads/main
 worktree /path/to/worktree1
@@ -261,30 +214,25 @@ branch refs/heads/feature-branch
 worktree /path/to/worktree2
 HEAD cdef3ab
 detached`
-
-		return &CommandResult{ExitCode: 0, Stdout: mockOutput}, nil
-	})
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "list", "--porcelain"}).Return(&CommandResult{ExitCode: 0, Stdout: mockOutput}, nil)
 	client := NewCLIClient(mockExecutor)
 
 	worktrees, err := client.ListWorktrees(context.Background(), "/test/repo")
 	require.NoError(t, err)
 	assert.Len(t, worktrees, 3)
 
-	// Check main worktree
 	mainWorktree := findWorktree(worktrees, "/path/to/repo")
 	require.NotNil(t, mainWorktree)
 	assert.Equal(t, "main", mainWorktree.Branch)
 	assert.Equal(t, "abcdef1", mainWorktree.Commit)
 	assert.False(t, mainWorktree.IsDetached)
 
-	// Check feature worktree
 	featureWorktree := findWorktree(worktrees, "/path/to/worktree1")
 	require.NotNil(t, featureWorktree)
 	assert.Equal(t, "feature-branch", featureWorktree.Branch)
 	assert.Equal(t, "bcdef2a", featureWorktree.Commit)
 	assert.False(t, featureWorktree.IsDetached)
 
-	// Check detached worktree
 	detachedWorktree := findWorktree(worktrees, "/path/to/worktree2")
 	require.NotNil(t, detachedWorktree)
 	assert.Equal(t, "cdef3ab", detachedWorktree.Commit)
@@ -292,13 +240,8 @@ detached`
 }
 
 func TestCLIClient_PruneWorktrees(t *testing.T) {
-	// Create mock command executor
-	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-		assert.Equal(t, "/test/repo", dir)
-		assert.Equal(t, "git", cmd)
-		assert.Equal(t, []string{"worktree", "prune"}, args)
-		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
-	})
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "prune"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
 	client := NewCLIClient(mockExecutor)
 
 	err := client.PruneWorktrees(context.Background(), "/test/repo")
@@ -338,12 +281,8 @@ func TestCLIClient_IsBranchMerged(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-				assert.Equal(t, "/test/repo", dir)
-				assert.Equal(t, "git", cmd)
-				assert.Equal(t, []string{"branch", "--merged"}, args)
-				return &CommandResult{ExitCode: 0, Stdout: tt.output}, nil
-			})
+			mockExecutor := NewMockCommandExecutor()
+			mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"branch", "--merged"}).Return(&CommandResult{ExitCode: 0, Stdout: tt.output}, nil)
 			client := NewCLIClient(mockExecutor)
 
 			isMerged, err := client.IsBranchMerged(context.Background(), "/test/repo", tt.branchName)
@@ -359,13 +298,8 @@ func TestCLIClient_IsBranchMerged(t *testing.T) {
 }
 
 func TestCLIClient_Timeout(t *testing.T) {
-	// Create mock command executor
-	mockExecutor := NewMockCommandExecutor(func(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
-		assert.Equal(t, "/test/repo", dir)
-		assert.Equal(t, "git", cmd)
-		assert.Equal(t, []string{"worktree", "list", "--porcelain"}, args)
-		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
-	})
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "list", "--porcelain"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
 	client := NewCLIClient(mockExecutor, 5)
 
 	_, err := client.ListWorktrees(context.Background(), "/test/repo")

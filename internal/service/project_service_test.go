@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/application"
@@ -29,25 +30,17 @@ func (s *ProjectServiceTestSuite) SetupTest() {
 }
 
 func (s *ProjectServiceTestSuite) configureGitMock() {
-	s.gitService.MockGoGitClient.ValidateRepositoryFunc = func(path string) error {
-		return nil
-	}
-
-	s.gitService.MockGoGitClient.GetRepositoryInfoFunc = func(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
-		return &domain.GitRepository{
-			Path:          repoPath,
-			IsBare:        false,
-			DefaultBranch: "main",
-			Remotes:       []domain.RemoteInfo{},
-			Branches:      []domain.BranchInfo{},
-			Worktrees:     []domain.WorktreeInfo{},
-			Status:        domain.RepositoryStatus{},
-		}, nil
-	}
-
-	s.gitService.MockCLIClient.ListWorktreesFunc = func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
-		return []domain.WorktreeInfo{}, nil
-	}
+	s.gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
+	s.gitService.MockGoGitClient.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+		Path:          "/path/to/project",
+		IsBare:        false,
+		DefaultBranch: "main",
+		Remotes:       []domain.RemoteInfo{},
+		Branches:      []domain.BranchInfo{},
+		Worktrees:     []domain.WorktreeInfo{},
+		Status:        domain.RepositoryStatus{},
+	}, nil).Maybe()
+	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
 }
 
 func TestProjectService(t *testing.T) {
@@ -252,23 +245,17 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 					ProjectsDirectory: projectsDir,
 				}
 				gitService := mocks.NewMockGitService()
-				gitService.MockGoGitClient.ValidateRepositoryFunc = func(path string) error {
-					return nil
-				}
-				gitService.MockGoGitClient.GetRepositoryInfoFunc = func(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
-					return &domain.GitRepository{
-						Path:          repoPath,
-						IsBare:        false,
-						DefaultBranch: "main",
-						Remotes:       []domain.RemoteInfo{},
-						Branches:      []domain.BranchInfo{},
-						Worktrees:     []domain.WorktreeInfo{},
-						Status:        domain.RepositoryStatus{},
-					}, nil
-				}
-				gitService.MockCLIClient.ListWorktreesFunc = func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
-					return []domain.WorktreeInfo{}, nil
-				}
+				gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
+				gitService.MockGoGitClient.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+					Path:          "/path/to/project",
+					IsBare:        false,
+					DefaultBranch: "main",
+					Remotes:       []domain.RemoteInfo{},
+					Branches:      []domain.BranchInfo{},
+					Worktrees:     []domain.WorktreeInfo{},
+					Status:        domain.RepositoryStatus{},
+				}, nil)
+				gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
 
 				service := &projectService{
 					gitService: gitService,
@@ -299,23 +286,17 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 					ProjectsDirectory: projectsDir,
 				}
 				gitService := mocks.NewMockGitService()
-				gitService.MockGoGitClient.ValidateRepositoryFunc = func(path string) error {
-					return nil
-				}
-				gitService.MockGoGitClient.GetRepositoryInfoFunc = func(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
-					return &domain.GitRepository{
-						Path:          repoPath,
-						IsBare:        false,
-						DefaultBranch: "main",
-						Remotes:       []domain.RemoteInfo{},
-						Branches:      []domain.BranchInfo{},
-						Worktrees:     []domain.WorktreeInfo{},
-						Status:        domain.RepositoryStatus{},
-					}, nil
-				}
-				gitService.MockCLIClient.ListWorktreesFunc = func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
-					return []domain.WorktreeInfo{}, nil
-				}
+				gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
+				gitService.MockGoGitClient.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+					Path:          "/path/to/project",
+					IsBare:        false,
+					DefaultBranch: "main",
+					Remotes:       []domain.RemoteInfo{},
+					Branches:      []domain.BranchInfo{},
+					Worktrees:     []domain.WorktreeInfo{},
+					Status:        domain.RepositoryStatus{},
+				}, nil)
+				gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
 
 				service := &projectService{
 					gitService: gitService,
@@ -348,23 +329,17 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 					ProjectsDirectory: projectsDir,
 				}
 				gitService := mocks.NewMockGitService()
-				gitService.MockGoGitClient.ValidateRepositoryFunc = func(path string) error {
-					return nil
-				}
-				gitService.MockGoGitClient.GetRepositoryInfoFunc = func(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
-					return &domain.GitRepository{
-						Path:          repoPath,
-						IsBare:        false,
-						DefaultBranch: "main",
-						Remotes:       []domain.RemoteInfo{},
-						Branches:      []domain.BranchInfo{},
-						Worktrees:     []domain.WorktreeInfo{},
-						Status:        domain.RepositoryStatus{},
-					}, nil
-				}
-				gitService.MockCLIClient.ListWorktreesFunc = func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
-					return []domain.WorktreeInfo{}, nil
-				}
+				gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
+				gitService.MockGoGitClient.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+					Path:          "/path/to/project",
+					IsBare:        false,
+					DefaultBranch: "main",
+					Remotes:       []domain.RemoteInfo{},
+					Branches:      []domain.BranchInfo{},
+					Worktrees:     []domain.WorktreeInfo{},
+					Status:        domain.RepositoryStatus{},
+				}, nil)
+				gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
 
 				service := &projectService{
 					gitService: gitService,
