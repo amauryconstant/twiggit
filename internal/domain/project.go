@@ -1,7 +1,9 @@
 // Package domain contains core entities for git worktree management.
 package domain
 
-import "errors"
+import (
+	"errors"
+)
 
 // Project represents a git project with basic validation
 type Project struct {

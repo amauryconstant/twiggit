@@ -1,6 +1,8 @@
 package domain
 
-import "time"
+import (
+	"time"
+)
 
 // Result represents a generic result type following the Result/Either pattern
 type Result[T any] struct {

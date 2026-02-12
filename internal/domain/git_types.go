@@ -1,6 +1,8 @@
 package domain
 
-import "time"
+import (
+	"time"
+)
 
 // BranchInfo represents information about a git branch
 type BranchInfo struct {
