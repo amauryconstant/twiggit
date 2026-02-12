@@ -48,11 +48,19 @@ Two implementations routed deterministically:
 
 | Operation | GoGitClient | CLIClient | Rationale |
 |-----------|-------------|-----------|-----------|
+| Open repository | ✅ | ❌ | GoGit is portable, deterministic |
+| List branches | ✅ | ❌ | GoGit is portable, deterministic |
+| Branch exists | ✅ | ❌ | GoGit is portable, deterministic |
+| Get repository status | ✅ | ❌ | GoGit is portable, deterministic |
+| Validate repository | ✅ | ❌ | GoGit is portable, deterministic |
+| Get repository info | ✅ | ❌ | GoGit is portable, deterministic |
+| List remotes | ✅ | ❌ | GoGit is portable, deterministic |
+| Get commit info | ✅ | ❌ | GoGit is portable, deterministic |
 | Create worktree | ❌ | ✅ | go-git lacks worktree support |
-| List worktrees | ✅ | ❌ | GoGit is portable, deterministic |
 | Delete worktree | ❌ | ✅ | go-git lacks worktree support |
-| Get current branch | ✅ | ❌ | GoGit is portable, deterministic |
-| Validate repo | ✅ | ❌ | GoGit is portable, deterministic |
+| List worktrees | ❌ | ✅ | go-git lacks worktree support |
+| Prune worktrees | ❌ | ✅ | go-git lacks worktree support |
+| Is branch merged | ❌ | ✅ | go-git lacks merge status support |
 
 **Composite client** routes to operation-specific implementation (no fallback logic).
 
@@ -61,10 +69,13 @@ Two implementations routed deterministically:
 ```go
 type GoGitClient interface {
     OpenRepository(path string) (*git.Repository, error)
-    ListBranches(ctx context.Context, repoPath string) ([]BranchInfo, error)
+    ListBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error)
     BranchExists(ctx context.Context, repoPath, branchName string) (bool, error)
-    GetRepositoryStatus(ctx context.Context, repoPath string) (RepositoryStatus, error)
+    GetRepositoryStatus(ctx context.Context, repoPath string) (domain.RepositoryStatus, error)
     ValidateRepository(path string) error
+    GetRepositoryInfo(ctx context.Context, repoPath string) (*domain.GitRepository, error)
+    ListRemotes(ctx context.Context, repoPath string) ([]domain.RemoteInfo, error)
+    GetCommitInfo(ctx context.Context, repoPath, commitHash string) (*domain.CommitInfo, error)
 }
 ```
 
@@ -74,9 +85,11 @@ type GoGitClient interface {
 
 ```go
 type CLIClient interface {
-    CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch, worktreePath string) error
-    DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error
-    ListWorktrees(ctx context.Context, repoPath string) ([]WorktreeInfo, error)
+    CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error
+    DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error
+    ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
+    PruneWorktrees(ctx context.Context, repoPath string) error
+    IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error)
 }
 ```
 

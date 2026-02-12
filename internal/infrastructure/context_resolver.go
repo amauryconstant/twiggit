@@ -3,7 +3,6 @@ package infrastructure
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -13,10 +12,10 @@ import (
 // Pure functions extracted from ContextResolver
 
 // validatePathUnder validates that a target path is under a base directory
-// Returns an error if the validation fails or if the path is outside the base
+// Returns an error if validation fails or if path is outside base
 func validatePathUnder(base, target, targetType, baseDesc string) error {
 	if under, err := IsPathUnder(base, target); err != nil {
-		return fmt.Errorf("failed to validate %s path: %w", targetType, err)
+		return domain.NewContextDetectionError(target, "path validation failed", err)
 	} else if !under {
 		return domain.NewContextDetectionError(target,
 			fmt.Sprintf("%s path is outside configured %s directory", targetType, baseDesc), nil)
@@ -40,7 +39,13 @@ func parseCrossProjectReference(identifier string) (project, branch string, vali
 
 // containsPathTraversal checks if a string contains path traversal sequences
 func containsPathTraversal(s string) bool {
-	return strings.Contains(s, "..") || strings.Contains(s, string(filepath.Separator)+".")
+	cleaned := filepath.Clean(s)
+	if cleaned != s {
+		return true
+	}
+	return strings.Contains(s, "..") ||
+		strings.Contains(s, "%2e%2e") ||
+		strings.Contains(s, "%2E%2E")
 }
 
 // buildWorktreePath builds the path to a worktree for a given project and branch
@@ -55,7 +60,7 @@ func buildProjectPath(projectsDir, project string) string {
 
 // filterSuggestions filters suggestions based on a partial string match
 func filterSuggestions(suggestions []string, partial string) []string {
-	result := make([]string, 0)
+	result := make([]string, 0, len(suggestions))
 	for _, suggestion := range suggestions {
 		if strings.HasPrefix(suggestion, partial) {
 			result = append(result, suggestion)
@@ -163,8 +168,11 @@ func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, par
 
 	// Add worktree and branch suggestions if git service is available
 	if cr.gitService != nil && ctx.Path != "" {
-		suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial)
-		suggestions = cr.addBranchSuggestions(suggestions, ctx, partial)
+		worktrees, err := cr.gitService.ListWorktrees(context.Background(), ctx.Path)
+		if err == nil {
+			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees)
+			suggestions = cr.addBranchSuggestions(suggestions, ctx, partial, worktrees)
+		}
 	}
 
 	return suggestions
@@ -184,14 +192,7 @@ func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSug
 }
 
 // addWorktreeSuggestions adds suggestions for existing worktrees
-func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
-	worktrees, err := cr.gitService.ListWorktrees(context.Background(), ctx.Path)
-	if err != nil {
-		// Silent degradation is acceptable for suggestions - errors shouldn't prevent
-		// the operation from proceeding, just reduce the helpfulness of completions
-		return suggestions
-	}
-
+func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, worktrees []domain.WorktreeInfo) []*domain.ResolutionSuggestion {
 	for _, worktree := range worktrees {
 		if strings.HasPrefix(worktree.Branch, partial) {
 			suggestions = append(suggestions, &domain.ResolutionSuggestion{
@@ -207,7 +208,7 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 }
 
 // addBranchSuggestions adds suggestions for branches without worktrees
-func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, existingWorktrees []domain.WorktreeInfo) []*domain.ResolutionSuggestion {
 	branches, err := cr.gitService.ListBranches(context.Background(), ctx.Path)
 	if err != nil {
 		// Silent degradation is acceptable for suggestions - errors shouldn't prevent
@@ -215,10 +216,9 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.Resolution
 		return suggestions
 	}
 
-	// Get existing worktrees to avoid duplicates
-	worktrees, _ := cr.gitService.ListWorktrees(context.Background(), ctx.Path)
+	// Build map of existing worktree branches from passed list
 	worktreeBranches := make(map[string]bool)
-	for _, worktree := range worktrees {
+	for _, worktree := range existingWorktrees {
 		worktreeBranches[worktree.Branch] = true
 	}
 
@@ -399,35 +399,16 @@ type ProjectRef struct {
 func (cr *contextResolver) discoverProjects() ([]ProjectRef, error) {
 	projectsDir := cr.config.ProjectsDirectory
 
-	// Check if directory exists
-	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
-		return nil, domain.NewContextDetectionError(projectsDir, "projects directory does not exist", nil)
-	}
-
-	// Read directory contents
-	entries, err := os.ReadDir(projectsDir)
+	gitDirs, err := FindGitRepositories(projectsDir, cr.gitService)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read projects directory: %w", err)
+		return nil, domain.NewContextDetectionError(projectsDir, "failed to scan for git repositories", err)
 	}
 
-	projects := make([]ProjectRef, 0, 10) // Pre-allocate with reasonable capacity
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		projectPath := filepath.Join(projectsDir, entry.Name())
-
-		// Validate it's a git repository if git service is available
-		if cr.gitService != nil {
-			if err := cr.gitService.ValidateRepository(projectPath); err != nil {
-				continue // Skip non-git directories
-			}
-		}
-
+	projects := make([]ProjectRef, 0, len(gitDirs))
+	for _, gitDir := range gitDirs {
 		projects = append(projects, ProjectRef{
-			Name: entry.Name(),
-			Path: projectPath,
+			Name: gitDir.Name,
+			Path: gitDir.Path,
 		})
 	}
 

@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -35,7 +34,8 @@ type shell struct {
 // NewShell creates a new Shell instance with validation
 func NewShell(shellType ShellType, path, version string) (Shell, error) {
 	if !IsValidShellType(shellType) {
-		return nil, fmt.Errorf("unsupported shell type: %s", shellType)
+		return nil, NewValidationError("NewShell", "shellType", string(shellType), "unsupported shell type").
+			WithSuggestions([]string{"Supported shells: bash, zsh, fish"})
 	}
 
 	return &shell{

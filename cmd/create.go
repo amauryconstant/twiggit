@@ -118,16 +118,20 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 
 // parseProjectBranch parses the project/branch specification
 func parseProjectBranch(spec string, ctx *domain.Context) (string, string, error) {
-	// Check if spec contains a slash (project/branch format)
 	if strings.Contains(spec, "/") {
 		parts := strings.SplitN(spec, "/", 2)
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 			return "", "", errors.New("invalid format: expected <project>/<branch>")
 		}
-		return parts[0], parts[1], nil
+		projectName := parts[0]
+
+		if validation := domain.ValidateProjectName(projectName); validation.IsError() {
+			return "", "", validation.Error
+		}
+
+		return projectName, parts[1], nil
 	}
 
-	// If no slash, infer project from context
 	if ctx.ProjectName != "" {
 		return ctx.ProjectName, spec, nil
 	}
@@ -144,7 +148,7 @@ func extractBranchNameForValidation(spec string) string {
 			return parts[1]
 		}
 	}
-	// If no slash, the spec itself is the branch name
+	// If no slash, spec itself is the branch name
 	return spec
 }
 

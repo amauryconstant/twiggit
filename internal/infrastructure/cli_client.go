@@ -306,7 +306,7 @@ func (c *CLIClientImpl) branchExists(ctx context.Context, repoPath, branchName s
 				Stderr:   gitCmdErr.Stderr,
 			}
 		} else {
-			return false, fmt.Errorf("failed to check if branch exists: %w", err)
+			return false, domain.NewGitRepositoryError(repoPath, "failed to check branch existence", err)
 		}
 	}
 
@@ -318,60 +318,5 @@ func (c *CLIClientImpl) branchExists(ctx context.Context, repoPath, branchName s
 	}
 
 	// Any other exit code is an error
-	return false, fmt.Errorf("git show-ref exited with unexpected code: %d", result.ExitCode)
-}
-
-// MockCLIClient for testing
-type MockCLIClient struct {
-	// Mock functions
-	CreateWorktreeFunc func(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error
-	DeleteWorktreeFunc func(ctx context.Context, repoPath, worktreePath string, force bool) error
-	ListWorktreesFunc  func(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
-	PruneWorktreesFunc func(ctx context.Context, repoPath string) error
-	IsBranchMergedFunc func(ctx context.Context, repoPath, branchName string) (bool, error)
-}
-
-// NewMockCLIClient creates a new MockCLIClient
-func NewMockCLIClient() *MockCLIClient {
-	return &MockCLIClient{}
-}
-
-// CreateWorktree mock implementation for testing
-func (m *MockCLIClient) CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error {
-	if m.CreateWorktreeFunc != nil {
-		return m.CreateWorktreeFunc(ctx, repoPath, branchName, sourceBranch, worktreePath)
-	}
-	return nil
-}
-
-// DeleteWorktree mock implementation for testing
-func (m *MockCLIClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
-	if m.DeleteWorktreeFunc != nil {
-		return m.DeleteWorktreeFunc(ctx, repoPath, worktreePath, force)
-	}
-	return nil
-}
-
-// ListWorktrees mock implementation for testing
-func (m *MockCLIClient) ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
-	if m.ListWorktreesFunc != nil {
-		return m.ListWorktreesFunc(ctx, repoPath)
-	}
-	return []domain.WorktreeInfo{}, nil
-}
-
-// PruneWorktrees mock implementation for testing
-func (m *MockCLIClient) PruneWorktrees(ctx context.Context, repoPath string) error {
-	if m.PruneWorktreesFunc != nil {
-		return m.PruneWorktreesFunc(ctx, repoPath)
-	}
-	return nil
-}
-
-// IsBranchMerged mock implementation for testing
-func (m *MockCLIClient) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
-	if m.IsBranchMergedFunc != nil {
-		return m.IsBranchMergedFunc(ctx, repoPath, branchName)
-	}
-	return false, nil
+	return false, domain.NewGitRepositoryError(repoPath, fmt.Sprintf("git show-ref exited with unexpected code: %d", result.ExitCode), nil)
 }

@@ -83,11 +83,12 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra
 
 	status, err := config.Services.WorktreeService.GetWorktreeStatus(ctx, worktreePath)
 	if err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "worktree not found") ||
-			strings.Contains(errStr, "invalid git repository") ||
-			strings.Contains(errStr, "repository does not exist") ||
-			strings.Contains(errStr, "no such file or directory") {
+		var worktreeErr *domain.WorktreeServiceError
+		var gitRepoErr *domain.GitRepositoryError
+		var gitWorktreeErr *domain.GitWorktreeError
+		if errors.As(err, &worktreeErr) && strings.Contains(worktreeErr.Error(), "not found") ||
+			errors.As(err, &gitRepoErr) && strings.Contains(gitRepoErr.Error(), "does not exist") ||
+			errors.As(err, &gitWorktreeErr) && strings.Contains(gitWorktreeErr.Error(), "not found") {
 			if changeDir {
 				navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
 				if navigationTarget != "" {

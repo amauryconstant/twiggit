@@ -69,10 +69,10 @@ func runInit(cmd *cobra.Command, config *CommandConfig, configFile string, check
 	}
 
 	request := &domain.SetupShellRequest{
-		ShellType:  shellType,
-		Force:      force,
-		DryRun:     dryRun,
-		ConfigFile: configFile,
+		ShellType:      shellType,
+		ForceOverwrite: force,
+		DryRun:         dryRun,
+		ConfigFile:     configFile,
 	}
 
 	result, err := config.Services.ShellService.SetupShell(context.Background(), request)

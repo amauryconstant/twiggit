@@ -172,132 +172,132 @@ func (s *shellInfrastructure) getConfigFiles(shellType domain.ShellType) []strin
 	}
 }
 
-// bashWrapperTemplate returns the bash wrapper template
-func (s *shellInfrastructure) bashWrapperTemplate() string {
+// shellTemplateConfig defines shell-specific syntax for wrapper template
+type shellTemplateConfig struct {
+	caseBegin     string
+	caseEnd       string
+	elif          string
+	caseSeparator string
+	argsVar       string
+	ifSyntax      string
+	thenSyntax    string
+	elseSyntax    string
+	fiSyntax      string
+	andOperator   string
+	funcDef       string
+	funcEnd       string
+}
+
+// getShellTemplateConfig returns shell-specific template configuration
+func getShellTemplateConfig(shellType domain.ShellType) shellTemplateConfig {
+	switch shellType {
+	case domain.ShellBash, domain.ShellZsh:
+		return shellTemplateConfig{
+			caseBegin:     `case "$1" in`,
+			caseEnd:       "esac",
+			elif:          ";;",
+			caseSeparator: "    ",
+			argsVar:       `"$@"`,
+			ifSyntax:      "if [[",
+			thenSyntax:    "]]; then",
+			elseSyntax:    "else",
+			fiSyntax:      "fi",
+			andOperator:   "]] || [[",
+			funcDef:       "twiggit() {",
+			funcEnd:       "}",
+		}
+	case domain.ShellFish:
+		return shellTemplateConfig{
+			caseBegin:     `switch "$argv[1]"`,
+			caseEnd:       "end",
+			elif:          "",
+			caseSeparator: "    ",
+			argsVar:       "$argv",
+			ifSyntax:      "if",
+			thenSyntax:    "",
+			elseSyntax:    "else",
+			fiSyntax:      "end",
+			andOperator:   "or",
+			funcDef:       "function twiggit",
+			funcEnd:       "end",
+		}
+	default:
+		return shellTemplateConfig{
+			caseBegin:     `case "$1" in`,
+			caseEnd:       "esac",
+			elif:          ";;",
+			caseSeparator: "    ",
+			argsVar:       `"$@"`,
+			ifSyntax:      "if [[",
+			thenSyntax:    "]]; then",
+			elseSyntax:    "else",
+			fiSyntax:      "fi",
+			andOperator:   "]] || [[",
+			funcDef:       "twiggit() {",
+			funcEnd:       "}",
+		}
+	}
+}
+
+// wrapperTemplate returns the shell wrapper template with shell-specific syntax
+func (s *shellInfrastructure) wrapperTemplate(shellType domain.ShellType) string {
+	config := getShellTemplateConfig(shellType)
+
 	return `### BEGIN TWIGGIT WRAPPER
-# Twiggit bash wrapper - Generated on {{TIMESTAMP}}
-twiggit() {
-    case "$1" in
-        cd)
-            # Handle cd command with directory change
-            target_dir=$(command twiggit "$@")
+# Twiggit ` + string(shellType) + ` wrapper - Generated on {{TIMESTAMP}}
+` + config.funcDef + `
+` + config.caseBegin + `
+    cd)
+        # Handle cd command with directory change
+        target_dir=$(command twiggit ` + config.argsVar + `)
+        if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+            builtin cd "$target_dir"
+        fi
+        ` + config.elif + `
+    create)
+        # Handle create command with -C flag
+        ` + config.ifSyntax + ` " ` + config.argsVar + ` " == *" -C "* ]] ` + config.andOperator + ` " ` + config.argsVar + ` " == *" --cd "* ]] ` + config.thenSyntax + `
+            target_dir=$(command twiggit ` + config.argsVar + `)
             if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
                 builtin cd "$target_dir"
             fi
-            ;;
-        create)
-            # Handle create command with -C flag
-            if [[ " $@ " == *" -C "* ]] || [[ " $@ " == *" --cd "* ]]; then
-                target_dir=$(command twiggit "$@")
-                if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-                    builtin cd "$target_dir"
-                fi
-            else
-                command twiggit "$@"
+        ` + config.elseSyntax + `
+            command twiggit ` + config.argsVar + `
+        ` + config.fiSyntax + `
+        ` + config.elif + `
+    delete)
+        # Handle delete command with -C flag
+        ` + config.ifSyntax + ` " ` + config.argsVar + ` " == *" -C "* ]] ` + config.andOperator + ` " ` + config.argsVar + ` " == *" --cd "* ]] ` + config.thenSyntax + `
+            target_dir=$(command twiggit ` + config.argsVar + `)
+            if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+                builtin cd "$target_dir"
             fi
-            ;;
-        delete)
-            # Handle delete command with -C flag
-            if [[ " $@ " == *" -C "* ]] || [[ " $@ " == *" --cd "* ]]; then
-                target_dir=$(command twiggit "$@")
-                if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-                    builtin cd "$target_dir"
-                fi
-            else
-                command twiggit "$@"
-            fi
-            ;;
-        *)
-            # Pass through all other commands
-            command twiggit "$@"
-            ;;
-    esac
-}
+        ` + config.elseSyntax + `
+            command twiggit ` + config.argsVar + `
+        ` + config.fiSyntax + `
+        ` + config.elif + `
+    *)
+        # Pass through all other commands
+        command twiggit ` + config.argsVar + `
+        ` + config.elif + `
+` + config.caseEnd + `
+` + config.funcEnd + `
 ### END TWIGGIT WRAPPER`
+}
+
+// bashWrapperTemplate returns the bash wrapper template
+func (s *shellInfrastructure) bashWrapperTemplate() string {
+	return s.wrapperTemplate(domain.ShellBash)
 }
 
 // zshWrapperTemplate returns the zsh wrapper template
 func (s *shellInfrastructure) zshWrapperTemplate() string {
-	return `### BEGIN TWIGGIT WRAPPER
-# Twiggit zsh wrapper - Generated on {{TIMESTAMP}}
-twiggit() {
-    case "$1" in
-        cd)
-            # Handle cd command with directory change
-            target_dir=$(command twiggit "$@")
-            if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-                builtin cd "$target_dir"
-            fi
-            ;;
-        create)
-            # Handle create command with -C flag
-            if [[ " $@ " == *" -C "* ]] || [[ " $@ " == *" --cd "* ]]; then
-                target_dir=$(command twiggit "$@")
-                if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-                    builtin cd "$target_dir"
-                fi
-            else
-                command twiggit "$@"
-            fi
-            ;;
-        delete)
-            # Handle delete command with -C flag
-            if [[ " $@ " == *" -C "* ]] || [[ " $@ " == *" --cd "* ]]; then
-                target_dir=$(command twiggit "$@")
-                if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-                    builtin cd "$target_dir"
-                fi
-            else
-                command twiggit "$@"
-            fi
-            ;;
-        *)
-            # Pass through all other commands
-            command twiggit "$@"
-            ;;
-    esac
-}
-### END TWIGGIT WRAPPER`
+	return s.wrapperTemplate(domain.ShellZsh)
 }
 
 // fishWrapperTemplate returns the fish wrapper template
 func (s *shellInfrastructure) fishWrapperTemplate() string {
-	return `### BEGIN TWIGGIT WRAPPER
-# Twiggit fish wrapper - Generated on {{TIMESTAMP}}
-function twiggit
-    switch "$argv[1]"
-        case cd
-            # Handle cd command with directory change
-            set target_dir (command twiggit $argv)
-            if test $status -eq 0 -a -n "$target_dir"
-                builtin cd "$target_dir"
-            end
-        case create
-            # Handle create command with -C flag
-            if string match -q "* -C *" " $argv "; or string match -q "* --cd *" " $argv "
-                set target_dir (command twiggit $argv)
-                if test $status -eq 0 -a -n "$target_dir"
-                    builtin cd "$target_dir"
-                end
-            else
-                command twiggit $argv
-            end
-        case delete
-            # Handle delete command with -C flag
-            if string match -q "* -C *" " $argv "; or string match -q "* --cd *" " $argv "
-                set target_dir (command twiggit $argv)
-                if test $status -eq 0 -a -n "$target_dir"
-                    builtin cd "$target_dir"
-                end
-            else
-                command twiggit $argv
-            end
-        case '*'
-            # Pass through all other commands
-            command twiggit $argv
-    end
-end
-### END TWIGGIT WRAPPER`
+	return s.wrapperTemplate(domain.ShellFish)
 }
 
 const (

@@ -1,9 +1,10 @@
 package infrastructure
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
+
+	"twiggit/internal/domain"
 )
 
 // NormalizePath normalizes a path for cross-platform compatibility
@@ -14,7 +15,7 @@ func NormalizePath(path string) (string, error) {
 	// Convert to absolute path
 	abs, err := filepath.Abs(cleaned)
 	if err != nil {
-		return "", fmt.Errorf("failed to normalize path: %w", err)
+		return "", domain.NewContextDetectionError(path, "path normalization failed", err)
 	}
 
 	// Resolve symlinks
@@ -31,7 +32,7 @@ func NormalizePath(path string) (string, error) {
 func IsPathUnder(base, target string) (bool, error) {
 	rel, err := filepath.Rel(base, target)
 	if err != nil {
-		return false, fmt.Errorf("failed to get relative path from %s to %s: %w", base, target, err)
+		return false, domain.NewContextDetectionError(target, "failed to get relative path", err)
 	}
 
 	// Check if relative path starts with ".."

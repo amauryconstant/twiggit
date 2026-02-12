@@ -70,7 +70,7 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 	}
 
 	// Check existing installation
-	if !req.Force {
+	if !req.ForceOverwrite {
 		if err := s.integration.ValidateInstallation(shellType, configFile); err == nil {
 			return &domain.SetupShellResult{
 				ShellType:  shellType,
@@ -101,7 +101,7 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 	}
 
 	// Install wrapper
-	if err := s.integration.InstallWrapper(shellType, wrapper, configFile, req.Force); err != nil {
+	if err := s.integration.InstallWrapper(shellType, wrapper, configFile, req.ForceOverwrite); err != nil {
 		// Check if it's already installed error
 		var shellErr *domain.ShellError
 		if errors.As(err, &shellErr) && shellErr.Code == domain.ErrShellAlreadyInstalled {

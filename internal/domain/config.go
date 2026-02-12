@@ -49,13 +49,6 @@ type NavigationConfig struct {
 	FuzzyMatching     bool `toml:"fuzzy_matching" koanf:"fuzzy_matching"`
 }
 
-// ShellConfigFiles represents shell-specific configuration file paths
-type ShellConfigFiles struct {
-	Bash string `toml:"bash" koanf:"bash"`
-	Zsh  string `toml:"zsh" koanf:"zsh"`
-	Fish string `toml:"fish" koanf:"fish"`
-}
-
 // ShellWrapperConfig represents shell wrapper specific configuration
 type ShellWrapperConfig struct {
 	// Enable shell wrapper functionality
@@ -66,9 +59,6 @@ type ShellWrapperConfig struct {
 
 	// Default shell type if auto-detection fails
 	DefaultShell string `toml:"default_shell" koanf:"default_shell"`
-
-	// Configuration file paths for each shell
-	ConfigFiles ShellConfigFiles `toml:"config_files" koanf:"config_files"`
 
 	// Enable backup of existing configuration files
 	BackupEnabled bool `toml:"backup_enabled" koanf:"backup_enabled"`
@@ -162,14 +152,9 @@ func DefaultConfig() *Config {
 			Enabled: true,
 			Timeout: 30,
 			Wrapper: ShellWrapperConfig{
-				Enabled:      true,
-				AutoDetect:   true,
-				DefaultShell: "bash",
-				ConfigFiles: ShellConfigFiles{
-					Bash: "~/.bashrc",
-					Zsh:  "~/.zshrc",
-					Fish: "~/.config/fish/config.fish",
-				},
+				Enabled:       true,
+				AutoDetect:    true,
+				DefaultShell:  "bash",
 				BackupEnabled: true,
 				BackupDir:     "~/.config/twiggit/backups",
 			},

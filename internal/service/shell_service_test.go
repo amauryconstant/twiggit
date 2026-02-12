@@ -55,9 +55,9 @@ func (s *ShellServiceTestSuite) TestSetupShell() {
 		{
 			name: "dry run setup for bash",
 			request: &domain.SetupShellRequest{
-				ShellType: domain.ShellBash,
-				Force:     false,
-				DryRun:    true,
+				ShellType:      domain.ShellBash,
+				ForceOverwrite: false,
+				DryRun:         true,
 			},
 			validate: func(result *domain.SetupShellResult) {
 				s.True(result.DryRun)
@@ -70,9 +70,9 @@ func (s *ShellServiceTestSuite) TestSetupShell() {
 		{
 			name: "dry run setup for zsh",
 			request: &domain.SetupShellRequest{
-				ShellType: domain.ShellZsh,
-				Force:     false,
-				DryRun:    true,
+				ShellType:      domain.ShellZsh,
+				ForceOverwrite: false,
+				DryRun:         true,
 			},
 			validate: func(result *domain.SetupShellResult) {
 				s.True(result.DryRun)
@@ -85,9 +85,9 @@ func (s *ShellServiceTestSuite) TestSetupShell() {
 		{
 			name: "dry run setup for fish",
 			request: &domain.SetupShellRequest{
-				ShellType: domain.ShellFish,
-				Force:     false,
-				DryRun:    true,
+				ShellType:      domain.ShellFish,
+				ForceOverwrite: false,
+				DryRun:         true,
 			},
 			validate: func(result *domain.SetupShellResult) {
 				s.True(result.DryRun)
@@ -100,9 +100,9 @@ func (s *ShellServiceTestSuite) TestSetupShell() {
 		{
 			name: "force reinstall setup",
 			request: &domain.SetupShellRequest{
-				ShellType: domain.ShellBash,
-				Force:     true,
-				DryRun:    false,
+				ShellType:      domain.ShellBash,
+				ForceOverwrite: true,
+				DryRun:         false,
 			},
 			expectError: true,
 		},
@@ -137,9 +137,9 @@ func (s *ShellServiceTestSuite) TestSetupShellValidation() {
 		{
 			name: "invalid shell type",
 			request: &domain.SetupShellRequest{
-				ShellType: domain.ShellType("invalid"),
-				Force:     false,
-				DryRun:    true,
+				ShellType:      domain.ShellType("invalid"),
+				ForceOverwrite: false,
+				DryRun:         true,
 			},
 			expectError:  true,
 			errorMessage: "unsupported shell type",
@@ -147,9 +147,9 @@ func (s *ShellServiceTestSuite) TestSetupShellValidation() {
 		{
 			name: "empty shell type with unsupported SHELL",
 			request: &domain.SetupShellRequest{
-				ShellType: domain.ShellType(""),
-				Force:     false,
-				DryRun:    true,
+				ShellType:      domain.ShellType(""),
+				ForceOverwrite: false,
+				DryRun:         true,
 			},
 			setEnv: func() {
 				s.T().Setenv("SHELL", "/bin/sh")

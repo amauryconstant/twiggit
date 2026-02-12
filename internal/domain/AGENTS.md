@@ -81,10 +81,38 @@ func (e *ValidationError) Error() string {
   - Worktree listing failures
   - Pattern: `domain.NewGitWorktreeError(worktreePath, branchName, "message", cause)`
 
+- **GitCommandError**: Git command execution errors (infrastructure layer, used as cause)
+  - Failed git CLI commands
+  - Non-zero exit codes
+  - Includes command, args, exit code, stdout, stderr
+  - Pattern: `domain.NewGitCommandError(command, args, exitCode, stdout, stderr, message, cause)`
+
 - **ContextDetectionError**: Context detection failures
   - Directory access issues
   - Invalid paths
   - Pattern: `domain.NewContextDetectionError(path, "message", cause)`
+
+- **ServiceError**: General service operation errors
+  - Generic service failures
+  - Includes service name, operation name, message
+  - Pattern: `domain.NewServiceError(service, operation, message, cause)`
+
+- **ShellError**: Shell service errors
+  - Shell type validation failures
+  - Config file issues
+  - Wrapper generation/installation failures
+  - Pattern: `domain.NewShellError(code, shellType, context)`
+
+- **ResolutionError**: Path resolution errors
+  - Failed identifier resolution
+  - Invalid target paths
+  - Includes optional suggestions
+  - Pattern: `domain.NewResolutionError(target, context, message, suggestions, cause)`
+
+- **ConflictError**: Operation conflict errors
+  - Resource conflicts during operations
+  - Includes resource type, identifier, operation
+  - Pattern: `domain.NewConflictError(resource, identifier, operation, message, cause)`
 
 ### Error Wrapping Rules
 

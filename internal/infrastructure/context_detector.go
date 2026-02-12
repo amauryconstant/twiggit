@@ -108,30 +108,16 @@ func (cd *contextDetector) detectWorktreeContext(dir string) *domain.Context {
 }
 
 func (cd *contextDetector) detectProjectContext(dir string) *domain.Context {
-	currentDir := dir
+	gitDir := FindGitDirByTraversal(dir)
+	if gitDir != nil {
+		projectName := cd.extractProjectName(*gitDir)
 
-	// Traverse up directory tree looking for .git
-	for {
-		gitPath := filepath.Join(currentDir, ".git")
-		if _, err := os.Stat(gitPath); err == nil {
-			// Found .git directory
-			projectName := cd.extractProjectName(currentDir)
-
-			return &domain.Context{
-				Type:        domain.ContextProject,
-				ProjectName: projectName,
-				Path:        currentDir,
-				Explanation: fmt.Sprintf("In project directory '%s'", projectName),
-			}
+		return &domain.Context{
+			Type:        domain.ContextProject,
+			ProjectName: projectName,
+			Path:        *gitDir,
+			Explanation: fmt.Sprintf("In project directory '%s'", projectName),
 		}
-
-		// Move to parent directory
-		parent := filepath.Dir(currentDir)
-		if parent == currentDir {
-			// Reached filesystem root
-			break
-		}
-		currentDir = parent
 	}
 
 	return nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"twiggit/internal/application"
@@ -310,7 +311,6 @@ func (s *worktreeService) validateDeleteRequest(req *domain.DeleteWorktreeReques
 }
 
 func (s *worktreeService) calculateWorktreePath(projectName, branchName string) string {
-	// Sanitize branch name for filesystem
 	safeBranchName := filepath.Base(branchName)
 	safeBranchName = filepath.Clean(safeBranchName)
 
@@ -318,27 +318,74 @@ func (s *worktreeService) calculateWorktreePath(projectName, branchName string) 
 }
 
 func (s *worktreeService) findProjectByWorktree(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {
-	// For now, we'll use a simple approach - try to find the parent git repository
-	// In a real implementation, this might be more sophisticated
+	if info, err := s.findProjectFromConfig(ctx, worktreePath); err != nil {
+		return nil, err
+	} else if info != nil {
+		return info, nil
+	}
 
-	// Get all projects and check which one contains this worktree
+	return s.findProjectByListing(ctx, worktreePath)
+}
+
+func (s *worktreeService) findProjectFromConfig(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {
+	if s.config == nil || s.config.WorktreesDirectory == "" || s.config.ProjectsDirectory == "" {
+		return nil, nil
+	}
+
+	worktreeDir := filepath.Clean(s.config.WorktreesDirectory)
+	if !strings.HasPrefix(worktreePath, worktreeDir+string(filepath.Separator)) {
+		return nil, nil
+	}
+
+	relPath, err := filepath.Rel(worktreeDir, worktreePath)
+	if err != nil {
+		return nil, nil
+	}
+
+	parts := strings.Split(relPath, string(filepath.Separator))
+	if len(parts) < 1 {
+		return nil, nil
+	}
+
+	projectName := parts[0]
+	projectPath := filepath.Join(s.config.ProjectsDirectory, projectName)
+
+	if _, statErr := os.Stat(projectPath); statErr != nil {
+		return nil, nil
+	}
+
+	info, err := s.projectService.GetProjectInfo(ctx, projectPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get project info for %s: %w", projectPath, err)
+	}
+	return info, nil
+}
+
+func (s *worktreeService) findProjectByListing(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {
 	projects, err := s.projectService.ListProjects(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list projects: %w", err)
 	}
 
 	for _, project := range projects {
-		worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath)
-		if err != nil {
-			continue // Skip this project if we can't list its worktrees
-		}
-
-		for _, wt := range worktrees {
-			if wt.Path == worktreePath {
-				return project, nil
-			}
+		if s.isWorktreeInProject(ctx, worktreePath, project) {
+			return project, nil
 		}
 	}
 
 	return nil, domain.NewWorktreeServiceError(worktreePath, "", "findProjectByWorktree", "worktree not found in any project", nil)
+}
+
+func (s *worktreeService) isWorktreeInProject(ctx context.Context, worktreePath string, project *domain.ProjectInfo) bool {
+	worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath)
+	if err != nil {
+		return false
+	}
+
+	for _, wt := range worktrees {
+		if wt.Path == worktreePath {
+			return true
+		}
+	}
+	return false
 }

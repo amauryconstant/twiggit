@@ -63,35 +63,16 @@ func (s *projectService) ValidateProject(_ context.Context, projectPath string) 
 func (s *projectService) ListProjects(ctx context.Context) ([]*domain.ProjectInfo, error) {
 	projectsDir := s.config.ProjectsDirectory
 
-	// Check if projects directory exists
-	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
-		return []*domain.ProjectInfo{}, nil
-	}
-
-	// Read projects directory
-	entries, err := os.ReadDir(projectsDir)
+	gitDirs, err := infrastructure.FindGitRepositories(projectsDir, s.gitService)
 	if err != nil {
-		return nil, domain.NewProjectServiceError("", projectsDir, "ListProjects", "failed to read projects directory", err)
+		return nil, domain.NewProjectServiceError("", projectsDir, "ListProjects", "failed to scan for git repositories", err)
 	}
 
-	projects := make([]*domain.ProjectInfo, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
-		projectName := entry.Name()
-		projectPath := filepath.Join(projectsDir, projectName)
-
-		// Validate that it's a git repository
-		if err := s.gitService.ValidateRepository(projectPath); err != nil {
-			continue // Skip non-git directories
-		}
-
-		// Get project info
-		projectInfo, err := s.GetProjectInfo(ctx, projectPath)
+	projects := make([]*domain.ProjectInfo, 0, len(gitDirs))
+	for _, gitDir := range gitDirs {
+		projectInfo, err := s.GetProjectInfo(ctx, gitDir.Path)
 		if err != nil {
-			continue // Skip projects we can't get info for
+			continue
 		}
 
 		projects = append(projects, projectInfo)
@@ -232,51 +213,43 @@ func (s *projectService) searchProjectByName(ctx context.Context, projectName st
 }
 
 func (s *projectService) findMainRepoFromWorktree(worktreePath string) string {
-	// Check if we can use the configured directories
-	if s.config != nil && s.config.WorktreesDirectory != "" && s.config.ProjectsDirectory != "" {
-		worktreeDir := filepath.Clean(s.config.WorktreesDirectory)
-
-		// Check if worktree path is under worktrees directory
-		if strings.HasPrefix(worktreePath, worktreeDir+string(filepath.Separator)) {
-			relPath, err := filepath.Rel(worktreeDir, worktreePath)
-			if err == nil {
-				parts := strings.Split(relPath, string(filepath.Separator))
-				if len(parts) >= 1 {
-					projectName := parts[0]
-					// Construct main repository path
-					mainRepoPath := filepath.Join(s.config.ProjectsDirectory, projectName)
-					if _, err := os.Stat(filepath.Join(mainRepoPath, ".git")); err == nil {
-						return mainRepoPath
-					}
-				}
-			}
-		}
+	if mainRepo := s.findMainRepoFromConfig(worktreePath); mainRepo != "" {
+		return mainRepo
 	}
 
-	// Fallback: traverse up directories looking for .git directory
-	currentPath := worktreePath
-	for {
-		gitPath := filepath.Join(currentPath, ".git")
-
-		// Check if .git is a directory (main repo) not a file (worktree)
-		if info, err := os.Stat(gitPath); err == nil && info.IsDir() {
-			// Check if it's a worktree by looking for gitdir file
-			gitdirPath := filepath.Join(gitPath, "gitdir")
-			if _, err := os.Stat(gitdirPath); os.IsNotExist(err) {
-				// This is the main repository
-				return currentPath
-			}
-		}
-
-		// Go up one directory
-		parent := filepath.Dir(currentPath)
-		if parent == currentPath {
-			// Reached root
-			break
-		}
-		currentPath = parent
+	if mainRepo := infrastructure.FindMainRepoByTraversal(worktreePath); mainRepo != "" {
+		return mainRepo
 	}
 
-	// Last fallback to worktree path
 	return worktreePath
+}
+
+func (s *projectService) findMainRepoFromConfig(worktreePath string) string {
+	if s.config == nil || s.config.WorktreesDirectory == "" || s.config.ProjectsDirectory == "" {
+		return ""
+	}
+
+	worktreeDir := filepath.Clean(s.config.WorktreesDirectory)
+	if !strings.HasPrefix(worktreePath, worktreeDir+string(filepath.Separator)) {
+		return ""
+	}
+
+	relPath, err := filepath.Rel(worktreeDir, worktreePath)
+	if err != nil {
+		return ""
+	}
+
+	parts := strings.Split(relPath, string(filepath.Separator))
+	if len(parts) < 1 {
+		return ""
+	}
+
+	projectName := parts[0]
+	mainRepoPath := filepath.Join(s.config.ProjectsDirectory, projectName)
+
+	if infrastructure.IsMainRepo(mainRepoPath) {
+		return mainRepoPath
+	}
+
+	return ""
 }

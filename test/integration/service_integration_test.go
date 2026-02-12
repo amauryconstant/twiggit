@@ -82,9 +82,9 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
 		request := &domain.SetupShellRequest{
-			ShellType:  domain.ShellBash,
-			ConfigFile: configFile,
-			Force:      true,
+			ShellType:      domain.ShellBash,
+			ConfigFile:     configFile,
+			ForceOverwrite: true,
 		}
 
 		result, err := shellService.SetupShell(nil, request)
@@ -119,9 +119,9 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
 		request := &domain.SetupShellRequest{
-			ShellType:  domain.ShellBash,
-			ConfigFile: configFile,
-			Force:      true,
+			ShellType:      domain.ShellBash,
+			ConfigFile:     configFile,
+			ForceOverwrite: true,
 		}
 
 		result, err := shellService.SetupShell(nil, request)
@@ -160,9 +160,9 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
 		request := &domain.SetupShellRequest{
-			ShellType:  domain.ShellBash,
-			ConfigFile: configFile,
-			Force:      false,
+			ShellType:      domain.ShellBash,
+			ConfigFile:     configFile,
+			ForceOverwrite: false,
 		}
 
 		result, err := shellService.SetupShell(nil, request)
@@ -189,9 +189,9 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
 		request := &domain.SetupShellRequest{
-			ShellType:  domain.ShellBash,
-			ConfigFile: configFile,
-			Force:      false,
+			ShellType:      domain.ShellBash,
+			ConfigFile:     configFile,
+			ForceOverwrite: false,
 		}
 
 		result, err := shellService.SetupShell(nil, request)
