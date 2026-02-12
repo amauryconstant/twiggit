@@ -14,7 +14,9 @@ Add new audit areas by creating sections below. When adding new areas:
 
 ---
 
-## Package Structure
+**Note:** See [validation-checklist.md](validation-checklist.md) for finding validation criteria.
+
+---## Package Structure
 
 Check for naming conventions, directory organization, layer separation, and architectural violations.
 
@@ -42,6 +44,8 @@ Check for naming conventions, directory organization, layer separation, and arch
 - **HIGH**: Package naming violations that affect consistency across codebase
 - **MEDIUM**: File naming violations or minor structural issues
 - **LOW**: Stylistic variations that don't affect functionality
+
+**See Finding Validation Checklist above.**
 
 ### Language-Specific Notes
 
@@ -83,6 +87,8 @@ Check for repeated logic, similar functions, and consolidation opportunities.
 - **MEDIUM**: Similar logic or repeated error patterns (5-20 lines)
 - **LOW**: Minor repetitions or similar patterns
 
+**See Finding Validation Checklist above.**
+
 ---
 
 ## Interface Compliance
@@ -111,6 +117,8 @@ Check for implementation completeness, signature mismatches, and unused interfac
 - **MEDIUM**: Signature mismatches or missing implementations
 - **LOW**: Unused methods on otherwise valid interfaces
 
+**See Finding Validation Checklist above.**
+
 ---
 
 ## Test Patterns
@@ -125,11 +133,32 @@ Check for test organization, coverage gaps, and mock usage consistency.
 - Test pattern consistency (suite-based vs table-driven)
 - Mock duplication
 - TDD artifacts or outdated comments
+- Critical files without comprehensive tests
 
 ### Examples
 
 - **Inline mocks**: `mockShellIntegration` defined in `shell_service_test.go` instead of centralized `test/mocks/cmd_mocks.go`
 - **Mock duplication**: `MockWorktreeService`, `MockProjectService`, `MockNavigationService` exist in both `test/mocks/cmd_mocks.go` and `test/mocks/services/`
+- **MockCLIClient duplication**: Inline functional mock in `cli_client.go:324-377` AND centralized Testify mock in `test/mocks/git_service_mock.go:85-126` - creates maintenance burden
+  ```go
+  // BAD: Inline mock in cli_client.go
+  type MockCLIClient struct {
+      CreateWorktreeFunc func(...)
+      DeleteWorktreeFunc func(...)
+      ListWorktreesFunc func(...)
+      // ...
+  }
+  
+  // GOOD: Use centralized mock from test/mocks/
+  // Remove inline version, use test/mocks.MockCLIClient consistently
+  ```
+- **Critical files missing tests**: Files >100 lines of production code with no test coverage
+  - `git_client.go` (136 lines) - contains CompositeGitClient with routing logic for 13 methods
+  - `error_handler.go` (137 lines) - contains critical CLI error handling functions:
+    - `HandleCLIError()` - main error handling
+    - `GetExitCodeForError()` - error to exit code mapping
+    - `CategorizeError()` - error categorization with reflection
+    - `IsCobraArgumentError()` - pattern matching for argument errors
 - **Coverage gaps**: Error type files (`errors.go`, `service_errors.go`, `shell_errors.go`) lack tests
 - **Pattern mixing**: `cli_client_test.go` uses both suite-based and table-driven tests inconsistently
 - **Naming inconsistency**: `ContextResolverMock` should be `MockContextResolver` for consistency
@@ -140,6 +169,8 @@ Check for test organization, coverage gaps, and mock usage consistency.
 - **HIGH**: Critical files missing tests (error constructors, validation logic)
 - **MEDIUM**: Inline mocks that should be centralized, test pattern inconsistency
 - **LOW**: TDD comments or minor naming variations
+
+**See Finding Validation Checklist above.**
 
 ---
 
@@ -156,14 +187,41 @@ Check AGENTS.md and other documentation files against actual code implementation
 - Missing methods in interface documentation
 - Outdated patterns (e.g., referencing removed fields or deprecated approaches)
 - Misleading information (non-existent features)
+- Missing error type documentation
+- Parameter name inconsistencies in documentation
 
 ### Examples
 
+- **Missing error type documentation**: Major error types completely undocumented
+  - `GitCommandError` (errors.go:119-171) - Git CLI command execution failures with detailed command info, exit codes, stdout/stderr
+  - `ServiceError` (service_errors.go:8-32) - General service operation error type
+  - `ShellError` (shell_errors.go:37-87) - Shell service errors with context
+  - `ResolutionError` (service_errors.go:199-231) - Path resolution errors with suggestions
+  - `ConflictError` (service_errors.go:233-259) - Operation conflict errors
+- **Incorrect interface method signatures**: Parameter names don't match implementation
+  ```go
+  // DOCUMENTATION (WRONG):
+  type CLIClient interface {
+      DeleteWorktree(ctx context.Context, repoPath, worktreePath string, keepBranch bool) error
+  }
+  
+  // ACTUAL CODE (CORRECT):
+  type CLIClient interface {
+      DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error
+  }
+  ```
+  - Issue: `keepBranch` vs `force` parameter name mismatch
+- **Missing interface methods**: Documentation incomplete for GoGitClient
+  ```go
+  // DOCUMENTATION MISSING:
+  GetRepositoryInfo(ctx context.Context, repoPath string) (*domain.GitRepository, error)
+  ListRemotes(ctx context.Context, repoPath string) ([]domain.RemoteInfo, error)
+  GetCommitInfo(ctx context.Context, repoPath, commitHash string) (*domain.CommitInfo, error)
+  ```
+- **Missing CLIClient methods**: Documentation missing `PruneWorktrees` and `IsBranchMerged` methods
 - **Missing fields**: Documentation shows `Force bool` field in `CreateWorktreeRequest` (missing in docs)
 - **Incorrect types**: Docs reference `ProjectRepository` but actual uses `application.ProjectService`
-- **Missing types**: All error types (`ServiceError`, `WorktreeServiceError`, `ProjectServiceError`, etc.) completely undocumented
 - **Wrong package names**: Docs show `service_requests.CreateWorktreeRequest` but actual is `domain.CreateWorktreeRequest`
-- **Undocumented methods**: `GetRepositoryInfo`, `ListRemotes`, `GetCommitInfo` on `GoGitClient` not documented
 - **Missing context**: Shell interface methods (`Type()`, `Path()`, `Version()`) completely undocumented
 
 ### Severity Guidelines
@@ -172,6 +230,8 @@ Check AGENTS.md and other documentation files against actual code implementation
 - **HIGH**: Incorrect signatures or types affecting architectural understanding
 - **MEDIUM**: Missing fields or methods (documentation is incomplete but usable)
 - **LOW**: Typos or minor inaccuracies
+
+**See Finding Validation Checklist above.**
 
 ---
 
@@ -202,6 +262,8 @@ Check for import ordering, circular dependencies, and dependency health.
 - **MEDIUM**: Import ordering or unused imports
 - **LOW**: Inconsistent alias usage
 
+**See Finding Validation Checklist above.**
+
 ### Language-Specific Notes
 
 For Go projects:
@@ -209,6 +271,52 @@ For Go projects:
 - No circular dependencies (verified via `go build`)
 - Minimal external dependencies
 - Clean layer separation: `services` → `application`, `domain`, `infrastructure`
+
+### Layer Dependency Violations
+
+Check for violations of clean architecture layering principles where code imports from inappropriate layers.
+
+### What to Look For
+
+- Command layer (cmd/) importing infrastructure directly
+- Application layer importing infrastructure directly
+- Infrastructure layer importing services
+- Domain layer depending on any other internal layer
+- Circumventing application services in cmd layer
+
+### Examples
+
+- **cmd importing infrastructure directly**:
+  ```go
+  // cmd/root.go:27 - BAD: cmd depends on infrastructure
+  import (
+      "myapp/internal/infrastructure"
+  )
+  
+  type ServiceContainer struct {
+      GitClient infrastructure.GitClient  // Should go through application layer
+  }
+  
+  // cmd/create.go:76 - BAD: Direct infrastructure call
+  config.Services.GitClient.BranchExists(ctx, project.Path, source)
+  
+  // CORRECT: Use application service
+  config.Services.WorktreeService.BranchExists(ctx, project.Path, source)
+  ```
+- **cmd/importing infrastructure bypasses application layer**: Commands should only use application services
+  ```go
+  // cmd/delete.go:48 - BAD: Direct infrastructure access
+  worktrees, err := config.Services.GitClient.ListWorktrees(ctx, project.Path)
+  
+  // CORRECT: Go through application service
+  worktreeInfo, err := config.Services.WorktreeService.GetWorktreeStatus(ctx, req)
+  ```
+
+### Severity Guidelines
+
+- **HIGH**: cmd layer importing infrastructure directly (architectural violation)
+- **MEDIUM**: Application layer importing infrastructure when service layer exists
+- **LOW**: Minor layering issues that don't affect architecture
 
 See [go-patterns.md](go-patterns.md) for Go-specific patterns.
 
@@ -236,14 +344,54 @@ Check for error wrapping patterns, error type usage, and message consistency.
 - **Context loss**: `context_detector.go` returns plain error without wrapping underlying cause
 - **Message casing**: Some errors use "failed to", others use "Failed to"
 - **Chain breaks**: Errors converted to nil returns, then checked separately
-- **String detection**: `strings.Contains(err.Error(), "worktree not found")` instead of type checking
+- **String-based error detection** (CRITICAL): Using `strings.Contains(err.Error(), "...")` instead of `errors.As()`
+  ```go
+  // BAD: Fragile string-based detection - breaks if error message changes
+  errStr := err.Error()
+  if strings.Contains(errStr, "worktree not found") ||
+      strings.Contains(errStr, "invalid git repository") ||
+      strings.Contains(errStr, "repository does not exist") ||
+      strings.Contains(errStr, "no such file or directory") {
+      return fmt.Errorf("worktree not found: %s", worktreePath)
+  }
+  
+  // GOOD: Type-based error detection
+  var worktreeErr *domain.WorktreeServiceError
+  var gitErr *domain.GitRepositoryError
+  if errors.As(err, &worktreeErr) {
+      return fmt.Errorf("worktree not found: %s", worktreePath)
+  } else if errors.As(err, &gitErr) {
+      return fmt.Errorf("git repository error: %w", gitErr)
+  }
+  ```
+- **Layer-specific error type violations**: Infrastructure layer using `fmt.Errorf` instead of domain types
+  ```go
+  // BAD: Infrastructure returns plain fmt.Errorf
+  return fmt.Errorf("failed to validate %s path: %w", targetType, err)
+  
+  // GOOD: Infrastructure returns domain error type
+  return domain.NewContextDetectionError(target, "path validation failed", err)
+  
+  // BAD: Domain constructor uses fmt.Errorf
+  if !IsValidShellType(shellType) {
+      return nil, fmt.Errorf("unsupported shell type: %s", shellType)
+  }
+  
+  // GOOD: Domain constructor uses ValidationError
+  if !IsValidShellType(shellType) {
+      return nil, domain.NewValidationError("NewShell", "shellType", string(shellType), "unsupported shell type").
+          WithSuggestions([]string{"Supported shells: bash, zsh, fish"})
+  }
+  ```
 
 ### Severity Guidelines
 
-- **CRITICAL**: Panic in production code, complete loss of error context
-- **HIGH**: String-based error detection (fragile and error-prone)
-- **MEDIUM**: Mixed wrapping styles, error chain breaks
-- **LOW**: Message casing inconsistency or minor format variations
+- **CRITICAL**: Panic in production code, complete loss of error context, string-based error detection (strings.Contains instead of errors.As)
+- **HIGH**: Layer-specific error type violations (infrastructure using fmt.Errorf), mixed wrapping styles in critical paths
+- **MEDIUM**: Mixed wrapping styles, error chain breaks, message casing inconsistencies
+- **LOW**: Minor format variations or minor inconsistencies
+
+**See Finding Validation Checklist above.**
 
 ---
 
@@ -272,6 +420,8 @@ Check for inline vs centralized mocks, duplicate implementations, and missing mo
 - **HIGH**: Inline mocks for commonly used interfaces
 - **MEDIUM**: Missing centralized mocks, naming inconsistencies
 - **LOW**: Mocks for niche or rarely-used interfaces
+
+**See Finding Validation Checklist above.**
 
 ---
  
@@ -320,6 +470,8 @@ When documenting or implementing audit areas, reference related areas to help us
 
 ---
 
+## Security
+
 
 Check for common security vulnerabilities, secret handling, and input validation.
 
@@ -332,20 +484,81 @@ Check for common security vulnerabilities, secret handling, and input validation
 - Missing input validation
 - Insecure random number generation
 - Unencrypted sensitive data storage
+- Weak path traversal detection (incomplete pattern matching)
+- Symlink-based path traversal bypasses
+- Branch name sanitization in path construction
 
 ### Examples
 
 - **Hardcoded secrets**: AWS keys, database passwords in source code
 - **SQL injection**: String concatenation in SQL queries instead of parameterized queries
 - **Command injection**: User input directly passed to shell/exec without sanitization
-- **Path traversal**: `filepath.Join()` with unvalidated user paths allowing directory traversal
+- **Weak path traversal detection**: `strings.Contains(s, "..")` fails to catch URL-encoded sequences like `..//` or `%2e%2e`
+  ```go
+  // BAD: Incomplete pattern matching
+  func containsPathTraversal(s string) bool {
+      return strings.Contains(s, "..") || strings.Contains(s, string(filepath.Separator)+".")
+  }
+  
+  // GOOD: Clean path and detect traversal
+  func containsPathTraversal(s string) bool {
+      cleaned := filepath.Clean(s)
+      if cleaned != s {
+          return true  // Traversal detected
+      }
+      return strings.Contains(s, "..") || strings.Contains(s, "%2e%2e") || strings.Contains(s, "%2E%2E")
+  }
+  ```
+- **Symlink bypass vulnerability**: `validatePathUnder` doesn't resolve symlinks before validation
+  ```go
+  // BAD: Symlink not resolved
+  if under, err := IsPathUnder(base, target); err == nil && under { ... }
+  
+  // GOOD: Resolve symlinks first
+  resolvedBase, _ := filepath.EvalSymlinks(base)
+  resolvedTarget, _ := filepath.EvalSymlinks(target)
+  if under, err := IsPathUnder(resolvedBase, resolvedTarget); err == nil && under { ... }
+  ```
+- **Missing project name validation**: Cross-project reference `<project>/<branch>` only validates branch component
+  ```go
+  // BAD: Project name not validated
+  parts := strings.SplitN(spec, "/", 2)
+  return parts[0], parts[1], nil  // parts[0] used without validation
+  
+  // GOOD: Validate both components
+  parts := strings.SplitN(spec, "/", 2)
+  if validation := domain.ValidateProjectName(parts[0]); validation.IsError() {
+      return "", "", validation.Error
+  }
+  return parts[0], parts[1], nil
+  ```
+- **Weak branch name sanitization**: `filepath.Base()` and `filepath.Clean()` insufficient
+  ```go
+  // BAD: Weak sanitization
+  safeBranchName := filepath.Base(branchName)
+  safeBranchName = filepath.Clean(safeBranchName)
+  worktreePath := filepath.Join(s.config.WorktreesDirectory, projectName, safeBranchName)
+  
+  // GOOD: Validate first, then sanitize
+  if validation := domain.ValidateBranchName(branchName); validation.IsError() {
+      return "", validation.Error
+  }
+  safeBranchName := filepath.Base(branchName)
+  safeBranchName = filepath.Clean(safeBranchName)
+  worktreePath := filepath.Join(s.config.WorktreesDirectory, projectName, safeBranchName)
+  if err := infrastructure.ValidatePathUnder(s.config.WorktreesDirectory, worktreePath, "worktree", "worktrees"); err != nil {
+      return "", err
+  }
+  ```
 
 ### Severity Guidelines
 
-- **CRITICAL**: Hardcoded secrets, injection vulnerabilities, credential leaks
-- **HIGH**: Missing input validation on user-controlled data
-- **MEDIUM**: Weak cryptography or insecure defaults
+- **CRITICAL**: Hardcoded secrets, injection vulnerabilities, credential leaks, path traversal bypasses, symlink vulnerabilities
+- **HIGH**: Missing input validation on user-controlled data, weak path traversal detection, unvalidated cross-project references
+- **MEDIUM**: Weak cryptography or insecure defaults, insufficient sanitization
 - **LOW**: Security best practice violations (no immediate vulnerability)
+
+**See Finding Validation Checklist above.**
 
 ---
 
@@ -362,20 +575,170 @@ Check for common performance anti-patterns, inefficient algorithms, and resource
 - Resource leaks (unclosed files, connections)
 - Synchronous operations that could be async
 - Inefficient data structures for common operations
+- Memory leaks from unbounded caches/maps
+- Directory traversal without caching
+- Repeated filesystem I/O operations
+- O(n²) slice operations (missing pre-allocation)
 
 ### Examples
 
-- **N+1 query**: Querying database inside loop instead of single query with IN clause
-- **String concatenation**: Using `+` in loop instead of `strings.Builder`
-- **Memory leak**: File opened but never closed
-- **Inefficient search**: O(n²) algorithm when O(n) solution exists
+- **Memory leak - unbounded cache growth**: Repository cache grows indefinitely
+  ```go
+  // BAD: Unbounded map - memory leak
+  type GoGitClientImpl struct {
+      cache        map[string]*git.Repository // Grows forever
+      cacheEnabled bool
+  }
+  
+  // GOOD: Bounded LRU cache
+  import "github.com/hashicorp/golang-lru/v2"
+  
+  type GoGitClientImpl struct {
+      cache        *lru.Cache[string, *git.Repository] // Bounded cache
+      cacheEnabled bool
+  }
+  
+  func NewGoGitClient(cacheSize int, cacheEnabled ...bool) *GoGitClientImpl {
+      cache, _ := lru.New[string, *git.Repository](cacheSize)
+      return &GoGitClientImpl{cache: cache, cacheEnabled: true}
+  }
+  ```
+- **N+1 filesystem query**: Lists all projects, then calls `ListWorktrees` for each
+  ```go
+  // BAD: O(n*m) complexity
+  func (s *worktreeService) findProjectByWorktree(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {
+      projects, err := s.projectService.ListProjects(ctx) // O(n)
+      for _, project := range projects {
+          worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath) // O(m) per project
+          // Find match
+      }
+  }
+  
+  // GOOD: Parse path directly - O(1)
+  func (s *worktreeService) findProjectByWorktree(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {
+      relPath, _ := filepath.Rel(s.config.WorktreesDirectory, worktreePath)
+      parts := strings.Split(relPath, string(filepath.Separator))
+      projectName := parts[0]
+      return s.projectService.DiscoverProject(ctx, projectName, nil)
+  }
+  ```
+- **Double I/O operation**: Calling same method twice for same data
+  ```go
+  // BAD: ListWorktrees called twice
+  worktrees, _ := cr.gitService.ListWorktrees(ctx, ctx.Path) // First call
+  if len(worktrees) > 0 { ... }
+  worktrees, _ = cr.gitService.ListWorktrees(ctx, ctx.Path) // Second call!
+  for _, wt := range worktrees { ... }
+  
+  // GOOD: Cache result or call once
+  worktrees, _ := cr.gitService.ListWorktrees(ctx, ctx.Path)
+  if len(worktrees) > 0 {
+      worktreeMap := make(map[string]bool)
+      for _, wt := range worktrees {
+          worktreeMap[wt.Branch] = true
+      }
+      // Use cached map instead of second call
+  }
+  ```
+- **Directory traversal without caching**: O(n) filesystem calls every time
+  ```go
+  // BAD: Traverse filesystem every time
+  func (cd *contextDetector) detectProjectContext(dir string) *domain.Context {
+      currentDir := dir
+      for {
+          gitPath := filepath.Join(currentDir, ".git")
+          if _, err := os.Stat(gitPath); err == nil { ... }
+          parent := filepath.Dir(currentDir)
+          if parent == currentDir { break }
+          currentDir = parent
+      }
+  }
+  
+  // GOOD: Cache repository root paths
+  type contextDetector struct {
+      config        *domain.Config
+      repoRootCache map[string]string // Cache: path → repo root
+  }
+  
+  func (cd *contextDetector) detectProjectContext(dir string) *domain.Context {
+      absDir, _ := filepath.Abs(dir)
+      if repoRoot, exists := cd.repoRootCache[absDir]; exists {
+          return &domain.Context{Type: domain.ContextProject, Path: repoRoot, ...}
+      }
+      // ... traversal logic ...
+      if ctx != nil {
+          cd.repoRootCache[absDir] = ctx.Path
+      }
+      return ctx
+  }
+  ```
+- **O(n²) slice appends**: No pre-allocation causing repeated reallocations
+  ```go
+  // BAD: Repeated allocations
+  func filterSuggestions(suggestions []string, partial string) []string {
+      result := make([]string, 0) // No capacity
+      for _, suggestion := range suggestions {
+          if strings.HasPrefix(suggestion, partial) {
+              result = append(result, suggestion) // Reallocates many times
+          }
+      }
+      return result
+  }
+  
+  // GOOD: Pre-allocate capacity
+  func filterSuggestions(suggestions []string, partial string) []string {
+      result := make([]string, 0, len(suggestions)) // Full capacity
+      for _, suggestion := range suggestions {
+          if strings.HasPrefix(suggestion, partial) {
+              result = append(result, suggestion) // No reallocation
+          }
+      }
+      return result
+  }
+  ```
+- **Repeated os.Stat calls**: Multiple filesystem I/O in traversal
+  ```go
+  // BAD: Stat in loop
+  func findMainRepoFromWorktree(worktreePath string) string {
+      current := worktreePath
+      for {
+          if _, err := os.Stat(filepath.Join(current, ".git")); err == nil {
+              if info, _ := os.Stat(filepath.Join(current, ".git")); info.IsDir() {
+                  return current
+              }
+          }
+          parent := filepath.Dir(current)
+          if parent == current { break }
+          current = parent
+      }
+  }
+  
+  // GOOD: Parse .git file directly (single I/O)
+  func findMainRepoFromWorktree(worktreePath string) string {
+      gitFilePath := filepath.Join(worktreePath, ".git")
+      if content, err := os.ReadFile(gitFilePath); err == nil {
+          contentStr := strings.TrimSpace(string(content))
+          if strings.HasPrefix(contentStr, "gitdir:") {
+              gitdirPath := strings.TrimPrefix(contentStr, "gitdir:")
+              gitdirPath = strings.TrimSpace(gitdirPath)
+              if strings.Contains(gitdirPath, "/.git/worktrees/") {
+                  parts := strings.Split(gitdirPath, "/.git/worktrees/")
+                  return filepath.Dir(filepath.Dir(parts[0]))
+              }
+          }
+      }
+      return worktreePath
+  }
+  ```
 
 ### Severity Guidelines
 
-- **CRITICAL**: Resource leaks causing gradual degradation
-- **HIGH**: O(n²) algorithm where O(n) exists and affects common operations
-- **MEDIUM**: Inefficient operations in hot paths
+- **CRITICAL**: Resource leaks causing gradual degradation (memory leaks, unbounded growth)
+- **HIGH**: O(n²) algorithm where O(n) exists and affects common operations, N+1 queries in critical paths
+- **MEDIUM**: Inefficient operations in hot paths, missing caching for repeated operations
 - **LOW**: Suboptimal data structure choice or minor performance issues
+
+**See Finding Validation Checklist above.**
 
 ---
 
@@ -405,3 +768,5 @@ Check for unused code, unreachable code, and commented-out production code.
 - **HIGH**: Entire unused files or modules (>50 lines)
 - **MEDIUM**: Unused functions or unreachable code blocks (10-50 lines)
 - **LOW**: Unused variables, small helper functions, or commented debug code
+
+**See Finding Validation Checklist above.**
