@@ -33,14 +33,14 @@ func (s *WorktreeTestSuite) TestNewWorktree() {
 			path:         "",
 			branch:       "feature",
 			expectError:  true,
-			errorMessage: "new worktree: path cannot be empty",
+			errorMessage: "validation failed for NewWorktree.path: cannot be empty",
 		},
 		{
 			name:         "empty branch",
 			path:         "/home/user/Worktrees/project/feature",
 			branch:       "",
 			expectError:  true,
-			errorMessage: "new worktree: branch cannot be empty",
+			errorMessage: "validation failed for NewWorktree.branch: cannot be empty",
 		},
 	}
 

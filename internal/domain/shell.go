@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -97,7 +96,8 @@ func InferShellTypeFromPath(configPath string) (ShellType, error) {
 			ErrInferenceFailed,
 			"",
 			"cannot infer shell type from path: "+configPath,
-			errors.New("use --shell to specify shell type (bash, zsh, fish)"),
+			NewValidationError("InferShellTypeFromPath", "shellType", "", "cannot infer shell type").
+				WithSuggestions([]string{"use --shell to specify shell type (bash, zsh, fish)"}),
 		)
 	}
 }
@@ -124,7 +124,8 @@ func DetectShellFromEnv() (ShellType, error) {
 			ErrShellDetectionFailed,
 			"",
 			"unsupported shell detected: "+shellName,
-			errors.New("use --shell to specify shell type (bash, zsh, fish)"),
+			NewValidationError("DetectShellFromEnv", "shellType", shellName, "unsupported shell type").
+				WithSuggestions([]string{"use --shell to specify shell type (bash, zsh, fish)"}),
 		)
 	}
 }

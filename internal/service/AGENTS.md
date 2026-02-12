@@ -37,9 +37,72 @@ func (s *worktreeService) CreateWorktree(
 ```
 
 ## Error Handling
-- Wrap errors with context: `fmt.Errorf("action failed: %w", err)`
-- Use domain error types: `ValidationError`, `WorktreeServiceError`
-- Never panic in production code
+
+### Error Wrapping Rules
+
+1. **ValidationError MUST be returned directly, not wrapped**
+   - ValidationError already provides context (request type, field, message, suggestions)
+   - Wrapping adds unnecessary nesting and breaks error type checking
+
+   ```go
+   // Wrong: Wrapping ValidationError
+   if err := s.validateRequest(req); err != nil {
+       return nil, fmt.Errorf("validation failed: %w", err)
+   }
+
+   // Right: Return ValidationError directly
+   if err := s.validateRequest(req); err != nil {
+       return nil, err
+   }
+   ```
+
+2. **Wrap non-validation errors with domain-specific ServiceError types**
+   - Use `domain.NewWorktreeServiceError()` for worktree operations
+   - Use `domain.NewProjectServiceError()` for project operations
+   - Use `domain.NewNavigationServiceError()` for navigation operations
+
+   ```go
+   // Wrap infrastructure errors with service context
+   err = s.gitService.CreateWorktree(ctx, repoPath, branch, sourceBranch, worktreePath)
+   if err != nil {
+       return nil, domain.NewWorktreeServiceError(worktreePath, branchName, "CreateWorktree", "failed to create worktree", err)
+   }
+   ```
+
+3. **Use fmt.Errorf("operation failed: %w", err) only when no domain error type applies**
+   - For generic operation failures that don't have a specific domain error type
+   - Always use `%w` verb to preserve error chain
+   - Provide meaningful context in the error message
+
+   ```go
+   // For non-domain-specific failures
+   project, err := s.projectService.DiscoverProject(ctx, req.ProjectName, req.Context)
+   if err != nil {
+       return nil, fmt.Errorf("failed to resolve project: %w", err)
+   }
+   ```
+
+4. **Never panic in production code**
+   - All errors should be returned, never panics
+   - Use error returns for all failure cases
+
+### Error Type Checking
+
+**Use `errors.As()` for type checking instead of string matching**:
+```go
+// Wrong: String-based error detection
+if strings.Contains(err.Error(), "worktree not found") {
+    return nil
+}
+
+// Right: Type-based error detection
+var worktreeErr *domain.WorktreeServiceError
+if errors.As(err, &worktreeErr) && worktreeErr.Message == "worktree not found in any project" {
+    return nil
+}
+```
+
+**Exception**: String-based checks are acceptable for parsing external CLI output (infrastructure layer only).
 
 ## Testing
 - **Unit tests**: Testify suites with mocks from `test/mocks/`

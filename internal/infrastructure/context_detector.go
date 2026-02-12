@@ -35,13 +35,13 @@ func (cd *contextDetector) DetectContext(dir string) (*domain.Context, error) {
 	// Normalize path and resolve symlinks
 	normalizedDir, err := NormalizePath(dir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to normalize directory: %w", err)
+		return nil, domain.NewContextDetectionError(dir, "failed to normalize directory", err)
 	}
 
 	// Perform detection
 	ctx := cd.detectContextInternal(normalizedDir)
 	if ctx == nil {
-		return nil, fmt.Errorf("failed to detect context for directory: %s", normalizedDir)
+		return nil, domain.NewContextDetectionError(normalizedDir, "failed to detect context for directory", nil)
 	}
 
 	return ctx, nil

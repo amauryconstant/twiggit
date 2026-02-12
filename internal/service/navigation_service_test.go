@@ -59,7 +59,7 @@ func (s *NavigationServiceTestSuite) TestResolvePath() {
 				},
 			},
 			expectError:  true,
-			errorMessage: "target cannot be empty",
+			errorMessage: "validation failed for ResolvePathRequest.target: cannot be empty",
 		},
 	}
 
@@ -95,7 +95,7 @@ func (s *NavigationServiceTestSuite) TestValidatePath() {
 			name:         "empty path",
 			path:         "",
 			expectError:  true,
-			errorMessage: "path cannot be empty",
+			errorMessage: "validation failed for ValidatePath.path: cannot be empty",
 		},
 	}
 

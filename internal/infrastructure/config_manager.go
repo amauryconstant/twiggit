@@ -88,19 +88,19 @@ func (m *koanfConfigManager) Load() (*domain.Config, error) {
 	if configFileExists(configPath) {
 		// Load TOML file
 		if err := m.ko.Load(file.Provider(configPath), toml.Parser()); err != nil {
-			return nil, fmt.Errorf("Failed to load configuration: failed to parse config file %s: %w", configPath, err)
+			return nil, fmt.Errorf("failed to load configuration: failed to parse config file %s: %w", configPath, err)
 		}
 	}
 
 	// 3. Unmarshal to config object
 	config := &domain.Config{}
 	if err := m.ko.Unmarshal("", config); err != nil {
-		return nil, fmt.Errorf("Failed to load configuration: failed to unmarshal configuration: %w", err)
+		return nil, fmt.Errorf("failed to load configuration: failed to unmarshal configuration: %w", err)
 	}
 
 	// 4. Validate configuration using pure function
 	if err := validateConfig(config); err != nil {
-		return nil, fmt.Errorf("Failed to load configuration: validation failed: %w", err)
+		return nil, fmt.Errorf("failed to load configuration: validation failed: %w", err)
 	}
 
 	// 5. Store immutable config

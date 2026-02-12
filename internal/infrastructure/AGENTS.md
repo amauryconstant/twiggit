@@ -1,6 +1,47 @@
 ## Infrastructure Layer
 Layer: External integrations (git, config, CLI execution)
 
+## Error Handling
+
+### Infrastructure Layer Error Wrapping
+
+**Rule**: Infrastructure layer SHALL always return domain error types, not plain errors or fmt.Errorf
+
+| Operation | Error Type | Pattern |
+|-----------|-------------|----------|
+| Repository operations | `domain.NewGitRepositoryError(path, message, cause)` | GoGit operations |
+| Worktree operations | `domain.NewGitWorktreeError(worktreePath, branchName, message, cause)` | CLI operations |
+| Context detection | `domain.NewContextDetectionError(path, message, cause)` | Path validation failures |
+
+**Examples**:
+```go
+// Wrong: Plain error
+return nil, fmt.Errorf("failed to open repository: %w", err)
+
+// Right: Domain error type
+return nil, domain.NewGitRepositoryError(path, "failed to open repository", err)
+```
+
+### Error Chain Preservation
+
+- All error wrapping uses `%w` verb to preserve error chain
+- Enables `errors.As()` and `errors.Is()` for error type checking in upper layers
+- Domain error types implement `Unwrap()` method
+
+### CLI Error Parsing
+
+**Exception**: String-based checks are appropriate for parsing external CLI output
+- `strings.Contains(result.Stderr, "not found")` is acceptable
+- This is parsing external output, not internal error type checking
+- Do not use string matching for internal error detection (use `errors.As()` instead)
+
+### Silent Error Handling
+
+**Guideline**: Silent error degradation is acceptable for non-critical paths
+- Suggestion methods may silently return empty lists on errors
+- Document why errors are ignored with comments
+- Example: completion suggestions in `ContextResolver`
+
 ## Git Client Routing Strategy
 
 Two implementations routed deterministically:

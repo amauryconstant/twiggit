@@ -33,14 +33,14 @@ func (s *ProjectTestSuite) TestNewProject() {
 			projectName:  "",
 			path:         "/path/to/project",
 			expectError:  true,
-			errorMessage: "new project: name cannot be empty",
+			errorMessage: "validation failed for NewProject.name: cannot be empty",
 		},
 		{
 			name:         "empty project path",
 			projectName:  "my-project",
 			path:         "",
 			expectError:  true,
-			errorMessage: "new project: path cannot be empty",
+			errorMessage: "validation failed for NewProject.path: cannot be empty",
 		},
 	}
 

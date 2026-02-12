@@ -1,9 +1,7 @@
 // Package domain contains core entities for git worktree management.
 package domain
 
-import (
-	"errors"
-)
+import ()
 
 // Project represents a git project with basic validation
 type Project struct {
@@ -14,10 +12,10 @@ type Project struct {
 // NewProject creates a new project with validation
 func NewProject(name, path string) (*Project, error) {
 	if name == "" {
-		return nil, errors.New("new project: name cannot be empty")
+		return nil, NewValidationError("NewProject", "name", "", "cannot be empty")
 	}
 	if path == "" {
-		return nil, errors.New("new project: path cannot be empty")
+		return nil, NewValidationError("NewProject", "path", "", "cannot be empty")
 	}
 
 	return &Project{

@@ -1,9 +1,7 @@
 // Package domain contains core entities for git worktree management.
 package domain
 
-import (
-	"errors"
-)
+import ()
 
 // Worktree represents a git worktree with basic validation
 type Worktree struct {
@@ -14,10 +12,10 @@ type Worktree struct {
 // NewWorktree creates a new worktree with validation
 func NewWorktree(path, branch string) (*Worktree, error) {
 	if path == "" {
-		return nil, errors.New("new worktree: path cannot be empty")
+		return nil, NewValidationError("NewWorktree", "path", "", "cannot be empty")
 	}
 	if branch == "" {
-		return nil, errors.New("new worktree: branch cannot be empty")
+		return nil, NewValidationError("NewWorktree", "branch", "", "cannot be empty")
 	}
 
 	return &Worktree{

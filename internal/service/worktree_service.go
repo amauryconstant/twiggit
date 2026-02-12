@@ -2,10 +2,10 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"twiggit/internal/application"
@@ -37,7 +37,7 @@ func NewWorktreeService(
 func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error) {
 	// Validate request
 	if err := s.validateCreateRequest(req); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
+		return nil, err
 	}
 
 	// Resolve project
@@ -72,17 +72,18 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 func (s *worktreeService) DeleteWorktree(ctx context.Context, req *domain.DeleteWorktreeRequest) error {
 	// Validate request
 	if err := s.validateDeleteRequest(req); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
+		return err
 	}
 
 	// Find the project that contains this worktree
 	project, err := s.findProjectByWorktree(ctx, req.WorktreePath)
 	if err != nil {
 		// If worktree is not found in any project, consider it already deleted (idempotent)
-		if strings.Contains(err.Error(), "worktree not found in any project") {
+		var worktreeErr *domain.WorktreeServiceError
+		if errors.As(err, &worktreeErr) && worktreeErr.Message == "worktree not found in any project" {
 			return nil
 		}
-		return fmt.Errorf("failed to find project for worktree: %w", err)
+		return domain.NewWorktreeServiceError(req.WorktreePath, "", "DeleteWorktree", "failed to find project for worktree", err)
 	}
 
 	// Delete worktree using CLI client

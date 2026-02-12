@@ -2,7 +2,6 @@ package infrastructure
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/go-git/go-git/v5"
 	"twiggit/internal/domain"
@@ -26,7 +25,7 @@ func NewCompositeGitClient(goGitClient GoGitClient, cliClient CLIClient) GitClie
 func (c *CompositeGitClient) OpenRepository(path string) (*git.Repository, error) {
 	repo, err := c.goGitClient.OpenRepository(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open repository: %w", err)
+		return nil, domain.NewGitRepositoryError(path, "failed to open repository", err)
 	}
 	return repo, nil
 }
@@ -35,7 +34,7 @@ func (c *CompositeGitClient) OpenRepository(path string) (*git.Repository, error
 func (c *CompositeGitClient) ListBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error) {
 	branches, err := c.goGitClient.ListBranches(ctx, repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list branches: %w", err)
+		return nil, domain.NewGitRepositoryError(repoPath, "failed to list branches", err)
 	}
 	return branches, nil
 }
@@ -44,7 +43,7 @@ func (c *CompositeGitClient) ListBranches(ctx context.Context, repoPath string) 
 func (c *CompositeGitClient) BranchExists(ctx context.Context, repoPath, branchName string) (bool, error) {
 	exists, err := c.goGitClient.BranchExists(ctx, repoPath, branchName)
 	if err != nil {
-		return false, fmt.Errorf("failed to check branch existence: %w", err)
+		return false, domain.NewGitRepositoryError(repoPath, "failed to check branch existence", err)
 	}
 	return exists, nil
 }
@@ -53,7 +52,7 @@ func (c *CompositeGitClient) BranchExists(ctx context.Context, repoPath, branchN
 func (c *CompositeGitClient) GetRepositoryStatus(ctx context.Context, repoPath string) (domain.RepositoryStatus, error) {
 	status, err := c.goGitClient.GetRepositoryStatus(ctx, repoPath)
 	if err != nil {
-		return domain.RepositoryStatus{}, fmt.Errorf("failed to get repository status: %w", err)
+		return domain.RepositoryStatus{}, domain.NewGitRepositoryError(repoPath, "failed to get repository status", err)
 	}
 	return status, nil
 }
@@ -61,7 +60,7 @@ func (c *CompositeGitClient) GetRepositoryStatus(ctx context.Context, repoPath s
 // ValidateRepository validates a repository using the GoGit client
 func (c *CompositeGitClient) ValidateRepository(path string) error {
 	if err := c.goGitClient.ValidateRepository(path); err != nil {
-		return fmt.Errorf("failed to validate repository: %w", err)
+		return domain.NewGitRepositoryError(path, "failed to validate repository", err)
 	}
 	return nil
 }
@@ -70,7 +69,7 @@ func (c *CompositeGitClient) ValidateRepository(path string) error {
 func (c *CompositeGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
 	info, err := c.goGitClient.GetRepositoryInfo(ctx, repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get repository info: %w", err)
+		return nil, domain.NewGitRepositoryError(repoPath, "failed to get repository info", err)
 	}
 	return info, nil
 }
@@ -79,7 +78,7 @@ func (c *CompositeGitClient) GetRepositoryInfo(ctx context.Context, repoPath str
 func (c *CompositeGitClient) ListRemotes(ctx context.Context, repoPath string) ([]domain.RemoteInfo, error) {
 	remotes, err := c.goGitClient.ListRemotes(ctx, repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list remotes: %w", err)
+		return nil, domain.NewGitRepositoryError(repoPath, "failed to list remotes", err)
 	}
 	return remotes, nil
 }
@@ -88,7 +87,7 @@ func (c *CompositeGitClient) ListRemotes(ctx context.Context, repoPath string) (
 func (c *CompositeGitClient) GetCommitInfo(ctx context.Context, repoPath, commitHash string) (*domain.CommitInfo, error) {
 	info, err := c.goGitClient.GetCommitInfo(ctx, repoPath, commitHash)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get commit info: %w", err)
+		return nil, domain.NewGitRepositoryError(repoPath, "failed to get commit info", err)
 	}
 	return info, nil
 }
@@ -96,7 +95,7 @@ func (c *CompositeGitClient) GetCommitInfo(ctx context.Context, repoPath, commit
 // CreateWorktree creates a worktree using the CLI client
 func (c *CompositeGitClient) CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error {
 	if err := c.cliClient.CreateWorktree(ctx, repoPath, branchName, sourceBranch, worktreePath); err != nil {
-		return fmt.Errorf("failed to create worktree: %w", err)
+		return domain.NewGitWorktreeError(worktreePath, branchName, "failed to create worktree", err)
 	}
 	return nil
 }
@@ -104,7 +103,7 @@ func (c *CompositeGitClient) CreateWorktree(ctx context.Context, repoPath, branc
 // DeleteWorktree deletes a worktree using the CLI client
 func (c *CompositeGitClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
 	if err := c.cliClient.DeleteWorktree(ctx, repoPath, worktreePath, force); err != nil {
-		return fmt.Errorf("failed to delete worktree: %w", err)
+		return domain.NewGitWorktreeError(worktreePath, "", "failed to delete worktree", err)
 	}
 	return nil
 }
@@ -113,7 +112,7 @@ func (c *CompositeGitClient) DeleteWorktree(ctx context.Context, repoPath, workt
 func (c *CompositeGitClient) ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
 	worktrees, err := c.cliClient.ListWorktrees(ctx, repoPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list worktrees: %w", err)
+		return nil, domain.NewGitWorktreeError(repoPath, "", "failed to list worktrees", err)
 	}
 	return worktrees, nil
 }
@@ -121,7 +120,7 @@ func (c *CompositeGitClient) ListWorktrees(ctx context.Context, repoPath string)
 // PruneWorktrees prunes stale worktree references using the CLI client
 func (c *CompositeGitClient) PruneWorktrees(ctx context.Context, repoPath string) error {
 	if err := c.cliClient.PruneWorktrees(ctx, repoPath); err != nil {
-		return fmt.Errorf("failed to prune worktrees: %w", err)
+		return domain.NewGitWorktreeError(repoPath, "", "failed to prune worktrees", err)
 	}
 	return nil
 }
@@ -130,7 +129,7 @@ func (c *CompositeGitClient) PruneWorktrees(ctx context.Context, repoPath string
 func (c *CompositeGitClient) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
 	merged, err := c.cliClient.IsBranchMerged(ctx, repoPath, branchName)
 	if err != nil {
-		return false, fmt.Errorf("failed to check if branch is merged: %w", err)
+		return false, domain.NewGitWorktreeError(repoPath, branchName, "failed to check if branch is merged", err)
 	}
 	return merged, nil
 }

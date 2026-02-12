@@ -187,6 +187,8 @@ func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSug
 func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
 	worktrees, err := cr.gitService.ListWorktrees(context.Background(), ctx.Path)
 	if err != nil {
+		// Silent degradation is acceptable for suggestions - errors shouldn't prevent
+		// the operation from proceeding, just reduce the helpfulness of completions
 		return suggestions
 	}
 
@@ -208,6 +210,8 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
 	branches, err := cr.gitService.ListBranches(context.Background(), ctx.Path)
 	if err != nil {
+		// Silent degradation is acceptable for suggestions - errors shouldn't prevent
+		// the operation from proceeding, just reduce the helpfulness of completions
 		return suggestions
 	}
 
@@ -397,7 +401,7 @@ func (cr *contextResolver) discoverProjects() ([]ProjectRef, error) {
 
 	// Check if directory exists
 	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
-		return nil, fmt.Errorf("projects directory does not exist: %s", projectsDir)
+		return nil, domain.NewContextDetectionError(projectsDir, "projects directory does not exist", nil)
 	}
 
 	// Read directory contents

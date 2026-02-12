@@ -1,10 +1,8 @@
 package domain
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 )
 
@@ -181,31 +179,26 @@ func DefaultConfig() *Config {
 
 // Validate validates the configuration and returns any errors
 func (c *Config) Validate() error {
-	var validationErrors []error
+	var validationErrors []string
 
 	// Validate projects directory
 	if !filepath.IsAbs(c.ProjectsDirectory) {
-		validationErrors = append(validationErrors, errors.New("projects_directory must be absolute path"))
+		validationErrors = append(validationErrors, "projects_directory must be absolute path")
 	}
 
 	// Validate worktrees directory
 	if !filepath.IsAbs(c.WorktreesDirectory) {
-		validationErrors = append(validationErrors, errors.New("worktrees_directory must be absolute path"))
+		validationErrors = append(validationErrors, "worktrees_directory must be absolute path")
 	}
 
 	// Validate default source branch
 	if c.DefaultSourceBranch == "" {
-		validationErrors = append(validationErrors, errors.New("default_source_branch cannot be empty"))
+		validationErrors = append(validationErrors, "default_source_branch cannot be empty")
 	}
 
 	if len(validationErrors) > 0 {
-		var errorMsg string
-		var errorMsgSb strings.Builder
-		for _, err := range validationErrors {
-			errorMsgSb.WriteString(err.Error() + "; ")
-		}
-		errorMsg += errorMsgSb.String()
-		return errors.New("config validation failed: " + errorMsg)
+		return NewValidationError("Config.Validate", "validation", "", "config validation failed").
+			WithSuggestions(validationErrors)
 	}
 
 	return nil

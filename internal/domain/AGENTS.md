@@ -60,6 +60,47 @@ func (e *ValidationError) Error() string {
 }
 ```
 
+## Error Handling
+
+### Domain Layer Error Types
+
+- **ValidationError**: Used for all validation failures across the domain layer
+  - Constructor validation (NewProject, NewWorktree, etc.)
+  - Config validation (Config.Validate)
+  - Shell validation (shell type inference)
+  - Pattern: `domain.NewValidationError("RequestType", "field", value, "message")`
+
+- **GitRepositoryError**: Git repository operation errors
+  - Repository access failures
+  - Branch listing failures
+  - Status retrieval failures
+  - Pattern: `domain.NewGitRepositoryError(path, "message", cause)`
+
+- **GitWorktreeError**: Git worktree operation errors
+  - Worktree creation/deletion failures
+  - Worktree listing failures
+  - Pattern: `domain.NewGitWorktreeError(worktreePath, branchName, "message", cause)`
+
+- **ContextDetectionError**: Context detection failures
+  - Directory access issues
+  - Invalid paths
+  - Pattern: `domain.NewContextDetectionError(path, "message", cause)`
+
+### Error Wrapping Rules
+
+1. **Domain constructors MUST return ValidationError for validation failures**
+   - Use `domain.NewValidationError()` instead of `errors.New()`
+   - Leverage `WithSuggestions()` for actionable guidance
+
+2. **All domain error types implement Unwrap() for error chain support**
+   - Use `%w` verb when wrapping errors
+   - Enables `errors.As()` and `errors.Is()` for error type checking
+
+3. **Error message format consistency**
+   - Use lowercase "failed to" consistently
+   - Include relevant context (path, branch, operation)
+   - Keep messages concise but informative
+
 ## Error Types
 
 ```go

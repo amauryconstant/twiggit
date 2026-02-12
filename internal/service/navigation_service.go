@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +33,7 @@ func NewNavigationService(
 // ResolvePath resolves a target identifier to a concrete path
 func (s *navigationService) ResolvePath(_ context.Context, req *domain.ResolvePathRequest) (*domain.ResolutionResult, error) {
 	if req.Target == "" {
-		return nil, errors.New("target cannot be empty")
+		return nil, domain.NewValidationError("ResolvePathRequest", "target", "", "cannot be empty")
 	}
 
 	// Delegate to ContextResolver for consistency
@@ -48,7 +47,7 @@ func (s *navigationService) ResolvePath(_ context.Context, req *domain.ResolvePa
 // ValidatePath validates that a path is accessible and valid
 func (s *navigationService) ValidatePath(_ context.Context, path string) error {
 	if path == "" {
-		return errors.New("path cannot be empty")
+		return domain.NewValidationError("ValidatePath", "path", "", "cannot be empty")
 	}
 
 	// Check if path exists
