@@ -95,6 +95,11 @@ twiggit cd feature/my-new-feature
 
 # Delete a worktree
 twiggit delete feature/old-feature
+
+# Prune merged worktrees
+twiggit prune --dry-run              # Preview what would be deleted
+twiggit prune                        # Delete merged worktrees in current project
+twiggit prune --all                  # Prune across all projects
 ```
 
 ## Documentation

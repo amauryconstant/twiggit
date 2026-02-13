@@ -61,6 +61,7 @@ Two implementations routed deterministically:
 | List worktrees | ❌ | ✅ | go-git lacks worktree support |
 | Prune worktrees | ❌ | ✅ | go-git lacks worktree support |
 | Is branch merged | ❌ | ✅ | go-git lacks merge status support |
+| Delete branch | ❌ | ✅ | go-git fails on worktree-referenced branches |
 
 **Composite client** routes to operation-specific implementation (no fallback logic).
 
@@ -90,6 +91,7 @@ type CLIClient interface {
     ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
     PruneWorktrees(ctx context.Context, repoPath string) error
     IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error)
+    DeleteBranch(ctx context.Context, repoPath, branchName string) error
 }
 ```
 

@@ -42,6 +42,41 @@ func NewProject(name, path string) (*Project, error) {
 // Immutable: getters only, no setters
 ```
 
+## Prune Request/Result Types
+
+```go
+type PruneWorktreesRequest struct {
+    Context          *Context
+    Force            bool
+    DeleteBranches   bool
+    DryRun           bool
+    AllProjects      bool
+    SpecificWorktree string  // Format: "project/branch"
+}
+
+type PruneWorktreesResult struct {
+    DeletedWorktrees       []*PruneWorktreeResult
+    SkippedWorktrees       []*PruneWorktreeResult
+    ProtectedSkipped       []*PruneWorktreeResult
+    UnmergedSkipped        []*PruneWorktreeResult
+    CurrentWorktreeSkipped []*PruneWorktreeResult
+    TotalDeleted           int
+    TotalSkipped           int
+    TotalBranchesDeleted   int
+    NavigationPath         string  // Set for single-worktree prune
+}
+
+type PruneWorktreeResult struct {
+    ProjectName   string
+    WorktreePath  string
+    BranchName    string
+    Deleted       bool
+    BranchDeleted bool
+    SkipReason    string
+    Error         error
+}
+```
+
 ## Validation Pipeline
 
 Functional validation in `validation.go`:
@@ -110,9 +145,15 @@ func (e *ValidationError) Error() string {
   - Pattern: `domain.NewResolutionError(target, context, message, suggestions, cause)`
 
 - **ConflictError**: Operation conflict errors
-  - Resource conflicts during operations
-  - Includes resource type, identifier, operation
-  - Pattern: `domain.NewConflictError(resource, identifier, operation, message, cause)`
+   - Resource conflicts during operations
+   - Includes resource type, identifier, operation
+   - Pattern: `domain.NewConflictError(resource, identifier, operation, message, cause)`
+
+- **ProtectedBranchError**: Attempt to delete a protected branch
+   - Raised when prune/delete operations target protected branches
+   - Protected branches configured in `ValidationConfig.ProtectedBranches`
+   - Default: main, master, develop, staging, production
+   - Pattern: `domain.NewProtectedBranchError(branchName, protectedBranches)`
 
 ### Error Wrapping Rules
 

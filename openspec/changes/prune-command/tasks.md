@@ -8,11 +8,11 @@
 
 ## 2. Infrastructure Layer
 
-- [x] 2.1 Add `DeleteBranch()` method signature to `GoGitClient` interface in `internal/infrastructure/interfaces.go`
-- [x] 2.2 Implement `DeleteBranch()` method in `internal/infrastructure/gogit_client.go` using go-git's `DeleteReference()` with structured error handling
-- [x] 2.3 Add validation logic to check if branch is current HEAD before deletion
-- [x] 2.4 Add validation logic to check if branch exists before deletion
-- [x] 2.5 Return appropriate error for empty repository path or empty branch name
+- [x] 2.1 Add `DeleteBranch()` method signature to `CLIClient` interface in `internal/infrastructure/interfaces.go`
+- [x] 2.2 Implement `DeleteBranch()` method in `internal/infrastructure/cli_client.go` using git CLI with structured error handling
+- [x] 2.3 Add validation logic for empty repository path and empty branch name
+- [x] 2.4 Handle "branch not found" as non-error (idempotent behavior)
+- [x] 2.5 Use `git branch -D` to handle worktree-referenced branches
 
 ## 3. Application Layer
 
@@ -46,8 +46,8 @@
 ## 5. Unit Tests
 
 - [x] 5.1 Add unit tests for `ProtectedBranchError` type
-- [x] 5.2 Add unit tests for `DeleteBranch()` method in `gogit_client.go` using Testify patterns
-- [x] 5.3 Add unit tests for branch validation (current HEAD, existence, empty inputs)
+- [x] 5.2 Add unit tests for `DeleteBranch()` method in `cli_client.go` using Testify patterns
+- [x] 5.3 Add unit tests for branch validation (empty inputs, not found handling)
 - [x] 5.4 Add unit tests for protected branch filtering logic
 - [x] 5.5 Add unit tests for merged worktree identification
 - [x] 5.6 Add unit tests for dry-run mode
@@ -84,3 +84,12 @@
 - [x] 7.14 Add E2E test for confirmation prompt with `--all --delete-branches` (stdin "y" acceptance)
 - [x] 7.15 Add E2E test for confirmation cancellation ("n" and empty response)
 - [x] 7.16 Add E2E test for `--force` bypassing confirmation prompt
+
+## 8. Documentation
+
+- [x] 8.1 Add `prune` command to README.md Quick Start examples
+- [x] 8.2 Add `prune` command specification to `cmd/AGENTS.md`
+- [x] 8.3 Document prune-related domain types in `internal/domain/AGENTS.md` (PruneWorktreesRequest, PruneWorktreesResult, PruneWorktreeResult, ProtectedBranchError, ProtectedBranches config)
+- [x] 8.4 Add prune request/result types to `internal/application/AGENTS.md` Request/Result Patterns section
+- [x] 8.5 Update `internal/infrastructure/AGENTS.md` with DeleteBranch routing and CLIClient interface (done during verification)
+- [x] 8.6 Update `openspec/changes/prune-command/design.md` Decision 3 to reflect CLIClient choice (done during verification)

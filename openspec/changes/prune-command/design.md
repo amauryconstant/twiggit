@@ -63,20 +63,19 @@ Architecture constraints:
 - No protection at all: Risky for production deployments
 - Check if branch is default branch of remote: Adds network dependency, overkill
 
-### 3. Branch Deletion: GoGitClient via go-git
+### 3. Branch Deletion: CLIClient via git CLI
 
-**Choice:** Implement `DeleteBranch()` in GoGitClient using go-git's `repo.Storer.DeleteReference()`
+**Choice:** Implement `DeleteBranch()` in CLIClient using `git branch -D`
 
 **Rationale:**
-- Aligns with infrastructure guide: GoGitClient for branch operations, CLIClient for worktree operations
-- Deterministic and portable (no CLI fallback ambiguity)
-- Already using go-git for `ListBranches()`, `BranchExists()`, `GetRepositoryStatus()`
-- Faster than spawning CLI process for each branch deletion
-- Consistent with structured error handling patterns
+- go-git cannot delete branches that are referenced by worktrees (returns error about "refs/heads/... being worktree's HEAD")
+- Git CLI handles worktree-referenced branches correctly after worktree deletion
+- Aligns with CLIClient's existing role for worktree-related operations
+- Structured error handling with `GitWorktreeError` type
 
 **Alternatives considered:**
-- Use CLI (`git branch -d <branch>`): Requires additional CLI routing logic
-- Use CLI for consistency with worktree ops: Mixing responsibilities, breaks deterministic routing guide
+- Use GoGitClient with go-git's `DeleteReference()`: Fails when branch is worktree HEAD, requires fallback anyway
+- Implement in both clients with routing: Adds complexity, worktree-aware branches always need CLI
 - Don't delete branches at all: Requires manual cleanup after pruning worktrees
 
 ### 4. Confirmation Prompt: Bulk Mode Only

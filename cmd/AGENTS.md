@@ -64,6 +64,20 @@ Flags: `--check`, `-f, --force`, `--dry-run`, `--shell <bash|zsh|fish>` (alphabe
 Behavior: Auto-detects shell/config file from SHELL env var, generates wrapper, adds to shell config
 Usage: `twiggit init` | `twiggit init ~/.bashrc` | `twiggit init --shell=zsh`
 
+### prune
+Purpose: Delete merged worktrees for post-merge cleanup
+Args: `[project/branch]` (optional, specific worktree to prune)
+Flags: `-n, --dry-run`, `-f, --force`, `--delete-branches`, `-a, --all`
+Behavior:
+- Context-aware: Infers project from current directory (worktree > project > outside git)
+- `--dry-run`: Preview what would be deleted without making changes
+- `--force`: Bypass uncommitted changes safety check and bulk confirmation
+- `--delete-branches`: Also delete corresponding git branches after worktree removal
+- `--all`: Prune across all projects (requires confirmation unless --force)
+- Protected branches (main, master, develop, staging, production) are never deleted
+- Outputs navigation path to stdout for single-worktree prune (for shell wrapper)
+Navigation: Single worktree prune outputs project directory path; bulk prune outputs nothing
+
 ## Verbose Output
 
 Commands use `logv()` helper function for verbose output. See `cmd/util.go`.

@@ -28,6 +28,17 @@ type WorktreeInfo struct {
     Branch string
     Status string
 }
+
+type PruneWorktreesResult struct {
+    DeletedWorktrees       []*PruneWorktreeResult
+    SkippedWorktrees       []*PruneWorktreeResult
+    ProtectedSkipped       []*PruneWorktreeResult
+    UnmergedSkipped        []*PruneWorktreeResult
+    TotalDeleted           int
+    TotalSkipped           int
+    TotalBranchesDeleted   int
+    NavigationPath         string
+}
 ```
 
 ## Dependency Injection Pattern
