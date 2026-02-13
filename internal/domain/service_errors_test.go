@@ -243,3 +243,22 @@ func (s *ServiceErrorsTestSuite) TestServiceError_Unwrap() {
 	err := NewServiceError("Service", "Operation", "message", cause)
 	s.Equal(cause, err.Unwrap())
 }
+
+func (s *ServiceErrorsTestSuite) TestProtectedBranchError_Error() {
+	err := NewProtectedBranchError("main", []string{"main", "master", "develop"})
+	msg := err.Error()
+
+	s.Contains(msg, "cannot delete protected branch")
+	s.Contains(msg, "main")
+	s.Contains(msg, "main")
+	s.Contains(msg, "master")
+	s.Contains(msg, "develop")
+}
+
+func (s *ServiceErrorsTestSuite) TestProtectedBranchError_EmptyProtectedList() {
+	err := NewProtectedBranchError("feature", []string{})
+	msg := err.Error()
+
+	s.Contains(msg, "cannot delete protected branch")
+	s.Contains(msg, "feature")
+}

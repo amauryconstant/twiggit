@@ -125,6 +125,12 @@ func (m *MockCLIClient) IsBranchMerged(ctx context.Context, repoPath, branchName
 	return args.Bool(0), args.Error(1)
 }
 
+// DeleteBranch mocks deleting a branch
+func (m *MockCLIClient) DeleteBranch(ctx context.Context, repoPath, branchName string) error {
+	args := m.Called(ctx, repoPath, branchName)
+	return args.Error(0)
+}
+
 // MockGitService implements infrastructure.GitClient for testing
 type MockGitService struct {
 	*MockGoGitClient

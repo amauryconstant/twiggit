@@ -21,6 +21,7 @@ func (s *ConfigTestSuite) TestDefaultConfig() {
 	s.NotEmpty(config.ProjectsDirectory)
 	s.NotEmpty(config.WorktreesDirectory)
 	s.Equal("main", config.DefaultSourceBranch)
+	s.Equal([]string{"main", "master", "develop", "staging", "production"}, config.Validation.ProtectedBranches)
 }
 
 func (s *ConfigTestSuite) TestValidate() {

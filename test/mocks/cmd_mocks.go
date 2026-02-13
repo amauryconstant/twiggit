@@ -57,6 +57,15 @@ func (m *MockWorktreeService) ValidateWorktree(ctx context.Context, worktreePath
 	return args.Error(0)
 }
 
+// PruneMergedWorktrees mocks pruning merged worktrees
+func (m *MockWorktreeService) PruneMergedWorktrees(ctx context.Context, req *domain.PruneWorktreesRequest) (*domain.PruneWorktreesResult, error) {
+	args := m.Called(ctx, req)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.PruneWorktreesResult), args.Error(1)
+}
+
 // MockProjectService is a mock implementation of application.ProjectService
 type MockProjectService struct {
 	mock.Mock

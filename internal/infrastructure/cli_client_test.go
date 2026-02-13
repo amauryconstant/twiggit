@@ -297,6 +297,76 @@ func TestCLIClient_IsBranchMerged(t *testing.T) {
 	}
 }
 
+func TestCLIClient_DeleteBranch(t *testing.T) {
+	tests := []struct {
+		name        string
+		repoPath    string
+		branchName  string
+		mockResult  *CommandResult
+		mockError   error
+		expectErr   bool
+		errContains string
+	}{
+		{
+			name:       "successful deletion",
+			repoPath:   "/test/repo",
+			branchName: "feature-branch",
+			mockResult: &CommandResult{ExitCode: 0, Stdout: "", Stderr: ""},
+			expectErr:  false,
+		},
+		{
+			name:        "empty repo path",
+			repoPath:    "",
+			branchName:  "feature",
+			expectErr:   true,
+			errContains: "repository path cannot be empty",
+		},
+		{
+			name:        "empty branch name",
+			repoPath:    "/test/repo",
+			branchName:  "",
+			expectErr:   true,
+			errContains: "branch name cannot be empty",
+		},
+		{
+			name:       "branch not found - idempotent",
+			repoPath:   "/test/repo",
+			branchName: "non-existent",
+			mockResult: &CommandResult{ExitCode: 1, Stdout: "", Stderr: "error: branch 'non-existent' not found"},
+			expectErr:  false,
+		},
+		{
+			name:        "git command fails",
+			repoPath:    "/test/repo",
+			branchName:  "feature",
+			mockResult:  &CommandResult{ExitCode: 1, Stdout: "", Stderr: "error: some error"},
+			expectErr:   true,
+			errContains: "git branch -D failed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockExecutor := NewMockCommandExecutor()
+			if tt.repoPath != "" && tt.branchName != "" {
+				mockExecutor.On("ExecuteWithTimeout", mock.Anything, tt.repoPath, "git", mock.AnythingOfType("time.Duration"), []string{"branch", "-D", tt.branchName}).Return(tt.mockResult, tt.mockError)
+			}
+			client := NewCLIClient(mockExecutor)
+
+			err := client.DeleteBranch(context.Background(), tt.repoPath, tt.branchName)
+
+			if tt.expectErr {
+				require.Error(t, err)
+				if tt.errContains != "" {
+					assert.Contains(t, err.Error(), tt.errContains)
+				}
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestCLIClient_Timeout(t *testing.T) {
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "list", "--porcelain"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)

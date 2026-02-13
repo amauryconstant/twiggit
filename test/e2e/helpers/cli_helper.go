@@ -5,6 +5,7 @@ package helpers
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -108,6 +109,41 @@ func (cli *TwiggitCLI) RunWithDir(dir string, args ...string) *gexec.Session {
 	command.Env = env
 
 	// Create and start the session
+	session, err := gexec.Start(command, nil, nil)
+	Expect(err).NotTo(HaveOccurred())
+
+	return session
+}
+
+// RunWithStdin executes the twiggit CLI with stdin input for interactive prompts
+func (cli *TwiggitCLI) RunWithStdin(stdin io.Reader, args ...string) *gexec.Session {
+	command := exec.Command(cli.binaryPath, args...)
+	command.Stdin = stdin
+
+	env := os.Environ()
+	for key, value := range cli.env {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+	command.Env = env
+
+	session, err := gexec.Start(command, nil, nil)
+	Expect(err).NotTo(HaveOccurred())
+
+	return session
+}
+
+// RunWithStdinAndDir executes the twiggit CLI with stdin from a specific directory
+func (cli *TwiggitCLI) RunWithStdinAndDir(dir string, stdin io.Reader, args ...string) *gexec.Session {
+	command := exec.Command(cli.binaryPath, args...)
+	command.Dir = dir
+	command.Stdin = stdin
+
+	env := os.Environ()
+	for key, value := range cli.env {
+		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+	command.Env = env
+
 	session, err := gexec.Start(command, nil, nil)
 	Expect(err).NotTo(HaveOccurred())
 

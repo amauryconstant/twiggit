@@ -272,6 +272,78 @@ func (f *E2ETestFixture) CreateWorktreeSetup(projectName string) *CreateWorktree
 	}
 }
 
+// CreateMergedWorktreeSetup creates a project with a worktree whose branch is already merged to main
+// This is used for prune tests that need worktrees which will actually be deleted
+func (f *E2ETestFixture) CreateMergedWorktreeSetup(projectName string) *CreateWorktreeSetupResult {
+	projectsDir := filepath.Join(f.tempDir, "projects")
+	err := os.MkdirAll(projectsDir, FilePermAll)
+	Expect(err).NotTo(HaveOccurred())
+
+	projectPath := filepath.Join(projectsDir, projectName)
+	err = extractRepoFixtureToDir("single-branch", projectPath)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract fixture to project directory")
+
+	f.projects[projectName] = &ProjectInfo{
+		Name: projectName,
+		Path: projectPath,
+	}
+
+	worktreesDir := filepath.Join(f.tempDir, "worktrees")
+
+	// Update in-memory config paths
+	f.configHelper.WithProjectsDir(projectsDir)
+	f.configHelper.WithWorktreesDir(worktreesDir)
+
+	// Generate branch names
+	feature1Branch := f.testID.BranchName("merged-feature-1")
+	feature2Branch := f.testID.BranchName("merged-feature-2")
+
+	// Create worktree 1 with feature branch
+	worktree1Path := filepath.Join(worktreesDir, projectName, feature1Branch)
+	_, err = f.gitExecutor.Execute(
+		context.Background(),
+		projectPath,
+		"git", "worktree", "add", "-b", feature1Branch, worktree1Path,
+	)
+	Expect(err).NotTo(HaveOccurred(), "Failed to create worktree for merged-feature-1")
+	f.createdWorktrees = append(f.createdWorktrees, worktree1Path)
+	f.TrackWorktree(worktree1Path, projectPath)
+
+	// Create worktree 2 with feature branch
+	worktree2Path := filepath.Join(worktreesDir, projectName, feature2Branch)
+	_, err = f.gitExecutor.Execute(
+		context.Background(),
+		projectPath,
+		"git", "worktree", "add", "-b", feature2Branch, worktree2Path,
+	)
+	Expect(err).NotTo(HaveOccurred(), "Failed to create worktree for merged-feature-2")
+	f.createdWorktrees = append(f.createdWorktrees, worktree2Path)
+	f.TrackWorktree(worktree2Path, projectPath)
+
+	// Merge feature branches into main so they're "merged" and can be pruned
+	_, err = f.gitExecutor.Execute(
+		context.Background(),
+		projectPath,
+		"git", "merge", feature1Branch, "--no-edit",
+	)
+	Expect(err).NotTo(HaveOccurred(), "Failed to merge feature-1 into main")
+
+	_, err = f.gitExecutor.Execute(
+		context.Background(),
+		projectPath,
+		"git", "merge", feature2Branch, "--no-edit",
+	)
+	Expect(err).NotTo(HaveOccurred(), "Failed to merge feature-2 into main")
+
+	// Rebuild config file
+	f.configHelper.Build()
+
+	return &CreateWorktreeSetupResult{
+		Feature1Branch: feature1Branch,
+		Feature2Branch: feature2Branch,
+	}
+}
+
 // CreateCustomBranchSetup creates a project with custom default branch
 func (f *E2ETestFixture) CreateCustomBranchSetup(projectName, defaultBranch string) *E2ETestFixture {
 	projectPath := f.SetupSingleProject(projectName).GetProjectPath(projectName)

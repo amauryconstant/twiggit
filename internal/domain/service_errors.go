@@ -257,3 +257,21 @@ func NewConflictError(resource, identifier, operation, message string, cause err
 		Cause:      cause,
 	}
 }
+
+// ProtectedBranchError represents an error when attempting to delete a protected branch
+type ProtectedBranchError struct {
+	BranchName        string   // Branch name that is protected
+	ProtectedBranches []string // List of all protected branches
+}
+
+func (e *ProtectedBranchError) Error() string {
+	return fmt.Sprintf("cannot delete protected branch: %s (protected branches: %v)", e.BranchName, e.ProtectedBranches)
+}
+
+// NewProtectedBranchError creates a new protected branch error
+func NewProtectedBranchError(branchName string, protectedBranches []string) *ProtectedBranchError {
+	return &ProtectedBranchError{
+		BranchName:        branchName,
+		ProtectedBranches: protectedBranches,
+	}
+}

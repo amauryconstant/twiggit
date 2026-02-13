@@ -58,6 +58,9 @@ type CLIClient interface {
 
 	// IsBranchMerged checks if a branch is merged into the current branch
 	IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error)
+
+	// DeleteBranch deletes a branch using git CLI (handles worktree-referenced branches)
+	DeleteBranch(ctx context.Context, repoPath, branchName string) error
 }
 
 // ShellInfrastructure defines low-level shell infrastructure operations

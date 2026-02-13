@@ -50,6 +50,7 @@ across multiple projects.`,
 	cmd.AddCommand(NewListCommand(config))
 	cmd.AddCommand(NewCreateCommand(config))
 	cmd.AddCommand(NewDeleteCommand(config))
+	cmd.AddCommand(NewPruneCommand(config))
 	cmd.AddCommand(NewCDCommand(config))
 	cmd.AddCommand(NewInitCmd(config))
 	cmd.AddCommand(NewVersionCommand(config))

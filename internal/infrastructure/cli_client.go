@@ -200,6 +200,31 @@ func (c *CLIClientImpl) PruneWorktrees(ctx context.Context, repoPath string) err
 	return nil
 }
 
+// DeleteBranch deletes a branch using git CLI (handles worktree-referenced branches)
+func (c *CLIClientImpl) DeleteBranch(ctx context.Context, repoPath, branchName string) error {
+	if repoPath == "" {
+		return domain.NewGitWorktreeError("", branchName, "repository path cannot be empty", nil)
+	}
+	if branchName == "" {
+		return domain.NewGitWorktreeError("", "", "branch name cannot be empty", nil)
+	}
+
+	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, "branch", "-D", branchName)
+	if err != nil {
+		return domain.NewGitWorktreeError("", branchName, "failed to delete branch", err)
+	}
+
+	if result.ExitCode != 0 {
+		if strings.Contains(result.Stderr, "not found") {
+			return nil
+		}
+		return domain.NewGitWorktreeError("", branchName,
+			"git branch -D failed: "+result.Stderr, nil)
+	}
+
+	return nil
+}
+
 // IsBranchMerged checks if a branch is merged into the current branch
 func (c *CLIClientImpl) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
 	// Validate input
@@ -225,8 +250,9 @@ func (c *CLIClientImpl) IsBranchMerged(ctx context.Context, repoPath, branchName
 	mergedBranches := strings.Split(result.Stdout, "\n")
 	for _, branch := range mergedBranches {
 		trimmed := strings.TrimSpace(branch)
-		// Remove leading asterisk if present (indicates current branch)
+		// Remove leading markers: * (current branch), + (branch in another worktree)
 		trimmed = strings.TrimPrefix(trimmed, "*")
+		trimmed = strings.TrimPrefix(trimmed, "+")
 		trimmed = strings.TrimSpace(trimmed)
 		if trimmed == branchName {
 			return true, nil

@@ -37,9 +37,10 @@ type ServiceConfig struct {
 
 // ValidationConfig holds validation-specific configuration
 type ValidationConfig struct {
-	StrictBranchNames    bool `toml:"strict_branch_names" koanf:"strict_branch_names"`
-	RequireCleanWorktree bool `toml:"require_clean_worktree" koanf:"require_clean_worktree"`
-	AllowForceDelete     bool `toml:"allow_force_delete" koanf:"allow_force_delete"`
+	StrictBranchNames    bool     `toml:"strict_branch_names" koanf:"strict_branch_names"`
+	RequireCleanWorktree bool     `toml:"require_clean_worktree" koanf:"require_clean_worktree"`
+	AllowForceDelete     bool     `toml:"allow_force_delete" koanf:"allow_force_delete"`
+	ProtectedBranches    []string `toml:"protected_branches" koanf:"protected_branches"`
 }
 
 // NavigationConfig holds navigation-specific configuration
@@ -142,6 +143,7 @@ func DefaultConfig() *Config {
 			StrictBranchNames:    true,
 			RequireCleanWorktree: true,
 			AllowForceDelete:     false,
+			ProtectedBranches:    []string{"main", "master", "develop", "staging", "production"},
 		},
 		Navigation: NavigationConfig{
 			EnableSuggestions: true,

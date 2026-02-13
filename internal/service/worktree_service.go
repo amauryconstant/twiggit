@@ -389,3 +389,208 @@ func (s *worktreeService) isWorktreeInProject(ctx context.Context, worktreePath 
 	}
 	return false
 }
+
+func (s *worktreeService) PruneMergedWorktrees(ctx context.Context, req *domain.PruneWorktreesRequest) (*domain.PruneWorktreesResult, error) {
+	if err := s.validatePruneRequest(req); err != nil {
+		return nil, err
+	}
+
+	var projects []*domain.ProjectInfo
+	var err error
+
+	if req.AllProjects {
+		projects, err = s.projectService.ListProjects(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list projects: %w", err)
+		}
+	} else if req.SpecificWorktree != "" {
+		parts := strings.Split(req.SpecificWorktree, "/")
+		if len(parts) != 2 {
+			return nil, domain.NewValidationError("PruneWorktreesRequest", "SpecificWorktree", req.SpecificWorktree, "must be in format project/branch")
+		}
+		project, err := s.projectService.DiscoverProject(ctx, parts[0], req.Context)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve project: %w", err)
+		}
+		projects = []*domain.ProjectInfo{project}
+	} else {
+		projectName := req.ProjectName
+		if projectName == "" && req.Context != nil {
+			projectName = req.Context.ProjectName
+		}
+		if projectName == "" {
+			project, err := s.projectService.GetProjectInfo(ctx, req.Context.Path)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get project info from context: %w", err)
+			}
+			projects = []*domain.ProjectInfo{project}
+		} else {
+			project, err := s.projectService.DiscoverProject(ctx, projectName, req.Context)
+			if err != nil {
+				return nil, fmt.Errorf("failed to resolve project: %w", err)
+			}
+			projects = []*domain.ProjectInfo{project}
+		}
+	}
+
+	result := &domain.PruneWorktreesResult{
+		DeletedWorktrees:     []*domain.PruneWorktreeResult{},
+		SkippedWorktrees:     []*domain.PruneWorktreeResult{},
+		ProtectedSkipped:     []*domain.PruneWorktreeResult{},
+		UnmergedSkipped:      []*domain.PruneWorktreeResult{},
+		TotalDeleted:         0,
+		TotalSkipped:         0,
+		TotalBranchesDeleted: 0,
+	}
+
+	singleWorktreeTarget := ""
+	if req.SpecificWorktree != "" {
+		parts := strings.Split(req.SpecificWorktree, "/")
+		singleWorktreeTarget = parts[1]
+	}
+
+	for _, project := range projects {
+		s.pruneProjectWorktrees(ctx, req, project, result, singleWorktreeTarget)
+	}
+
+	if len(result.DeletedWorktrees) == 1 && req.SpecificWorktree != "" {
+		projectName := strings.Split(req.SpecificWorktree, "/")[0]
+		projectPath := filepath.Join(s.config.ProjectsDirectory, projectName)
+		if _, statErr := os.Stat(projectPath); statErr == nil {
+			result.NavigationPath = projectPath
+		}
+	}
+
+	return result, nil
+}
+
+func (s *worktreeService) validatePruneRequest(req *domain.PruneWorktreesRequest) error {
+	if req.SpecificWorktree != "" && req.AllProjects {
+		return domain.NewValidationError("PruneWorktreesRequest", "AllProjects", "true", "cannot use --all with specific worktree")
+	}
+	return nil
+}
+
+func (s *worktreeService) pruneProjectWorktrees(ctx context.Context, req *domain.PruneWorktreesRequest, project *domain.ProjectInfo, result *domain.PruneWorktreesResult, singleWorktreeTarget string) {
+	worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath)
+	if err != nil {
+		return
+	}
+
+	cwd, _ := os.Getwd()
+
+	for _, wt := range worktrees {
+		if wt.Path == project.GitRepoPath {
+			continue
+		}
+
+		if singleWorktreeTarget != "" && wt.Branch != singleWorktreeTarget {
+			continue
+		}
+
+		pruneResult := &domain.PruneWorktreeResult{
+			ProjectName:   project.Name,
+			WorktreePath:  wt.Path,
+			BranchName:    wt.Branch,
+			Deleted:       false,
+			BranchDeleted: false,
+		}
+
+		if skip := s.checkWorktreeSkip(ctx, wt, project, cwd, req); skip != nil {
+			s.addSkippedResult(result, pruneResult, skip)
+			continue
+		}
+
+		s.deleteWorktreeAndBranch(ctx, project, wt, req, pruneResult, result)
+	}
+}
+
+type worktreeSkipResult struct {
+	reason   string
+	err      error
+	category string
+}
+
+func (s *worktreeService) checkWorktreeSkip(ctx context.Context, wt domain.WorktreeInfo, project *domain.ProjectInfo, cwd string, req *domain.PruneWorktreesRequest) *worktreeSkipResult {
+	if cwd != "" && (strings.HasPrefix(cwd, wt.Path+string(filepath.Separator)) || cwd == wt.Path) {
+		return &worktreeSkipResult{reason: "cannot prune current worktree", category: "current"}
+	}
+
+	if s.isProtectedBranch(wt.Branch) {
+		return &worktreeSkipResult{reason: "protected branch", category: "protected"}
+	}
+
+	isMerged, err := s.gitService.IsBranchMerged(ctx, project.GitRepoPath, wt.Branch)
+	if err != nil {
+		return &worktreeSkipResult{reason: "failed to check merge status", err: err, category: "skipped"}
+	}
+
+	if !isMerged {
+		return &worktreeSkipResult{reason: "branch not merged", category: "unmerged"}
+	}
+
+	if !req.Force && !req.DryRun {
+		status, err := s.gitService.GetRepositoryStatus(ctx, wt.Path)
+		if err == nil && !status.IsClean {
+			return &worktreeSkipResult{reason: "uncommitted changes (use --force to override)", category: "skipped"}
+		}
+	}
+
+	if req.DryRun {
+		return &worktreeSkipResult{reason: "dry run", category: "skipped"}
+	}
+
+	return nil
+}
+
+func (s *worktreeService) addSkippedResult(result *domain.PruneWorktreesResult, pruneResult *domain.PruneWorktreeResult, skip *worktreeSkipResult) {
+	pruneResult.SkipReason = skip.reason
+	pruneResult.Error = skip.err
+
+	switch skip.category {
+	case "current":
+		result.CurrentWorktreeSkipped = append(result.CurrentWorktreeSkipped, pruneResult)
+	case "protected":
+		result.ProtectedSkipped = append(result.ProtectedSkipped, pruneResult)
+	case "unmerged":
+		result.UnmergedSkipped = append(result.UnmergedSkipped, pruneResult)
+	default:
+		result.SkippedWorktrees = append(result.SkippedWorktrees, pruneResult)
+	}
+	result.TotalSkipped++
+}
+
+func (s *worktreeService) deleteWorktreeAndBranch(ctx context.Context, project *domain.ProjectInfo, wt domain.WorktreeInfo, req *domain.PruneWorktreesRequest, pruneResult *domain.PruneWorktreeResult, result *domain.PruneWorktreesResult) {
+	err := s.gitService.DeleteWorktree(ctx, project.GitRepoPath, wt.Path, req.Force)
+	if err != nil {
+		pruneResult.Error = err
+		result.SkippedWorktrees = append(result.SkippedWorktrees, pruneResult)
+		result.TotalSkipped++
+		return
+	}
+
+	pruneResult.Deleted = true
+	result.DeletedWorktrees = append(result.DeletedWorktrees, pruneResult)
+	result.TotalDeleted++
+
+	if req.DeleteBranches {
+		_ = s.gitService.PruneWorktrees(ctx, project.GitRepoPath)
+		err = s.gitService.DeleteBranch(ctx, project.GitRepoPath, wt.Branch)
+		if err != nil {
+			pruneResult.Error = fmt.Errorf("worktree deleted but branch deletion failed: %w", err)
+		} else {
+			pruneResult.BranchDeleted = true
+			result.TotalBranchesDeleted++
+		}
+	}
+}
+
+func (s *worktreeService) isProtectedBranch(branchName string) bool {
+	protectedBranches := s.config.Validation.ProtectedBranches
+	for _, protected := range protectedBranches {
+		if branchName == protected {
+			return true
+		}
+	}
+	return false
+}

@@ -43,6 +43,9 @@ type WorktreeService interface {
 
 	// ValidateWorktree validates that a worktree is properly configured
 	ValidateWorktree(ctx context.Context, worktreePath string) error
+
+	// PruneMergedWorktrees deletes merged worktrees with optional branch deletion
+	PruneMergedWorktrees(ctx context.Context, req *domain.PruneWorktreesRequest) (*domain.PruneWorktreesResult, error)
 }
 
 // ProjectService provides project discovery and management operations

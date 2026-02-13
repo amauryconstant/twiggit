@@ -133,3 +133,11 @@ func (c *CompositeGitClient) IsBranchMerged(ctx context.Context, repoPath, branc
 	}
 	return merged, nil
 }
+
+// DeleteBranch deletes a branch using the CLI client (handles worktree-referenced branches)
+func (c *CompositeGitClient) DeleteBranch(ctx context.Context, repoPath, branchName string) error {
+	if err := c.cliClient.DeleteBranch(ctx, repoPath, branchName); err != nil {
+		return domain.NewGitWorktreeError("", branchName, "failed to delete branch", err)
+	}
+	return nil
+}

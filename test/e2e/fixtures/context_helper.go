@@ -4,6 +4,7 @@
 package fixtures
 
 import (
+	"io"
 	"path/filepath"
 
 	"github.com/onsi/gomega/gexec"
@@ -48,6 +49,12 @@ func (h *ContextHelper) FromWorktreeDir(projectName, branch string, args ...stri
 // Use this to test commands that require explicit project names
 func (h *ContextHelper) FromOutsideGit(args ...string) *gexec.Session {
 	return h.cli.RunWithDir(h.fixture.GetTempDir(), args...)
+}
+
+// FromOutsideGitWithStdin runs command from outside git with stdin input
+// Use this for testing interactive prompts like confirmation dialogs
+func (h *ContextHelper) FromOutsideGitWithStdin(stdin io.Reader, args ...string) *gexec.Session {
+	return h.cli.RunWithStdinAndDir(h.fixture.GetTempDir(), stdin, args...)
 }
 
 // WithConfigDir returns a new ContextHelper with the specified config directory
