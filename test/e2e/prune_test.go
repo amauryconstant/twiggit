@@ -167,4 +167,25 @@ var _ = Describe("prune command", func() {
 			Eventually(session).Should(gexec.Exit(0))
 		})
 	})
+
+	Describe("navigation output", func() {
+		It("outputs project path to stdout for single-worktree prune", func() {
+			result := fixture.CreateMergedWorktreeSetup("testnav")
+			projectPath := fixture.GetProjectPath("testnav")
+
+			session := ctxHelper.FromOutsideGit("prune", "--force", "testnav/"+result.Feature1Branch)
+
+			Eventually(session).Should(gexec.Exit(0))
+			Eventually(session.Out).Should(gbytes.Say(projectPath))
+		})
+
+		It("does not output navigation path for bulk prune", func() {
+			_ = fixture.CreateMergedWorktreeSetup("testbulk")
+
+			session := ctxHelper.FromOutsideGit("prune", "--all", "--force")
+
+			Eventually(session).Should(gexec.Exit(0))
+			Consistently(session.Out).ShouldNot(gbytes.Say("projects"))
+		})
+	})
 })

@@ -84,6 +84,7 @@
 - [x] 7.14 Add E2E test for confirmation prompt with `--all --delete-branches` (stdin "y" acceptance)
 - [x] 7.15 Add E2E test for confirmation cancellation ("n" and empty response)
 - [x] 7.16 Add E2E test for `--force` bypassing confirmation prompt
+- [x] 7.17 Add E2E test for explicit navigation output assertion (single-worktree prune outputs project path to stdout)
 
 ## 8. Documentation
 
