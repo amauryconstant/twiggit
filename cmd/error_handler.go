@@ -1,9 +1,9 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"reflect"
 	"strings"
 
 	"twiggit/internal/domain"
@@ -78,23 +78,39 @@ func CategorizeError(err error) ErrorCategory {
 		return ErrorCategoryCobra
 	}
 
-	// Check for specific domain error types using reflection
-	errType := reflect.TypeOf(err)
-
-	switch errType {
-	case reflect.TypeOf(&domain.ValidationError{}):
+	// Check for specific domain error types using errors.As for wrapped error support
+	var validationErr *domain.ValidationError
+	if errors.As(err, &validationErr) {
 		return ErrorCategoryValidation
-	case reflect.TypeOf(&domain.WorktreeServiceError{}):
+	}
+
+	var worktreeServiceErr *domain.WorktreeServiceError
+	if errors.As(err, &worktreeServiceErr) {
 		return ErrorCategoryService
-	case reflect.TypeOf(&domain.ProjectServiceError{}):
+	}
+
+	var projectServiceErr *domain.ProjectServiceError
+	if errors.As(err, &projectServiceErr) {
 		return ErrorCategoryService
-	case reflect.TypeOf(&domain.ServiceError{}):
+	}
+
+	var serviceErr *domain.ServiceError
+	if errors.As(err, &serviceErr) {
 		return ErrorCategoryService
-	case reflect.TypeOf(&domain.GitRepositoryError{}):
+	}
+
+	var gitRepoErr *domain.GitRepositoryError
+	if errors.As(err, &gitRepoErr) {
 		return ErrorCategoryGit
-	case reflect.TypeOf(&domain.GitWorktreeError{}):
+	}
+
+	var gitWorktreeErr *domain.GitWorktreeError
+	if errors.As(err, &gitWorktreeErr) {
 		return ErrorCategoryGit
-	case reflect.TypeOf(&domain.GitCommandError{}):
+	}
+
+	var gitCmdErr *domain.GitCommandError
+	if errors.As(err, &gitCmdErr) {
 		return ErrorCategoryGit
 	}
 

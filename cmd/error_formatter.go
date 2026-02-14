@@ -36,8 +36,15 @@ func (ef *ErrorFormatter) registerFormatter(errorType error, formatter func(erro
 
 // Format formats an error according to its type using functional composition
 func (ef *ErrorFormatter) Format(err error) string {
-	if formatter, exists := ef.formatters[reflect.TypeOf(err)]; exists {
-		return formatter(err)
+	for errType, formatter := range ef.formatters {
+		// Create a pointer to a variable of the error type for errors.As
+		// e.g., for *domain.ValidationError, we need **domain.ValidationError
+		targetPtr := reflect.New(errType).Interface()
+		if errors.As(err, targetPtr) {
+			// Extract the matched error from the pointer
+			actualErr := reflect.ValueOf(targetPtr).Elem().Interface().(error)
+			return formatter(actualErr)
+		}
 	}
 	return formatGenericError(err)
 }
@@ -66,7 +73,7 @@ func formatValidationError(err error) string {
 		output.WriteString(fmt.Sprintf("Context: %s\n", context))
 	}
 
-	return strings.TrimSpace(output.String())
+	return output.String()
 }
 
 // formatWorktreeError formats WorktreeServiceError with emoji indicators
@@ -87,7 +94,7 @@ func formatWorktreeError(err error) string {
 	// Add helpful suggestion
 	output.WriteString("Hint: Use 'twiggit list' to see available worktrees\n")
 
-	return strings.TrimSpace(output.String())
+	return output.String()
 }
 
 // formatProjectError formats ProjectServiceError with emoji indicators
@@ -108,7 +115,7 @@ func formatProjectError(err error) string {
 	// Add helpful suggestion
 	output.WriteString("Hint: Use 'twiggit list --all' to see available projects\n")
 
-	return strings.TrimSpace(output.String())
+	return output.String()
 }
 
 // formatServiceError formats ServiceError with emoji indicators
@@ -134,10 +141,10 @@ func formatServiceError(err error) string {
 		output.WriteString("Hint: Check your configuration and try again\n")
 	}
 
-	return strings.TrimSpace(output.String())
+	return output.String()
 }
 
 // formatGenericError formats any error with basic plain text formatting
 func formatGenericError(err error) string {
-	return "Error: " + err.Error()
+	return fmt.Sprintf("Error: %s\n", err.Error())
 }
