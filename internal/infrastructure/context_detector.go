@@ -5,17 +5,42 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"time"
 
 	"twiggit/internal/domain"
 )
 
+type worktreeCacheEntry struct {
+	valid     bool
+	expiresAt time.Time
+}
+
 type contextDetector struct {
 	config *domain.Config
+	cache  map[string]worktreeCacheEntry
+	mu     sync.RWMutex
+	ttl    time.Duration
 }
 
 // NewContextDetector creates a new context detector
 func NewContextDetector(cfg *domain.Config) domain.ContextDetector {
-	return &contextDetector{config: cfg}
+	ttl := parseTTL(cfg.ContextDetection.CacheTTL, 5*time.Second)
+	return &contextDetector{
+		config: cfg,
+		cache:  make(map[string]worktreeCacheEntry),
+		ttl:    ttl,
+	}
+}
+
+func parseTTL(ttlStr string, defaultTTL time.Duration) time.Duration {
+	if ttlStr == "" {
+		return defaultTTL
+	}
+	if d, err := time.ParseDuration(ttlStr); err == nil {
+		return d
+	}
+	return defaultTTL
 }
 
 func (cd *contextDetector) DetectContext(dir string) (*domain.Context, error) {
@@ -124,25 +149,44 @@ func (cd *contextDetector) detectProjectContext(dir string) *domain.Context {
 }
 
 func (cd *contextDetector) isValidGitWorktree(dir string) bool {
+	now := time.Now()
+
+	cd.mu.RLock()
+	if entry, ok := cd.cache[dir]; ok && entry.expiresAt.After(now) {
+		cd.mu.RUnlock()
+		return entry.valid
+	}
+	cd.mu.RUnlock()
+
+	valid := cd.checkValidGitWorktree(dir)
+
+	cd.mu.Lock()
+	cd.cache[dir] = worktreeCacheEntry{
+		valid:     valid,
+		expiresAt: now.Add(cd.ttl),
+	}
+	cd.mu.Unlock()
+
+	return valid
+}
+
+func (cd *contextDetector) checkValidGitWorktree(dir string) bool {
 	gitPath := filepath.Join(dir, ".git")
 
-	// Check if .git exists and is a file (worktree indicator)
 	info, err := os.Stat(gitPath)
 	if err != nil {
 		return false
 	}
 
 	if !info.Mode().IsRegular() {
-		return false // Should be a regular file for worktrees
+		return false
 	}
 
-	// Read .git file to verify it's a worktree
 	content, err := os.ReadFile(gitPath)
 	if err != nil {
 		return false
 	}
 
-	// Worktree .git files contain: "gitdir: <path>"
 	return strings.Contains(string(content), "gitdir:")
 }
 

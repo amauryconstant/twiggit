@@ -585,6 +585,17 @@ func (m *mockProjectServiceForPrune) ListProjects(ctx context.Context) ([]*domai
 	return []*domain.ProjectInfo{}, nil
 }
 
+func (m *mockProjectServiceForPrune) ListProjectSummaries(ctx context.Context) ([]*domain.ProjectSummary, error) {
+	if m.project != nil {
+		return []*domain.ProjectSummary{{
+			Name:        m.project.Name,
+			Path:        m.project.Path,
+			GitRepoPath: m.project.GitRepoPath,
+		}}, nil
+	}
+	return []*domain.ProjectSummary{}, nil
+}
+
 func (m *mockProjectServiceForPrune) ValidateProject(ctx context.Context, path string) error {
 	return nil
 }

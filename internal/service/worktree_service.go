@@ -169,17 +169,17 @@ func (s *worktreeService) ListWorktrees(ctx context.Context, req *domain.ListWor
 
 // listAllProjects retrieves all available projects from the projects directory
 func (s *worktreeService) listAllProjects(ctx context.Context) ([]*domain.ProjectInfo, error) {
-	projects, err := s.projectService.ListProjects(ctx)
+	summaries, err := s.projectService.ListProjectSummaries(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list projects: %w", err)
 	}
 
-	result := make([]*domain.ProjectInfo, len(projects))
-	for i, project := range projects {
+	result := make([]*domain.ProjectInfo, len(summaries))
+	for i, summary := range summaries {
 		result[i] = &domain.ProjectInfo{
-			Name:        project.Name,
-			Path:        project.Path,
-			GitRepoPath: project.GitRepoPath,
+			Name:        summary.Name,
+			Path:        summary.Path,
+			GitRepoPath: summary.GitRepoPath,
 		}
 	}
 
@@ -376,7 +376,7 @@ func (s *worktreeService) findProjectByListing(ctx context.Context, worktreePath
 	}
 
 	for _, project := range projects {
-		if s.isWorktreeInProject(ctx, worktreePath, project) {
+		if s.isWorktreeInProject(worktreePath, project) {
 			return project, nil
 		}
 	}
@@ -384,13 +384,8 @@ func (s *worktreeService) findProjectByListing(ctx context.Context, worktreePath
 	return nil, domain.NewWorktreeServiceError(worktreePath, "", "findProjectByWorktree", "worktree not found in any project", nil)
 }
 
-func (s *worktreeService) isWorktreeInProject(ctx context.Context, worktreePath string, project *domain.ProjectInfo) bool {
-	worktrees, err := s.gitService.ListWorktrees(ctx, project.GitRepoPath)
-	if err != nil {
-		return false
-	}
-
-	for _, wt := range worktrees {
+func (s *worktreeService) isWorktreeInProject(worktreePath string, project *domain.ProjectInfo) bool {
+	for _, wt := range project.Worktrees {
 		if wt.Path == worktreePath {
 			return true
 		}
@@ -404,12 +399,19 @@ func (s *worktreeService) PruneMergedWorktrees(ctx context.Context, req *domain.
 	}
 
 	var projects []*domain.ProjectInfo
-	var err error
 
 	if req.AllProjects {
-		projects, err = s.projectService.ListProjects(ctx)
+		summaries, err := s.projectService.ListProjectSummaries(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list projects: %w", err)
+		}
+		projects = make([]*domain.ProjectInfo, len(summaries))
+		for i, summary := range summaries {
+			projects[i] = &domain.ProjectInfo{
+				Name:        summary.Name,
+				Path:        summary.Path,
+				GitRepoPath: summary.GitRepoPath,
+			}
 		}
 	} else if req.SpecificWorktree != "" {
 		parts := strings.Split(req.SpecificWorktree, "/")

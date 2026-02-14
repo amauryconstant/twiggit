@@ -121,6 +121,15 @@ func (m *MockProjectService) ListProjects(ctx context.Context) ([]*domain.Projec
 	return args.Get(0).([]*domain.ProjectInfo), args.Error(1)
 }
 
+// ListProjectSummaries mocks listing project summaries
+func (m *MockProjectService) ListProjectSummaries(ctx context.Context) ([]*domain.ProjectSummary, error) {
+	args := m.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domain.ProjectSummary), args.Error(1)
+}
+
 // GetProjectInfo mocks getting project info
 func (m *MockProjectService) GetProjectInfo(ctx context.Context, projectPath string) (*domain.ProjectInfo, error) {
 	args := m.Called(ctx, projectPath)

@@ -53,3 +53,10 @@ type ProjectInfo struct {
 	IsBare        bool
 	LastModified  time.Time
 }
+
+// ProjectSummary represents lightweight project information without expensive git data
+type ProjectSummary struct {
+	Name        string
+	Path        string
+	GitRepoPath string
+}

@@ -59,7 +59,7 @@ func (s *projectService) ValidateProject(_ context.Context, projectPath string) 
 	return nil
 }
 
-// ListProjects lists all available projects
+// ListProjects lists all available projects with full info (including worktrees)
 func (s *projectService) ListProjects(ctx context.Context) ([]*domain.ProjectInfo, error) {
 	projectsDir := s.config.ProjectsDirectory
 
@@ -79,6 +79,34 @@ func (s *projectService) ListProjects(ctx context.Context) ([]*domain.ProjectInf
 	}
 
 	return projects, nil
+}
+
+// ListProjectSummaries lists project names/paths without loading worktrees
+func (s *projectService) ListProjectSummaries(ctx context.Context) ([]*domain.ProjectSummary, error) {
+	projectsDir := s.config.ProjectsDirectory
+
+	gitDirs, err := infrastructure.FindGitRepositories(projectsDir, s.gitService)
+	if err != nil {
+		return nil, domain.NewProjectServiceError("", projectsDir, "ListProjectSummaries", "failed to scan for git repositories", err)
+	}
+
+	summaries := make([]*domain.ProjectSummary, 0, len(gitDirs))
+	for _, gitDir := range gitDirs {
+		if err := s.ValidateProject(ctx, gitDir.Path); err != nil {
+			continue
+		}
+
+		mainRepoPath := s.findMainRepoFromWorktree(gitDir.Path)
+		projectName := filepath.Base(mainRepoPath)
+
+		summaries = append(summaries, &domain.ProjectSummary{
+			Name:        projectName,
+			Path:        gitDir.Path,
+			GitRepoPath: mainRepoPath,
+		})
+	}
+
+	return summaries, nil
 }
 
 // GetProjectInfo retrieves detailed information about a project

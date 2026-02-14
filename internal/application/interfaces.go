@@ -65,8 +65,11 @@ type ProjectService interface {
 	// ValidateProject validates that a project is properly configured
 	ValidateProject(ctx context.Context, projectPath string) error
 
-	// ListProjects lists all available projects
+	// ListProjects lists all available projects with full info (including worktrees)
 	ListProjects(ctx context.Context) ([]*domain.ProjectInfo, error)
+
+	// ListProjectSummaries lists project names/paths without loading worktrees
+	ListProjectSummaries(ctx context.Context) ([]*domain.ProjectSummary, error)
 
 	// GetProjectInfo retrieves detailed information about a project
 	GetProjectInfo(ctx context.Context, projectPath string) (*domain.ProjectInfo, error)

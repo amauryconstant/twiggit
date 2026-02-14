@@ -31,6 +31,9 @@ func (s *WorktreeServiceTestSuite) SetupTest() {
 		Name:        "test-project",
 		Path:        "/path/to/project",
 		GitRepoPath: "/path/to/project/.git",
+		Worktrees: []*domain.WorktreeInfo{
+			{Path: "/path/to/worktree", Branch: "feature-branch", Commit: "abc123", IsBare: false},
+		},
 		Branches: []*domain.BranchInfo{
 			{Name: "main", IsCurrent: true},
 			{Name: "feature-branch", IsCurrent: false},
@@ -42,6 +45,13 @@ func (s *WorktreeServiceTestSuite) SetupTest() {
 
 func (s *WorktreeServiceTestSuite) configureMocks() {
 	s.projectService.On("ListProjects", mock.Anything).Return([]*domain.ProjectInfo{s.testProject}, nil).Maybe()
+
+	testSummary := &domain.ProjectSummary{
+		Name:        s.testProject.Name,
+		Path:        s.testProject.Path,
+		GitRepoPath: s.testProject.GitRepoPath,
+	}
+	s.projectService.On("ListProjectSummaries", mock.Anything).Return([]*domain.ProjectSummary{testSummary}, nil).Maybe()
 
 	s.projectService.On("DiscoverProject", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("*domain.Context")).Return(s.testProject, nil).Maybe()
 
@@ -659,7 +669,11 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_AllProjects() {
 		GitRepoPath: "/path/to/project2/.git",
 	}
 
-	s.projectService.On("ListProjects", mock.Anything).Return([]*domain.ProjectInfo{project1, project2}, nil).Once()
+	summaries := []*domain.ProjectSummary{
+		{Name: project1.Name, Path: project1.Path, GitRepoPath: project1.GitRepoPath},
+		{Name: project2.Name, Path: project2.Path, GitRepoPath: project2.GitRepoPath},
+	}
+	s.projectService.On("ListProjectSummaries", mock.Anything).Return(summaries, nil).Once()
 	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project1/.git").Return([]domain.WorktreeInfo{
 		{Path: "/path/to/wt1", Branch: "feature-1", Commit: "abc123"},
 	}, nil).Once()
