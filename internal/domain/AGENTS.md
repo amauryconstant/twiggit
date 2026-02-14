@@ -149,12 +149,6 @@ func (e *ValidationError) Error() string {
    - Includes resource type, identifier, operation
    - Pattern: `domain.NewConflictError(resource, identifier, operation, message, cause)`
 
-- **ProtectedBranchError**: Attempt to delete a protected branch
-   - Raised when prune/delete operations target protected branches
-   - Protected branches configured in `ValidationConfig.ProtectedBranches`
-   - Default: main, master, develop, staging, production
-   - Pattern: `domain.NewProtectedBranchError(branchName, protectedBranches)`
-
 ### Error Wrapping Rules
 
 1. **Domain constructors MUST return ValidationError for validation failures**

@@ -18,48 +18,6 @@ const (
 	ShellFish ShellType = "fish"
 )
 
-// Shell represents a shell with its configuration
-type Shell interface {
-	Type() ShellType
-	Path() string
-	Version() string
-}
-
-type shell struct {
-	shellType ShellType
-	path      string
-	version   string
-}
-
-// NewShell creates a new Shell instance with validation
-func NewShell(shellType ShellType, path, version string) (Shell, error) {
-	if !IsValidShellType(shellType) {
-		return nil, NewValidationError("NewShell", "shellType", string(shellType), "unsupported shell type").
-			WithSuggestions([]string{"Supported shells: bash, zsh, fish"})
-	}
-
-	return &shell{
-		shellType: shellType,
-		path:      path,
-		version:   version,
-	}, nil
-}
-
-// Type returns the shell type
-func (s *shell) Type() ShellType {
-	return s.shellType
-}
-
-// Path returns the shell path
-func (s *shell) Path() string {
-	return s.path
-}
-
-// Version returns the shell version
-func (s *shell) Version() string {
-	return s.version
-}
-
 // IsValidShellType checks if the shell type is supported
 func IsValidShellType(shellType ShellType) bool {
 	switch shellType {

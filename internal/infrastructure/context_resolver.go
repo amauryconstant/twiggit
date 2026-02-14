@@ -85,7 +85,7 @@ func NewContextResolver(cfg *domain.Config, gitService GitClient) domain.Context
 func (cr *contextResolver) ResolveIdentifier(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
 	// Handle empty identifier
 	if identifier == "" {
-		return nil, domain.NewContextDetectionError("", "empty identifier", nil)
+		return nil, domain.NewResolutionError("", "", "empty identifier", nil, nil)
 	}
 
 	switch ctx.Type {
@@ -136,9 +136,11 @@ func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identi
 
 	// Validate project name and branch name don't contain path traversal sequences
 	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
-		return nil, domain.NewContextDetectionError(
-			filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier),
+		return nil, domain.NewResolutionError(
+			identifier,
+			ctx.Path,
 			"project or branch name contains path traversal sequences",
+			[]string{"Use a valid project or branch name without '..' or path separators"},
 			nil,
 		)
 	}
@@ -241,9 +243,11 @@ func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, ident
 	if identifier == "main" {
 		// Validate project name doesn't contain path traversal sequences
 		if containsPathTraversal(ctx.ProjectName) {
-			return nil, domain.NewContextDetectionError(
-				filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName),
+			return nil, domain.NewResolutionError(
+				identifier,
+				ctx.Path,
 				"project name contains path traversal sequences",
+				[]string{"Use a valid project name without '..' or path separators"},
 				nil,
 			)
 		}
@@ -270,9 +274,11 @@ func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, ident
 
 	// Validate project name and branch name don't contain path traversal sequences
 	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
-		return nil, domain.NewContextDetectionError(
-			filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier),
+		return nil, domain.NewResolutionError(
+			identifier,
+			ctx.Path,
 			"project or branch name contains path traversal sequences",
+			[]string{"Use a valid project or branch name without '..' or path separators"},
 			nil,
 		)
 	}
@@ -335,9 +341,11 @@ func (cr *contextResolver) resolveFromOutsideGitContext(_ *domain.Context, ident
 
 	// Validate project name doesn't contain path traversal sequences
 	if containsPathTraversal(identifier) {
-		return nil, domain.NewContextDetectionError(
-			filepath.Join(cr.config.ProjectsDirectory, identifier),
+		return nil, domain.NewResolutionError(
+			identifier,
+			"",
 			"project name contains path traversal sequences",
+			[]string{"Use a valid project name without '..' or path separators"},
 			nil,
 		)
 	}
@@ -418,9 +426,11 @@ func (cr *contextResolver) discoverProjects() ([]ProjectRef, error) {
 func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*domain.ResolutionResult, error) {
 	// Check for path traversal before parsing
 	if containsPathTraversal(identifier) {
-		return nil, domain.NewContextDetectionError(
-			filepath.Join(cr.config.WorktreesDirectory, identifier),
+		return nil, domain.NewResolutionError(
+			identifier,
+			"",
 			"identifier contains path traversal sequences",
+			[]string{"Use format 'project/branch' with valid names"},
 			nil,
 		)
 	}

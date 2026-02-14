@@ -50,6 +50,11 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 	// Calculate worktree path
 	worktreePath := s.calculateWorktreePath(project.Name, req.BranchName)
 
+	// Check if worktree already exists
+	if _, err := os.Stat(worktreePath); err == nil {
+		return nil, domain.NewConflictError("worktree", req.BranchName, "CreateWorktree", "worktree already exists at "+worktreePath, nil)
+	}
+
 	// Ensure parent directories exist
 	parentDir := filepath.Dir(worktreePath)
 	if err := os.MkdirAll(parentDir, 0755); err != nil {

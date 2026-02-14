@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -39,7 +38,7 @@ func (s *navigationService) ResolvePath(_ context.Context, req *domain.ResolvePa
 	// Delegate to ContextResolver for consistency
 	result, err := s.contextService.ResolveIdentifierFromContext(req.Context, req.Target)
 	if err != nil {
-		return nil, fmt.Errorf("failed to resolve identifier: %w", err)
+		return nil, domain.NewNavigationServiceError(req.Target, req.Context.Path, "ResolvePath", "failed to resolve identifier", err)
 	}
 	return result, nil
 }
@@ -52,14 +51,14 @@ func (s *navigationService) ValidatePath(_ context.Context, path string) error {
 
 	// Check if path exists
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return fmt.Errorf("path does not exist: %s", path)
+		return domain.NewNavigationServiceError(path, "", "ValidatePath", "path does not exist", nil)
 	}
 
 	// Check if path is accessible
 	if !filepath.IsAbs(path) {
 		absPath, err := filepath.Abs(path)
 		if err != nil {
-			return fmt.Errorf("failed to resolve absolute path: %w", err)
+			return domain.NewNavigationServiceError(path, "", "ValidatePath", "failed to resolve absolute path", err)
 		}
 		path = absPath
 	}
@@ -67,11 +66,11 @@ func (s *navigationService) ValidatePath(_ context.Context, path string) error {
 	// Check if it's a directory
 	info, err := os.Stat(path)
 	if err != nil {
-		return fmt.Errorf("failed to access path: %w", err)
+		return domain.NewNavigationServiceError(path, "", "ValidatePath", "failed to access path", err)
 	}
 
 	if !info.IsDir() {
-		return fmt.Errorf("path is not a directory: %s", path)
+		return domain.NewNavigationServiceError(path, "", "ValidatePath", "path is not a directory", nil)
 	}
 
 	return nil
@@ -91,7 +90,7 @@ func (s *navigationService) GetNavigationSuggestions(_ context.Context, context 
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get completion suggestions: %w", err)
+		return nil, domain.NewNavigationServiceError(partial, "", "GetNavigationSuggestions", "failed to get completion suggestions", err)
 	}
 
 	// Filter suggestions based on context if needed
