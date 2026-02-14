@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -136,9 +137,17 @@ func (s *PathUtilsTestSuite) TestIsPathUnder() {
 			name:        "target outside base - parent",
 			base:        "/foo/bar",
 			target:      "/foo",
-			expected:    true,
+			expected:    false,
 			expectError: false,
 			description: "Target outside base (parent) should return false",
+		},
+		{
+			name:        "target is parent of base - rel equals dotdot",
+			base:        "/home/user/worktrees",
+			target:      "/home/user",
+			expected:    false,
+			expectError: false,
+			description: "Target is parent of base (rel == '..') should return false",
 		},
 		{
 			name:        "target outside base - sibling",
@@ -343,5 +352,62 @@ func (s *PathUtilsTestSuite) TestIsPathUnder_EdgeCases() {
 			s.Require().NoError(err)
 			s.Equal(tt.expected, result)
 		}
+	})
+}
+
+func (s *PathUtilsTestSuite) TestIsPathUnder_SymlinkTraversal() {
+	if runtime.GOOS == "windows" {
+		s.T().Skip("Skipping symlink test on Windows")
+	}
+
+	s.Run("symlink pointing outside base", func() {
+		tmpDir, err := os.MkdirTemp("", "pathutils-test-*")
+		s.Require().NoError(err)
+		defer os.RemoveAll(tmpDir)
+
+		baseDir := filepath.Join(tmpDir, "base")
+		outsideDir := filepath.Join(tmpDir, "outside")
+		s.Require().NoError(os.MkdirAll(baseDir, 0755))
+		s.Require().NoError(os.MkdirAll(outsideDir, 0755))
+
+		symlinkPath := filepath.Join(baseDir, "link")
+		s.Require().NoError(os.Symlink(outsideDir, symlinkPath))
+
+		result, err := IsPathUnder(baseDir, symlinkPath)
+		s.Require().NoError(err)
+		s.False(result, "symlink pointing outside base should return false")
+	})
+
+	s.Run("symlink pointing inside base", func() {
+		tmpDir, err := os.MkdirTemp("", "pathutils-test-*")
+		s.Require().NoError(err)
+		defer os.RemoveAll(tmpDir)
+
+		baseDir := filepath.Join(tmpDir, "base")
+		subDir := filepath.Join(baseDir, "subdir")
+		s.Require().NoError(os.MkdirAll(subDir, 0755))
+
+		symlinkPath := filepath.Join(baseDir, "link")
+		s.Require().NoError(os.Symlink(subDir, symlinkPath))
+
+		result, err := IsPathUnder(baseDir, symlinkPath)
+		s.Require().NoError(err)
+		s.True(result, "symlink pointing inside base should return true")
+	})
+
+	s.Run("broken symlink should not error", func() {
+		tmpDir, err := os.MkdirTemp("", "pathutils-test-*")
+		s.Require().NoError(err)
+		defer os.RemoveAll(tmpDir)
+
+		baseDir := filepath.Join(tmpDir, "base")
+		s.Require().NoError(os.MkdirAll(baseDir, 0755))
+
+		symlinkPath := filepath.Join(baseDir, "broken-link")
+		s.Require().NoError(os.Symlink("/nonexistent/path", symlinkPath))
+
+		result, err := IsPathUnder(baseDir, symlinkPath)
+		s.Require().NoError(err)
+		s.True(result, "broken symlink should be handled gracefully")
 	})
 }

@@ -316,10 +316,13 @@ func (s *worktreeService) validateDeleteRequest(req *domain.DeleteWorktreeReques
 }
 
 func (s *worktreeService) calculateWorktreePath(projectName, branchName string) string {
+	safeProjectName := filepath.Base(projectName)
+	safeProjectName = filepath.Clean(safeProjectName)
+
 	safeBranchName := filepath.Base(branchName)
 	safeBranchName = filepath.Clean(safeBranchName)
 
-	return filepath.Join(s.config.WorktreesDirectory, projectName, safeBranchName)
+	return filepath.Join(s.config.WorktreesDirectory, safeProjectName, safeBranchName)
 }
 
 func (s *worktreeService) findProjectByWorktree(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {

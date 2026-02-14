@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -38,14 +39,31 @@ func parseCrossProjectReference(identifier string) (project, branch string, vali
 }
 
 // containsPathTraversal checks if a string contains path traversal sequences
+// Handles literal "..", URL-encoded variants (all cases), and double-encoding
 func containsPathTraversal(s string) bool {
-	cleaned := filepath.Clean(s)
-	if cleaned != s {
+	if strings.Contains(s, "..") {
 		return true
 	}
-	return strings.Contains(s, "..") ||
-		strings.Contains(s, "%2e%2e") ||
-		strings.Contains(s, "%2E%2E")
+
+	cleaned := filepath.Clean(s)
+	if cleaned != s && strings.Contains(cleaned, "..") {
+		return true
+	}
+
+	decoded, err := url.QueryUnescape(s)
+	if err == nil && decoded != s {
+		if strings.Contains(decoded, "..") {
+			return true
+		}
+		doubleDecoded, err := url.QueryUnescape(decoded)
+		if err == nil && doubleDecoded != decoded {
+			if strings.Contains(doubleDecoded, "..") {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // buildWorktreePath builds the path to a worktree for a given project and branch

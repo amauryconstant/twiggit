@@ -67,6 +67,27 @@ func (s *ValidationTestSuite) TestValidateProjectName_ValidProject() {
 	s.True(result.Value)
 }
 
+func (s *ValidationTestSuite) TestValidateProjectName_PathTraversal() {
+	pathTraversalCases := []string{
+		"..",
+		"../",
+		"../etc",
+		"..project",
+		"project..",
+		"project/../other",
+		"../project",
+	}
+
+	for _, projectName := range pathTraversalCases {
+		s.Run(projectName, func() {
+			result := ValidateProjectName(projectName)
+
+			s.False(result.IsSuccess(), "Project name %q should fail validation", projectName)
+			s.Contains(result.Error.Error(), "invalid")
+		})
+	}
+}
+
 func (s *ValidationTestSuite) TestValidateShellType_EmptyShell() {
 	result := ValidateShellType("")
 

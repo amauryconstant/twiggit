@@ -152,11 +152,23 @@ func ValidateProjectNameFormat(projectName string) Result[bool] {
 	return NewResult(true)
 }
 
+// ValidateProjectNamePathTraversal checks if project name contains path traversal sequences
+func ValidateProjectNamePathTraversal(projectName string) Result[bool] {
+	if strings.Contains(projectName, "..") {
+		return NewErrorResult[bool](
+			NewValidationError("Validation", "ProjectName", projectName, "project name contains invalid path traversal sequence").
+				WithSuggestions([]string{"Remove '..' from project name"}),
+		)
+	}
+	return NewResult(true)
+}
+
 // ValidateProjectName composes all project name validations
 func ValidateProjectName(projectName string) Result[bool] {
 	pipeline := NewValidationPipeline(
 		ValidateProjectNameNotEmpty,
 		ValidateProjectNameFormat,
+		ValidateProjectNamePathTraversal,
 	)
 	return pipeline.Validate(projectName)
 }

@@ -229,7 +229,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 			{"file outside base", baseDir, outsideFile, false},
 			{"directory outside base", baseDir, outsideDir, false},
 			{"same directory", baseDir, baseDir, true},
-			{"parent directory", subDir, baseDir, true}, // subDir is under baseDir
+			{"parent directory", subDir, baseDir, false}, // baseDir is parent of subDir, so baseDir is NOT under subDir
 		}
 
 		for _, tt := range tests {
@@ -295,7 +295,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 
 		result, err = infrastructure.IsPathUnder("base/sub", "base")
 		require.NoError(t, err)
-		assert.True(t, result) // "base" is parent of "base/sub", so "base" is under "base/sub"
+		assert.False(t, result) // "base" is parent of "base/sub", so "base" is NOT under "base/sub"
 
 		// Change to base directory
 		err = os.Chdir(baseDir)
@@ -352,7 +352,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 			{"cmd under project", projectRoot, cmdDir, true},
 			{"vendor under project", projectRoot, vendorDir, true},
 			{"test under project", projectRoot, testDir, true},
-			{"project under src", srcDir, projectRoot, true}, // srcDir is under projectRoot
+			{"project under src", srcDir, projectRoot, false}, // projectRoot is parent of srcDir, so projectRoot is NOT under srcDir
 			{"cmd under src", srcDir, cmdDir, false},
 			{"go.mod under project", projectRoot, filepath.Join(projectRoot, "go.mod"), true},
 			{"utils.go under pkg", pkgDir, filepath.Join(pkgDir, "utils.go"), true},

@@ -29,12 +29,46 @@ func NormalizePath(path string) (string, error) {
 }
 
 // IsPathUnder checks if target is under base directory
+// Resolves symlinks to prevent symlink-based path traversal attacks
 func IsPathUnder(base, target string) (bool, error) {
-	rel, err := filepath.Rel(base, target)
+	// Handle edge cases for empty paths
+	if base == "" && target == "" {
+		return true, nil
+	}
+	if base == "" {
+		return false, domain.NewContextDetectionError(target, "base path cannot be empty", nil)
+	}
+	if target == "" {
+		return false, domain.NewContextDetectionError(base, "target path cannot be empty", nil)
+	}
+
+	resolvedBase, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		resolvedBase = base
+	}
+
+	resolvedTarget, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		resolvedTarget = target
+	}
+
+	absBase, err := filepath.Abs(resolvedBase)
+	if err != nil {
+		return false, domain.NewContextDetectionError(target, "failed to get absolute path for base", err)
+	}
+
+	absTarget, err := filepath.Abs(resolvedTarget)
+	if err != nil {
+		return false, domain.NewContextDetectionError(target, "failed to get absolute path for target", err)
+	}
+
+	rel, err := filepath.Rel(absBase, absTarget)
 	if err != nil {
 		return false, domain.NewContextDetectionError(target, "failed to get relative path", err)
 	}
 
-	// Check if relative path starts with ".."
-	return !strings.HasPrefix(rel, ".."+string(filepath.Separator)), nil
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false, nil
+	}
+	return true, nil
 }

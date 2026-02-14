@@ -443,6 +443,38 @@ func (s *ContextResolverTestSuite) TestFilterSuggestions() {
 	}
 }
 
+func (s *ContextResolverTestSuite) TestContainsPathTraversal() {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{"literal dots", "..", true},
+		{"path with dots", "../etc/passwd", true},
+		{"lowercase URL-encoded", "%2e%2e", true},
+		{"uppercase URL-encoded", "%2E%2E", true},
+		{"mixed case URL-encoded", "%2e%2E", true},
+		{"mixed case URL-encoded v2", "%2E%2e", true},
+		{"double URL-encoded", "%252e%252e", true},
+		{"double URL-encoded uppercase", "%252E%252E", true},
+		{"URL-encoded with slash", "%2e%2e%2f", true},
+		{"valid branch name", "feature-branch", false},
+		{"valid project name", "my-project", false},
+		{"valid name with slash", "feature/branch", false},
+		{"valid name with dots elsewhere", "v1.2.3", false},
+		{"empty string", "", false},
+		{"single dot", ".", false},
+		{"URL-encoded single char", "%2e", false},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			result := containsPathTraversal(tt.input)
+			s.Equal(tt.expected, result)
+		})
+	}
+}
+
 func (s *ContextResolverTestSuite) TestPathTraversalProtection() {
 	tests := []struct {
 		name          string
@@ -586,6 +618,78 @@ func (s *ContextResolverTestSuite) TestPathTraversalProtection() {
 			identifier:  "other-project/feature-branch",
 			expectError: false,
 			description: "Normal cross-project reference should succeed",
+		},
+		{
+			name: "URL-encoded path traversal lowercase",
+			context: &domain.Context{
+				Type:        domain.ContextProject,
+				ProjectName: "test-project",
+				Path:        "/home/user/Projects/test-project",
+			},
+			identifier:    "%2e%2e",
+			expectError:   true,
+			errorContains: "path traversal sequences",
+			description:   "Lowercase URL-encoded .. should be rejected",
+		},
+		{
+			name: "URL-encoded path traversal uppercase",
+			context: &domain.Context{
+				Type:        domain.ContextProject,
+				ProjectName: "test-project",
+				Path:        "/home/user/Projects/test-project",
+			},
+			identifier:    "%2E%2E",
+			expectError:   true,
+			errorContains: "path traversal sequences",
+			description:   "Uppercase URL-encoded .. should be rejected",
+		},
+		{
+			name: "URL-encoded path traversal mixed case",
+			context: &domain.Context{
+				Type:        domain.ContextProject,
+				ProjectName: "test-project",
+				Path:        "/home/user/Projects/test-project",
+			},
+			identifier:    "%2e%2E",
+			expectError:   true,
+			errorContains: "path traversal sequences",
+			description:   "Mixed case URL-encoded .. should be rejected",
+		},
+		{
+			name: "double URL-encoded path traversal",
+			context: &domain.Context{
+				Type:        domain.ContextProject,
+				ProjectName: "test-project",
+				Path:        "/home/user/Projects/test-project",
+			},
+			identifier:    "%252e%252e",
+			expectError:   true,
+			errorContains: "path traversal sequences",
+			description:   "Double URL-encoded .. should be rejected",
+		},
+		{
+			name: "URL-encoded path traversal in project name",
+			context: &domain.Context{
+				Type:        domain.ContextWorktree,
+				ProjectName: "%2e%2e",
+				BranchName:  "current-branch",
+				Path:        "/home/user/Worktrees/test-project/current-branch",
+			},
+			identifier:    "main",
+			expectError:   true,
+			errorContains: "project name contains path traversal sequences",
+			description:   "URL-encoded path traversal in project name should be rejected",
+		},
+		{
+			name: "URL-encoded path traversal in cross-project reference",
+			context: &domain.Context{
+				Type: domain.ContextOutsideGit,
+				Path: "/home/user",
+			},
+			identifier:    "project/%2e%2e%2f%2e%2e",
+			expectError:   true,
+			errorContains: "path traversal sequences",
+			description:   "URL-encoded traversal in cross-project reference should be rejected",
 		},
 	}
 
