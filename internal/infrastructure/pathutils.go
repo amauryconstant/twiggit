@@ -7,6 +7,9 @@ import (
 	"twiggit/internal/domain"
 )
 
+// ExtractProjectFromWorktreePath extracts the project name from a worktree path.
+// Worktree paths follow the pattern: {worktreesDir}/{projectName}/{branchName}/...
+// Returns empty string if the path is not under the worktrees directory.
 func ExtractProjectFromWorktreePath(worktreePath, worktreesDir string) (projectName string, err error) {
 	cleanedWorktreesDir := filepath.Clean(worktreesDir)
 	if !strings.HasPrefix(worktreePath, cleanedWorktreesDir+string(filepath.Separator)) {
@@ -15,7 +18,7 @@ func ExtractProjectFromWorktreePath(worktreePath, worktreesDir string) (projectN
 
 	relPath, err := filepath.Rel(cleanedWorktreesDir, worktreePath)
 	if err != nil {
-		return "", err
+		return "", domain.NewContextDetectionError(worktreePath, "failed to get relative path from worktrees directory", err)
 	}
 
 	parts := strings.Split(relPath, string(filepath.Separator))

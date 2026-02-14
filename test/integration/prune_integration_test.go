@@ -9,12 +9,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
+	"twiggit/test/mocks"
 )
 
 type PruneIntegrationTestSuite struct {
@@ -59,13 +61,21 @@ func (s *PruneIntegrationTestSuite) setupTestRepo(projectName string) (repoPath 
 
 func (s *PruneIntegrationTestSuite) createWorktreeService(repoPath string) application.WorktreeService {
 	config := domain.DefaultConfig()
-	mockProjectService := &mockProjectServiceForPrune{
-		project: &domain.ProjectInfo{
-			Name:        "test-project",
-			Path:        repoPath,
-			GitRepoPath: repoPath,
-		},
+	projectInfo := &domain.ProjectInfo{
+		Name:        "test-project",
+		Path:        repoPath,
+		GitRepoPath: repoPath,
 	}
+	mockProjectService := mocks.NewMockProjectService()
+	mockProjectService.On("DiscoverProject", context.Background(), "test-project", mock.Anything).Return(projectInfo, nil)
+	mockProjectService.On("GetProjectInfo", context.Background(), repoPath).Return(projectInfo, nil)
+	mockProjectService.On("ListProjects", context.Background()).Return([]*domain.ProjectInfo{projectInfo}, nil)
+	mockProjectService.On("ListProjectSummaries", context.Background()).Return([]*domain.ProjectSummary{{
+		Name:        projectInfo.Name,
+		Path:        projectInfo.Path,
+		GitRepoPath: projectInfo.GitRepoPath,
+	}}, nil)
+	mockProjectService.On("ValidateProject", context.Background(), repoPath).Return(nil)
 	return service.NewWorktreeService(s.gitService, mockProjectService, config)
 }
 
@@ -485,13 +495,21 @@ func (s *PruneIntegrationTestSuite) TestNavigationOutput_SingleWorktreePrune() {
 
 	config := domain.DefaultConfig()
 	config.ProjectsDirectory = tempDir
-	mockProjectService := &mockProjectServiceForPrune{
-		project: &domain.ProjectInfo{
-			Name:        "test-repo",
-			Path:        repoPath,
-			GitRepoPath: repoPath,
-		},
+	projectInfo := &domain.ProjectInfo{
+		Name:        "test-repo",
+		Path:        repoPath,
+		GitRepoPath: repoPath,
 	}
+	mockProjectService := mocks.NewMockProjectService()
+	mockProjectService.On("DiscoverProject", context.Background(), "test-repo", mock.Anything).Return(projectInfo, nil)
+	mockProjectService.On("GetProjectInfo", context.Background(), repoPath).Return(projectInfo, nil)
+	mockProjectService.On("ListProjects", context.Background()).Return([]*domain.ProjectInfo{projectInfo}, nil)
+	mockProjectService.On("ListProjectSummaries", context.Background()).Return([]*domain.ProjectSummary{{
+		Name:        projectInfo.Name,
+		Path:        projectInfo.Path,
+		GitRepoPath: projectInfo.GitRepoPath,
+	}}, nil)
+	mockProjectService.On("ValidateProject", context.Background(), repoPath).Return(nil)
 	worktreeService := service.NewWorktreeService(s.gitService, mockProjectService, config)
 
 	req := &domain.PruneWorktreesRequest{
@@ -564,38 +582,4 @@ func (s *PruneIntegrationTestSuite) TestOperationSummary_CorrectTotals() {
 
 	s.Len(result.UnmergedSkipped, 1, "should have 1 unmerged skipped")
 	s.Equal("feature-summary-2", result.UnmergedSkipped[0].BranchName)
-}
-
-type mockProjectServiceForPrune struct {
-	project *domain.ProjectInfo
-}
-
-func (m *mockProjectServiceForPrune) DiscoverProject(ctx context.Context, name string, context *domain.Context) (*domain.ProjectInfo, error) {
-	return m.project, nil
-}
-
-func (m *mockProjectServiceForPrune) GetProjectInfo(ctx context.Context, path string) (*domain.ProjectInfo, error) {
-	return m.project, nil
-}
-
-func (m *mockProjectServiceForPrune) ListProjects(ctx context.Context) ([]*domain.ProjectInfo, error) {
-	if m.project != nil {
-		return []*domain.ProjectInfo{m.project}, nil
-	}
-	return []*domain.ProjectInfo{}, nil
-}
-
-func (m *mockProjectServiceForPrune) ListProjectSummaries(ctx context.Context) ([]*domain.ProjectSummary, error) {
-	if m.project != nil {
-		return []*domain.ProjectSummary{{
-			Name:        m.project.Name,
-			Path:        m.project.Path,
-			GitRepoPath: m.project.GitRepoPath,
-		}}, nil
-	}
-	return []*domain.ProjectSummary{}, nil
-}
-
-func (m *mockProjectServiceForPrune) ValidateProject(ctx context.Context, path string) error {
-	return nil
 }
