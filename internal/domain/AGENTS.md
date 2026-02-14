@@ -4,45 +4,44 @@ Layer: Business logic, entities, no external dependencies
 ## Context Types
 
 ```go
-type ContextType int
-
-const (
-    ContextUnknown ContextType = iota
-    ContextProject
-    ContextWorktree
-    ContextOutsideGit
-)
+type ContextType int // ContextUnknown, ContextProject, ContextWorktree, ContextOutsideGit
 
 type Context struct {
     Type        ContextType
     ProjectName string
-    BranchName  string // Only for ContextWorktree
+    BranchName  string  // Only for ContextWorktree
     Path        string
     Explanation string
 }
-```
 
-**Context detection**: See `internal/infrastructure/AGENTS.md` for rules and resolution.
+type PathType int // PathTypeUnknown, PathTypeProject, PathTypeWorktree, PathTypeOutside
 
-## Domain Model Pattern
-
-```go
-type Project struct {
-    name      string
-    path      string
-    worktrees []*Worktree
+type ResolutionResult struct {
+    TargetPath  string
+    TargetType  PathType
+    ProjectName string
+    BranchName  string
 }
 
-func NewProject(name, path string) (*Project, error) {
-    if name == "" {
-        return nil, &ValidationError{Field: "name", Message: "cannot be empty"}
-    }
-    return &Project{name: name, path: path, worktrees: []*Worktree{}}, nil
+type ResolutionSuggestion struct {
+    Identifier   string
+    DisplayText  string
+    ResourceType PathType
 }
-// Immutable: getters only, no setters
 ```
 
-## Prune Request/Result Types
+**Detection:** See `internal/infrastructure/AGENTS.md` for rules.
+
+## Core Types
+
+| Type | Fields | Purpose |
+|------|--------|---------|
+| ProjectInfo | Name, Path, GitRepoPath, Worktrees, Branches, Remotes, DefaultBranch, IsBare, LastModified | Full project data |
+| ProjectSummary | Name, Path, GitRepoPath | Lightweight listing |
+| WorktreeInfo | Path, Branch, Commit, IsBare, IsDetached, Modified | Worktree details |
+| Result[T] | Value, Error | Generic Result/Either pattern |
+
+## Prune Types
 
 ```go
 type PruneWorktreesRequest struct {
@@ -51,7 +50,7 @@ type PruneWorktreesRequest struct {
     DeleteBranches   bool
     DryRun           bool
     AllProjects      bool
-    SpecificWorktree string  // Format: "project/branch"
+    SpecificWorktree string  // "project/branch"
 }
 
 type PruneWorktreesResult struct {
@@ -60,158 +59,50 @@ type PruneWorktreesResult struct {
     ProtectedSkipped       []*PruneWorktreeResult
     UnmergedSkipped        []*PruneWorktreeResult
     CurrentWorktreeSkipped []*PruneWorktreeResult
-    TotalDeleted           int
-    TotalSkipped           int
-    TotalBranchesDeleted   int
-    NavigationPath         string  // Set for single-worktree prune
-}
-
-type PruneWorktreeResult struct {
-    ProjectName   string
-    WorktreePath  string
-    BranchName    string
-    Deleted       bool
-    BranchDeleted bool
-    SkipReason    string
-    Error         error
+    TotalDeleted, TotalSkipped, TotalBranchesDeleted int
+    NavigationPath string  // Single-worktree prune
 }
 ```
 
-## Validation Pipeline
-
-Functional validation in `validation.go`:
-- Composable validation rules
-- Returns `ValidationError` with field + message
-- Used in service layer before business logic
+## Validation
 
 ```go
-type ValidationError struct {
-    Field   string
-    Message string
-}
+type ValidationError struct { /* private fields */ }
 
-func (e *ValidationError) Error() string {
-    return fmt.Sprintf("validation error in field %s: %s", e.Field, e.Message)
-}
+func NewValidationError(request, field, value, message string) *ValidationError
+func (e *ValidationError) WithSuggestions([]string) *ValidationError  // immutable
+func (e *ValidationError) WithContext(string) *ValidationError         // immutable
+// Getters: Field(), Value(), Message(), Request(), Suggestions(), Context()
 ```
-
-## Error Handling
-
-### Domain Layer Error Types
-
-- **ValidationError**: Used for all validation failures across the domain layer
-  - Constructor validation (NewProject, NewWorktree, etc.)
-  - Config validation (Config.Validate)
-  - Shell validation (shell type inference)
-  - Pattern: `domain.NewValidationError("RequestType", "field", value, "message")`
-
-- **GitRepositoryError**: Git repository operation errors
-  - Repository access failures
-  - Branch listing failures
-  - Status retrieval failures
-  - Pattern: `domain.NewGitRepositoryError(path, "message", cause)`
-
-- **GitWorktreeError**: Git worktree operation errors
-  - Worktree creation/deletion failures
-  - Worktree listing failures
-  - Pattern: `domain.NewGitWorktreeError(worktreePath, branchName, "message", cause)`
-
-- **GitCommandError**: Git command execution errors (infrastructure layer, used as cause)
-  - Failed git CLI commands
-  - Non-zero exit codes
-  - Includes command, args, exit code, stdout, stderr
-  - Pattern: `domain.NewGitCommandError(command, args, exitCode, stdout, stderr, message, cause)`
-
-- **ContextDetectionError**: Context detection failures
-  - Directory access issues
-  - Invalid paths
-  - Pattern: `domain.NewContextDetectionError(path, "message", cause)`
-
-- **ServiceError**: General service operation errors
-  - Generic service failures
-  - Includes service name, operation name, message
-  - Pattern: `domain.NewServiceError(service, operation, message, cause)`
-
-- **ShellError**: Shell service errors
-  - Shell type validation failures
-  - Config file issues
-  - Wrapper generation/installation failures
-  - Pattern: `domain.NewShellError(code, shellType, context)`
-
-- **ResolutionError**: Path resolution errors
-  - Failed identifier resolution
-  - Invalid target paths
-  - Includes optional suggestions
-  - Pattern: `domain.NewResolutionError(target, context, message, suggestions, cause)`
-
-- **ConflictError**: Operation conflict errors
-   - Resource conflicts during operations
-   - Includes resource type, identifier, operation
-   - Pattern: `domain.NewConflictError(resource, identifier, operation, message, cause)`
-
-### Error Wrapping Rules
-
-1. **Domain constructors MUST return ValidationError for validation failures**
-   - Use `domain.NewValidationError()` instead of `errors.New()`
-   - Leverage `WithSuggestions()` for actionable guidance
-
-2. **All domain error types implement Unwrap() for error chain support**
-   - Use `%w` verb when wrapping errors
-   - Enables `errors.As()` and `errors.Is()` for error type checking
-
-3. **Error message format consistency**
-   - Use lowercase "failed to" consistently
-   - Include relevant context (path, branch, operation)
-   - Keep messages concise but informative
 
 ## Error Types
 
-```go
-type ContextDetectionError struct {
-    Path    string
-    Cause   error
-    Message string
-}
+| Type | Constructor | IsNotFound() |
+|------|-------------|--------------|
+| ValidationError | `NewValidationError(request, field, value, message)` | - |
+| GitRepositoryError | `NewGitRepositoryError(path, message, cause)` | ✅ |
+| GitWorktreeError | `NewGitWorktreeError(worktreePath, branchName, message, cause)` | ✅ |
+| GitCommandError | `NewGitCommandError(cmd, args, exitCode, stdout, stderr, msg, cause)` | - |
+| ConfigError | `NewConfigError(path, message, cause)` | - |
+| ContextDetectionError | `NewContextDetectionError(path, message, cause)` | - |
+| ServiceError | `NewServiceError(service, operation, message, cause)` | - |
+| WorktreeServiceError | `NewWorktreeServiceError(worktreePath, branchName, op, msg, cause)` | ✅ |
+| ProjectServiceError | `NewProjectServiceError(projectName, projectPath, op, msg, cause)` | - |
+| NavigationServiceError | `NewNavigationServiceError(target, ctx, op, msg, cause)` | - |
+| ShellError | `NewShellError(code, shellType, context)` or `NewShellErrorWithCause(..., cause)` | - |
+| ResolutionError | `NewResolutionError(target, ctx, msg, suggestions, cause)` | - |
+| ConflictError | `NewConflictError(resource, identifier, operation, message, cause)` | - |
 
-func (e *ContextDetectionError) Error() string {
-    return fmt.Sprintf("context detection failed for %s: %s", e.Path, e.Message)
-}
+**All error types implement `Unwrap()` for error chain support.**
 
-func (e *ContextDetectionError) Unwrap() error {
-    return e.Cause
-}
-```
-
-## Shell Detection
-
-**Function**: `DetectShellFromEnv()` reads SHELL environment variable
-**Returns**: ShellType (bash/zsh/fish) or error
-**Error**: `ErrShellDetectionFailed` when SHELL not set or unsupported
-**Pattern**: Case-insensitive path parsing (e.g., `/bin/BASH`, `/usr/local/Zsh/bin/zsh`)
-
-## Shell Domain Model
+## Shell Types
 
 ```go
-type Shell interface {
-    Type() ShellType
-    Path() string
-    Version() string
-}
+type ShellType string // ShellBash, ShellZsh, ShellFish
 
-type ShellType string
-
-const (
-    ShellBash ShellType = "bash"
-    ShellZsh ShellType = "zsh"
-    ShellFish ShellType = "fish"
-)
+func IsValidShellType(ShellType) bool
+func DetectShellFromEnv() (ShellType, error)  // reads SHELL env
+func InferShellTypeFromPath(string) ShellType
 ```
 
-**Design Rationale**: Shell domain model is minimal - only Type, Path, and Version. Wrapper template generation and config file detection are infrastructure concerns (see `internal/infrastructure/AGENTS.md`).
-
-**Validation**: Use `IsValidShellType(shellType)` to validate shell types (exported function).
-
-## Testing
-- **Unit tests**: Testify suites with table-driven tests
-- **Mocking**: Centralized mocks in test/mocks/
-- **Focus**: Business logic, validation rules, edge cases
+**Error code:** `ErrShellDetectionFailed = "SHELL_DETECTION_FAILED"` (string constant)

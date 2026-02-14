@@ -2,56 +2,61 @@
 Interface definitions for application layer contracts
 
 ## Core Interfaces
-- **WorktreeService**: Worktree CRUD operations
-- **ProjectService**: Project discovery/management
-- **NavigationService**: Context-aware navigation
-- **ShellService**: Shell wrapper management
 
-See source files for full interface signatures.
+### ContextService
+- `GetCurrentContext() (*domain.Context, error)`
+- `DetectContextFromPath(path) (*domain.Context, error)`
+- `ResolveIdentifier(identifier) (*domain.ResolutionResult, error)`
+- `ResolveIdentifierFromContext(ctx, identifier) (*domain.ResolutionResult, error)`
+- `GetCompletionSuggestions(partial) ([]*domain.ResolutionSuggestion, error)`
+- `GetCompletionSuggestionsFromContext(ctx, partial) ([]*domain.ResolutionSuggestion, error)`
 
-## Request/Result Patterns
+### WorktreeService
+- `CreateWorktree(ctx, *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error)`
+- `DeleteWorktree(ctx, *domain.DeleteWorktreeRequest) error`
+- `ListWorktrees(ctx, *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error)`
+- `GetWorktreeStatus(ctx, worktreePath) (*domain.WorktreeStatus, error)`
+- `ValidateWorktree(ctx, worktreePath) error`
+- `PruneMergedWorktrees(ctx, *domain.PruneWorktreesRequest) (*domain.PruneWorktreesResult, error)`
+- `BranchExists(ctx, projectPath, branchName) (bool, error)`
+- `IsBranchMerged(ctx, worktreePath, branchName) (bool, error)`
+- `GetWorktreeByPath(ctx, projectPath, worktreePath) (*domain.WorktreeInfo, error)`
 
-### Request Structure
+### ProjectService
+- `DiscoverProject(ctx, projectName, context) (*domain.ProjectInfo, error)`
+- `ValidateProject(ctx, projectPath) error`
+- `ListProjects(ctx) ([]*domain.ProjectInfo, error)`
+- `ListProjectSummaries(ctx) ([]*domain.ProjectSummary, error)`
+- `GetProjectInfo(ctx, projectPath) (*domain.ProjectInfo, error)`
+
+### NavigationService
+- `ResolvePath(ctx, *domain.ResolvePathRequest) (*domain.ResolutionResult, error)`
+- `ValidatePath(ctx, path) error`
+- `GetNavigationSuggestions(ctx, context, partial) ([]*domain.ResolutionSuggestion, error)`
+
+### ShellService
+- `SetupShell(ctx, *domain.SetupShellRequest) (*domain.SetupShellResult, error)`
+- `ValidateInstallation(ctx, *domain.ValidateInstallationRequest) (*domain.ValidateInstallationResult, error)`
+- `GenerateWrapper(ctx, *domain.GenerateWrapperRequest) (*domain.GenerateWrapperResult, error)`
+
+## Request Types
+
 ```go
 type CreateWorktreeRequest struct {
-    ProjectName  string
-    BranchName   string
-    SourceBranch string
-    Context      *domain.Context
+    ProjectName, BranchName, SourceBranch string
+    Context *domain.Context
+    Force   bool
 }
 ```
 
-### Result Structure
-```go
-type WorktreeInfo struct {
-    Path   string
-    Branch string
-    Status string
-}
+**Result types:** See `internal/domain/AGENTS.md` (WorktreeInfo, PruneWorktreesResult)
 
-type PruneWorktreesResult struct {
-    DeletedWorktrees       []*PruneWorktreeResult
-    SkippedWorktrees       []*PruneWorktreeResult
-    ProtectedSkipped       []*PruneWorktreeResult
-    UnmergedSkipped        []*PruneWorktreeResult
-    TotalDeleted           int
-    TotalSkipped           int
-    TotalBranchesDeleted   int
-    NavigationPath         string
-}
-```
+## Dependency Injection
 
-## Dependency Injection Pattern
-Interfaces injected via constructor:
 ```go
 func NewWorktreeService(
-    gitClient infrastructure.GitClient,
-    projectRepo ProjectRepository,
-    logger Logger,
-) WorktreeService
+    gitService infrastructure.GitClient,
+    projectService application.ProjectService,
+    config *domain.Config,
+) application.WorktreeService
 ```
-
-## Testing
-- **Unit tests**: Mock interfaces for testing
-- **Integration tests**: Real implementations
-- **Focus**: Interface contracts, behavior, not implementation

@@ -1,7 +1,23 @@
 ## Command Structure
 - **Root command**: `cmd/root.go` - service container setup
 - **Pattern**: Cobra commands → services → infrastructure
-- **Error handling**: Centralized in `cmd/error_handler.go`
+- **Error handling**: Centralized in `cmd/error_handler.go` (handling logic) and `cmd/error_formatter.go` (formatting)
+
+## ServiceContainer
+
+Services available to commands (defined in `cmd/root.go`):
+
+```go
+type ServiceContainer struct {
+    WorktreeService   application.WorktreeService
+    ProjectService    application.ProjectService
+    NavigationService application.NavigationService
+    ContextService    application.ContextService
+    ShellService      application.ShellService
+}
+```
+
+**Note**: GitClient is NOT in ServiceContainer - it's internal to service implementations. Commands use WorktreeService methods (`BranchExists`, `IsBranchMerged`, `GetWorktreeByPath`) instead of accessing GitClient directly.
 
 ## Cobra Command Pattern
 ```go
@@ -34,7 +50,9 @@ See `internal/infrastructure/AGENTS.md` for detection rules and resolution.
 - **Contract tests**: `cmd/contract_test.go` verifies service integration
 
 ## Error Handling
-Error formatting centralized in `cmd/error_formatter.go`. Error wrapping pattern: `fmt.Errorf("action failed: %w", err)`.
+- **Error handling**: `cmd/error_handler.go` - determines error type, formats for CLI output
+- **Error formatting**: `cmd/error_formatter.go` - formats error messages for display
+- **Pattern**: `fmt.Errorf("action failed: %w", err)` for wrapping
 
 ## Command Specifications
 

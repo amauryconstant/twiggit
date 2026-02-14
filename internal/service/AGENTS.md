@@ -17,12 +17,25 @@ type worktreeService struct {
     config         *domain.Config
 }
 
+func NewWorktreeService(
+    gitService infrastructure.GitClient,
+    projectService application.ProjectService,
+    config *domain.Config,
+) application.WorktreeService {
+    return &worktreeService{
+        gitService:     gitService,
+        projectService: projectService,
+        config:         config,
+    }
+}
+
 func (s *worktreeService) CreateWorktree(
     ctx context.Context,
     req *domain.CreateWorktreeRequest,
 ) (*domain.WorktreeInfo, error) {
+    // ValidationError returned directly, not wrapped
     if err := s.validateCreateRequest(req); err != nil {
-        return nil, fmt.Errorf("validation failed: %w", err)
+        return nil, err
     }
     project, err := s.projectService.DiscoverProject(ctx, req.ProjectName, req.Context)
     if err != nil {
@@ -30,7 +43,7 @@ func (s *worktreeService) CreateWorktree(
     }
     worktree, err := s.gitService.CreateWorktree(ctx, project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)
     if err != nil {
-        return nil, fmt.Errorf("create failed: %w", err)
+        return nil, domain.NewWorktreeServiceError(worktreePath, req.BranchName, "CreateWorktree", "failed to create worktree", err)
     }
     return &domain.WorktreeInfo{Path: worktreePath, Branch: req.BranchName}, nil
 }
@@ -116,17 +129,19 @@ if errors.As(err, &worktreeErr) && worktreeErr.Message == "worktree not found in
 - Validate project name, branch name before git operations
 - Use GitClient for worktree operations
 - Handle worktree existence errors with specific error messages
+- Methods: `BranchExists`, `IsBranchMerged`, `GetWorktreeByPath` (added for cmd layer isolation)
 
 ### ProjectService
 - Discover projects by name or from context
 - Validate project directories contain valid git repos
 - Use ContextDetector for context-aware discovery
+- Method: `ListProjectSummaries` for lightweight listings without expensive git data
 
 ### ContextService
 - Detect context from current working directory
 - Resolve identifiers based on current context
 - Provide completion suggestions for context-aware operations
-- Delegate to ContextDetector and ContextResolver
+- Delegate to ContextDetector and ContextResolver (infrastructure layer)
 
 ### NavigationService
 - Delegate to ContextResolver for identifier resolution
