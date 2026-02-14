@@ -167,15 +167,15 @@ func (s *ErrorHandlerTestSuite) TestCategorizeError_GitCommandError() {
 }
 
 func (s *ErrorHandlerTestSuite) TestCategorizeError_ConfigError() {
-	err := errors.New("config file not found")
+	err := domain.NewConfigError("/path/to/config.toml", "failed to parse config file", nil)
 
 	category := CategorizeError(err)
 
 	s.Equal(ErrorCategoryConfig, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_TomlError() {
-	err := errors.New("invalid TOML syntax")
+func (s *ErrorHandlerTestSuite) TestCategorizeError_ConfigErrorWithCause() {
+	err := domain.NewConfigError("/path/to/config.toml", "validation failed", errors.New("invalid field"))
 
 	category := CategorizeError(err)
 

@@ -117,7 +117,7 @@ func (c *CLIClientImpl) CreateWorktree(ctx context.Context, repoPath, branchName
 	// Check if worktree was actually created
 	if _, err := os.Stat(worktreePath); err != nil {
 		return domain.NewGitWorktreeError(worktreePath, branchName,
-			"git worktree add succeeded but worktree directory not found: "+err.Error(), nil)
+			"git worktree add succeeded but worktree directory not found", err)
 	}
 
 	return nil

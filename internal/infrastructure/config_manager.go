@@ -80,7 +80,7 @@ func NewConfigManager() domain.ConfigManager {
 func (m *koanfConfigManager) Load() (*domain.Config, error) {
 	// 1. Load defaults
 	if err := m.loadDefaults(); err != nil {
-		return nil, fmt.Errorf("failed to load default configuration: %w", err)
+		return nil, domain.NewConfigError("", "failed to load default configuration", err)
 	}
 
 	// 2. Load config file using pure function for existence check
@@ -88,19 +88,19 @@ func (m *koanfConfigManager) Load() (*domain.Config, error) {
 	if configFileExists(configPath) {
 		// Load TOML file
 		if err := m.ko.Load(file.Provider(configPath), toml.Parser()); err != nil {
-			return nil, fmt.Errorf("failed to load configuration: failed to parse config file %s: %w", configPath, err)
+			return nil, domain.NewConfigError(configPath, "failed to parse config file", err)
 		}
 	}
 
 	// 3. Unmarshal to config object
 	config := &domain.Config{}
 	if err := m.ko.Unmarshal("", config); err != nil {
-		return nil, fmt.Errorf("failed to load configuration: failed to unmarshal configuration: %w", err)
+		return nil, domain.NewConfigError(configPath, "failed to unmarshal configuration", err)
 	}
 
 	// 4. Validate configuration using pure function
 	if err := validateConfig(config); err != nil {
-		return nil, fmt.Errorf("failed to load configuration: validation failed: %w", err)
+		return nil, domain.NewConfigError(configPath, "validation failed", err)
 	}
 
 	// 5. Store immutable config

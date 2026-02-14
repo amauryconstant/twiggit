@@ -184,3 +184,27 @@ func NewGitCommandError(command string, args []string, exitCode int, stdout, std
 		Cause:    cause,
 	}
 }
+
+// ConfigError represents configuration-related errors
+type ConfigError struct {
+	Path    string
+	Message string
+	Cause   error
+}
+
+func (e *ConfigError) Error() string {
+	return fmt.Sprintf("config error for %s: %s", e.Path, e.Message)
+}
+
+func (e *ConfigError) Unwrap() error {
+	return e.Cause
+}
+
+// NewConfigError creates a new config error
+func NewConfigError(path, message string, cause error) *ConfigError {
+	return &ConfigError{
+		Path:    path,
+		Message: message,
+		Cause:   cause,
+	}
+}

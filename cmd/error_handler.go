@@ -114,13 +114,13 @@ func CategorizeError(err error) ErrorCategory {
 		return ErrorCategoryGit
 	}
 
-	// Check for configuration-related errors by message content
-	errStr := strings.ToLower(err.Error())
-	if strings.Contains(errStr, "config") || strings.Contains(errStr, "toml") {
+	var configErr *domain.ConfigError
+	if errors.As(err, &configErr) {
 		return ErrorCategoryConfig
 	}
 
 	// Check for validation-related errors by message content
+	errStr := strings.ToLower(err.Error())
 	if strings.Contains(errStr, "invalid") || strings.Contains(errStr, "validation") {
 		return ErrorCategoryValidation
 	}
