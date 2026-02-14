@@ -45,3 +45,9 @@ func (m *MockShellInfrastructure) ValidateInstallation(shellType domain.ShellTyp
 	args := m.Called(shellType, configFile)
 	return args.Error(0)
 }
+
+// ComposeWrapper mocks composing custom template with placeholders
+func (m *MockShellInfrastructure) ComposeWrapper(template string, shellType domain.ShellType) string {
+	args := m.Called(template, shellType)
+	return args.String(0)
+}

@@ -71,6 +71,57 @@ func buildWorktreePath(worktreesDir, project, branch string) string {
 	return filepath.Join(worktreesDir, project, branch)
 }
 
+// resolveMainIdentifier resolves "main" to the project root path
+func (cr *contextResolver) resolveMainIdentifier(ctx *domain.Context) (*domain.ResolutionResult, error) {
+	if containsPathTraversal(ctx.ProjectName) {
+		return nil, domain.NewResolutionError(
+			"main",
+			ctx.Path,
+			"project name contains path traversal sequences",
+			[]string{"Use a valid project name without '..' or path separators"},
+			nil,
+		)
+	}
+
+	projectPath := filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
+	if err := validatePathUnder(cr.config.ProjectsDirectory, projectPath, "project", "projects"); err != nil {
+		return nil, err
+	}
+
+	return &domain.ResolutionResult{
+		ResolvedPath: projectPath,
+		Type:         domain.PathTypeProject,
+		ProjectName:  ctx.ProjectName,
+		Explanation:  fmt.Sprintf("Resolved 'main' to project root '%s'", ctx.ProjectName),
+	}, nil
+}
+
+// resolveWorktreePath resolves a branch identifier to a worktree path
+func (cr *contextResolver) resolveWorktreePath(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
+		return nil, domain.NewResolutionError(
+			identifier,
+			ctx.Path,
+			"project or branch name contains path traversal sequences",
+			[]string{"Use a valid project or branch name without '..' or path separators"},
+			nil,
+		)
+	}
+
+	worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
+	if err := validatePathUnder(cr.config.WorktreesDirectory, worktreePath, "worktree", "worktrees"); err != nil {
+		return nil, err
+	}
+
+	return &domain.ResolutionResult{
+		ResolvedPath: worktreePath,
+		Type:         domain.PathTypeWorktree,
+		ProjectName:  ctx.ProjectName,
+		BranchName:   identifier,
+		Explanation:  fmt.Sprintf("Resolved '%s' to worktree of project '%s'", identifier, ctx.ProjectName),
+	}, nil
+}
+
 // buildProjectPath builds the path to a project directory
 func buildProjectPath(projectsDir, project string) string {
 	return filepath.Join(projectsDir, project)
@@ -137,47 +188,15 @@ func (cr *contextResolver) GetResolutionSuggestions(ctx *domain.Context, partial
 }
 
 func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
-	// Handle special case: "main" resolves to project root
 	if identifier == "main" {
-		return &domain.ResolutionResult{
-			ResolvedPath: ctx.Path,
-			Type:         domain.PathTypeProject,
-			ProjectName:  ctx.ProjectName,
-			Explanation:  fmt.Sprintf("Resolved 'main' to project root '%s'", ctx.ProjectName),
-		}, nil
+		return cr.resolveMainIdentifier(ctx)
 	}
 
-	// Check if identifier contains "/" (cross-project reference)
 	if strings.Contains(identifier, "/") {
 		return cr.resolveCrossProjectReference(identifier)
 	}
 
-	// Validate project name and branch name don't contain path traversal sequences
-	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
-		return nil, domain.NewResolutionError(
-			identifier,
-			ctx.Path,
-			"project or branch name contains path traversal sequences",
-			[]string{"Use a valid project or branch name without '..' or path separators"},
-			nil,
-		)
-	}
-
-	// Resolve as branch name (worktree of current project)
-	worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
-
-	// Validate the worktree path is under the worktrees directory to prevent path traversal
-	if err := validatePathUnder(cr.config.WorktreesDirectory, worktreePath, "worktree", "worktrees"); err != nil {
-		return nil, err
-	}
-
-	return &domain.ResolutionResult{
-		ResolvedPath: worktreePath,
-		Type:         domain.PathTypeWorktree,
-		ProjectName:  ctx.ProjectName,
-		BranchName:   identifier,
-		Explanation:  fmt.Sprintf("Resolved '%s' to worktree of project '%s'", identifier, ctx.ProjectName),
-	}, nil
+	return cr.resolveWorktreePath(ctx, identifier)
 }
 
 func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
@@ -257,94 +276,23 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.Resolution
 }
 
 func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
-	// Handle special case: "main" resolves to project root
 	if identifier == "main" {
-		// Validate project name doesn't contain path traversal sequences
-		if containsPathTraversal(ctx.ProjectName) {
-			return nil, domain.NewResolutionError(
-				identifier,
-				ctx.Path,
-				"project name contains path traversal sequences",
-				[]string{"Use a valid project name without '..' or path separators"},
-				nil,
-			)
-		}
-
-		projectPath := filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
-
-		// Validate the project path is under the projects directory to prevent path traversal
-		if err := validatePathUnder(cr.config.ProjectsDirectory, projectPath, "project", "projects"); err != nil {
-			return nil, err
-		}
-
-		return &domain.ResolutionResult{
-			ResolvedPath: projectPath,
-			Type:         domain.PathTypeProject,
-			ProjectName:  ctx.ProjectName,
-			Explanation:  fmt.Sprintf("Resolved 'main' to project root '%s'", ctx.ProjectName),
-		}, nil
+		return cr.resolveMainIdentifier(ctx)
 	}
 
-	// Check if identifier contains "/" (cross-project reference)
 	if strings.Contains(identifier, "/") {
 		return cr.resolveCrossProjectReference(identifier)
 	}
 
-	// Validate project name and branch name don't contain path traversal sequences
-	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
-		return nil, domain.NewResolutionError(
-			identifier,
-			ctx.Path,
-			"project or branch name contains path traversal sequences",
-			[]string{"Use a valid project or branch name without '..' or path separators"},
-			nil,
-		)
-	}
-
-	// Resolve as different worktree of same project
-	worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
-
-	// Validate the worktree path is under the worktrees directory to prevent path traversal
-	if err := validatePathUnder(cr.config.WorktreesDirectory, worktreePath, "worktree", "worktrees"); err != nil {
-		return nil, err
-	}
-
-	return &domain.ResolutionResult{
-		ResolvedPath: worktreePath,
-		Type:         domain.PathTypeWorktree,
-		ProjectName:  ctx.ProjectName,
-		BranchName:   identifier,
-		Explanation:  fmt.Sprintf("Resolved '%s' to worktree of project '%s'", identifier, ctx.ProjectName),
-	}, nil
+	return cr.resolveWorktreePath(ctx, identifier)
 }
 
 func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
-	var suggestions []*domain.ResolutionSuggestion
+	suggestions := cr.addMainSuggestion(nil, ctx, partial)
 
-	// Always suggest "main" for worktree context
-	if strings.HasPrefix("main", partial) {
-		suggestions = append(suggestions, &domain.ResolutionSuggestion{
-			Text:        "main",
-			Description: "Project root directory",
-			Type:        domain.PathTypeProject,
-			ProjectName: ctx.ProjectName,
-		})
-	}
-
-	// Add actual worktree discovery using git operations
 	if cr.gitService != nil && ctx.Path != "" {
 		if worktrees, err := cr.gitService.ListWorktrees(context.Background(), ctx.Path); err == nil {
-			for _, worktree := range worktrees {
-				if strings.HasPrefix(worktree.Branch, partial) {
-					suggestions = append(suggestions, &domain.ResolutionSuggestion{
-						Text:        worktree.Branch,
-						Description: "Worktree for branch " + worktree.Branch,
-						Type:        domain.PathTypeWorktree,
-						ProjectName: ctx.ProjectName,
-						BranchName:  worktree.Branch,
-					})
-				}
-			}
+			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees)
 		}
 	}
 

@@ -411,3 +411,85 @@ func (s *PathUtilsTestSuite) TestIsPathUnder_SymlinkTraversal() {
 		s.True(result, "broken symlink should be handled gracefully")
 	})
 }
+
+func (s *PathUtilsTestSuite) TestExtractProjectFromWorktreePath() {
+	tests := []struct {
+		name         string
+		worktreePath string
+		worktreesDir string
+		expectedName string
+		description  string
+	}{
+		{
+			name:         "standard worktree path",
+			worktreePath: "/home/user/Worktrees/myproject/feature-branch",
+			worktreesDir: "/home/user/Worktrees",
+			expectedName: "myproject",
+			description:  "Should extract project name from standard path",
+		},
+		{
+			name:         "worktree path with nested branch",
+			worktreePath: "/home/user/Worktrees/myproject/feature/nested/path",
+			worktreesDir: "/home/user/Worktrees",
+			expectedName: "myproject",
+			description:  "Should extract project name even with nested paths",
+		},
+		{
+			name:         "path with trailing separator",
+			worktreePath: "/home/user/Worktrees/myproject/feature-branch/",
+			worktreesDir: "/home/user/Worktrees",
+			expectedName: "myproject",
+			description:  "Should handle trailing separator",
+		},
+		{
+			name:         "worktrees dir with trailing separator",
+			worktreePath: "/home/user/Worktrees/myproject/feature-branch",
+			worktreesDir: "/home/user/Worktrees/",
+			expectedName: "myproject",
+			description:  "Should handle worktrees dir with trailing separator",
+		},
+		{
+			name:         "relative path",
+			worktreePath: "worktrees/myproject/branch",
+			worktreesDir: "worktrees",
+			expectedName: "myproject",
+			description:  "Should work with relative paths",
+		},
+		{
+			name:         "path outside worktrees dir",
+			worktreePath: "/home/user/projects/myproject",
+			worktreesDir: "/home/user/Worktrees",
+			expectedName: "",
+			description:  "Should return empty string for paths outside worktrees dir",
+		},
+		{
+			name:         "path is worktrees dir itself",
+			worktreePath: "/home/user/Worktrees",
+			worktreesDir: "/home/user/Worktrees",
+			expectedName: "",
+			description:  "Should return empty string when path is worktrees dir itself",
+		},
+		{
+			name:         "path is project directory under worktrees",
+			worktreePath: "/home/user/Worktrees/myproject",
+			worktreesDir: "/home/user/Worktrees",
+			expectedName: "myproject",
+			description:  "Should extract project name when at project level",
+		},
+		{
+			name:         "project name with hyphens and underscores",
+			worktreePath: "/home/user/Worktrees/my-project_name/feature",
+			worktreesDir: "/home/user/Worktrees",
+			expectedName: "my-project_name",
+			description:  "Should preserve hyphens and underscores in project name",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			result, err := ExtractProjectFromWorktreePath(tt.worktreePath, tt.worktreesDir)
+			s.Require().NoError(err, tt.description)
+			s.Equal(tt.expectedName, result, tt.description)
+		})
+	}
+}

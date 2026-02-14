@@ -68,6 +68,9 @@ type ShellInfrastructure interface {
 	// GenerateWrapper generates a shell wrapper for the specified shell type
 	GenerateWrapper(shellType domain.ShellType) (string, error)
 
+	// ComposeWrapper composes a custom template with placeholder replacements
+	ComposeWrapper(template string, shellType domain.ShellType) string
+
 	// DetectConfigFile detects the appropriate config file for the shell type
 	DetectConfigFile(shellType domain.ShellType) (string, error)
 

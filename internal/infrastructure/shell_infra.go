@@ -24,7 +24,7 @@ func (s *shellInfrastructure) GenerateWrapper(shellType domain.ShellType) (strin
 	}
 
 	// Pure function composition for wrapper generation
-	return s.composeWrapper(template, shellType), nil
+	return s.ComposeWrapper(template, shellType), nil
 }
 
 // DetectConfigFile detects the appropriate config file for the shell type
@@ -142,8 +142,8 @@ func (s *shellInfrastructure) getWrapperTemplate(shellType domain.ShellType) str
 	}
 }
 
-// composeWrapper composes the wrapper with template replacements (pure function)
-func (s *shellInfrastructure) composeWrapper(template string, shellType domain.ShellType) string {
+// ComposeWrapper composes the wrapper with template replacements (pure function)
+func (s *shellInfrastructure) ComposeWrapper(template string, shellType domain.ShellType) string {
 	// Pure function: no side effects, deterministic output
 	replacements := map[string]string{
 		"{{SHELL_TYPE}}": string(shellType),

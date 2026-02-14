@@ -257,22 +257,11 @@ func (s *projectService) findMainRepoFromConfig(worktreePath string) string {
 		return ""
 	}
 
-	worktreeDir := filepath.Clean(s.config.WorktreesDirectory)
-	if !strings.HasPrefix(worktreePath, worktreeDir+string(filepath.Separator)) {
+	projectName, err := infrastructure.ExtractProjectFromWorktreePath(worktreePath, s.config.WorktreesDirectory)
+	if err != nil || projectName == "" {
 		return ""
 	}
 
-	relPath, err := filepath.Rel(worktreeDir, worktreePath)
-	if err != nil {
-		return ""
-	}
-
-	parts := strings.Split(relPath, string(filepath.Separator))
-	if len(parts) < 1 {
-		return ""
-	}
-
-	projectName := parts[0]
 	mainRepoPath := filepath.Join(s.config.ProjectsDirectory, projectName)
 
 	if infrastructure.IsMainRepo(mainRepoPath) {

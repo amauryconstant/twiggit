@@ -202,7 +202,7 @@ func (s *shellService) GenerateWrapper(_ context.Context, req *domain.GenerateWr
 
 	if req.CustomTemplate != "" {
 		// Use custom template with composition
-		wrapper = s.composeWrapper(req.CustomTemplate, req.ShellType)
+		wrapper = s.integration.ComposeWrapper(req.CustomTemplate, req.ShellType)
 	} else {
 		// Use standard template
 		wrapper, err = s.integration.GenerateWrapper(req.ShellType)
@@ -222,19 +222,4 @@ func (s *shellService) GenerateWrapper(_ context.Context, req *domain.GenerateWr
 		TemplateUsed:   templateUsed,
 		Message:        "Wrapper generated successfully",
 	}, nil
-}
-
-// composeWrapper composes the wrapper with template replacements (pure function)
-func (s *shellService) composeWrapper(template string, shellType domain.ShellType) string {
-	// Pure function: no side effects, deterministic output
-	replacements := map[string]string{
-		"{{SHELL_TYPE}}": string(shellType),
-	}
-
-	result := template
-	for key, value := range replacements {
-		result = fmt.Sprintf(result, key, value)
-	}
-
-	return result
 }

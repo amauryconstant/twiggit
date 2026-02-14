@@ -7,6 +7,25 @@ import (
 	"twiggit/internal/domain"
 )
 
+func ExtractProjectFromWorktreePath(worktreePath, worktreesDir string) (projectName string, err error) {
+	cleanedWorktreesDir := filepath.Clean(worktreesDir)
+	if !strings.HasPrefix(worktreePath, cleanedWorktreesDir+string(filepath.Separator)) {
+		return "", nil
+	}
+
+	relPath, err := filepath.Rel(cleanedWorktreesDir, worktreePath)
+	if err != nil {
+		return "", err
+	}
+
+	parts := strings.Split(relPath, string(filepath.Separator))
+	if len(parts) < 1 {
+		return "", nil
+	}
+
+	return parts[0], nil
+}
+
 // NormalizePath normalizes a path for cross-platform compatibility
 func NormalizePath(path string) (string, error) {
 	// Clean the path

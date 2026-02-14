@@ -340,22 +340,11 @@ func (s *worktreeService) findProjectFromConfig(ctx context.Context, worktreePat
 		return nil, nil
 	}
 
-	worktreeDir := filepath.Clean(s.config.WorktreesDirectory)
-	if !strings.HasPrefix(worktreePath, worktreeDir+string(filepath.Separator)) {
+	projectName, err := infrastructure.ExtractProjectFromWorktreePath(worktreePath, s.config.WorktreesDirectory)
+	if err != nil || projectName == "" {
 		return nil, nil
 	}
 
-	relPath, err := filepath.Rel(worktreeDir, worktreePath)
-	if err != nil {
-		return nil, nil
-	}
-
-	parts := strings.Split(relPath, string(filepath.Separator))
-	if len(parts) < 1 {
-		return nil, nil
-	}
-
-	projectName := parts[0]
 	projectPath := filepath.Join(s.config.ProjectsDirectory, projectName)
 
 	if _, statErr := os.Stat(projectPath); statErr != nil {
