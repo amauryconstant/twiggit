@@ -1,4 +1,3 @@
-// Package cmd contains the CLI commands for twiggit.
 package cmd
 
 import (
@@ -8,7 +7,6 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
-	"twiggit/internal/infrastructure"
 )
 
 // CommandConfig holds the configuration for CLI commands
@@ -24,7 +22,6 @@ type ServiceContainer struct {
 	NavigationService application.NavigationService
 	ContextService    application.ContextService
 	ShellService      application.ShellService
-	GitClient         infrastructure.GitClient
 }
 
 // NewRootCommand creates a new root command with the given configuration

@@ -66,6 +66,27 @@ func (m *MockWorktreeService) PruneMergedWorktrees(ctx context.Context, req *dom
 	return args.Get(0).(*domain.PruneWorktreesResult), args.Error(1)
 }
 
+// BranchExists mocks checking if a branch exists
+func (m *MockWorktreeService) BranchExists(ctx context.Context, projectPath, branchName string) (bool, error) {
+	args := m.Called(ctx, projectPath, branchName)
+	return args.Bool(0), args.Error(1)
+}
+
+// IsBranchMerged mocks checking if a branch is merged
+func (m *MockWorktreeService) IsBranchMerged(ctx context.Context, worktreePath, branchName string) (bool, error) {
+	args := m.Called(ctx, worktreePath, branchName)
+	return args.Bool(0), args.Error(1)
+}
+
+// GetWorktreeByPath mocks getting a worktree by path
+func (m *MockWorktreeService) GetWorktreeByPath(ctx context.Context, projectPath, worktreePath string) (*domain.WorktreeInfo, error) {
+	args := m.Called(ctx, projectPath, worktreePath)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.WorktreeInfo), args.Error(1)
+}
+
 // MockProjectService is a mock implementation of application.ProjectService
 type MockProjectService struct {
 	mock.Mock

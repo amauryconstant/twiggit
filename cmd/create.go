@@ -73,7 +73,7 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 	}
 
 	// Validate source branch exists before creating worktree
-	sourceBranchExists, err := config.Services.GitClient.BranchExists(ctx, project.Path, source)
+	sourceBranchExists, err := config.Services.WorktreeService.BranchExists(ctx, project.Path, source)
 	if err != nil {
 		return fmt.Errorf("failed to check if source branch '%s' exists: %w", source, err)
 	}

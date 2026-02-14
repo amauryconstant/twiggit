@@ -602,3 +602,34 @@ func (s *worktreeService) isProtectedBranch(branchName string) bool {
 	}
 	return false
 }
+
+func (s *worktreeService) BranchExists(ctx context.Context, projectPath string, branchName string) (bool, error) {
+	exists, err := s.gitService.BranchExists(ctx, projectPath, branchName)
+	if err != nil {
+		return false, domain.NewWorktreeServiceError(projectPath, branchName, "BranchExists", "failed to check branch existence", err)
+	}
+	return exists, nil
+}
+
+func (s *worktreeService) IsBranchMerged(ctx context.Context, worktreePath string, branchName string) (bool, error) {
+	merged, err := s.gitService.IsBranchMerged(ctx, worktreePath, branchName)
+	if err != nil {
+		return false, domain.NewWorktreeServiceError(worktreePath, branchName, "IsBranchMerged", "failed to check merge status", err)
+	}
+	return merged, nil
+}
+
+func (s *worktreeService) GetWorktreeByPath(ctx context.Context, projectPath, worktreePath string) (*domain.WorktreeInfo, error) {
+	worktrees, err := s.gitService.ListWorktrees(ctx, projectPath)
+	if err != nil {
+		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeByPath", "failed to list worktrees", err)
+	}
+
+	for i := range worktrees {
+		if worktrees[i].Path == worktreePath {
+			return &worktrees[i], nil
+		}
+	}
+
+	return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeByPath", "worktree not found", nil)
+}

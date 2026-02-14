@@ -49,7 +49,7 @@ func executeDelete(c *cobra.Command, config *CommandConfig, target string, force
 		return err
 	}
 
-	err = validateMergedOnly(ctx, config, worktreePath, mergedOnly)
+	err = validateMergedOnly(ctx, config, worktreePath, mergedOnly, currentCtx)
 	if err != nil {
 		return err
 	}
@@ -108,35 +108,23 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra
 	return nil
 }
 
-func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath string, mergedOnly bool) error {
+func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath string, mergedOnly bool, currentCtx *domain.Context) error {
 	if !mergedOnly {
 		return nil
 	}
 
-	worktrees, err := config.Services.GitClient.ListWorktrees(ctx, worktreePath)
+	worktreeInfo, err := config.Services.WorktreeService.GetWorktreeByPath(ctx, currentCtx.Path, worktreePath)
 	if err != nil {
-		return fmt.Errorf("failed to list worktrees: %w", err)
+		return fmt.Errorf("failed to get worktree info: %w", err)
 	}
 
-	var branchName string
-	for _, wt := range worktrees {
-		if wt.Path == worktreePath {
-			branchName = wt.Branch
-			break
-		}
-	}
-
-	if branchName == "" {
-		return fmt.Errorf("could not determine branch name for worktree: %s", worktreePath)
-	}
-
-	isMerged, err := config.Services.GitClient.IsBranchMerged(ctx, worktreePath, branchName)
+	isMerged, err := config.Services.WorktreeService.IsBranchMerged(ctx, worktreePath, worktreeInfo.Branch)
 	if err != nil {
-		return fmt.Errorf("failed to check if branch '%s' is merged: %w", branchName, err)
+		return fmt.Errorf("failed to check if branch '%s' is merged: %w", worktreeInfo.Branch, err)
 	}
 
 	if !isMerged {
-		return fmt.Errorf("branch '%s' is not merged (cannot delete with --merged-only)", branchName)
+		return fmt.Errorf("branch '%s' is not merged (cannot delete with --merged-only)", worktreeInfo.Branch)
 	}
 
 	return nil
@@ -161,12 +149,9 @@ func deleteWorktree(ctx context.Context, config *CommandConfig, c *cobra.Command
 
 	logv(c, 2, "  project: %s", currentCtx.ProjectName)
 
-	worktrees, _ := config.Services.GitClient.ListWorktrees(ctx, worktreePath)
-	for _, wt := range worktrees {
-		if wt.Path == worktreePath {
-			logv(c, 2, "  branch: %s", wt.Branch)
-			break
-		}
+	worktreeInfo, _ := config.Services.WorktreeService.GetWorktreeByPath(ctx, currentCtx.Path, worktreePath)
+	if worktreeInfo != nil {
+		logv(c, 2, "  branch: %s", worktreeInfo.Branch)
 	}
 	logv(c, 2, "  force: %t", force)
 

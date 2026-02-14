@@ -46,6 +46,15 @@ type WorktreeService interface {
 
 	// PruneMergedWorktrees deletes merged worktrees with optional branch deletion
 	PruneMergedWorktrees(ctx context.Context, req *domain.PruneWorktreesRequest) (*domain.PruneWorktreesResult, error)
+
+	// BranchExists checks if a branch exists in the project
+	BranchExists(ctx context.Context, projectPath, branchName string) (bool, error)
+
+	// IsBranchMerged checks if a branch has been merged into its base branch
+	IsBranchMerged(ctx context.Context, worktreePath, branchName string) (bool, error)
+
+	// GetWorktreeByPath retrieves worktree info by its path
+	GetWorktreeByPath(ctx context.Context, projectPath, worktreePath string) (*domain.WorktreeInfo, error)
 }
 
 // ProjectService provides project discovery and management operations

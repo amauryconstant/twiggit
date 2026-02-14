@@ -46,7 +46,6 @@ func main() {
 			NavigationService: navigationService,
 			WorktreeService:   worktreeService,
 			ShellService:      shellService,
-			GitClient:         gitClient,
 		},
 	}
 
