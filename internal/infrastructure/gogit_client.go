@@ -8,24 +8,51 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"twiggit/internal/domain"
 )
 
 // GoGitClientImpl implements GoGitClient using go-git library
 type GoGitClientImpl struct {
-	cache        map[string]*git.Repository // Simple in-memory cache
+	cache        *lru.Cache[string, *git.Repository]
 	cacheEnabled bool
 }
 
 // NewGoGitClient creates a new GoGitClient implementation
+// cacheEnabled is optional - defaults to true if not provided
+// Uses default cache size of 25 repositories
 func NewGoGitClient(cacheEnabled ...bool) *GoGitClientImpl {
 	enabled := true
 	if len(cacheEnabled) > 0 {
 		enabled = cacheEnabled[0]
 	}
 
+	cache, _ := lru.New[string, *git.Repository](25)
+
 	return &GoGitClientImpl{
-		cache:        make(map[string]*git.Repository),
+		cache:        cache,
+		cacheEnabled: enabled,
+	}
+}
+
+// NewGoGitClientWithSize creates a new GoGitClient with custom cache size
+// cacheSize defaults to 25 if <= 0
+// cacheEnabled is optional - defaults to true if not provided
+func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) *GoGitClientImpl {
+	enabled := true
+	if len(cacheEnabled) > 0 {
+		enabled = cacheEnabled[0]
+	}
+
+	size := cacheSize
+	if size <= 0 {
+		size = 25
+	}
+
+	cache, _ := lru.New[string, *git.Repository](size)
+
+	return &GoGitClientImpl{
+		cache:        cache,
 		cacheEnabled: enabled,
 	}
 }
@@ -39,7 +66,7 @@ func (c *GoGitClientImpl) OpenRepository(path string) (*git.Repository, error) {
 	}
 
 	// Check cache first
-	if repo, exists := c.cache[absPath]; exists {
+	if repo, exists := c.cache.Get(absPath); exists {
 		return repo, nil
 	}
 
@@ -50,7 +77,7 @@ func (c *GoGitClientImpl) OpenRepository(path string) (*git.Repository, error) {
 	}
 
 	// Cache the repository
-	c.cache[absPath] = repo
+	c.cache.Add(absPath, repo)
 
 	return repo, nil
 }

@@ -126,6 +126,13 @@ func (e *WorktreeServiceError) Unwrap() error {
 	return e.Cause
 }
 
+// IsNotFound returns true if the error indicates the worktree was not found.
+func (e *WorktreeServiceError) IsNotFound() bool {
+	lowerMsg := strings.ToLower(e.Message)
+	return strings.Contains(lowerMsg, "not found") ||
+		strings.Contains(lowerMsg, "does not exist")
+}
+
 // NewWorktreeServiceError creates a new worktree service error
 func NewWorktreeServiceError(worktreePath, branchName, operation, message string, cause error) *WorktreeServiceError {
 	return &WorktreeServiceError{

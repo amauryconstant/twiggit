@@ -45,6 +45,14 @@ func (e *GitRepositoryError) Unwrap() error {
 	return e.Cause
 }
 
+// IsNotFound returns true if the error indicates the repository was not found.
+func (e *GitRepositoryError) IsNotFound() bool {
+	lowerMsg := strings.ToLower(e.Message)
+	return strings.Contains(lowerMsg, "not found") ||
+		strings.Contains(lowerMsg, "does not exist") ||
+		strings.Contains(lowerMsg, "no such file or directory")
+}
+
 // NewGitRepositoryError creates a new git repository error
 func NewGitRepositoryError(path, message string, cause error) *GitRepositoryError {
 	return &GitRepositoryError{
@@ -104,6 +112,13 @@ func (e *GitWorktreeError) getCauseDetails() string {
 
 func (e *GitWorktreeError) Unwrap() error {
 	return e.Cause
+}
+
+// IsNotFound returns true if the error indicates the worktree was not found.
+func (e *GitWorktreeError) IsNotFound() bool {
+	lowerMsg := strings.ToLower(e.Message)
+	return strings.Contains(lowerMsg, "not found") ||
+		strings.Contains(lowerMsg, "does not exist")
 }
 
 // NewGitWorktreeError creates a new git worktree error

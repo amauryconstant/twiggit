@@ -256,3 +256,47 @@ func (s *ErrorsTestSuite) TestGitCommandError_Unwrap() {
 		s.Equal(cause, err.Unwrap())
 	})
 }
+
+func (s *ErrorsTestSuite) TestGitRepositoryError_IsNotFound() {
+	tests := []struct {
+		name     string
+		message  string
+		expected bool
+	}{
+		{"not found lowercase", "repository not found", true},
+		{"not found uppercase", "REPOSITORY NOT FOUND", true},
+		{"does not exist lowercase", "repository does not exist", true},
+		{"no such file or directory", "no such file or directory", true},
+		{"No Such File Or Directory mixed", "No Such File Or Directory", true},
+		{"other error", "permission denied", false},
+		{"empty message", "", false},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			err := NewGitRepositoryError("/path", tt.message, nil)
+			s.Equal(tt.expected, err.IsNotFound())
+		})
+	}
+}
+
+func (s *ErrorsTestSuite) TestGitWorktreeError_IsNotFound() {
+	tests := []struct {
+		name     string
+		message  string
+		expected bool
+	}{
+		{"not found lowercase", "worktree not found", true},
+		{"not found uppercase", "WORKTREE NOT FOUND", true},
+		{"does not exist lowercase", "worktree does not exist", true},
+		{"other error", "permission denied", false},
+		{"empty message", "", false},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			err := NewGitWorktreeError("/path", "branch", tt.message, nil)
+			s.Equal(tt.expected, err.IsNotFound())
+		})
+	}
+}

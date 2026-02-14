@@ -135,6 +135,28 @@ func (s *ServiceErrorsTestSuite) TestWorktreeServiceError_Unwrap() {
 	s.Equal(cause, err.Unwrap())
 }
 
+func (s *ServiceErrorsTestSuite) TestWorktreeServiceError_IsNotFound() {
+	tests := []struct {
+		name     string
+		message  string
+		expected bool
+	}{
+		{"not found lowercase", "worktree not found", true},
+		{"not found uppercase", "WORKTREE NOT FOUND", true},
+		{"does not exist lowercase", "worktree does not exist", true},
+		{"does not exist mixed", "Worktree Does Not Exist", true},
+		{"other error", "permission denied", false},
+		{"empty message", "", false},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			err := NewWorktreeServiceError("/path", "branch", "operation", tt.message, nil)
+			s.Equal(tt.expected, err.IsNotFound())
+		})
+	}
+}
+
 func (s *ServiceErrorsTestSuite) TestProjectServiceError_Error_WithProjectName() {
 	err := NewProjectServiceError("test-project", "/path/to/project", "DiscoverProject", "not a git repository", nil)
 	msg := err.Error()

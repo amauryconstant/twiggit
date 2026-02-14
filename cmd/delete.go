@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/spf13/cobra"
 	"twiggit/internal/domain"
@@ -86,9 +85,9 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra
 		var worktreeErr *domain.WorktreeServiceError
 		var gitRepoErr *domain.GitRepositoryError
 		var gitWorktreeErr *domain.GitWorktreeError
-		if errors.As(err, &worktreeErr) && strings.Contains(worktreeErr.Error(), "not found") ||
-			errors.As(err, &gitRepoErr) && strings.Contains(gitRepoErr.Error(), "does not exist") ||
-			errors.As(err, &gitWorktreeErr) && strings.Contains(gitWorktreeErr.Error(), "not found") {
+		if errors.As(err, &worktreeErr) && worktreeErr.IsNotFound() ||
+			errors.As(err, &gitRepoErr) && gitRepoErr.IsNotFound() ||
+			errors.As(err, &gitWorktreeErr) && gitWorktreeErr.IsNotFound() {
 			if changeDir {
 				navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
 				if navigationTarget != "" {
