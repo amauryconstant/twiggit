@@ -1,6 +1,20 @@
 ## Purpose
 Interface definitions for application layer contracts
 
+## Design Rationale
+
+**Why separate interfaces?**
+- Enables mocking in tests (see `test/mocks/AGENTS.md`)
+- Allows implementation swapping without cmd changes
+- Documents service contracts explicitly
+
+**Dependency Rule**:
+```
+service/ imports application/ ✓
+application/ imports domain/ ✓
+application/ imports service/ ✗
+```
+
 ## Core Interfaces
 
 ### ContextService

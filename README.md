@@ -102,10 +102,6 @@ twiggit prune                        # Delete merged worktrees in current projec
 twiggit prune --all                  # Prune across all projects
 ```
 
-## Documentation
-
-For development and usage documentation, see [AGENTS.md](AGENTS.md).
-
 ## Troubleshooting
 
 **twiggit command not found**

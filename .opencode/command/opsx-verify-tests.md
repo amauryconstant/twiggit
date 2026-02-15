@@ -1,203 +1,155 @@
 ---
 description: Review test coverage for OpenSpec changes to ensure spec requirements have tests
+license: MIT
+metadata:
+  author: openspec-extended
+  version: "0.2.0"
 ---
 
 Review test coverage for OpenSpec changes, ensuring spec requirements have corresponding tests.
 
-**Input**: Specify change to review with optional flags:
+**IMPORTANT**: This is an AI-guided analysis workflow. It does not use any CLI flags.
 
-Required:
-- `[change-name]`: Change to review (infer from context if omitted)
+---
 
-Optional:
-- `--specs <path>`: Custom specs path to check
-- `--test-dir <path>`: Explicit test directory
-- `--test-pattern <glob>`: Test file pattern
-- `--report <path>`: Custom report output path
-- `--json`: JSON output format for CI integration
-- `--dry-run`: Preview without writing
+## Input
 
-**Steps**
+Optionally specify `[change-name]` after `/opsx-verify-tests`. If omitted, the AI will infer from context or prompt for selection.
 
-1. **Select change**
-   - If name provided: use it
-   - Otherwise: infer from conversation context
-   - If only one active change: auto-select it
-   - If multiple changes: run `openspec list --json` and use **AskUserQuestion** to let user select
+---
 
-   Always announce: "Reviewing tests for change: <name>" and how to override.
+## Steps
 
-2. **Get project context** from `openspec/config.yaml`:
+1. **Select the change**
+
+   If name provided: use it. Otherwise:
+   - Infer from conversation context
+   - Auto-select if only one active change
+   - If ambiguous: run `openspec list --json` and use **AskUserQuestion** to prompt
+
+   Announce: "Reviewing tests for change: <name>" and how to override.
+
+2. **Get project context**
+
+   Check for `openspec/config.yaml`:
    ```bash
    cat openspec/config.yaml
    ```
-
-   **Extract from context**:
+   
+   Extract if present:
    - Testing framework conventions
-   - Test directory structure patterns
-   - Project-specific validation rules
+   - Test directory patterns
+   - Project-specific rules
 
-3. **Read specs** for the change:
-   Parse OpenSpec specification files:
-   ```markdown
-   ## ADDED Requirements
+   If no config: use sensible defaults based on project structure.
 
-   ### Requirement: User Authentication
-   The system SHALL issue a JWT token upon successful login.
+3. **Read specs for the change**
 
-   #### Scenario: Valid credentials
-   - **GIVEN** a user with valid credentials
-   - **WHEN** user submits login form
-   - **THEN** a JWT token is returned
-   - **AND** user is redirected to dashboard
+   Find and read spec files:
+   ```bash
+   ls openspec/changes/<name>/specs/
    ```
-
-   **Extract**:
-   - Requirement names (### Requirement: ...)
-   - Scenario names (#### Scenario: ...)
+   
+   Parse each spec for:
+   - Requirement names (`### Requirement: ...`)
+   - Scenario names (`#### Scenario: ...`)
    - Scenario content (GIVEN/WHEN/THEN/AND clauses)
 
-4. **Discover tests** using project context:
+4. **Discover tests**
 
-   **Auto-discovery** (default): Framework-specific patterns from `config.yaml`, multi-language support.
+   Use Glob tool with language-appropriate patterns:
 
-   **Test file patterns** (by language):
-   | Language | Default Patterns | Examples |
-   |-----------|----------------|----------|
-   | Go | `**/*_test.go` | `internal/core/loader_test.go`, `pkg/models_test.go` |
-   | Python | `**/test_*.py` | `tests/test_auth.py`, `test_user.py` |
-   | JavaScript/TypeScript | `**/*.test.{js,ts,jsx,tsx}` | `auth.test.js`, `user.test.ts` |
-   | Java | `**/*Test.java` | `AuthTest.java`, `UserTest.java` |
-   | Ruby | `**/*_spec.rb` | `auth_spec.rb`, `user_spec.rb` |
+   | Language | Patterns |
+   |----------|----------|
+   | Go | `**/*_test.go` |
+   | Python | `**/test_*.py`, `**/*_test.py` |
+   | JavaScript/TS | `**/*.test.{js,ts,jsx,tsx}` |
+   | Java | `**/*Test.java` |
+   | Ruby | `**/*_spec.rb` |
 
-   **Override**: User can specify `--test-dir` or `--test-pattern`.
+   Auto-detect language from project if not specified.
 
-5. **Semantic extraction** from both specs and tests:
+5. **Extract semantics from specs and tests**
 
    **From specs** (GIVEN/WHEN/THEN/AND):
-   - **Actions**: verbs - `submits`, `validates`, `returns`, `authenticates`
-   - **Entities**: nouns - `token`, `credentials`, `user`, `session`, `form`
-   - **Conditions**: - `valid`, `empty`, `null`, `invalid`, `missing`
-   - **Outcomes**: - `SHALL have`, `must return`, `succeeds`, `errors`
+   - Actions: verbs - submits, validates, returns
+   - Entities: nouns - token, credentials, user
+   - Conditions: valid, empty, null, invalid
+   - Outcomes: SHALL have, must return, succeeds
 
-   **From tests** (agnostic parsing): Match patterns like:
-   - Go: `t.Errorf("expected non-nil, got %v", actual)`
-   - Python: `assert response.status_code == 200`
-   - JavaScript: `expect(result).toBe(expectedValue)`, `expect(error).toBeNull()`
+   **From tests** (language-agnostic):
+   - Test function names
+   - Assertion patterns
+   - Setup/teardown context
 
-6. **Semantic similarity scoring** to match spec scenarios to test implementations:
+6. **Match scenarios to tests**
 
-   **Confidence levels**:
+   Semantic similarity scoring:
 
-   | Score | Description | Example Match |
-   |--------|-------------|----------------|
-   | 100% | Exact scenario name match | Scenario: "Valid credentials" ↔ Test: `TestValidCredentials` |
-   | 85-95% | Strong semantic match | Scenario mentions "token" and test checks JWT behavior |
-   | 60-84% | Partial semantic match | Both mention "user" but in different contexts |
-   | 30-59% | Weak keyword overlap | Both mention "valid" but unrelated |
-   | 0% | No match | No common keywords or behavior overlap |
+   | Score | Description |
+   |-------|-------------|
+   | 100% | Exact name match |
+   | 85-95% | Strong semantic match |
+   | 60-84% | Partial match |
+   | 30-59% | Weak keyword overlap |
+   | 0% | No match |
 
-7. **Gap analysis** to identify missing test coverage:
+7. **Analyze gaps**
 
-   **Requirement coverage**:
-   ```markdown
-   ## Uncovered Requirements
+   Identify:
+   - **Untested scenarios**: No matching tests found
+   - **Partially covered**: Happy path only, edge cases missing
+   - **Orphaned tests**: Tests not matching any scenario
 
-   | Requirement | Scenario | Why No Match |
-   |-------------|-----------|---------------|
-   | User Authentication | Valid credentials | No test covers credential validation |
-   | Session Expiration | Idle timeout | Tests use fixed 30min timeout, not dynamic |
-   ```
+8. **Generate report**
 
-   **Test gaps**:
-   ```markdown
-   ## Gaps Analysis
+   Ask user for confirmation using **AskUserQuestion** before saving.
 
-   | Gap Type | Count | Examples |
-   |-----------|-------|----------|
-   | Untested scenarios | 3 | No tests for: valid credentials, invalid credentials, token expiry |
-   | Partially covered | 2 | Tests cover happy path only |
-   | Orphaned tests | 5 | Tests not matching any scenario |
-   ```
+   Default output: `openspec/changes/<name>/test-compliance-report.md`
 
-8. **Generate report** (Markdown or JSON based on `--json` flag):
+---
 
-   **Markdown format**:
-   ```markdown
-   ## Test Compliance Report: <change-name>
+## Output
 
-   ### Summary
-   - Total requirements: 12
-   - Requirements with tests: 9
-   - Requirements without tests: 3
-   - Overall coverage: 75%
+```
+## Test Compliance Report: <change-name>
 
-   ### Coverage Details
+### Summary
+- Total requirements: 12
+- Requirements with tests: 9
+- Requirements without tests: 3
+- Overall coverage: 75%
 
-   | Requirement | Scenario | Coverage | Tests | Notes |
-   |-------------|-----------|------------|--------|--------|
-   | User Authentication | Valid credentials | Partial (60%) | TestLoadDocumentIntegration covers loading, no specific credential test |
-   | Session Expiration | Idle timeout | None | No test for session expiry |
+### Coverage Details
 
-   ### Recommendations
-   - Add test `TestValidCredentials()` to cover credential validation
-   - Consider adding test for session expiry edge cases
-   - Document test `TestLoadDocumentIntegration()` as integration utility in tests
+| Requirement | Scenario | Coverage | Tests | Notes |
+|-------------|----------|----------|-------|-------|
+| User Auth | Valid credentials | Partial | TestLoadDocument... | No credential test |
 
-   ### Gaps Analysis
+### Gaps Analysis
 
-   | Gap Type | Count |
-   |-----------|-------|
-   | Untested scenarios | 3 |
-   | Partially covered | 2 |
-   | Orphaned tests | 5 |
-   ```
+| Gap Type | Count |
+|----------|-------|
+| Untested scenarios | 3 |
+| Partially covered | 2 |
+| Orphaned tests | 5 |
 
-   **JSON output format**:
-   ```json
-   {
-     "change": "add-dark-mode",
-     "summary": {
-       "totalRequirements": 12,
-       "testedRequirements": 9,
-       "untestedRequirements": 3,
-       "overallCoverage": 75
-     },
-     "coverageDetails": [...],
-     "recommendations": [...]
-   }
-   ```
+### Recommendations
+- Add test `TestValidCredentials()` to cover credential validation
+- Document test `TestLoadDocumentIntegration()` as integration utility
+```
 
-9. **Write to file**:
-   - Default: save to change directory
-   - Custom: use `--report <path>` path
-   - Preview if `--dry-run` specified
-   - Verify file was written successfully
+---
 
-**Output**
+## Guardrails
 
-Display summary and ask for confirmation before writing.
+- Gap-focused: Report what's missing, not just percentages
+- Explain context: Provide "why no match" explanations
+- Project-aware: Use config.yaml for patterns if available
+- Actionable: Suggest specific test additions
+- Reality check: Acknowledge unit tests != scenario tests
+- Confidence transparency: Show scores and explain matching
 
-**Advanced Usage**
+---
 
-- **Dry run**: Preview report without writing: `openspec-review-test-compliance --dry-run`
-- **Focus on specific requirements**: Check single requirement only: `openspec-review-test-compliance --change add-dark-mode --requirement "Session Expiration"`
-- **Compare multiple changes**: Review changes in date range: `openspec-review-test-compliance --since 2024-01-01 --until 2024-03-31`
-
-**Guardrails**
-
-- Gap-focused reporting: Report what's missing, not coverage percentages
-- Explain context: Provide "why no match" explanations, not just "no match"
-- Project-aware: Use `openspec/config.yaml` for test patterns
-- Actionable recommendations: Suggest specific test additions
-- Handle reality: Acknowledge unit tests ≠ scenario tests
-- Multiple evidence sources: Combine semantic + structural matching
-- Confidence transparency: Show scores and explain matching logic
-
-Load the corresponding skill for detailed implementation:
-
-See `.opencode/skills/openspec-review-test-compliance/SKILL.md` for:
-- Semantic similarity scoring algorithm details
-- Multi-language test discovery patterns
-- Gap analysis methodology
-- Report generation specifications
+See `.opencode/skills/openspec-review-test-compliance/SKILL.md` for detailed semantic matching and gap analysis methodology.

@@ -53,27 +53,7 @@ func (s *MyTestSuite) TestOperation_Success() {
 
 ## Mock Patterns
 
-All mocks centralized in `test/mocks/`:
-
-```go
-// test/mocks/my_service_mock.go
-type MockMyService struct {
-    mock.Mock
-}
-
-func (m *MockMyService) Method() error {
-    args := m.Called()
-    return args.Error(0)
-}
-```
-
-**Usage:**
-```go
-func (s *MyTestSuite) SetupTest() {
-    s.mock = mocks.NewMockMyService()
-    s.mock.On("Method").Return(nil)
-}
-```
+See `test/mocks/AGENTS.md` for mock inventory and usage patterns.
 
 ## Setup/Teardown
 

@@ -88,16 +88,12 @@ func (s *worktreeService) CreateWorktree(
    - Provide meaningful context in the error message
 
    ```go
-   // For non-domain-specific failures
-   project, err := s.projectService.DiscoverProject(ctx, req.ProjectName, req.Context)
-   if err != nil {
-       return nil, fmt.Errorf("failed to resolve project: %w", err)
-   }
-   ```
-
-4. **Never panic in production code**
-   - All errors should be returned, never panics
-   - Use error returns for all failure cases
+    // For non-domain-specific failures
+    project, err := s.projectService.DiscoverProject(ctx, req.ProjectName, req.Context)
+    if err != nil {
+        return nil, fmt.Errorf("failed to resolve project: %w", err)
+    }
+```
 
 ### Error Type Checking
 

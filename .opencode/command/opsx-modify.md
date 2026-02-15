@@ -1,102 +1,96 @@
 ---
 description: Modify artifacts in OpenSpec changes with dependency tracking
+license: MIT
+metadata:
+  author: openspec-extended
+  version: "0.2.0"
 ---
 
-Modify existing artifacts in an OpenSpec change.
+Modify existing artifacts in an OpenSpec change, automatically tracking and updating dependent artifacts.
 
-**Input**: Optionally specify `[change-name] [artifact-id]`. If omitted, infer from conversation context or auto-select when unambiguous.
+---
 
-**Steps**
+## Input
 
-1. **Select change**
-   - If name provided: use it
-   - Otherwise: infer from conversation context
-   - If only one active change: auto-select it
-   - If multiple changes and no inference: run `openspec list --json` and use **AskUserQuestion** to let user select
+Optionally specify `[change-name] [artifact-id]` after `/opsx-modify`. If omitted, the AI will infer from context or prompt for selection.
 
-   Always announce: "Using change: <name>" and how to override (e.g., `/opsx-modify <change> <artifact>`).
+**Patterns**:
+| Input | Behavior |
+|-------|----------|
+| `/opsx-modify add-auth proposal` | Direct: use specified change and artifact |
+| `/opsx-modify add-auth` | Change specified, auto-select artifact |
+| `/opsx-modify` | Infer from context or prompt for both |
+
+---
+
+## Steps
+
+1. **Select the change**
+
+   If name provided: use it. Otherwise:
+   - Infer from conversation context
+   - Auto-select if only one active change
+   - If ambiguous: run `openspec list --json` and use **AskUserQuestion** to prompt
+
+   Announce: "Using change: <name>" and how to override.
 
 2. **Check change status**
    ```bash
    openspec status --change "<name>" --json
    ```
-   Parse JSON to understand: schemaName, artifacts with status (done/ready/blocked), isComplete, applyRequires.
+   Parse JSON for: schemaName, artifacts with status (done/ready/blocked).
 
 3. **Select artifact to modify**
-   - If artifact ID specified: use it
-   - Otherwise: auto-select if only one artifact has status "ready"
-   - If user described content (e.g., "the requirements"): match by name
-   - If multiple artifacts ready and no direction: use **AskUserQuestion** to prompt
 
-   When prompting, present artifacts in schema order, showing: artifact ID, status, dependencies count, unlocks count.
+   If artifact ID specified: use it. Otherwise:
+   - Auto-select if only one artifact has status "ready"
+   - Match by name if user described content (e.g., "the requirements")
+   - Prompt if multiple ready and no direction
+
+   Present in schema order showing: ID, status, dependencies, unlocks.
 
 4. **Get modification context**
    ```bash
    openspec instructions <artifact-id> --change "<name>" --json
    ```
-   Parse JSON to extract: rules, context, template, dependencies, unlocks, outputPath, instruction.
+   Extract: rules, context, template, dependencies, unlocks, outputPath.
 
-   **Read the current artifact file** from `outputPath`.
+   **Read the current artifact file** from outputPath.
 
-5. **Display validation constraints**
-   Show user: rules array, dependencies list, unlocks list.
+5. **Determine modification mode**
 
-6. **Determine modification mode**
+   - **Mode A - Describe Changes**: User provides natural language → apply autonomously if clear, ask if ambiguous
+   - **Mode B - Interactive Edit**: User references specific content → show relevant sections, apply targeted edits
 
-   **Mode A - Describe Changes**: Use when user provides natural language (e.g., "Add a requirement for...", "Update design to...").
-   - Parse user's description
-   - Analyze current artifact content
-   - Identify which sections need changes
-   - Apply changes autonomously if clear
-   - If ambiguous or uncertain: pause and ask for clarification using AskUserQuestion
+   Auto-select based on input type.
 
-   **Mode B - Interactive Edit**: Use when user references specific content (e.g., "Change line 42 to...", "Replace the second paragraph...").
-   - Parse entire artifact file
-   - Identify relevant sections based on user's edit intent
-   - Show only those sections (not entire file)
-   - User provides specific edit instructions
-   - Apply targeted changes using Edit tool
-   - If more sections need changes, repeat
+6. **Apply modifications**
 
-   Decision: Auto-select based on input type. No explicit prompt needed.
+   Validate against `rules` from step 4:
+   - Clear violations → fix automatically
+   - Ambiguous violations → ask user
+   - Clear intent despite violation → proceed with warning
 
-7. **Apply modifications** based on selected mode.
+   Use Edit tool for targeted changes, Write for complete rewrites.
 
-8. **Validate modifications**
-   Check proposed changes against `rules` array from step 4:
-   1. Identify any rule violations
-   2. Clear/fixable violations → Fix automatically and continue
-   3. Ambiguous violations → Explain issue and ask user
-   4. If user's intent is clear despite violation → Proceed with warning
+7. **Handle dependent artifacts**
 
-   Note: Use the `rules` from instructions, do NOT run `openspec validate`.
+   Check `unlocks` array from instructions. For each dependent:
+   - Read the dependent artifact
+   - Analyze if modification affects it
+   - Track affected artifacts
 
-9. **Write the updated artifact file**
-   Use Edit tool for targeted changes, Write tool for complete rewrites.
-   Verify file was written successfully.
+   **Decision logic**:
+   - 0-1 affected: Auto-update and explain
+   - 2+ affected: Show list and prompt
+   - User said "cascade": Auto-update all
 
-10. **Handle dependent artifacts**
-    From the instructions output, check `unlocks` array (reverse dependencies).
+8. **Display summary**
 
-    **For each artifact in `unlocks`**:
-    - Run `openspec instructions <dependent-id> --change "<name>" --json`
-    - Read the dependent artifact file
-    - Analyze if modification affects this dependent artifact
-    - Track affected artifacts
+---
 
-    **Decision logic** (prefer reasonable decisions):
-    - **0-1 affected**: Auto-update and explain (no prompt)
-    - **2+ affected**: Show the list and prompt for confirmation
-    - **User mentioned "cascade"**: Auto-update regardless of count
+## Output
 
-    **When auto-updating**:
-    - Apply the same modification principles
-    - Summarize changes after all updates complete
-    - Mark dependent artifacts as modified
-
-**Output**
-
-After completion, display:
 ```
 ## Modification Complete
 
@@ -107,30 +101,24 @@ After completion, display:
 - [Section]: [Action] - [Summary]
 
 ### Dependent Artifacts Updated
-- [✓] <artifact-id>: [Summary]
+- [x] <artifact-id>: [Summary]
 
 ### Next Steps
 - Ready to implement: `/opsx-apply <name>`
 - Continue modifying: [describe next artifact]
 ```
 
-**Guardrails**
+---
+
+## Guardrails
 
 - Always read current artifact before modifying
-- Check dependents before finalizing changes
-- Use `rules` from instructions for validation (not CLI validate command)
+- Check dependents before finalizing
+- Use `rules` from instructions for validation (not `openspec validate`)
 - Use Edit for targeted changes, Write for complete rewrites
-- Prefer reasonable decisions to keep momentum (0-1 dependents → auto-update)
-- Pause and ask for clarification if unable to act autonomously
-- Follow schema order for artifact selection
-- IMPORTANT: `context` and `rules` are constraints for YOU, not content for the file
-  - Do NOT copy `<context>`, `<rules>`, `<project_context>` blocks into artifact
-  - These guide what you write, but should never appear in the output
+- Prefer reasonable decisions (0-1 dependents → auto-update)
+- **IMPORTANT**: `context` and `rules` are constraints for YOU, not content for the file
 
-Load the corresponding skill for detailed implementation:
+---
 
-See `.opencode/skills/openspec-modify-artifact/SKILL.md` for:
-- Detailed inference logic and auto-selection behavior
-- Complete modification modes and workflows
-- Validation against rules
-- Dependent artifact cascade update logic
+See `.opencode/skills/openspec-modify-artifacts/SKILL.md` for detailed implementation logic.
