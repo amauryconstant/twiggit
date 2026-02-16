@@ -133,3 +133,33 @@ logv(cmd, 2, "  to path: %s", path)
 - SHALL NOT add verbose output to service layer
 - SHALL use user-focused language, not developer-focused
 - SHALL NOT use "DEBUG:" prefix
+
+## Shell Completion
+
+Carapace integration provides shell completion for all commands.
+
+**Hidden command:** `twiggit _carapace <shell>` generates completion scripts.
+
+| Shells | bash, zsh, fish, nushell, elvish, powershell, tcsh, oil, xonsh, cmd-clink |
+|--------|-----------------------------------------------------------------------------|
+
+**Usage:**
+```bash
+# Bash
+source <(twiggit _carapace bash)
+# Zsh
+source <(twiggit _carapace zsh)
+```
+
+**Implementation:** `cmd/completion.go` provides action helpers:
+- `actionWorktreeTarget(config, opts...)` - Positional completion with `ActionMultiParts("/")`
+- `actionBranches(config)` - Branch completion for `--source` flag
+- `.Cache(5s)` - 5-second cache for performance
+- `.Timeout(timeout)` - Graceful degradation for slow git ops
+
+**Wiring pattern:**
+```go
+carapace.Gen(cmd).PositionalCompletion(
+    actionWorktreeTarget(config, WithExistingOnly()),  // for delete/prune
+)
+```

@@ -100,3 +100,11 @@ type CLIClient interface {
 
 **Location:** `$HOME/.config/twiggit/config.toml` (XDG)
 **Priority:** defaults → config file → env vars (`TWIGGIT_*`) → flags
+
+**Completion timeout:**
+```toml
+[completion]
+timeout = "500ms"  # Optional, default 500ms
+```
+
+Slow git operations gracefully degrade to empty suggestions.

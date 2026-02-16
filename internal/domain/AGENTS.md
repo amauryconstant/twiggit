@@ -106,3 +106,23 @@ func InferShellTypeFromPath(string) ShellType
 ```
 
 **Error code:** `ErrShellDetectionFailed = "SHELL_DETECTION_FAILED"` (string constant)
+
+## Suggestion Options
+
+```go
+type SuggestionOption func(*suggestionConfig)
+
+func WithExistingOnly() SuggestionOption  // Filter to materialized worktrees only
+```
+
+Used by `ContextResolver.GetResolutionSuggestions()` for completion filtering.
+
+## Config
+
+```go
+type Config struct {
+    ProjectsDirectory   string
+    WorktreesDirectory  string
+    CompletionTimeout   time.Duration  // Default: 500ms
+}
+```
