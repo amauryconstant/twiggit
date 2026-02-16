@@ -17,7 +17,7 @@ twiggit already has a suggestion system in `ContextResolver.GetResolutionSuggest
 
 **Goals:**
 - Integrate Carapace for shell completion generation
-- Wire `cd`, `create`, `delete` commands to existing suggestion system via Carapace actions
+- Wire `cd`, `create`, `delete`, `prune` commands to existing suggestion system via Carapace actions
 - Add `--source` flag completion for `create` command
 - Extend `GetResolutionSuggestions` with `SuggestionOption` for existing-worktree filtering
 - Support progressive `project/branch` completion via `ActionMultiParts`
@@ -175,6 +175,20 @@ func WithExistingOnly() SuggestionOption {
 func (cr *contextResolver) GetResolutionSuggestions(ctx *domain.Context, partial string, opts ...SuggestionOption) ([]*domain.ResolutionSuggestion, error)
 ```
 
+### 8. Prune command completion
+
+**Choice:** Reuse `actionWorktreeTarget(config, WithExistingOnly())` for prune command
+
+**Rationale:** Prune command accepts same `[project/branch]` format as delete; both show existing worktrees only; DRY principle
+
+**Wiring:**
+```go
+// cmd/prune.go
+carapace.Gen(cmd).PositionalCompletion(
+    actionWorktreeTarget(config, WithExistingOnly()),
+)
+```
+
 ## Risks / Trade-offs
 
 | Risk | Mitigation |
@@ -192,9 +206,11 @@ flowchart TB
         cd["cd.go"]
         create["create.go"]
         delete["delete.go"]
+        prune["prune.go"]
         completion["completion.go"]
         
-        cd & create & delete --> carapace["carapace.Gen(cmd)"]
+        cd & create & delete & prune --> carapace["carapace.Gen(cmd)"]
+        
         carapace --> pos["PositionalCompletion"]
         carapace --> flag["FlagCompletion"]
         
@@ -224,4 +240,4 @@ flowchart TB
 | Unit | `internal/infrastructure/context_resolver_test.go` | Extended for `WithExistingOnly` option |
 | Integration | `test/integration/context_detection_test.go` | Extended for real git operations |
 | E2E | `test/e2e/completion_test.go` | New file using `_carapace` command |
-| Config | `carapace.Test(t)` in root_test.go | Validates flag names exist |
+| Config | `carapace.Test(t)` in cmd/root_test.go | Validates flag names exist |

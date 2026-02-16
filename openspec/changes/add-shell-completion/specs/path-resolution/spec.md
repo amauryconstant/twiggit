@@ -25,6 +25,13 @@ The system SHALL support progressive completion for cross-project references whe
 - **THEN** system SHALL return empty suggestions
 - **AND** system SHALL NOT return an error (graceful degradation)
 
+#### Scenario: Handle slow or unreachable project repository
+
+- **WHEN** user requests completion with partial input matching `<project>/`
+- **AND** the project's repository cannot be accessed within 500ms timeout
+- **THEN** system SHALL gracefully degrade by returning empty suggestions for that project
+- **AND** system SHALL NOT return an error
+
 ### Requirement: Existing Worktree Filter
 
 The system SHALL support filtering suggestions to include only materialized worktrees.

@@ -43,7 +43,7 @@ The system SHALL provide context-aware tab completion for command arguments via 
 
 - **WHEN** user presses tab after `twiggit cd ` from within a worktree
 - **THEN** system SHALL suggest sibling worktree branch names
-- **AND** system SHALL include "main" as a suggestion
+- **AND** system SHALL NOT include "main" (already at project root)
 
 #### Scenario: Complete cd command from outside git context
 
@@ -71,6 +71,23 @@ The system SHALL provide tab completion for flag values via Carapace's `FlagComp
 - **WHEN** user presses tab after `twiggit create feature-1 --source ` from within a project
 - **THEN** system SHALL suggest branch names available as source branches
 - **AND** suggestions SHALL include all local branches in the repository
+
+### Requirement: Prune Command Completion
+
+The system SHALL provide tab completion for prune command arguments via Carapace, filtering to existing worktrees only.
+
+#### Scenario: Complete prune command argument from project context
+
+- **WHEN** user presses tab after `twiggit prune ` from within a project directory
+- **THEN** system SHALL suggest ONLY existing worktrees for the current project
+- **AND** system SHALL NOT suggest branches without materialized worktrees
+- **AND** system SHALL NOT include the project root ("main") as a suggestion
+
+#### Scenario: Complete prune command argument with cross-project prefix
+
+- **WHEN** user presses tab after `twiggit prune myproject/` from outside any project
+- **THEN** system SHALL suggest existing worktrees for the specified project
+- **AND** suggestions SHALL be formatted as `<project>/<branch>`
 
 ### Requirement: Completion Descriptions
 
@@ -102,9 +119,18 @@ The system SHALL cache completion results for acceptable performance.
 - **WHEN** completion fetches branch names from git
 - **THEN** system SHALL cache results for 5 seconds
 - **AND** subsequent tab presses within cache window SHALL use cached data
+- **AND** cache misses SHALL trigger fresh git operations with 500ms timeout protection
+
+#### Scenario: Cache hit avoids timeout
+
+- **WHEN** user requests completion within 5 seconds of previous completion
+- **THEN** system SHALL return cached results immediately
+- **AND** system SHALL not perform git operations
+- **AND** 500ms timeout SHALL not apply to cache hits
 
 #### Scenario: Timeout protection for slow operations
 
 - **WHEN** git operations take longer than 500ms during completion
-- **THEN** system SHALL return empty suggestions rather than blocking
+- **THEN** system SHALL gracefully degrade by returning empty suggestions
+- **AND** system SHALL not return partial results that might be incomplete
 - **AND** user experience SHALL not be degraded by slow git operations
