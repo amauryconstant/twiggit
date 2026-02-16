@@ -277,7 +277,7 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 }
 
 // addBranchSuggestions adds suggestions for branches without worktrees
-func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, existingWorktrees []domain.WorktreeInfo, config *suggestionConfig) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, existingWorktrees []domain.WorktreeInfo, _ *suggestionConfig) []*domain.ResolutionSuggestion {
 	branches, err := cr.gitService.ListBranches(context.Background(), ctx.Path)
 	if err != nil {
 		// Silent degradation is acceptable for suggestions - errors shouldn't prevent

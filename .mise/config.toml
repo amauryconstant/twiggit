@@ -68,7 +68,7 @@ outputs = ["bin/twiggit"]
 [tasks."build:local"]
 description = "Build and install twiggit locally for testing"
 depends = ["build:clean"]
-run = "mkdir -p $HOME/.local/bin && go build -ldflags=\"-X twiggit/cmd.version=$(git describe --tags --always --dirty 2>/dev/null || echo dev)\" -o $HOME/.local/bin/twiggit main.go"
+run = "mkdir -p $HOME/.local/bin && go build -ldflags=\"-X twiggit/cmd.version=$(git describe --tags --always --dirty 2>/dev/null || echo dev) -X twiggit/cmd.commit=$(git rev-parse HEAD 2>/dev/null || echo unknown) -X twiggit/cmd.date=$(date +%Y-%m-%d)\" -o $HOME/.local/bin/twiggit main.go"
 
 [tasks."build:e2e"]
 description = "Build and install twiggit locally for e2e tests"
