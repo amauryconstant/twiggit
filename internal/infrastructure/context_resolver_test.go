@@ -851,6 +851,109 @@ func (s *ContextResolverTestSuite) setupTestRepo(path string) {
 	s.Require().NoError(err)
 }
 
+func (s *ContextResolverTestSuite) TestDescriptionFormats() {
+	s.Run("main suggestion has project root directory description", func() {
+		ctx := &domain.Context{
+			Type:        domain.ContextProject,
+			ProjectName: "test-project",
+			Path:        "/home/user/Projects/test-project",
+		}
+
+		resolver := NewContextResolver(s.config, nil)
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "main")
+
+		s.Require().NoError(err)
+		s.Require().Len(suggestions, 1)
+		s.Equal("main", suggestions[0].Text)
+		s.Equal("Project root directory", suggestions[0].Description)
+	})
+
+	s.Run("worktree suggestion has worktree for branch description", func() {
+		ctx := &domain.Context{
+			Type:        domain.ContextProject,
+			ProjectName: "test-project",
+			Path:        "/home/user/Projects/test-project",
+		}
+
+		mockGitService := mocks.NewMockGitService()
+		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/home/user/Projects/test-project").
+			Return([]domain.WorktreeInfo{
+				{Branch: "feature-1", Path: "/home/user/Worktrees/test-project/feature-1"},
+			}, nil)
+		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, "/home/user/Projects/test-project").
+			Return([]domain.BranchInfo{}, nil)
+
+		resolver := NewContextResolver(s.config, mockGitService)
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature-1")
+
+		s.Require().NoError(err)
+		s.Require().Len(suggestions, 1)
+		s.Equal("feature-1", suggestions[0].Text)
+		s.Equal("Worktree for branch feature-1", suggestions[0].Description)
+	})
+
+	s.Run("branch without worktree has create worktree description", func() {
+		ctx := &domain.Context{
+			Type:        domain.ContextProject,
+			ProjectName: "test-project",
+			Path:        "/home/user/Projects/test-project",
+		}
+
+		mockGitService := mocks.NewMockGitService()
+		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/home/user/Projects/test-project").
+			Return([]domain.WorktreeInfo{}, nil)
+		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, "/home/user/Projects/test-project").
+			Return([]domain.BranchInfo{{Name: "develop"}}, nil)
+
+		resolver := NewContextResolver(s.config, mockGitService)
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "develop")
+
+		s.Require().NoError(err)
+		s.Require().Len(suggestions, 1)
+		s.Equal("develop", suggestions[0].Text)
+		s.Equal("Branch develop (create worktree)", suggestions[0].Description)
+	})
+
+	s.Run("project suggestion has project directory description", func() {
+		tempDir := s.T().TempDir()
+		projectsDir := tempDir
+
+		project1Path := filepath.Join(projectsDir, "project1")
+		s.Require().NoError(os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
+		s.setupTestRepo(project1Path)
+
+		config := &domain.Config{
+			ProjectsDirectory:  projectsDir,
+			WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
+		}
+
+		mockGitService := mocks.NewMockGitService()
+		mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
+
+		resolver := NewContextResolver(config, mockGitService)
+
+		ctx := &domain.Context{
+			Type: domain.ContextOutsideGit,
+			Path: tempDir,
+		}
+
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "proj")
+
+		s.Require().NoError(err)
+		s.Require().GreaterOrEqual(len(suggestions), 1)
+
+		var project1 *domain.ResolutionSuggestion
+		for _, sug := range suggestions {
+			if sug.Text == "project1" {
+				project1 = sug
+				break
+			}
+		}
+		s.Require().NotNil(project1)
+		s.Equal("Project directory", project1.Description)
+	})
+}
+
 func (s *ContextResolverTestSuite) TestWithExistingOnlyFilter() {
 	_, err := os.Stat("/tmp/nonexistent")
 	s.Require().True(os.IsNotExist(err))

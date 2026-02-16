@@ -162,3 +162,190 @@ func TestContextResolution_WithExistingOnly_Integration(t *testing.T) {
 
 	assert.Len(t, suggestions, 0, "Should return 0 suggestions for empty project")
 }
+
+func TestWithExistingOnly_ExistingWorktrees(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	tempDir := t.TempDir()
+	projectsDir := filepath.Join(tempDir, "Projects")
+	worktreesDir := filepath.Join(tempDir, "Worktrees")
+
+	projectPath := filepath.Join(projectsDir, "test-project")
+	require.NoError(t, os.MkdirAll(projectPath, 0755))
+
+	setupTestGitRepo(t, projectPath)
+
+	existingWorktreePath := filepath.Join(worktreesDir, "test-project", "feature-1")
+	require.NoError(t, os.MkdirAll(existingWorktreePath, 0755))
+
+	nonExistingWorktreePath := filepath.Join(worktreesDir, "test-project", "feature-2")
+
+	config := &domain.Config{
+		ProjectsDirectory:  projectsDir,
+		WorktreesDirectory: worktreesDir,
+	}
+
+	mockGitService := mocks.NewMockGitService()
+	mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
+	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
+	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{
+		{Branch: "feature-1", Path: existingWorktreePath},
+		{Branch: "feature-2", Path: nonExistingWorktreePath},
+	}, nil)
+
+	resolver := infrastructure.NewContextResolver(config, mockGitService)
+
+	ctx := &domain.Context{
+		Type:        domain.ContextProject,
+		ProjectName: "test-project",
+		Path:        projectPath,
+	}
+
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", infrastructure.WithExistingOnly())
+	require.NoError(t, err)
+
+	assert.Len(t, suggestions, 1, "Should only return existing worktrees")
+	if len(suggestions) > 0 {
+		assert.Equal(t, "feature-1", suggestions[0].Text)
+		assert.Equal(t, "test-project", suggestions[0].ProjectName)
+	}
+}
+
+func TestWithExistingOnly_AllWorktreesExist(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	tempDir := t.TempDir()
+	projectsDir := filepath.Join(tempDir, "Projects")
+	worktreesDir := filepath.Join(tempDir, "Worktrees")
+
+	projectPath := filepath.Join(projectsDir, "test-project")
+	require.NoError(t, os.MkdirAll(projectPath, 0755))
+
+	setupTestGitRepo(t, projectPath)
+
+	worktree1Path := filepath.Join(worktreesDir, "test-project", "feature-1")
+	worktree2Path := filepath.Join(worktreesDir, "test-project", "feature-2")
+	require.NoError(t, os.MkdirAll(worktree1Path, 0755))
+	require.NoError(t, os.MkdirAll(worktree2Path, 0755))
+
+	config := &domain.Config{
+		ProjectsDirectory:  projectsDir,
+		WorktreesDirectory: worktreesDir,
+	}
+
+	mockGitService := mocks.NewMockGitService()
+	mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
+	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
+	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{
+		{Branch: "feature-1", Path: worktree1Path},
+		{Branch: "feature-2", Path: worktree2Path},
+	}, nil)
+
+	resolver := infrastructure.NewContextResolver(config, mockGitService)
+
+	ctx := &domain.Context{
+		Type:        domain.ContextProject,
+		ProjectName: "test-project",
+		Path:        projectPath,
+	}
+
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", infrastructure.WithExistingOnly())
+	require.NoError(t, err)
+
+	assert.Len(t, suggestions, 2, "Should return all worktrees when all exist")
+
+	suggestionTexts := make([]string, len(suggestions))
+	for i, s := range suggestions {
+		suggestionTexts[i] = s.Text
+	}
+	assert.Contains(t, suggestionTexts, "feature-1")
+	assert.Contains(t, suggestionTexts, "feature-2")
+}
+
+func TestWithExistingOnly_NoWorktreesExist(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	tempDir := t.TempDir()
+	projectsDir := filepath.Join(tempDir, "Projects")
+	worktreesDir := filepath.Join(tempDir, "Worktrees")
+
+	projectPath := filepath.Join(projectsDir, "test-project")
+	require.NoError(t, os.MkdirAll(projectPath, 0755))
+
+	setupTestGitRepo(t, projectPath)
+
+	nonExisting1 := filepath.Join(worktreesDir, "test-project", "feature-1")
+	nonExisting2 := filepath.Join(worktreesDir, "test-project", "feature-2")
+
+	config := &domain.Config{
+		ProjectsDirectory:  projectsDir,
+		WorktreesDirectory: worktreesDir,
+	}
+
+	mockGitService := mocks.NewMockGitService()
+	mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
+	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
+	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{
+		{Branch: "feature-1", Path: nonExisting1},
+		{Branch: "feature-2", Path: nonExisting2},
+	}, nil)
+
+	resolver := infrastructure.NewContextResolver(config, mockGitService)
+
+	ctx := &domain.Context{
+		Type:        domain.ContextProject,
+		ProjectName: "test-project",
+		Path:        projectPath,
+	}
+
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", infrastructure.WithExistingOnly())
+	require.NoError(t, err)
+
+	assert.Len(t, suggestions, 0, "Should return no suggestions when no worktrees exist")
+}
+
+func TestWithExistingOnly_SkipsMainSuggestion(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	tempDir := t.TempDir()
+	projectsDir := filepath.Join(tempDir, "Projects")
+	worktreesDir := filepath.Join(tempDir, "Worktrees")
+
+	projectPath := filepath.Join(projectsDir, "test-project")
+	require.NoError(t, os.MkdirAll(projectPath, 0755))
+
+	setupTestGitRepo(t, projectPath)
+
+	config := &domain.Config{
+		ProjectsDirectory:  projectsDir,
+		WorktreesDirectory: worktreesDir,
+	}
+
+	mockGitService := mocks.NewMockGitService()
+	mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
+	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
+	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{}, nil)
+
+	resolver := infrastructure.NewContextResolver(config, mockGitService)
+
+	ctx := &domain.Context{
+		Type:        domain.ContextProject,
+		ProjectName: "test-project",
+		Path:        projectPath,
+	}
+
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "main", infrastructure.WithExistingOnly())
+	require.NoError(t, err)
+
+	for _, s := range suggestions {
+		assert.NotEqual(t, "main", s.Text, "Should not include 'main' suggestion with WithExistingOnly")
+	}
+}

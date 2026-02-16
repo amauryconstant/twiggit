@@ -106,8 +106,8 @@ func actionBranchesForProject(projectName string, config *CommandConfig) carapac
 		}
 
 		action := carapace.ActionValues(result...)
-		for range result {
-			action = action.Tag(descriptions[0])
+		for i := range result {
+			action = action.Tag(descriptions[i])
 		}
 		return action
 	}).Timeout(timeout, carapace.ActionValues()).Cache(5 * time.Second)
