@@ -21,10 +21,10 @@ type ContextService interface {
 	ResolveIdentifierFromContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error)
 
 	// GetCompletionSuggestions provides completion suggestions for partial identifiers
-	GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error)
+	GetCompletionSuggestions(partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error)
 
 	// GetCompletionSuggestionsFromContext provides completion suggestions for partial identifiers within a specific context
-	GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error)
+	GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error)
 }
 
 // WorktreeService provides high-level worktree management operations

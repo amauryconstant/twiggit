@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 
+	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
 	"twiggit/internal/application"
@@ -51,6 +52,8 @@ across multiple projects.`,
 	cmd.AddCommand(NewCDCommand(config))
 	cmd.AddCommand(NewInitCmd(config))
 	cmd.AddCommand(NewVersionCommand(config))
+
+	carapace.Gen(cmd)
 
 	return cmd
 }

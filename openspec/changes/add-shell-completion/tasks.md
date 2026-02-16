@@ -1,19 +1,19 @@
 ## 1. Dependencies and Setup
 
-- [ ] 1.1 Add Carapace dependency to `go.mod`: `github.com/carapace-sh/carapace`
-- [ ] 1.2 Initialize Carapace in `cmd/root.go` with `carapace.Gen(cmd)` after root command creation
+- [x] 1.1 Add Carapace dependency to `go.mod`: `github.com/carapace-sh/carapace`
+- [x] 1.2 Initialize Carapace in `cmd/root.go` with `carapace.Gen(cmd)` after root command creation
 
 ## 2. Domain Layer - Suggestion Options
 
-- [ ] 2.1 Add `SuggestionOption` functional option type and `suggestionConfig` struct in `internal/domain/context.go`
-- [ ] 2.2 Add `WithExistingOnly()` option function in `internal/domain/context.go`
-- [ ] 2.3 Update `ContextResolver` interface `GetResolutionSuggestions` signature to accept variadic options
+- [x] 2.1 Add `SuggestionOption` functional option type and `suggestionConfig` struct in `internal/domain/context.go`
+- [x] 2.2 Add `WithExistingOnly()` option function in `internal/domain/context.go`
+- [x] 2.3 Update `ContextResolver` interface `GetResolutionSuggestions` signature to accept variadic options
 
 ## 3. Infrastructure Layer - ContextResolver Extensions
 
-- [ ] 3.1 Add `suggestionConfig` internal struct to `contextResolver` in `internal/infrastructure/context_resolver.go`
-- [ ] 3.2 Implement `WithExistingOnly` filter logic in suggestion methods (filter to worktrees that exist on disk)
-- [ ] 3.3 Add description text to all suggestion types for Carapace display:
+- [x] 3.1 Add `suggestionConfig` internal struct to `contextResolver` in `internal/infrastructure/context_resolver.go`
+- [x] 3.2 Implement `WithExistingOnly` filter logic in suggestion methods (filter to worktrees that exist on disk)
+- [x] 3.3 Add description text to all suggestion types for Carapace display:
   - Worktree: "Worktree for branch <branch>"
   - Branch (unmaterialized): "Branch <branch> (create worktree)"
   - Project: "Project directory"

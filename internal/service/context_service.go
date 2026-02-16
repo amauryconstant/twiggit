@@ -71,13 +71,13 @@ func (cs *contextService) ResolveIdentifierFromContext(ctx *domain.Context, iden
 }
 
 // GetCompletionSuggestions provides completion suggestions based on current context
-func (cs *contextService) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
+func (cs *contextService) GetCompletionSuggestions(partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
 	ctx, err := cs.GetCurrentContext()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current context: %w", err)
 	}
 
-	suggestions, err := cs.resolver.GetResolutionSuggestions(ctx, partial)
+	suggestions, err := cs.resolver.GetResolutionSuggestions(ctx, partial, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get completion suggestions: %w", err)
 	}
@@ -85,8 +85,8 @@ func (cs *contextService) GetCompletionSuggestions(partial string) ([]*domain.Re
 }
 
 // GetCompletionSuggestionsFromContext provides completion suggestions based on specified context
-func (cs *contextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
-	suggestions, err := cs.resolver.GetResolutionSuggestions(ctx, partial)
+func (cs *contextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
+	suggestions, err := cs.resolver.GetResolutionSuggestions(ctx, partial, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get completion suggestions: %w", err)
 	}

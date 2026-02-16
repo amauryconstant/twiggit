@@ -79,6 +79,9 @@ type ResolutionSuggestion struct {
 	BranchName  string
 }
 
+// SuggestionOption is a functional option for configuring resolution suggestions
+type SuggestionOption func(interface{})
+
 // ContextDetector detects the current git context
 type ContextDetector interface {
 	// DetectContext detects the context from the given directory
@@ -91,5 +94,5 @@ type ContextResolver interface {
 	ResolveIdentifier(ctx *Context, identifier string) (*ResolutionResult, error)
 
 	// GetResolutionSuggestions provides completion suggestions
-	GetResolutionSuggestions(ctx *Context, partial string) ([]*ResolutionSuggestion, error)
+	GetResolutionSuggestions(ctx *Context, partial string, opts ...SuggestionOption) ([]*ResolutionSuggestion, error)
 }

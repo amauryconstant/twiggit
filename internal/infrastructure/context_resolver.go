@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -172,19 +173,38 @@ func (cr *contextResolver) ResolveIdentifier(ctx *domain.Context, identifier str
 	}
 }
 
-func (cr *contextResolver) GetResolutionSuggestions(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
+func (cr *contextResolver) GetResolutionSuggestions(ctx *domain.Context, partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
+	config := &suggestionConfig{}
+	for _, opt := range opts {
+		opt(config)
+	}
+
 	var suggestions []*domain.ResolutionSuggestion
 
 	switch ctx.Type {
 	case domain.ContextProject:
-		suggestions = append(suggestions, cr.getProjectContextSuggestions(ctx, partial)...)
+		suggestions = append(suggestions, cr.getProjectContextSuggestions(ctx, partial, config)...)
 	case domain.ContextWorktree:
-		suggestions = append(suggestions, cr.getWorktreeContextSuggestions(ctx, partial)...)
+		suggestions = append(suggestions, cr.getWorktreeContextSuggestions(ctx, partial, config)...)
 	case domain.ContextOutsideGit:
 		suggestions = append(suggestions, cr.getOutsideGitContextSuggestions(partial)...)
 	}
 
 	return suggestions, nil
+}
+
+// suggestionConfig holds configuration for resolution suggestions
+type suggestionConfig struct {
+	existingOnly bool
+}
+
+// WithExistingOnly returns an option that filters suggestions to existing worktrees only
+func WithExistingOnly() domain.SuggestionOption {
+	return func(c interface{}) {
+		if cfg, ok := c.(*suggestionConfig); ok {
+			cfg.existingOnly = true
+		}
+	}
 }
 
 func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
@@ -199,18 +219,18 @@ func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identi
 	return cr.resolveWorktreePath(ctx, identifier)
 }
 
-func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, partial string, config *suggestionConfig) []*domain.ResolutionSuggestion {
 	var suggestions []*domain.ResolutionSuggestion
 
 	// Add main suggestion
-	suggestions = cr.addMainSuggestion(suggestions, ctx, partial)
+	suggestions = cr.addMainSuggestion(suggestions, ctx, partial, config)
 
 	// Add worktree and branch suggestions if git service is available
 	if cr.gitService != nil && ctx.Path != "" {
 		worktrees, err := cr.gitService.ListWorktrees(context.Background(), ctx.Path)
 		if err == nil {
-			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees)
-			suggestions = cr.addBranchSuggestions(suggestions, ctx, partial, worktrees)
+			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees, config)
+			suggestions = cr.addBranchSuggestions(suggestions, ctx, partial, worktrees, config)
 		}
 	}
 
@@ -218,7 +238,7 @@ func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, par
 }
 
 // addMainSuggestion adds the "main" project root suggestion
-func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, config *suggestionConfig) []*domain.ResolutionSuggestion {
 	if strings.HasPrefix("main", partial) {
 		suggestions = append(suggestions, &domain.ResolutionSuggestion{
 			Text:        "main",
@@ -231,9 +251,14 @@ func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSug
 }
 
 // addWorktreeSuggestions adds suggestions for existing worktrees
-func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, worktrees []domain.WorktreeInfo) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, worktrees []domain.WorktreeInfo, config *suggestionConfig) []*domain.ResolutionSuggestion {
 	for _, worktree := range worktrees {
 		if strings.HasPrefix(worktree.Branch, partial) {
+			if config.existingOnly {
+				if _, err := os.Stat(worktree.Path); os.IsNotExist(err) {
+					continue
+				}
+			}
 			suggestions = append(suggestions, &domain.ResolutionSuggestion{
 				Text:        worktree.Branch,
 				Description: "Worktree for branch " + worktree.Branch,
@@ -247,7 +272,7 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 }
 
 // addBranchSuggestions adds suggestions for branches without worktrees
-func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, existingWorktrees []domain.WorktreeInfo) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, existingWorktrees []domain.WorktreeInfo, config *suggestionConfig) []*domain.ResolutionSuggestion {
 	branches, err := cr.gitService.ListBranches(context.Background(), ctx.Path)
 	if err != nil {
 		// Silent degradation is acceptable for suggestions - errors shouldn't prevent
@@ -287,12 +312,12 @@ func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, ident
 	return cr.resolveWorktreePath(ctx, identifier)
 }
 
-func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, partial string) []*domain.ResolutionSuggestion {
-	suggestions := cr.addMainSuggestion(nil, ctx, partial)
+func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, partial string, config *suggestionConfig) []*domain.ResolutionSuggestion {
+	suggestions := cr.addMainSuggestion(nil, ctx, partial, config)
 
 	if cr.gitService != nil && ctx.Path != "" {
 		if worktrees, err := cr.gitService.ListWorktrees(context.Background(), ctx.Path); err == nil {
-			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees)
+			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees, config)
 		}
 	}
 
