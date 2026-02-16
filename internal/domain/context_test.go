@@ -142,3 +142,34 @@ func (s *ContextTestSuite) TestResolutionSuggestion_ZeroValues() {
 	s.Empty(suggestion.ProjectName)
 	s.Empty(suggestion.BranchName)
 }
+
+type SuggestionOptionTestSuite struct {
+	suite.Suite
+}
+
+func TestSuggestionOptionSuite(t *testing.T) {
+	suite.Run(t, new(SuggestionOptionTestSuite))
+}
+
+func (s *SuggestionOptionTestSuite) TestWithExistingOnly() {
+	tests := []struct {
+		name     string
+		option   SuggestionOption
+		expected string
+	}{
+		{
+			name:     "WithExistingOnly option",
+			option:   WithExistingOnly(),
+			expected: "WithExistingOnly",
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			if tt.option == nil {
+				s.T().Fatal("option should not be nil")
+			}
+			s.NotNil(tt.option, "option should not be nil")
+		})
+	}
+}

@@ -53,6 +53,13 @@ func (s *ContextServiceTestSuite) TestGetCurrentContext() {
 			setupMock: func() {
 				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
+				s.resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat", []domain.SuggestionOption(nil)).Return(
+					[]*domain.ResolutionSuggestion{
+						{
+							Text:        "feature-branch",
+							Description: "Feature branch",
+						},
+					}, nil)
 			},
 			expectedContext: fixtures.NewProjectContext(),
 		},
@@ -295,7 +302,7 @@ func (s *ContextServiceTestSuite) TestGetCompletionSuggestions() {
 			setupMock: func() {
 				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				s.resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat").Return(
+				s.resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat", []domain.SuggestionOption(nil)).Return(
 					fixtures.NewFeatureSuggestions(), nil)
 			},
 			expectedSuggestions: fixtures.NewFeatureSuggestions(),
@@ -309,12 +316,12 @@ func (s *ContextServiceTestSuite) TestGetCompletionSuggestions() {
 			expectedError: "failed to get current context",
 		},
 		{
-			name:    "suggestions fail",
+			name:    "suggestions_fail",
 			partial: "invalid",
 			setupMock: func() {
 				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				s.resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "invalid").Return(
+				s.resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "invalid", []domain.SuggestionOption(nil)).Return(
 					nil, assert.AnError)
 			},
 			expectedError: "failed to get completion suggestions",

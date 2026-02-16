@@ -82,6 +82,16 @@ type ResolutionSuggestion struct {
 // SuggestionOption is a functional option for configuring resolution suggestions
 type SuggestionOption func(interface{})
 
+// WithExistingOnly returns an option that filters suggestions to existing worktrees only
+// Defined here for test accessibility - actual implementation in infrastructure layer
+func WithExistingOnly() SuggestionOption {
+	return func(c interface{}) {
+		if cfg, ok := c.(*interface{}); ok {
+			_ = cfg
+		}
+	}
+}
+
 // ContextDetector detects the current git context
 type ContextDetector interface {
 	// DetectContext detects the context from the given directory

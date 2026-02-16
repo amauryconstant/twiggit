@@ -220,8 +220,8 @@ func (m *MockContextService) ResolveIdentifierFromContext(ctx *domain.Context, i
 }
 
 // GetCompletionSuggestions mocks getting completion suggestions
-func (m *MockContextService) GetCompletionSuggestions(partial string) ([]*domain.ResolutionSuggestion, error) {
-	args := m.Called(partial)
+func (m *MockContextService) GetCompletionSuggestions(partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
+	args := m.Called(partial, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -229,8 +229,8 @@ func (m *MockContextService) GetCompletionSuggestions(partial string) ([]*domain
 }
 
 // GetCompletionSuggestionsFromContext mocks getting completion suggestions from context
-func (m *MockContextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string) ([]*domain.ResolutionSuggestion, error) {
-	args := m.Called(ctx, partial)
+func (m *MockContextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
+	args := m.Called(ctx, partial, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

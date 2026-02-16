@@ -158,7 +158,7 @@ func (s *NavigationServiceTestSuite) TestGetNavigationSuggestions() {
 			projectService := mocks.NewMockProjectService()
 			contextService := mocks.NewMockContextService()
 
-			contextService.On("GetCompletionSuggestionsFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string")).Return([]*domain.ResolutionSuggestion{
+			contextService.On("GetCompletionSuggestionsFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string"), []domain.SuggestionOption(nil)).Return([]*domain.ResolutionSuggestion{
 				{
 					Text:        "feature-branch",
 					Description: "Feature branch",
@@ -168,7 +168,7 @@ func (s *NavigationServiceTestSuite) TestGetNavigationSuggestions() {
 				},
 			}, nil)
 
-			contextService.On("GetCompletionSuggestions", mock.AnythingOfType("string")).Return([]*domain.ResolutionSuggestion{
+			contextService.On("GetCompletionSuggestions", mock.AnythingOfType("string"), []domain.SuggestionOption(nil)).Return([]*domain.ResolutionSuggestion{
 				{
 					Text:        "test-project",
 					Description: "Test project",

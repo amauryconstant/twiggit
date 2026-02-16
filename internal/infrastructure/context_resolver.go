@@ -239,6 +239,11 @@ func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, par
 
 // addMainSuggestion adds the "main" project root suggestion
 func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, config *suggestionConfig) []*domain.ResolutionSuggestion {
+	// Skip main suggestion when existingOnly is true (main is not a worktree)
+	if config.existingOnly {
+		return suggestions
+	}
+
 	if strings.HasPrefix("main", partial) {
 		suggestions = append(suggestions, &domain.ResolutionSuggestion{
 			Text:        "main",

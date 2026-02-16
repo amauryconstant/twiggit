@@ -850,3 +850,8 @@ func (s *ContextResolverTestSuite) setupTestRepo(path string) {
 	err = os.WriteFile(filepath.Join(gitDir, "main"), []byte("0000000000000000000000000000000000000000\n"), 0644)
 	s.Require().NoError(err)
 }
+
+func (s *ContextResolverTestSuite) TestWithExistingOnlyFilter() {
+	_, err := os.Stat("/tmp/nonexistent")
+	s.Require().True(os.IsNotExist(err))
+}

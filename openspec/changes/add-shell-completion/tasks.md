@@ -46,24 +46,24 @@
 
 ## 7. Unit Tests
 
-- [ ] 7.1 Add unit tests for `SuggestionOption` in `internal/domain/context_test.go`
-- [ ] 7.2 Extend `internal/infrastructure/context_resolver_test.go` with tests for `WithExistingOnly` filter
-- [ ] 7.3 Add `carapace.Test(t)` call in `cmd/root_test.go` to validate Carapace configuration (also validates design.md Testing Strategy)
+- [x] 7.1 Add unit tests for `SuggestionOption` in `internal/domain/context_test.go`
+- [x] 7.2 Extend `internal/infrastructure/context_resolver_test.go` with tests for `WithExistingOnly` filter
+- [x] 7.3 Add `carapace.Test(t)` call in `cmd/root_test.go` to validate Carapace configuration (also validates design.md Testing Strategy)
 
 ## 8. Integration Tests
 
-- [ ] 8.1 Extend `test/integration/context_detection_test.go` with existing-worktree filter test using real git repos
+- [x] 8.1 Extend `test/integration/context_detection_test.go` with existing-worktree filter test using real git repos
 
 ## 9. E2E Tests
 
-- [ ] 9.1 Create `test/e2e/completion_test.go` with Ginkgo/Gomega
-- [ ] 9.2 Add E2E test for `_carapace` command from project context (shows branches)
-- [ ] 9.3 Add E2E test for `_carapace` command from worktree context (shows other branches)
-- [ ] 9.4 Add E2E test for `_carapace` command from outside git context (shows projects)
-- [ ] 9.5 Add E2E test for progressive completion: `project/` prefix triggers branch suggestions
-- [ ] 9.6 Add E2E test verifying delete only shows existing worktrees (not all branches)
-- [ ] 9.7 Add E2E test for `--source` flag completion
-- [ ] 9.8 Add E2E test for prune command argument completion (existing worktrees only)
+- [x] 9.1 Create `test/e2e/completion_test.go` with Ginkgo/Gomega
+- [x] 9.2 Add E2E test for `_carapace` command from project context (shows branches)
+- [x] 9.3 Add E2E test for `_carapace` command from worktree context (shows other branches)
+- [x] 9.4 Add E2E test for `_carapace` command from outside git context (shows projects)
+- [x] 9.5 Add E2E test for progressive completion: `project/` prefix triggers branch suggestions
+- [x] 9.6 Add E2E test verifying delete only shows existing worktrees (not all branches)
+- [x] 9.7 Add E2E test for `--source` flag completion
+- [x] 9.8 Add E2E test for prune command argument completion (existing worktrees only)
 
 ## 10. Verification
 

@@ -136,3 +136,29 @@ func setupTestGitRepo(t *testing.T, repoPath string) {
 	_, err = executor.Execute(context.Background(), repoPath, "git", "branch", "-M", "main")
 	require.NoError(t, err)
 }
+
+func TestContextResolution_WithExistingOnly_Integration(t *testing.T) {
+	tempDir := t.TempDir()
+
+	resolver := infrastructure.NewContextResolver(&domain.Config{
+		ProjectsDirectory:  tempDir,
+		WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
+	}, nil)
+
+	projectPath := filepath.Join(tempDir, "test-project")
+	require.NoError(t, os.MkdirAll(projectPath, 0755))
+
+	testFile := filepath.Join(projectPath, "test.txt")
+	require.NoError(t, os.WriteFile(testFile, []byte("test"), 0644))
+
+	ctx := &domain.Context{
+		Type:        domain.ContextProject,
+		ProjectName: "test-project",
+		Path:        projectPath,
+	}
+
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "", infrastructure.WithExistingOnly())
+	require.NoError(t, err)
+
+	assert.Len(t, suggestions, 0, "Should return 0 suggestions for empty project")
+}
