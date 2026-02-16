@@ -37,12 +37,12 @@
 
 ## 6. Version Package Consolidation
 
-- [ ] 6.1 Add unexported `version`, `commit`, `date` variables to `cmd/version.go`
-- [ ] 6.2 Update `NewVersionCommand` to use unexported variables instead of `internal/version` package
-- [ ] 6.3 Update ldflags in `.mise/config.toml`: change paths from `twiggit/internal/version.*` to `twiggit/cmd.*`
-- [ ] 6.4 Update ldflags in `.goreleaser.yml`: change paths from `twiggit/internal/version.*` to `twiggit/cmd.*`
-- [ ] 6.5 Delete `internal/version/` directory
-- [ ] 6.6 Remove `twiggit/internal/version` import from any remaining files (verify with grep)
+- [x] 6.1 Add unexported `version`, `commit`, `date` variables to `cmd/version.go`
+- [x] 6.2 Update `NewVersionCommand` to use unexported variables instead of `internal/version` package
+- [x] 6.3 Update ldflags in `.mise/config.toml`: change paths from `twiggit/internal/version.*` to `twiggit/cmd.*`
+- [x] 6.4 Update ldflags in `.goreleaser.yml`: change paths from `twiggit/internal/version.*` to `twiggit/cmd.*`
+- [x] 6.5 Delete `internal/version/` directory
+- [x] 6.6 Remove `twiggit/internal/version` import from any remaining files (verify with grep)
 
 ## 7. Unit Tests
 
