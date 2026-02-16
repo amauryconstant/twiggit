@@ -26,6 +26,8 @@
 - [x] 4.3 Add `actionBranches(config)` helper for `--source` flag completion
 - [x] 4.4 Add `.Cache(5*time.Second)` to completion actions for performance (Decision 1)
 - [x] 4.5 Add conversion helper from `domain.ResolutionSuggestion` to `carapace.ActionValuesDescribed`
+- [x] 4.6 Add `CompletionTimeout` field to `domain.Config` with 500ms default (Decision 9)
+- [x] 4.7 Apply `.Timeout(config.Config.CompletionTimeout)` to all completion action callbacks with empty suggestion fallback
 
 ## 5. CLI Layer - Wire Command Completions
 
@@ -78,3 +80,6 @@
 - [x] 10.4 Verify `twiggit version` still outputs correctly after consolidation
 - [~] 10.5 Run E2E completion tests: `mise run test:e2e` (deferred - see task 9)
 - [x] 10.6 Verify prune command argument completion suggests existing worktrees only (requires manual shell testing)
+- [x] 10.7 Verify `twiggit _carapace bash` outputs completion script correctly
+- [x] 10.8 Test configurable timeout: Set `[completion]timeout = "100ms"` in config.toml and verify timeout works
+- [x] 10.9 Run `mise run check` after all changes to verify implementation

@@ -26,7 +26,6 @@ Users cannot tab-complete project or branch names when using twiggit commands. T
 
 - Auto-installing shell completions during `twiggit init` command
 - Modifying the existing shell wrapper installed by `init` command
-- Adding a visible `completion` command (Carapace's hidden `_carapace` is sufficient)
 - Providing GUI or interactive configuration for completions
 - Supporting custom completion scripts beyond what Carapace generates
 

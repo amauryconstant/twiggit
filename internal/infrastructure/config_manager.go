@@ -61,6 +61,7 @@ func copyConfig(config *domain.Config) *domain.Config {
 		Validation:          config.Validation,
 		Navigation:          config.Navigation,
 		Shell:               config.Shell,
+		Completion:          config.Completion,
 	}
 }
 
@@ -150,6 +151,9 @@ func (m *koanfConfigManager) loadDefaults() error {
 	}
 	if err := m.ko.Set("git.cache_enabled", defaults.Git.CacheEnabled); err != nil {
 		return fmt.Errorf("failed to set git.cache_enabled default: %w", err)
+	}
+	if err := m.ko.Set("completion.timeout", defaults.Completion.Timeout); err != nil {
+		return fmt.Errorf("failed to set completion.timeout default: %w", err)
 	}
 	return nil
 }

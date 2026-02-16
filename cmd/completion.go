@@ -8,15 +8,34 @@ import (
 	"twiggit/internal/domain"
 )
 
+// getCompletionTimeout returns the completion timeout duration from config, defaulting to 500ms
+func getCompletionTimeout(config *domain.Config) time.Duration {
+	if config == nil {
+		return 500 * time.Millisecond
+	}
+	if config.Completion.Timeout != "" {
+		if duration, err := time.ParseDuration(config.Completion.Timeout); err == nil {
+			return duration
+		}
+	}
+	return 500 * time.Millisecond
+}
+
 // actionWorktreeTarget provides completion for worktree targets (project/branch)
 // Supports progressive completion via ActionMultiParts("/")
 func actionWorktreeTarget(config *CommandConfig, opts ...domain.SuggestionOption) carapace.Action {
 	return carapace.ActionMultiParts("/", func(c carapace.Context) carapace.Action {
+		timeout := getCompletionTimeout(config.Config)
+
 		switch len(c.Parts) {
 		case 0:
-			return actionProjectsOrBranches(c, config, opts)
+			return carapace.ActionCallback(func(c carapace.Context) carapace.Action {
+				return actionProjectsOrBranches(c, config, opts)
+			}).Timeout(timeout, carapace.ActionValues())
 		case 1:
-			return actionBranchesForProject(c.Parts[0], config)
+			return carapace.ActionCallback(func(c carapace.Context) carapace.Action {
+				return actionBranchesForProject(c.Parts[0], config)
+			}).Timeout(timeout, carapace.ActionValues())
 		default:
 			return carapace.ActionValues()
 		}
@@ -25,6 +44,8 @@ func actionWorktreeTarget(config *CommandConfig, opts ...domain.SuggestionOption
 
 // actionBranches provides completion for branch names (--source flag)
 func actionBranches(config *CommandConfig) carapace.Action {
+	timeout := getCompletionTimeout(config.Config)
+
 	return carapace.ActionCallback(func(c carapace.Context) carapace.Action {
 		ctx, err := config.Services.ContextService.GetCurrentContext()
 		if err != nil {
@@ -37,7 +58,7 @@ func actionBranches(config *CommandConfig) carapace.Action {
 		}
 
 		return suggestionsToCarapaceAction(suggestions)
-	}).Cache(5 * time.Second)
+	}).Timeout(timeout, carapace.ActionValues()).Cache(5 * time.Second)
 }
 
 // actionProjectsOrBranches suggests projects or branches based on current context
@@ -57,37 +78,39 @@ func actionProjectsOrBranches(c carapace.Context, config *CommandConfig, opts []
 
 // actionBranchesForProject suggests branches for a specific project
 func actionBranchesForProject(projectName string, config *CommandConfig) carapace.Action {
-	ctx, err := config.Services.ContextService.GetCurrentContext()
-	if err != nil {
-		return carapace.ActionValues()
-	}
-
-	suggestions, err := config.Services.ContextService.GetCompletionSuggestionsFromContext(ctx, projectName)
-	if err != nil {
-		return carapace.ActionValues()
-	}
-
-	filtered := make([]*domain.ResolutionSuggestion, 0, len(suggestions))
-	for _, s := range suggestions {
-		if s.ProjectName == projectName {
-			filtered = append(filtered, s)
-		}
-	}
-
-	result := make([]string, 0, len(filtered))
-	descriptions := make([]string, 0, len(filtered))
-	for _, s := range filtered {
-		result = append(result, s.Text)
-		descriptions = append(descriptions, s.Description)
-	}
+	timeout := getCompletionTimeout(config.Config)
 
 	return carapace.ActionCallback(func(_ carapace.Context) carapace.Action {
+		ctx, err := config.Services.ContextService.GetCurrentContext()
+		if err != nil {
+			return carapace.ActionValues()
+		}
+
+		suggestions, err := config.Services.ContextService.GetCompletionSuggestionsFromContext(ctx, projectName)
+		if err != nil {
+			return carapace.ActionValues()
+		}
+
+		filtered := make([]*domain.ResolutionSuggestion, 0, len(suggestions))
+		for _, s := range suggestions {
+			if s.ProjectName == projectName {
+				filtered = append(filtered, s)
+			}
+		}
+
+		result := make([]string, 0, len(filtered))
+		descriptions := make([]string, 0, len(filtered))
+		for _, s := range filtered {
+			result = append(result, s.Text)
+			descriptions = append(descriptions, s.Description)
+		}
+
 		action := carapace.ActionValues(result...)
 		for range result {
 			action = action.Tag(descriptions[0])
 		}
 		return action
-	}).Cache(5 * time.Second)
+	}).Timeout(timeout, carapace.ActionValues()).Cache(5 * time.Second)
 }
 
 // suggestionsToCarapaceAction converts domain.ResolutionSuggestion to carapace.Action

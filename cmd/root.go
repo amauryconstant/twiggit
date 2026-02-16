@@ -52,7 +52,6 @@ across multiple projects.`,
 	cmd.AddCommand(NewCDCommand(config))
 	cmd.AddCommand(NewInitCmd(config))
 	cmd.AddCommand(NewVersionCommand(config))
-	cmd.AddCommand(NewCompletionCommand(cmd))
 
 	carapace.Gen(cmd)
 

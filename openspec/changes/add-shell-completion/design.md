@@ -27,7 +27,6 @@ twiggit already has a suggestion system in `ContextResolver.GetResolutionSuggest
 - Caching completion results (Carapace provides `.Cache()` built-in)
 - Modifying the shell wrapper installed by `init` command
 - Auto-installing completions during `init`
-- Adding a visible `completion` command (Carapace's hidden `_carapace` is sufficient)
 
 ## Decisions
 
@@ -189,14 +188,58 @@ carapace.Gen(cmd).PositionalCompletion(
 )
 ```
 
+### 9. Completion timeout configuration
+
+**Choice:** Add `CompletionTimeout` to `domain.Config` with 500ms default
+
+**Rationale:** 
+- Allows users to adjust timeout for slow git operations without code changes
+- 500ms default provides good balance between responsiveness and allowing git operations
+- Timeout applies only to git operations (inside callbacks), not to cache lookups
+- Graceful degradation: timeout returns empty suggestions, no error messages clutter shell
+
+**Implementation:**
+```go
+// internal/domain/config.go
+type Config struct {
+    ProjectsDirectory    string
+    WorktreesDirectory  string
+    CompletionTimeout   time.Duration // Default: 500ms
+}
+
+// cmd/completion.go
+func actionWorktreeTarget(config *CommandConfig, opts ...domain.SuggestionOption) carapace.Action {
+    timeout := config.Config.CompletionTimeout
+    if timeout == 0 {
+        timeout = 500 * time.Millisecond // Default
+    }
+    
+    return carapace.ActionMultiParts("/", func(c carapace.Context) carapace.Action {
+        // Wrap git operations with timeout
+        return carapace.ActionCallback(func(c carapace.Context) carapace.Action {
+            // ... existing logic ...
+            return suggestionsToCarapaceAction(suggestions)
+        }).Timeout(timeout, carapace.ActionValues())
+    }).Cache(5 * time.Second)
+}
+```
+
+**Configuration via TOML:**
+```toml
+# ~/.config/twiggit/config.toml
+[completion]
+timeout = "500ms"  # Optional, defaults to 500ms
+```
+
 ## Risks / Trade-offs
 
 | Risk | Mitigation |
 |------|------------|
 | New Carapace dependency | Well-maintained library (3k+ GitHub stars); auto-bridges existing Cobra completions |
-| Large repos with many branches could slow completion | Carapace `.Cache()` with 5s TTL; `.Timeout()` with 500ms fallback |
+| Large repos with many branches could slow completion | Carapace `.Cache()` with 5s TTL; `.Timeout()` with 500ms default (configurable) |
 | Cross-project completion requires git operations on other repos | Only triggered when `/` detected; user opt-in via typing |
 | Version ldflags paths change | Update in both `.mise/config.toml` and `.goreleaser.yml` |
+| Timeout too short for slow repos | Configurable via `[completion]timeout` in config.toml, 500ms default |
 
 ## Architecture
 
@@ -240,4 +283,4 @@ flowchart TB
 | Unit | `internal/infrastructure/context_resolver_test.go` | Extended for `WithExistingOnly` option |
 | Integration | `test/integration/context_detection_test.go` | Extended for real git operations |
 | E2E | `test/e2e/completion_test.go` | New file using `_carapace` command |
-| Config | `carapace.Test(t)` in cmd/root_test.go | Validates flag names exist |
+| Config | `carapace.Test(t)` in `cmd/root_test.go` | Validates Carapace configuration and flag names |

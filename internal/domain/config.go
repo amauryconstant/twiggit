@@ -68,6 +68,12 @@ type ShellWrapperConfig struct {
 	BackupDir string `toml:"backup_dir" koanf:"backup_dir"`
 }
 
+// CompletionConfig represents shell completion specific configuration
+type CompletionConfig struct {
+	// Timeout for completion operations
+	Timeout string `toml:"timeout" koanf:"timeout"`
+}
+
 // ShellConfig represents shell integration specific configuration
 type ShellConfig struct {
 	// Shell wrapper configuration
@@ -106,6 +112,9 @@ type Config struct {
 
 	// Shell integration settings
 	Shell ShellConfig `toml:"shell" koanf:"shell"`
+
+	// Completion settings
+	Completion CompletionConfig `toml:"completion" koanf:"completion"`
 }
 
 // DefaultConfig returns the default configuration values
@@ -160,6 +169,9 @@ func DefaultConfig() *Config {
 				BackupEnabled: true,
 				BackupDir:     "~/.config/twiggit/backups",
 			},
+		},
+		Completion: CompletionConfig{
+			Timeout: "500ms",
 		},
 	}
 }
