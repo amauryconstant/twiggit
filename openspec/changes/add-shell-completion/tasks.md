@@ -21,19 +21,19 @@
 
 ## 4. CLI Layer - Completion Helpers
 
-- [ ] 4.1 Create `cmd/completion.go` with `actionWorktreeTarget(config, opts...)` using `ActionMultiParts("/")`
-- [ ] 4.2 Implement `ActionMultiParts` callback: part 0 = projects/branches, part 1 = branches for project (Decision 3)
-- [ ] 4.3 Add `actionBranches(config)` helper for `--source` flag completion
-- [ ] 4.4 Add `.Cache(5*time.Second)` to completion actions for performance (Decision 1)
-- [ ] 4.5 Add conversion helper from `domain.ResolutionSuggestion` to `carapace.ActionValuesDescribed`
+- [x] 4.1 Create `cmd/completion.go` with `actionWorktreeTarget(config, opts...)` using `ActionMultiParts("/")`
+- [x] 4.2 Implement `ActionMultiParts` callback: part 0 = projects/branches, part 1 = branches for project (Decision 3)
+- [x] 4.3 Add `actionBranches(config)` helper for `--source` flag completion
+- [x] 4.4 Add `.Cache(5*time.Second)` to completion actions for performance (Decision 1)
+- [x] 4.5 Add conversion helper from `domain.ResolutionSuggestion` to `carapace.ActionValuesDescribed`
 
 ## 5. CLI Layer - Wire Command Completions
 
-- [ ] 5.1 Add `PositionalCompletion` to `cd` command in `cmd/cd.go` using `actionWorktreeTarget(config)`
-- [ ] 5.2 Add `PositionalCompletion` to `create` command in `cmd/create.go` using `actionWorktreeTarget(config)`
-- [ ] 5.3 Add `PositionalCompletion` to `delete` command in `cmd/delete.go` using `actionWorktreeTarget(config, WithExistingOnly())`
-- [ ] 5.4 Register `--source` flag completion in `cmd/create.go` using `FlagCompletion` with `actionBranches(config)`
-- [ ] 5.5 Add `PositionalCompletion` to `prune` command in `cmd/prune.go` using `actionWorktreeTarget(config, WithExistingOnly())` (Decision 8)
+- [x] 5.1 Add `PositionalCompletion` to `cd` command in `cmd/cd.go` using `actionWorktreeTarget(config)`
+- [x] 5.2 Add `PositionalCompletion` to `create` command in `cmd/create.go` using `actionWorktreeTarget(config)`
+- [x] 5.3 Add `PositionalCompletion` to `delete` command in `cmd/delete.go` using `actionWorktreeTarget(config, WithExistingOnly())`
+- [x] 5.4 Register `--source` flag completion in `cmd/create.go` using `FlagCompletion` with `actionBranches(config)`
+- [x] 5.5 Add `PositionalCompletion` to `prune` command in `cmd/prune.go` using `actionWorktreeTarget(config, WithExistingOnly())` (Decision 8)
 
 ## 6. Version Package Consolidation
 

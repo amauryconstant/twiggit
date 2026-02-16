@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 	"twiggit/internal/domain"
 )
@@ -32,6 +33,10 @@ Examples:
 			return executeCD(cmd, config, target)
 		},
 	}
+
+	carapace.Gen(cmd).PositionalCompletion(
+		actionWorktreeTarget(config),
+	)
 
 	return cmd
 }

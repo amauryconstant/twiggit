@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 	"twiggit/internal/domain"
 )
@@ -37,6 +38,14 @@ Flags:
 	// Silence usage to prevent double error printing
 	cmd.SilenceUsage = true
 	cmd.SilenceErrors = true
+
+	carapace.Gen(cmd).PositionalCompletion(
+		actionWorktreeTarget(config),
+	)
+
+	carapace.Gen(cmd).FlagCompletion(map[string]carapace.Action{
+		"source": actionBranches(config),
+	})
 
 	return cmd
 }

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 	"twiggit/internal/domain"
+	"twiggit/internal/infrastructure"
 )
 
 // NewDeleteCommand creates a new delete command
@@ -32,6 +34,10 @@ Flags:
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion even with uncommitted changes")
 	cmd.Flags().BoolVar(&mergedOnly, "merged-only", false, "Only delete if branch is merged")
 	cmd.Flags().BoolVarP(&changeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
+
+	carapace.Gen(cmd).PositionalCompletion(
+		actionWorktreeTarget(config, infrastructure.WithExistingOnly()),
+	)
 
 	return cmd
 }

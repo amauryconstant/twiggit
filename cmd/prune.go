@@ -7,8 +7,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 	"twiggit/internal/domain"
+	"twiggit/internal/infrastructure"
 )
 
 // NewPruneCommand creates a new prune command for deleting merged worktrees.
@@ -48,6 +50,10 @@ Examples:
 	cmd.Flags().BoolVar(&deleteBranches, "delete-branches", false, "Delete branches after worktree removal")
 	cmd.Flags().BoolVarP(&allProjects, "all", "a", false, "Prune across all projects")
 	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Preview only, no actual deletion")
+
+	carapace.Gen(cmd).PositionalCompletion(
+		actionWorktreeTarget(config, infrastructure.WithExistingOnly()),
+	)
 
 	return cmd
 }
