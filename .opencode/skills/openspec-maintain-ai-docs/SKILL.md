@@ -3,7 +3,7 @@ name: openspec-maintain-ai-docs
 description: Update AGENTS.md after implementing an OpenSpec change. Use between sync and archive to document what was built for future OpenCode sessions.
 license: MIT
 metadata:
-  generatedBy: "0.3.1"
+  generatedBy: "0.3.3"
   author: openspec-extended
   version: "0.2.0"
 ---

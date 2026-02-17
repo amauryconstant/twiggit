@@ -36,3 +36,11 @@ Thumbs.db
 
 # Legacy
 legacy
+
+# BEGIN OpenSpec autonomous workflow state
+.openspec-baseline.json
+openspec/changes/*/state.json
+openspec/changes/*/complete.json
+openspec/changes/*/iterations.json
+openspec/changes/*/decision-log.md
+# END OpenSpec autonomous workflow state

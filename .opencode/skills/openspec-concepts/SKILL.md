@@ -3,7 +3,7 @@ name: openspec-concepts
 description:  Foundational knowledge for OpenSpec-extended spec-driven development. INVOKE: At start of OpenSpec work in any project, when confused about concepts, or needing depth on artifacts/workflow. Essential reading for AI agents working on OpenSpec-empowered projects.
 license: MIT
 metadata:
-  generatedBy: "0.3.1"
+  generatedBy: "0.3.3"
   author: openspec-extended
   version: "0.3.1"
 ---

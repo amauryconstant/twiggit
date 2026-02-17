@@ -4,7 +4,7 @@ description: Modify an existing artifact in an OpenSpec change. Use during pre-i
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
-  generatedBy: "0.3.1"
+  generatedBy: "0.3.3"
   author: openspec-extended
   version: "0.2.0"
 ---

@@ -4,7 +4,7 @@ description: Analyze spec-to-test alignment for OpenSpec changes. Use after impl
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
-  generatedBy: "0.3.1"
+  generatedBy: "0.3.3"
   author: openspec-extended
   version: "0.2.0"
 ---
