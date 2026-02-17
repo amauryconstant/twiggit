@@ -72,3 +72,11 @@ The system SHALL create a new git worktree from a specified source branch, with 
 - **THEN** system SHALL display worktree creation success message
 - **AND** system SHALL display warning section with hook failure details
 - **AND** warning SHALL indicate worktree is ready but setup may be incomplete
+
+#### Scenario: Change directory after creation with -C flag
+
+- **WHEN** user runs `twiggit create -C myproject/feature-branch`
+- **AND** worktree creation succeeds
+- **THEN** system SHALL output path to change to (the newly created worktree directory)
+- **AND** path SHALL be printed to stdout for shell wrapper consumption
+- **AND** success message SHALL still be displayed to stdout/stderr
