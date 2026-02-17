@@ -65,6 +65,16 @@ Skip: `git commit -m "msg" --no-verify`
 | WILL/WILL NOT | System facts         | Behavior declarations  |
 | MAY/MAY NOT   | Optional             | Extensibility points   |
 
+## OpenSpec Foundation
+
+**Invoke `openspec-concepts` skill when:**
+- Starting your first OpenSpec task in this project
+- Confused about workflow, artifacts, or state transitions
+- Multiple active changes exist and you need guidance choosing
+- User asks "how does OpenSpec work?"
+
+**How:** Use the skill tool with name `openspec-concepts`
+
 ## OpenSpec Workflow
 
 **Config**: `openspec/config.yaml` (spec-driven schema)
