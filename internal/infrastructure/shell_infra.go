@@ -256,18 +256,18 @@ func (s *shellInfrastructure) wrapperTemplate(shellType domain.ShellType) string
         ` + config.elif + `
     create)
         # Handle create command with -C flag
-        ` + config.ifSyntax + ` " ` + config.argsVar + ` " == *" -C "* ]] ` + config.andOperator + ` " ` + config.argsVar + ` " == *" --cd "* ]] ` + config.thenSyntax + `
-            target_dir=$(command twiggit ` + config.argsVar + `)
-            if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
-                builtin cd "$target_dir"
-            fi
-        ` + config.elseSyntax + `
-            command twiggit ` + config.argsVar + `
-        ` + config.fiSyntax + `
-        ` + config.elif + `
-    delete)
-        # Handle delete command with -C flag
-        ` + config.ifSyntax + ` " ` + config.argsVar + ` " == *" -C "* ]] ` + config.andOperator + ` " ` + config.argsVar + ` " == *" --cd "* ]] ` + config.thenSyntax + `
+	` + config.ifSyntax + ` " ` + config.argsVar + ` " == *" -C "* ` + config.andOperator + ` " ` + config.argsVar + ` " == *" --cd "* ` + config.thenSyntax + `
+			target_dir=$(command twiggit ` + config.argsVar + `)
+			if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+				builtin cd "$target_dir"
+			fi
+		` + config.elseSyntax + `
+			command twiggit ` + config.argsVar + `
+		` + config.fiSyntax + `
+		` + config.elif + `
+	delete)
+		# Handle delete command with -C flag
+		` + config.ifSyntax + ` " ` + config.argsVar + ` " == *" -C "* ` + config.andOperator + ` " ` + config.argsVar + ` " == *" --cd "* ` + config.thenSyntax + `
             target_dir=$(command twiggit ` + config.argsVar + `)
             if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
                 builtin cd "$target_dir"

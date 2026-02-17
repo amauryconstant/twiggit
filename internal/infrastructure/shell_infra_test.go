@@ -2,6 +2,8 @@ package infrastructure
 
 import (
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/suite"
@@ -79,6 +81,63 @@ func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_InvalidShellType() {
 	s.Require().Error(err)
 	s.Empty(wrapper)
 	s.Contains(err.Error(), "unsupported shell type")
+}
+
+func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_SyntaxValidation() {
+	tests := []struct {
+		name      string
+		shellType domain.ShellType
+	}{
+		{name: "bash wrapper syntax", shellType: domain.ShellBash},
+		{name: "zsh wrapper syntax", shellType: domain.ShellZsh},
+	}
+
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			service := NewShellInfrastructure()
+			wrapper, err := service.GenerateWrapper(tc.shellType)
+			s.Require().NoError(err)
+
+			s.NotContains(wrapper, "]] ]]", "wrapper should not contain double closing brackets")
+			s.Contains(wrapper, "if [[", "wrapper should use if [[ for conditionals")
+			s.Contains(wrapper, "]] || [[", "wrapper should use ]]] || [[ for OR conditionals")
+			s.Contains(wrapper, "]]; then", "wrapper should use ]]; then for conditional end")
+
+			syntaxCheckCmd := "bash"
+			if tc.shellType == domain.ShellZsh {
+				syntaxCheckCmd = "zsh"
+			}
+
+			if _, err := exec.LookPath(syntaxCheckCmd); err == nil {
+				tmpFile, err := os.CreateTemp("", "wrapper_test_*.sh")
+				s.Require().NoError(err)
+				defer os.Remove(tmpFile.Name())
+
+				_, err = tmpFile.WriteString(wrapper)
+				s.Require().NoError(err)
+				tmpFile.Close()
+
+				cmd := exec.Command(syntaxCheckCmd, "-n", tmpFile.Name())
+				output, err := cmd.CombinedOutput()
+				s.Require().NoError(err, "wrapper should have valid %s syntax: %s", syntaxCheckCmd, string(output))
+			}
+		})
+	}
+}
+
+func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_FishSyntaxValidation() {
+	service := NewShellInfrastructure()
+	wrapper, err := service.GenerateWrapper(domain.ShellFish)
+	s.Require().NoError(err)
+
+	s.NotContains(wrapper, "]] ]]", "fish wrapper should not contain bash-style double brackets")
+	s.NotContains(wrapper, "if [[", "fish wrapper should not use bash-style if [[")
+	s.Contains(wrapper, "if", "fish wrapper should use fish if syntax")
+	s.Contains(wrapper, "or", "fish wrapper should use 'or' for OR conditionals")
+	s.Contains(wrapper, "end", "fish wrapper should use 'end' for block closure")
+
+	indentCount := strings.Count(wrapper, "    if")
+	s.Positive(indentCount, "fish wrapper should contain properly indented if statements")
 }
 
 func (s *ShellInfrastructureTestSuite) TestDetectConfigFile() {
