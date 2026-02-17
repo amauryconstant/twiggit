@@ -255,4 +255,27 @@ commands = ["exit 1"]
 		Expect(stdout).To(ContainSubstring("Created worktree"), "Should show success message")
 		Expect(stderr).NotTo(ContainSubstring("Warning"), "Should not show warning when no hooks")
 	})
+
+	It("errors when source branch does not exist", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("feature-test")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName, "--source", "nonexistent-branch")
+		cli.ShouldFailWithExit(session, 1)
+		cli.ShouldErrorOutput(session, "source branch 'nonexistent-branch' does not exist")
+	})
+
+	It("errors when outside git context without project specification", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("feature-test")
+
+		session := ctxHelper.FromOutsideGit("create", branchName)
+		cli.ShouldFailWithExit(session, 1)
+		cli.ShouldErrorOutput(session, "cannot infer project")
+		cli.ShouldErrorOutput(session, "no project specified")
+	})
 })

@@ -35,10 +35,12 @@
 - [x] 6.2 Add integration test for hook execution with real `.twiggit.toml` file
 - [x] 6.3 Add E2E test for `twiggit create` with hooks configured
 - [x] 6.4 Add E2E test for hook failure warning display
+- [x] 6.5 Add E2E test for error when `--source` branch does not exist
+- [x] 6.6 Add E2E test for error when outside git context without project specification
 
 ## 7. Mocks
 
-- [x] 7.1 Add `MockHookRunner` to `test/mocks/` for service layer testing
+- [x] 7.1 Add `MockHookRunner` to `test/mocks/` for service layer testing — SKIPPED: causes import cycle; hook_runner_test uses MockCommandExecutor directly
 
 ## 8. Documentation
 
