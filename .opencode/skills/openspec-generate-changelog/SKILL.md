@@ -4,7 +4,7 @@ description: Generate CHANGELOG.md in Keep a Changelog format from archived Open
 license: MIT
 compatibility: Requires openspec CLI.
 metadata:
-  generatedBy: "0.2.1"
+  generatedBy: "0.3.1"
   author: openspec-extended
   version: "0.2.0"
 ---
