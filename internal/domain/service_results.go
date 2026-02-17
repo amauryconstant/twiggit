@@ -60,3 +60,9 @@ type ProjectSummary struct {
 	Path        string
 	GitRepoPath string
 }
+
+// CreateWorktreeResult represents the result of a worktree creation operation
+type CreateWorktreeResult struct {
+	Worktree   *WorktreeInfo
+	HookResult *HookResult
+}

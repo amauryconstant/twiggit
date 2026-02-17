@@ -76,7 +76,7 @@ func (s *PruneIntegrationTestSuite) createWorktreeService(repoPath string) appli
 		GitRepoPath: projectInfo.GitRepoPath,
 	}}, nil)
 	mockProjectService.On("ValidateProject", context.Background(), repoPath).Return(nil)
-	return service.NewWorktreeService(s.gitService, mockProjectService, config)
+	return service.NewWorktreeService(s.gitService, mockProjectService, config, nil)
 }
 
 func (s *PruneIntegrationTestSuite) TestDeleteBranch_NonExistentBranch() {
@@ -510,7 +510,7 @@ func (s *PruneIntegrationTestSuite) TestNavigationOutput_SingleWorktreePrune() {
 		GitRepoPath: projectInfo.GitRepoPath,
 	}}, nil)
 	mockProjectService.On("ValidateProject", context.Background(), repoPath).Return(nil)
-	worktreeService := service.NewWorktreeService(s.gitService, mockProjectService, config)
+	worktreeService := service.NewWorktreeService(s.gitService, mockProjectService, config, nil)
 
 	req := &domain.PruneWorktreesRequest{
 		SpecificWorktree: "test-repo/feature-nav",

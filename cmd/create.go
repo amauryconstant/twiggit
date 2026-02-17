@@ -106,20 +106,25 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 	logv(cmd, 2, "  creating parent dir: %s", project.Path+"/"+branchName)
 
 	// Create worktree
-	worktree, err := config.Services.WorktreeService.CreateWorktree(ctx, req)
+	result, err := config.Services.WorktreeService.CreateWorktree(ctx, req)
 	if err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
 	}
 
-	logv(cmd, 2, "  created worktree at: %s", worktree.Path)
+	logv(cmd, 2, "  created worktree at: %s", result.Worktree.Path)
 
 	// Display output based on cdFlag
 	if cdFlag {
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), worktree.Path)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), result.Worktree.Path)
 	} else {
-		if err := displayCreateSuccess(cmd.OutOrStdout(), worktree); err != nil {
+		if err := displayCreateSuccess(cmd.OutOrStdout(), result.Worktree); err != nil {
 			return err
 		}
+	}
+
+	// Display hook failure warnings
+	if result.HookResult != nil && !result.HookResult.Success {
+		displayHookFailures(cmd.ErrOrStderr(), result.HookResult)
 	}
 
 	return nil
@@ -168,4 +173,19 @@ func displayCreateSuccess(out io.Writer, worktree *domain.WorktreeInfo) error {
 		return fmt.Errorf("failed to display success message: %w", err)
 	}
 	return nil
+}
+
+// displayHookFailures displays hook failure warnings to stderr
+func displayHookFailures(out io.Writer, result *domain.HookResult) {
+	_, _ = fmt.Fprintf(out, "\nWarning: %d post-create hook(s) failed. Worktree created but setup may be incomplete.\n", len(result.Failures))
+	for _, failure := range result.Failures {
+		_, _ = fmt.Fprintf(out, "\n  Command: %s\n", failure.Command)
+		_, _ = fmt.Fprintf(out, "  Exit code: %d\n", failure.ExitCode)
+		if failure.Output != "" {
+			_, _ = fmt.Fprintf(out, "  Output:\n")
+			for _, line := range strings.Split(failure.Output, "\n") {
+				_, _ = fmt.Fprintf(out, "    %s\n", line)
+			}
+		}
+	}
 }

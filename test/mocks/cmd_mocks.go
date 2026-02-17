@@ -19,12 +19,12 @@ func NewMockWorktreeService() *MockWorktreeService {
 }
 
 // CreateWorktree mocks creating a worktree
-func (m *MockWorktreeService) CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error) {
+func (m *MockWorktreeService) CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.CreateWorktreeResult, error) {
 	args := m.Called(ctx, req)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*domain.WorktreeInfo), args.Error(1)
+	return args.Get(0).(*domain.CreateWorktreeResult), args.Error(1)
 }
 
 // DeleteWorktree mocks deleting a worktree

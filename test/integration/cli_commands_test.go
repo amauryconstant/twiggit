@@ -119,9 +119,11 @@ func TestCreateCommand_WithCdFlag(t *testing.T) {
 			GitRepoPath: "/tmp/test-project",
 		}, nil)
 		mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-		mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.WorktreeInfo{
-			Path:   "/tmp/test-project/feature-branch",
-			Branch: "feature-branch",
+		mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
+			Worktree: &domain.WorktreeInfo{
+				Path:   "/tmp/test-project/feature-branch",
+				Branch: "feature-branch",
+			},
 		}, nil)
 
 		config := &cmd.CommandConfig{
@@ -157,9 +159,11 @@ func TestCreateCommand_WithCdFlag(t *testing.T) {
 			GitRepoPath: "/tmp/test-project",
 		}, nil)
 		mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-		mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.WorktreeInfo{
-			Path:   "/tmp/test-project/feature-branch",
-			Branch: "feature-branch",
+		mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
+			Worktree: &domain.WorktreeInfo{
+				Path:   "/tmp/test-project/feature-branch",
+				Branch: "feature-branch",
+			},
 		}, nil)
 
 		config := &cmd.CommandConfig{

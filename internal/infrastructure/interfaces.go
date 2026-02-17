@@ -63,6 +63,23 @@ type CLIClient interface {
 	DeleteBranch(ctx context.Context, repoPath, branchName string) error
 }
 
+// HookRunRequest contains the context needed to execute hooks
+type HookRunRequest struct {
+	HookType       domain.HookType
+	WorktreePath   string
+	ProjectName    string
+	BranchName     string
+	SourceBranch   string
+	MainRepoPath   string
+	ConfigFilePath string
+}
+
+// HookRunner defines the interface for executing post-create hooks
+type HookRunner interface {
+	// Run executes hooks of the specified type with the given request context
+	Run(ctx context.Context, req *HookRunRequest) (*domain.HookResult, error)
+}
+
 // ShellInfrastructure defines low-level shell infrastructure operations
 type ShellInfrastructure interface {
 	// GenerateWrapper generates a shell wrapper for the specified shell type

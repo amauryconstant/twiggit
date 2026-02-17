@@ -40,9 +40,11 @@ func TestCreateCommand_Execute(t *testing.T) {
 					GitRepoPath: "/home/user/Projects/test-project",
 				}, nil)
 				mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.WorktreeInfo{
-					Path:   "/home/user/Worktrees/test-project/feature-branch",
-					Branch: "feature-branch",
+				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
+					Worktree: &domain.WorktreeInfo{
+						Path:   "/home/user/Worktrees/test-project/feature-branch",
+						Branch: "feature-branch",
+					},
 				}, nil)
 			},
 			expectError: false,
@@ -63,7 +65,9 @@ func TestCreateCommand_Execute(t *testing.T) {
 					GitRepoPath: "/home/user/Projects/current-project",
 				}, nil)
 				mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.WorktreeInfo{}, nil)
+				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
+					Worktree: &domain.WorktreeInfo{},
+				}, nil)
 			},
 			expectError: false,
 		},
@@ -78,9 +82,11 @@ func TestCreateCommand_Execute(t *testing.T) {
 					GitRepoPath: "/home/user/Projects/test-project",
 				}, nil)
 				mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.WorktreeInfo{
-					Path:   "/home/user/Worktrees/test-project/feature-branch",
-					Branch: "feature-branch",
+				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
+					Worktree: &domain.WorktreeInfo{
+						Path:   "/home/user/Worktrees/test-project/feature-branch",
+						Branch: "feature-branch",
+					},
 				}, nil)
 			},
 			expectError: false,
@@ -100,9 +106,11 @@ func TestCreateCommand_Execute(t *testing.T) {
 					GitRepoPath: "/home/user/Projects/test-project",
 				}, nil)
 				mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.WorktreeInfo{
-					Path:   "/home/user/Worktrees/test-project/feature-branch",
-					Branch: "feature-branch",
+				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
+					Worktree: &domain.WorktreeInfo{
+						Path:   "/home/user/Worktrees/test-project/feature-branch",
+						Branch: "feature-branch",
+					},
 				}, nil)
 			},
 			expectError: false,

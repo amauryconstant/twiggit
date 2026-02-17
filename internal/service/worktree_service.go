@@ -19,6 +19,7 @@ type worktreeService struct {
 	gitService     infrastructure.GitClient
 	projectService application.ProjectService
 	config         *domain.Config
+	hookRunner     infrastructure.HookRunner
 }
 
 // NewWorktreeService creates a new WorktreeService instance
@@ -26,16 +27,18 @@ func NewWorktreeService(
 	gitService infrastructure.GitClient,
 	projectService application.ProjectService,
 	config *domain.Config,
+	hookRunner infrastructure.HookRunner,
 ) application.WorktreeService {
 	return &worktreeService{
 		gitService:     gitService,
 		projectService: projectService,
 		config:         config,
+		hookRunner:     hookRunner,
 	}
 }
 
 // CreateWorktree creates a new worktree for the specified project and branch
-func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error) {
+func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.CreateWorktreeResult, error) {
 	// Validate request
 	if err := s.validateCreateRequest(req); err != nil {
 		return nil, err
@@ -67,10 +70,29 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 		return nil, domain.NewWorktreeServiceError(worktreePath, req.BranchName, "CreateWorktree", "failed to create worktree", err)
 	}
 
-	// Return worktree info
-	return &domain.WorktreeInfo{
+	// Run post-create hooks
+	worktreeInfo := &domain.WorktreeInfo{
 		Path:   worktreePath,
 		Branch: req.BranchName,
+	}
+
+	var hookResult *domain.HookResult
+	if s.hookRunner != nil {
+		hookReq := &infrastructure.HookRunRequest{
+			HookType:       domain.HookPostCreate,
+			WorktreePath:   worktreePath,
+			ProjectName:    project.Name,
+			BranchName:     req.BranchName,
+			SourceBranch:   req.SourceBranch,
+			MainRepoPath:   project.GitRepoPath,
+			ConfigFilePath: filepath.Join(project.GitRepoPath, ".twiggit.toml"),
+		}
+		hookResult, _ = s.hookRunner.Run(ctx, hookReq)
+	}
+
+	return &domain.CreateWorktreeResult{
+		Worktree:   worktreeInfo,
+		HookResult: hookResult,
 	}, nil
 }
 

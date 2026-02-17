@@ -30,7 +30,7 @@ type ContextService interface {
 // WorktreeService provides high-level worktree management operations
 type WorktreeService interface {
 	// CreateWorktree creates a new worktree for the specified project and branch
-	CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error)
+	CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.CreateWorktreeResult, error)
 
 	// DeleteWorktree deletes an existing worktree
 	DeleteWorktree(ctx context.Context, req *domain.DeleteWorktreeRequest) error

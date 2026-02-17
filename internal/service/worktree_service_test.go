@@ -40,7 +40,7 @@ func (s *WorktreeServiceTestSuite) SetupTest() {
 		},
 	}
 	s.configureMocks()
-	s.service = NewWorktreeService(s.gitService, s.projectService, s.config)
+	s.service = NewWorktreeService(s.gitService, s.projectService, s.config, nil)
 }
 
 func (s *WorktreeServiceTestSuite) configureMocks() {
@@ -156,7 +156,7 @@ func (s *WorktreeServiceTestSuite) TestCreateWorktree() {
 			} else {
 				s.Require().NoError(err)
 				s.NotNil(result)
-				s.Equal(tc.request.BranchName, result.Branch)
+				s.Equal(tc.request.BranchName, result.Worktree.Branch)
 			}
 		})
 	}

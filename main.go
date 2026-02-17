@@ -33,7 +33,8 @@ func main() {
 	contextService := service.NewContextService(contextDetector, contextResolver, config)
 	projectService := service.NewProjectService(gitClient, contextService, config)
 	navigationService := service.NewNavigationService(projectService, contextService, config)
-	worktreeService := service.NewWorktreeService(gitClient, projectService, config)
+	hookRunner := infrastructure.NewHookRunner(commandExecutor)
+	worktreeService := service.NewWorktreeService(gitClient, projectService, config, hookRunner)
 	shellInfra := infrastructure.NewShellInfrastructure()
 	shellService := service.NewShellService(shellInfra, config)
 
