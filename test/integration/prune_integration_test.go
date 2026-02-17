@@ -41,6 +41,7 @@ func TestPruneIntegrationSuite(t *testing.T) {
 }
 
 func (s *PruneIntegrationTestSuite) setupTestRepo(projectName string) (repoPath string) {
+	s.T().Helper()
 	tempDir := s.T().TempDir()
 	repoPath = filepath.Join(tempDir, projectName)
 	s.Require().NoError(os.MkdirAll(repoPath, 0755))
@@ -279,7 +280,7 @@ func (s *PruneIntegrationTestSuite) TestProtectedBranch_Skipped() {
 	s.Require().NoError(err)
 	s.NotNil(result)
 	s.Equal(0, result.TotalDeleted, "should not delete protected branch worktree")
-	s.Equal(1, len(result.ProtectedSkipped), "should skip 1 protected branch")
+	s.Len(result.ProtectedSkipped, 1, "should skip 1 protected branch")
 }
 
 func (s *PruneIntegrationTestSuite) TestMergeStatus_UnmergedSkipped() {
@@ -314,7 +315,7 @@ func (s *PruneIntegrationTestSuite) TestMergeStatus_UnmergedSkipped() {
 	s.Require().NoError(err)
 	s.NotNil(result)
 	s.Equal(0, result.TotalDeleted, "should not delete unmerged worktree")
-	s.Equal(1, len(result.UnmergedSkipped), "should skip 1 unmerged branch")
+	s.Len(result.UnmergedSkipped, 1, "should skip 1 unmerged branch")
 }
 
 func (s *PruneIntegrationTestSuite) TestPruneErrorHandling_InvalidWorktreeFormat() {

@@ -265,10 +265,8 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		assert.True(t, result)
 
 		// Test mixed real/symlink paths
-		result, err = infrastructure.IsPathUnder(realBase, filepath.Join(symlinkBase, "subdir"))
+		_, err = infrastructure.IsPathUnder(realBase, filepath.Join(symlinkBase, "subdir"))
 		require.NoError(t, err)
-		// This depends on how filepath.Rel handles symlinks
-		// The result should be consistent with the underlying paths
 	})
 
 	t.Run("relative path integration", func(t *testing.T) {

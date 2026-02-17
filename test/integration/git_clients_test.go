@@ -59,26 +59,26 @@ func TestGitOperations_Integration(t *testing.T) {
 
 		// Test repository validation
 		err := client.ValidateRepository(repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Test opening repository
 		repo, err := client.OpenRepository(repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, repo)
 
 		// Test listing branches
 		branches, err := client.ListBranches(context.Background(), repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, branches)
 
 		// Test branch existence
 		exists, err := client.BranchExists(context.Background(), repoPath, "main")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, exists)
 
 		// Test repository status
 		status, err := client.GetRepositoryStatus(context.Background(), repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, status)
 	})
 
@@ -104,19 +104,19 @@ func TestGitOperations_Integration(t *testing.T) {
 		// Create worktree
 		worktreePath := filepath.Join(tempDir, "feature-worktree")
 		err = cliClient.CreateWorktree(context.Background(), repoPath, "feature-test", "main", worktreePath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify worktree was created
 		assert.DirExists(t, worktreePath)
 
 		// List worktrees
 		worktrees, err := cliClient.ListWorktrees(context.Background(), repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Len(t, worktrees, 2) // main + feature worktree
 
 		// Delete worktree
 		err = cliClient.DeleteWorktree(context.Background(), repoPath, worktreePath, false)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Verify worktree directory is removed (or at least worktree is pruned)
 		_, err = os.Stat(worktreePath)
@@ -131,17 +131,17 @@ func TestGitOperations_Integration(t *testing.T) {
 
 		// Test that branch operations use GoGit
 		branches, err := gitService.ListBranches(context.Background(), repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, branches)
 
 		// Test that worktree operations use CLI
 		worktreePath := filepath.Join(tempDir, "routing-test")
 		err = gitService.CreateWorktree(context.Background(), repoPath, "feature-test", "main", worktreePath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Cleanup
 		err = gitService.DeleteWorktree(context.Background(), repoPath, worktreePath, false)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -157,11 +157,11 @@ func TestGitOperations_ErrorHandling(t *testing.T) {
 
 	// Test validation of non-existent repository
 	err := client.ValidateRepository(nonExistentPath)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a valid git repository")
 
 	// Test opening non-existent repository
 	_, err = client.OpenRepository(nonExistentPath)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to open git repository")
 }

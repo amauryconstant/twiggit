@@ -5,6 +5,9 @@ run:
   timeout: 5m
   tests: true
   go: "1.25.5"
+  build-tags:
+    - e2e
+    - integration
 
 linters:
   default: none
@@ -93,8 +96,8 @@ linters:
 
   exclusions:
     rules:
-      # Broad test exclusions (fixtures, helpers, mocks, integration, etc.)
-      - path: ".*_test\\.go|test/(fixtures|helpers|mocks|integration)/.*\\.go"
+      # Broad test exclusions (fixtures, helpers, mocks, integration, e2e, etc.)
+      - path: ".*_test\\.go|test/(fixtures|helpers|mocks|integration)/.*\\.go|test/e2e/(fixtures|helpers)/.*\\.go"
         linters:
           - funlen
           - gocyclo

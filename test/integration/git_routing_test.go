@@ -64,7 +64,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 
 		// Test branch listing - should use GoGit only
 		branches, err := gitService.ListBranches(context.Background(), repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, branches)
 
 		// Verify we got branch data (proving GoGit worked)
@@ -100,7 +100,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 
 		// Test worktree listing - should use CLI only
 		worktrees, err := gitService.ListWorktrees(context.Background(), repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotEmpty(t, worktrees)
 
 		// Verify we got worktree data (proving CLI worked)
@@ -116,11 +116,11 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 
 		// Test repository validation - should use GoGit only
 		err := gitService.ValidateRepository(repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Test repository info - should use GoGit only
 		info, err := gitService.GetRepositoryInfo(context.Background(), repoPath)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.NotNil(t, info)
 		assert.Equal(t, repoPath, info.Path)
 	})
@@ -134,7 +134,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 		gitService := infrastructure.NewCompositeGitClient(mockGoGit, cliClient)
 
 		_, err := gitService.ListBranches(context.Background(), repoPath)
-		assert.Error(t, err)
+		require.Error(t, err)
 
 		assert.ErrorIs(t, err, assert.AnError)
 	})

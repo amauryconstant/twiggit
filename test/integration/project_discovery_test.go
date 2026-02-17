@@ -160,7 +160,7 @@ func TestContextResolution_WithExistingOnly_Integration(t *testing.T) {
 	suggestions, err := resolver.GetResolutionSuggestions(ctx, "", infrastructure.WithExistingOnly())
 	require.NoError(t, err)
 
-	assert.Len(t, suggestions, 0, "Should return 0 suggestions for empty project")
+	assert.Empty(t, suggestions, "Should return 0 suggestions for empty project")
 }
 
 func TestWithExistingOnly_ExistingWorktrees(t *testing.T) {
@@ -307,7 +307,7 @@ func TestWithExistingOnly_NoWorktreesExist(t *testing.T) {
 	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", infrastructure.WithExistingOnly())
 	require.NoError(t, err)
 
-	assert.Len(t, suggestions, 0, "Should return no suggestions when no worktrees exist")
+	assert.Empty(t, suggestions, "Should return no suggestions when no worktrees exist")
 }
 
 func TestWithExistingOnly_SkipsMainSuggestion(t *testing.T) {
