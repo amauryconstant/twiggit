@@ -102,6 +102,50 @@ twiggit prune                        # Delete merged worktrees in current projec
 twiggit prune --all                  # Prune across all projects
 ```
 
+## Post-Create Hooks
+
+Twiggit can execute commands automatically after creating a worktree. This is useful for running project setup commands like `mise trust` or `npm install`.
+
+### Configuration
+
+Create a `.twiggit.toml` file in your repository root:
+
+```toml
+[hooks.post-create]
+commands = [
+    "mise trust",
+    "npm install",
+]
+```
+
+When you run `twiggit create`, these commands will execute in the new worktree directory with the following environment variables:
+
+| Variable | Description |
+|----------|-------------|
+| `TWIGGIT_WORKTREE_PATH` | Path to the new worktree |
+| `TWIGGIT_PROJECT_NAME` | Project identifier |
+| `TWIGGIT_BRANCH_NAME` | Name of the new branch |
+| `TWIGGIT_SOURCE_BRANCH` | Branch the worktree was created from |
+| `TWIGGIT_MAIN_REPO_PATH` | Path to the main repository |
+
+### Behavior
+
+- Commands run sequentially in the worktree directory
+- If a command fails, remaining commands continue to execute
+- Failures are displayed as warnings (worktree creation still succeeds)
+- No `.twiggit.toml` file = no hooks executed
+
+### Security Warning
+
+**Important**: The `.twiggit.toml` file can execute arbitrary commands on your system. Always review this file before trusting a repository:
+
+```bash
+# Check for hooks before creating worktrees in a new repo
+cat .twiggit.toml
+```
+
+Hooks are opt-in only—without a `.twiggit.toml` file, no commands are executed.
+
 ## Troubleshooting
 
 **twiggit command not found**

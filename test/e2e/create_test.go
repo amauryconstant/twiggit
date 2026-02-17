@@ -6,6 +6,7 @@
 package e2e
 
 import (
+	"os"
 	"path/filepath"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -179,5 +180,79 @@ var _ = Describe("create command", func() {
 
 		Expect(output).To(ContainSubstring("Created worktree"), "Should include success message")
 		Expect(output).To(ContainSubstring(branchName), "Should include branch name")
+	})
+
+	It("executes post-create hooks when .twiggit.toml exists", func() {
+		fixture.SetupSingleProject("test-project")
+		projectPath := fixture.GetProjectPath("test-project")
+
+		hookConfigContent := `
+[hooks.post-create]
+commands = ["echo hook-ran-successfully"]
+`
+		hookConfigPath := filepath.Join(projectPath, ".twiggit.toml")
+		err := os.WriteFile(hookConfigPath, []byte(hookConfigContent), 0644)
+		Expect(err).NotTo(HaveOccurred())
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("hook-test")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName)
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("Created worktree"), "Should show success message")
+	})
+
+	It("displays warning when post-create hook fails", func() {
+		fixture.SetupSingleProject("test-project")
+		projectPath := fixture.GetProjectPath("test-project")
+
+		hookConfigContent := `
+[hooks.post-create]
+commands = ["exit 1"]
+`
+		hookConfigPath := filepath.Join(projectPath, ".twiggit.toml")
+		err := os.WriteFile(hookConfigPath, []byte(hookConfigContent), 0644)
+		Expect(err).NotTo(HaveOccurred())
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("hook-fail-test")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName)
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		stdout := string(session.Out.Contents())
+		stderr := string(session.Err.Contents())
+		Expect(stdout).To(ContainSubstring("Created worktree"), "Worktree should still be created")
+		Expect(stderr).To(ContainSubstring("Warning"), "Should show warning for hook failure on stderr")
+		Expect(stderr).To(ContainSubstring("exit 1"), "Should show failed command")
+	})
+
+	It("continues normally when no .twiggit.toml exists", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("no-hook-test")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName)
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		stdout := string(session.Out.Contents())
+		stderr := string(session.Err.Contents())
+		Expect(stdout).To(ContainSubstring("Created worktree"), "Should show success message")
+		Expect(stderr).NotTo(ContainSubstring("Warning"), "Should not show warning when no hooks")
 	})
 })

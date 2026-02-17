@@ -31,10 +31,10 @@
 
 ## 6. Tests
 
-- [ ] 6.1 Add unit tests for `hook_runner.go` with mock `CommandExecutor` (success, failure, malformed TOML, missing commands array, empty commands)
-- [ ] 6.2 Add integration test for hook execution with real `.twiggit.toml` file
-- [ ] 6.3 Add E2E test for `twiggit create` with hooks configured
-- [ ] 6.4 Add E2E test for hook failure warning display
+- [x] 6.1 Add unit tests for `hook_runner.go` with mock `CommandExecutor` (success, failure, malformed TOML, missing commands array, empty commands)
+- [x] 6.2 Add integration test for hook execution with real `.twiggit.toml` file
+- [x] 6.3 Add E2E test for `twiggit create` with hooks configured
+- [x] 6.4 Add E2E test for hook failure warning display
 
 ## 7. Mocks
 
@@ -42,4 +42,4 @@
 
 ## 8. Documentation
 
-- [ ] 8.1 Add security note to README/docs: users should review `.twiggit.toml` before trusting a repo (hooks execute arbitrary commands)
+- [x] 8.1 Add security note to README/docs: users should review `.twiggit.toml` before trusting a repo (hooks execute arbitrary commands)

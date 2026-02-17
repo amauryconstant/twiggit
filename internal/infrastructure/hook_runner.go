@@ -155,19 +155,19 @@ func (r *hookRunner) executeCommands(ctx context.Context, req *HookRunRequest, c
 func (r *hookRunner) buildEnvExports(req *HookRunRequest) string {
 	var exports strings.Builder
 	if req.WorktreePath != "" {
-		exports.WriteString(fmt.Sprintf("export TWIGGIT_WORKTREE_PATH=%q ", req.WorktreePath))
+		exports.WriteString(fmt.Sprintf("export TWIGGIT_WORKTREE_PATH=%q; ", req.WorktreePath))
 	}
 	if req.ProjectName != "" {
-		exports.WriteString(fmt.Sprintf("export TWIGGIT_PROJECT_NAME=%q ", req.ProjectName))
+		exports.WriteString(fmt.Sprintf("export TWIGGIT_PROJECT_NAME=%q; ", req.ProjectName))
 	}
 	if req.BranchName != "" {
-		exports.WriteString(fmt.Sprintf("export TWIGGIT_BRANCH_NAME=%q ", req.BranchName))
+		exports.WriteString(fmt.Sprintf("export TWIGGIT_BRANCH_NAME=%q; ", req.BranchName))
 	}
 	if req.SourceBranch != "" {
-		exports.WriteString(fmt.Sprintf("export TWIGGIT_SOURCE_BRANCH=%q ", req.SourceBranch))
+		exports.WriteString(fmt.Sprintf("export TWIGGIT_SOURCE_BRANCH=%q; ", req.SourceBranch))
 	}
 	if req.MainRepoPath != "" {
-		exports.WriteString(fmt.Sprintf("export TWIGGIT_MAIN_REPO_PATH=%q ", req.MainRepoPath))
+		exports.WriteString(fmt.Sprintf("export TWIGGIT_MAIN_REPO_PATH=%q; ", req.MainRepoPath))
 	}
 	return exports.String()
 }
