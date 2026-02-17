@@ -2,7 +2,7 @@
 go = "1.25.5"
 golangci-lint = "2.8.0"
 goreleaser = "2.13.3"
-ginkgo = "2.26.0"
+ginkgo = "2.28.1"
 "go:github.com/boumenot/gocover-cobertura" = "1.4.0"
 "go:github.com/cybusio/gocovmerge" = "1.0.1"
 pre-commit = "latest"
