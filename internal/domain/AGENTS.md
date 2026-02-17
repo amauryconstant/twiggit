@@ -117,6 +117,34 @@ func WithExistingOnly() SuggestionOption  // Filter to materialized worktrees on
 
 Used by `ContextResolver.GetResolutionSuggestions()` for completion filtering.
 
+## Hook Types
+
+```go
+type HookType string
+const HookPostCreate HookType = "post-create"
+
+type HookConfig struct {
+    PostCreate *HookDefinition `toml:"post-create" koanf:"post-create"`
+}
+
+type HookDefinition struct {
+    Commands []string `toml:"commands" koanf:"commands"`
+}
+
+type HookResult struct {
+    HookType HookType
+    Executed bool           // Were commands configured?
+    Success  bool           // All commands succeeded?
+    Failures []HookFailure  // Empty if success
+}
+
+type HookFailure struct {
+    Command  string
+    ExitCode int
+    Output   string
+}
+```
+
 ## Config
 
 ```go

@@ -108,3 +108,36 @@ timeout = "500ms"  # Optional, default 500ms
 ```
 
 Slow git operations gracefully degrade to empty suggestions.
+
+## HookRunner
+
+Executes configured commands after worktree lifecycle events.
+
+**Interface:**
+```go
+type HookRunner interface {
+    ReadHookConfig(repoPath string) (*domain.HookConfig, error)
+    Run(ctx context.Context, req *HookRunRequest) *domain.HookResult
+}
+```
+
+**Configuration:** `.twiggit.toml` at repository root
+```toml
+[hooks.post-create]
+commands = [
+    "mise trust",
+    "npm install",
+]
+```
+
+**Execution context:** Commands run in new worktree directory with env vars:
+
+| Variable | Description |
+|----------|-------------|
+| `TWIGGIT_WORKTREE_PATH` | Path to new worktree (also cwd) |
+| `TWIGGIT_PROJECT_NAME` | Project identifier |
+| `TWIGGIT_BRANCH_NAME` | New branch name |
+| `TWIGGIT_SOURCE_BRANCH` | Branch created from |
+| `TWIGGIT_MAIN_REPO_PATH` | Main repository location |
+
+**Failure handling:** All commands run even if previous fail; failures collected and returned.

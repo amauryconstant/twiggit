@@ -63,7 +63,8 @@ Flags: `--all` (show all projects, override context)
 ### create
 Required: Project name (inferred), branch name, source branch (default: main)
 Flags: `--source <branch>`, `-C, --cd`
-Behavior: Create worktree, maintain current dir (unless -C outputs path to stdout)
+Behavior: Create worktree, execute post-create hooks if `.twiggit.toml` configured, display hook failure warnings
+Output: Worktree info + hook warnings (if any)
 
 ### delete
 Safety checks: Uncommitted changes, current worktree status

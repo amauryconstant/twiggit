@@ -14,17 +14,20 @@ Layer: Application services orchestrate domain logic + infrastructure
 type worktreeService struct {
     gitService     infrastructure.GitClient
     projectService application.ProjectService
+    hookRunner     infrastructure.HookRunner
     config         *domain.Config
 }
 
 func NewWorktreeService(
     gitService infrastructure.GitClient,
     projectService application.ProjectService,
+    hookRunner infrastructure.HookRunner,
     config *domain.Config,
 ) application.WorktreeService {
     return &worktreeService{
         gitService:     gitService,
         projectService: projectService,
+        hookRunner:     hookRunner,
         config:         config,
     }
 }
@@ -32,7 +35,7 @@ func NewWorktreeService(
 func (s *worktreeService) CreateWorktree(
     ctx context.Context,
     req *domain.CreateWorktreeRequest,
-) (*domain.WorktreeInfo, error) {
+) (*domain.CreateWorktreeResult, error) {
     // ValidationError returned directly, not wrapped
     if err := s.validateCreateRequest(req); err != nil {
         return nil, err
@@ -45,7 +48,12 @@ func (s *worktreeService) CreateWorktree(
     if err != nil {
         return nil, domain.NewWorktreeServiceError(worktreePath, req.BranchName, "CreateWorktree", "failed to create worktree", err)
     }
-    return &domain.WorktreeInfo{Path: worktreePath, Branch: req.BranchName}, nil
+    // Execute post-create hooks
+    hookResult := s.hookRunner.Run(ctx, &infrastructure.HookRunRequest{...})
+    return &domain.CreateWorktreeResult{
+        Worktree:   &domain.WorktreeInfo{Path: worktreePath, Branch: req.BranchName},
+        HookResult: hookResult,
+    }, nil
 }
 ```
 
@@ -124,7 +132,8 @@ if errors.As(err, &worktreeErr) && worktreeErr.Message == "worktree not found in
 ### WorktreeService
 - Validate project name, branch name before git operations
 - Use GitClient for worktree operations
-- Handle worktree existence errors with specific error messages
+- Execute post-create hooks via HookRunner after successful worktree creation
+- Return `CreateWorktreeResult` with worktree info and hook results
 - Methods: `BranchExists`, `IsBranchMerged`, `GetWorktreeByPath` (added for cmd layer isolation)
 
 ### ProjectService

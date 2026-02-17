@@ -18,6 +18,7 @@ graph TB
     subgraph infrastructure
         G[GitClient]
         X[Config/Shell]
+        H[HookRunner]
     end
     subgraph domain
         D[Entities/Errors]
@@ -26,6 +27,7 @@ graph TB
     I -.->|implements| S
     S --> G
     S --> X
+    S --> H
     S --> D
     G --> D
 ```
