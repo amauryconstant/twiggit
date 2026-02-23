@@ -151,7 +151,7 @@ source <(twiggit _carapace bash)
 source <(twiggit _carapace zsh)
 ```
 
-**Implementation:** `cmd/completion.go` provides action helpers:
+**Implementation:** `cmd/suggestions.go` provides action helpers:
 - `actionWorktreeTarget(config, opts...)` - Positional completion with `ActionMultiParts("/")`
 - `actionBranches(config)` - Branch completion for `--source` flag
 - `.Cache(5s)` - 5-second cache for performance

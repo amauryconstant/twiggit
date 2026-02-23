@@ -6,30 +6,34 @@ Shell completion support for twiggit CLI via Carapace, providing context-aware t
 
 ### Requirement: Shell Completion Generation
 
-The system SHALL provide shell completion scripts via Carapace's hidden `_carapace` command, supporting bash, zsh, fish, powershell, nushell, elvish, and other shells.
+The system SHALL provide shell completion scripts via the `completion` command, which outputs Carapace-generated scripts supporting bash, zsh, fish, powershell, nushell, elvish, and other shells. The hidden `_carapace` command is also available for advanced use cases.
 
 #### Scenario: Generate bash completion script
 
-- **WHEN** user runs `twiggit _carapace bash` (or sources output via shell hook)
-- **THEN** system SHALL output bash completion script to stdout
+- **WHEN** user runs `twiggit completion bash`
+- **OR** user runs `twiggit _carapace bash` (hidden command)
+- **THEN** system SHALL output Carapace bash completion script to stdout
 - **AND** script SHALL be sourceable in bash shell
 
 #### Scenario: Generate zsh completion script
 
-- **WHEN** user runs `twiggit _carapace zsh`
-- **THEN** system SHALL output zsh completion script to stdout
+- **WHEN** user runs `twiggit completion zsh`
+- **OR** user runs `twiggit _carapace zsh` (hidden command)
+- **THEN** system SHALL output Carapace zsh completion script to stdout
 - **AND** script SHALL be sourceable in zsh shell
 
 #### Scenario: Generate fish completion script
 
-- **WHEN** user runs `twiggit _carapace fish`
-- **THEN** system SHALL output fish completion script to stdout
+- **WHEN** user runs `twiggit completion fish`
+- **OR** user runs `twiggit _carapace fish` (hidden command)
+- **THEN** system SHALL output Carapace fish completion script to stdout
 - **AND** script SHALL be sourceable in fish shell
 
 #### Scenario: Generate completion for additional shells
 
-- **WHEN** user runs `twiggit _carapace <shell>` where shell is nushell, elvish, powershell, tcsh, oil, xonsh, or cmd-clink
-- **THEN** system SHALL output appropriate completion script to stdout
+- **WHEN** user runs `twiggit completion <shell>` where shell is powershell, nushell, elvish, tcsh, oil, xonsh, or cmd-clink
+- **OR** user runs `twiggit _carapace <shell>` (hidden command)
+- **THEN** system SHALL output appropriate Carapace completion script to stdout
 - **AND** script SHALL be sourceable in the target shell
 
 ### Requirement: Command Argument Completion

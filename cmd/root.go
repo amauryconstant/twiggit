@@ -55,5 +55,11 @@ across multiple projects.`,
 
 	carapace.Gen(cmd)
 
+	// Replace Cobra's default completion command with Carapace's version
+	if completionCmd, _, err := cmd.Find([]string{"completion"}); err == nil {
+		cmd.RemoveCommand(completionCmd)
+	}
+	cmd.AddCommand(newCompletionCommand(cmd))
+
 	return cmd
 }

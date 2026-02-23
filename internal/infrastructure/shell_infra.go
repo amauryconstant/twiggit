@@ -285,31 +285,48 @@ func (s *shellInfrastructure) wrapperTemplate(shellType domain.ShellType) string
 ### END TWIGGIT WRAPPER`
 }
 
-// bashWrapperTemplate returns the bash wrapper template
+// bashWrapperTemplate returns the bash wrapper template with Carapace completion
 func (s *shellInfrastructure) bashWrapperTemplate() string {
-	return s.wrapperTemplate(domain.ShellBash)
+	return s.wrapperTemplate(domain.ShellBash) + `
+### BEGIN TWIGGIT COMPLETION
+source <(command twiggit _carapace bash)
+### END TWIGGIT COMPLETION`
 }
 
-// zshWrapperTemplate returns the zsh wrapper template
+// zshWrapperTemplate returns the zsh wrapper template with Carapace completion
 func (s *shellInfrastructure) zshWrapperTemplate() string {
-	return s.wrapperTemplate(domain.ShellZsh)
+	return s.wrapperTemplate(domain.ShellZsh) + `
+### BEGIN TWIGGIT COMPLETION
+source <(command twiggit _carapace zsh)
+### END TWIGGIT COMPLETION`
 }
 
-// fishWrapperTemplate returns the fish wrapper template
+// fishWrapperTemplate returns the fish wrapper template with Carapace completion
 func (s *shellInfrastructure) fishWrapperTemplate() string {
-	return s.wrapperTemplate(domain.ShellFish)
+	return s.wrapperTemplate(domain.ShellFish) + `
+### BEGIN TWIGGIT COMPLETION
+command twiggit _carapace fish | source
+### END TWIGGIT COMPLETION`
 }
 
 const (
-	beginDelimiter = "### BEGIN TWIGGIT WRAPPER"
-	endDelimiter   = "### END TWIGGIT WRAPPER"
+	beginWrapperDelimiter    = "### BEGIN TWIGGIT WRAPPER"
+	endWrapperDelimiter      = "### END TWIGGIT WRAPPER"
+	beginCompletionDelimiter = "### BEGIN TWIGGIT COMPLETION"
+	endCompletionDelimiter   = "### END TWIGGIT COMPLETION"
 )
 
 func (s *shellInfrastructure) hasWrapperBlock(content string) bool {
-	return strings.Contains(content, beginDelimiter) && strings.Contains(content, endDelimiter)
+	return strings.Contains(content, beginWrapperDelimiter) && strings.Contains(content, endWrapperDelimiter)
 }
 
 func (s *shellInfrastructure) removeWrapperBlock(content string) string {
+	content = s.removeBlock(content, beginWrapperDelimiter, endWrapperDelimiter)
+	content = s.removeBlock(content, beginCompletionDelimiter, endCompletionDelimiter)
+	return content
+}
+
+func (s *shellInfrastructure) removeBlock(content, beginDelimiter, endDelimiter string) string {
 	beginIdx := strings.Index(content, beginDelimiter)
 	if beginIdx == -1 {
 		return content

@@ -63,6 +63,8 @@ The system SHALL install shell wrapper to explicitly specified configuration fil
 - **THEN** system SHALL generate shell-specific wrapper
 - **AND** system SHALL append wrapper to specified or auto-detected config file
 - **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
+- **AND** system SHALL append Carapace completion sourcing for the detected shell
+- **AND** completion SHALL include block delimiters (`### BEGIN/END TWIGGIT COMPLETION`)
 - **AND** system SHALL not modify existing file content
 - **AND** success message SHALL indicate installation completed
 - **AND** success message SHALL include config file path (either specified or auto-detected)
@@ -75,6 +77,8 @@ The system SHALL install shell wrapper to explicitly specified configuration fil
 - **THEN** system SHALL create empty config file with permissions 0644
 - **AND** system SHALL append wrapper to new config file
 - **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
+- **AND** system SHALL append Carapace completion sourcing for the detected shell
+- **AND** completion SHALL include block delimiters (`### BEGIN/END TWIGGIT COMPLETION`)
 - **AND** success message SHALL indicate installation completed
 - **AND** success message SHALL indicate file was created
 - **AND** success message SHALL include config file path
@@ -105,31 +109,32 @@ The system SHALL remove existing wrapper blocks before reinstalling when --force
 #### Scenario: Remove old wrapper block before reinstall
 
 - **WHEN** user runs `twiggit init <config-file> --force`
-- **AND** config file contains existing wrapper block
-- **THEN** system SHALL detect block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
-- **AND** system SHALL remove entire wrapper block including delimiters
+- **AND** config file contains existing wrapper and/or completion blocks
+- **THEN** system SHALL detect WRAPPER block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
+- **AND** system SHALL detect COMPLETION block delimiters (`### BEGIN/END TWIGGIT COMPLETION`)
+- **AND** system SHALL remove both blocks entirely including delimiters
 - **AND** system SHALL preserve all other config file content
-- **AND** system SHALL append new wrapper block with delimiters
-- **AND** system SHALL not create duplicate wrapper blocks
+- **AND** system SHALL append new wrapper and completion blocks with delimiters
+- **AND** system SHALL not create duplicate blocks
 - **AND** success message SHALL indicate reinstallation completed
 
 #### Scenario: Handle missing end delimiter on force
 
 - **WHEN** user runs `twiggit init <config-file> --force`
-- **AND** config file contains only BEGIN delimiter without END delimiter
-- **THEN** system SHALL treat as incomplete wrapper installation
-- **AND** system SHALL remove partial wrapper block
-- **AND** system SHALL append complete wrapper block
-- **AND** warning message SHALL indicate incomplete wrapper was removed
+- **AND** config file contains only BEGIN delimiter without END delimiter (WRAPPER or COMPLETION block)
+- **THEN** system SHALL treat as incomplete installation
+- **AND** system SHALL remove partial blocks
+- **AND** system SHALL append complete wrapper and completion blocks
+- **AND** warning message SHALL indicate incomplete blocks were removed
 
 #### Scenario: Handle missing begin delimiter on force
 
 - **WHEN** user runs `twiggit init <config-file> --force`
-- **AND** config file contains only END delimiter without BEGIN delimiter
+- **AND** config file contains only END delimiter without BEGIN delimiter (WRAPPER or COMPLETION block)
 - **THEN** system SHALL treat as orphaned delimiter
-- **AND** system SHALL remove orphaned delimiter
-- **AND** system SHALL append complete wrapper block
-- **AND** warning message SHALL indicate orphaned delimiter was removed
+- **AND** system SHALL remove orphaned delimiters
+- **AND** system SHALL append complete wrapper and completion blocks
+- **AND** warning message SHALL indicate orphaned delimiters were removed
 
 ---
 

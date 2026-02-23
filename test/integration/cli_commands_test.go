@@ -37,7 +37,7 @@ func TestRootCommand_Integration(t *testing.T) {
 		assert.NotEmpty(t, rootCmd.Long)
 
 		// Verify all subcommands are registered
-		expectedCommands := []string{"list", "create", "delete", "prune", "cd", "init", "version"}
+		expectedCommands := []string{"list", "create", "delete", "prune", "cd", "init", "version", "completion"}
 		for _, expected := range expectedCommands {
 			cmd, _, err := rootCmd.Find([]string{expected})
 			require.NoError(t, err, "Command '%s' should be registered", expected)
@@ -45,7 +45,7 @@ func TestRootCommand_Integration(t *testing.T) {
 		}
 
 		// Verify total number of commands
-		assert.Len(t, rootCmd.Commands(), 8, "Should have exactly 8 subcommands registered")
+		assert.Len(t, rootCmd.Commands(), 9, "Should have exactly 9 subcommands registered")
 	})
 
 	t.Run("command help accessibility", func(t *testing.T) {
