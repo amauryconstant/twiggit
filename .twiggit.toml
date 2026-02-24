@@ -1,0 +1,2 @@
+[hooks.post-create]
+commands = ["mise trust"]
