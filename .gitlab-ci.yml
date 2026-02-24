@@ -135,6 +135,10 @@ default:
 setup:
   stage: setup
   resource_group: cache_updates
+  interruptible: true
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_COMMIT_TAG"
   cache:
     <<: *cache_config
     policy: pull-push
@@ -175,7 +179,8 @@ lint:
   script:
     - golangci-lint run
   rules:
-    - when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_COMMIT_TAG"
 
 test:
   stage: validate
@@ -183,6 +188,7 @@ test:
   cache:
     <<: *cache_config
     policy: pull
+  interruptible: true
   script:
     - mise run ci:coverage
     - mise run build
@@ -196,16 +202,16 @@ test:
       - coverage.html
       - coverage.xml
   rules:
-    - when: on_success
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_COMMIT_TAG"
 
 goreleaser-dry-run:
   stage: validate
   image:
     name: goreleaser/goreleaser
     entrypoint: [""]
-  cache:
-    <<: *cache_config
-    policy: pull
+  cache: {}
+  interruptible: true
   variables:
     GIT_DEPTH: 10
   script:
@@ -228,6 +234,7 @@ release:
   image:
     name: goreleaser/goreleaser
     entrypoint: [""]
+  cache: {}
   variables:
     GIT_DEPTH: 0
     GITLAB_TOKEN: "$GITLAB_RELEASE_TOKEN"
@@ -247,6 +254,8 @@ release:
 # --------------------------------
 mirror-to-github:
   stage: distribute
+  image: bitnami/git:latest
+  cache: {}
   variables:
     GIT_STRATEGY: fetch
   script:
