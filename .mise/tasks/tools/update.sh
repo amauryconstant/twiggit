@@ -26,17 +26,21 @@ update_tool() {
     local name=$1
     local repo=$2
 
-    local current=$(grep "${name} = " "${CONFIG_FILE}" | sed "s/${name} = \"//" | sed 's/"//')
+    local current=$(grep "^${name} = " "${CONFIG_FILE}" | sed -E 's/.* = "([^"]*)"/\1/')
     local latest=$(get_latest_version "${repo}")
+    local display_name=$(echo "$name" | sed 's/^"//;s/"$//')
 
-    echo "Updating ${name}: ${current} -> ${latest}"
+    echo "Updating ${display_name}: ${current} -> ${latest}"
 
-    sed -i.tmp "s/${name} = \".*\"/${name} = \"${latest}\"/" "${CONFIG_FILE}"
+    sed -i.tmp "s|^${name} = \".*\"|${name} = \"${latest}\"|" "${CONFIG_FILE}"
     rm -f "${CONFIG_FILE}.tmp"
 }
 
+update_tool "ginkgo" "onsi/ginkgo"
 update_tool "golangci-lint" "golangci/golangci-lint"
 update_tool "goreleaser" "goreleaser/goreleaser"
+update_tool '"go:github.com/boumenot/gocover-cobertura"' "boumenot/gocover-cobertura"
+update_tool '"go:github.com/cybusio/gocovmerge"' "cybusio/gocovmerge"
 
 echo ""
 echo "Updated ${CONFIG_FILE}"

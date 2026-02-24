@@ -27,8 +27,9 @@ check_tool() {
     local name=$1
     local repo=$2
 
-    local current=$(grep "${name} = " "${CONFIG_FILE}" | sed "s/${name} = \"//" | sed 's/"//')
-    echo -n "${name}: "
+    local current=$(grep "^${name} = " "${CONFIG_FILE}" | sed -E 's/.* = "([^"]*)"/\1/')
+    local display_name=$(echo "$name" | sed 's/^"//;s/"$//')
+    echo -n "${display_name}: "
     if [ "$current" = "latest" ]; then
         echo "current: latest (always latest)"
         return
@@ -43,8 +44,11 @@ check_tool() {
     fi
 }
 
+check_tool "ginkgo" "onsi/ginkgo"
 check_tool "golangci-lint" "golangci/golangci-lint"
 check_tool "goreleaser" "goreleaser/goreleaser"
+check_tool '"go:github.com/boumenot/gocover-cobertura"' "boumenot/gocover-cobertura"
+check_tool '"go:github.com/cybusio/gocovmerge"' "cybusio/gocovmerge"
 
 echo ""
 echo "Run 'mise run tools:update' to update versions in ${CONFIG_FILE}"
