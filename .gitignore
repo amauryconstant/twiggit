@@ -47,5 +47,5 @@ openspec/changes/*/verification-report.md
 openspec/changes/*/reflections.md
 openspec/changes/*/test-compliance-report.md
 openspec/changes/*/suggestions.md
-.openspec-auto-*.log
+.osx-orchestrate-*.log
 # END OpenSpec autonomous workflow state
