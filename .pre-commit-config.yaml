@@ -31,16 +31,23 @@ repos:
     hooks:
       - id: gofmt
         name: Format Go code
-        entry: mise
-        args: [run, format]
+        entry: gofmt
+        args: [-w]
         language: system
+        types: [go]
+
+      - id: govet
+        name: Run go vet
+        entry: go vet ./...
+        language: system
+        pass_filenames: false
         types: [go]
 
       - id: golangci-lint
         name: Run golangci-lint
-        entry: mise
-        args: [run, lint:check]
+        entry: golangci-lint run
         language: system
+        pass_filenames: false
         types: [go]
 
 default_language_version:
