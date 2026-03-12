@@ -1,100 +1,75 @@
 ## Purpose
 
-Provides shell initialization functionality for twiggit, including shell type inference, explicit config file installation, and force reinstall capabilities.
+Provides shell initialization functionality for twiggit with stdout output as the default mode, enabling eval-based activation, and file installation as an opt-in mode via flags.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Shell Type Inference
 
-The system SHALL infer shell type from configuration file path using pattern matching to reduce command verbosity.
+The system SHALL accept shell type as a positional argument (bash, zsh, fish) with auto-detection from $SHELL when omitted, replacing the previous --shell flag.
 
-#### Scenario: Infer bash from standard config file
+#### Scenario: Use explicit shell type from positional argument
 
-- **WHEN** config file path is `.bashrc`, `.bash_profile`, or `.profile`
-- **THEN** system SHALL infer shell type as bash
-- **AND** inference SHALL be based on filename pattern matching
+- **WHEN** user runs `twiggit init bash` or `twiggit init zsh` or `twiggit init fish`
+- **THEN** system SHALL use the explicitly specified shell type
+- **AND** no --shell flag SHALL be required
 
-#### Scenario: Infer bash from custom config file
+#### Scenario: Auto-detect shell from SHELL env when positional omitted
 
-- **WHEN** config file path is `custom.bash`, `my-bash-config`, or ends with `.bash`
-- **THEN** system SHALL infer shell type as bash
-- **AND** inference SHALL be based on filename pattern matching
+- **WHEN** user runs `twiggit init` without positional argument
+- **AND** SHELL environment variable is set to supported shell
+- **THEN** system SHALL detect shell type from SHELL environment variable
+- **AND** system SHALL proceed with detected shell type
 
-#### Scenario: Infer zsh from standard config file
+#### Scenario: Return error when shell cannot be detected
 
-- **WHEN** config file path is `.zshrc` or `.zprofile`
-- **THEN** system SHALL infer shell type as zsh
-- **AND** inference SHALL be based on filename pattern matching
-
-#### Scenario: Infer zsh from custom config file
-
-- **WHEN** config file path ends with `.zsh`
-- **THEN** system SHALL infer shell type as zsh
-- **AND** inference SHALL be based on filename pattern matching
-
-#### Scenario: Infer fish from config file
-
-- **WHEN** config file path contains "fish" in name
-- **AND** path includes `config.fish` or `.fishrc`
-- **THEN** system SHALL infer shell type as fish
-- **AND** inference SHALL be based on filename pattern matching
-
-#### Scenario: Return error when shell type cannot be inferred
-
-- **WHEN** config file path does not match any shell type pattern
-- **THEN** system SHALL return inference error
-- **AND** error message SHALL indicate cannot infer shell type
-- **AND** error message SHALL include config file path
-- **AND** error message SHALL suggest using --shell flag to specify shell type
+- **WHEN** user runs `twiggit init` without positional argument
+- **AND** SHELL environment variable is not set or contains unsupported shell
+- **THEN** system SHALL return detection error
+- **AND** error message SHALL suggest specifying shell type as positional argument
 - **AND** system SHALL provide list of supported shells (bash, zsh, fish)
 
 ---
 
 ### Requirement: Install to Explicit Config File
 
-The system SHALL install shell wrapper to explicitly specified configuration file path, or auto-detect config file when not provided.
+The system SHALL install shell wrapper to a config file only when --install flag is provided, with optional custom config file via --config flag.
 
-#### Scenario: Install to existing config file
+#### Scenario: Install to auto-detected config file with --install
 
-- **WHEN** user runs `twiggit init /custom/path/config` with explicit config file
-- **OR** user runs `twiggit init` without arguments for auto-detection
-- **AND** shell type is inferred or specified
+- **WHEN** user runs `twiggit init --install` or `twiggit init bash --install`
+- **AND** no --config flag is provided
 - **AND** wrapper is not already installed
-- **THEN** system SHALL generate shell-specific wrapper
-- **AND** system SHALL append wrapper to specified or auto-detected config file
+- **THEN** system SHALL auto-detect config file for the shell type
+- **AND** system SHALL generate shell-specific wrapper
+- **AND** system SHALL append wrapper to auto-detected config file
 - **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
-- **AND** system SHALL append Carapace completion sourcing for the detected shell
-- **AND** completion SHALL include block delimiters (`### BEGIN/END TWIGGIT COMPLETION`)
-- **AND** system SHALL not modify existing file content
-- **AND** success message SHALL indicate installation completed
-- **AND** success message SHALL include config file path (either specified or auto-detected)
-
-#### Scenario: Install to missing config file
-
-- **WHEN** user runs `twiggit init /custom/path/config` with explicit missing config file
-- **OR** user runs `twiggit init` without arguments where auto-detected config file does not exist
-- **AND** parent directory exists and is writable
-- **THEN** system SHALL create empty config file with permissions 0644
-- **AND** system SHALL append wrapper to new config file
-- **AND** wrapper SHALL include block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
-- **AND** system SHALL append Carapace completion sourcing for the detected shell
+- **AND** system SHALL append Carapace completion sourcing
 - **AND** completion SHALL include block delimiters (`### BEGIN/END TWIGGIT COMPLETION`)
 - **AND** success message SHALL indicate installation completed
-- **AND** success message SHALL indicate file was created
 - **AND** success message SHALL include config file path
 
-#### Scenario: Return error for unwritable config directory
+#### Scenario: Install to explicit config file with --config
 
-- **WHEN** user runs `twiggit init /custom/path/config`
-- **AND** config file does not exist
-- **AND** parent directory is not writable
-- **THEN** system SHALL return error indicating config file not writable
-- **AND** error message SHALL include config file path
-- **AND** installation SHALL not proceed
+- **WHEN** user runs `twiggit init bash --install --config ~/.customrc`
+- **AND** --install flag is present
+- **AND** --config flag specifies a path
+- **AND** wrapper is not already installed
+- **THEN** system SHALL generate shell-specific wrapper
+- **AND** system SHALL append wrapper to specified config file
+- **AND** wrapper SHALL include block delimiters
+- **AND** success message SHALL indicate installation completed
+- **AND** success message SHALL include specified config file path
+
+#### Scenario: Return error when --config used without --install
+
+- **WHEN** user runs `twiggit init bash --config ~/.bashrc` without --install
+- **THEN** system SHALL return validation error
+- **AND** error message SHALL indicate --config requires --install flag
 
 #### Scenario: Return error for missing parent directory
 
-- **WHEN** user runs `twiggit init /custom/path/config`
+- **WHEN** user runs `twiggit init bash --install --config /nonexistent/path/config`
 - **AND** parent directory does not exist
 - **THEN** system SHALL return error indicating directory not found
 - **AND** error message SHALL include config file path
@@ -104,23 +79,28 @@ The system SHALL install shell wrapper to explicitly specified configuration fil
 
 ### Requirement: Force Reinstall with Block Delimiters
 
-The system SHALL remove existing wrapper blocks before reinstalling when --force flag is provided.
+The system SHALL remove existing wrapper blocks before reinstalling when --force flag is provided alongside --install.
 
-#### Scenario: Remove old wrapper block before reinstall
+#### Scenario: Force reinstall removes old blocks
 
-- **WHEN** user runs `twiggit init <config-file> --force`
+- **WHEN** user runs `twiggit init bash --install --force`
 - **AND** config file contains existing wrapper and/or completion blocks
-- **THEN** system SHALL detect WRAPPER block delimiters (`### BEGIN/END TWIGGIT WRAPPER`)
-- **AND** system SHALL detect COMPLETION block delimiters (`### BEGIN/END TWIGGIT COMPLETION`)
+- **THEN** system SHALL detect WRAPPER block delimiters
+- **AND** system SHALL detect COMPLETION block delimiters
 - **AND** system SHALL remove both blocks entirely including delimiters
 - **AND** system SHALL preserve all other config file content
-- **AND** system SHALL append new wrapper and completion blocks with delimiters
-- **AND** system SHALL not create duplicate blocks
+- **AND** system SHALL append new wrapper and completion blocks
 - **AND** success message SHALL indicate reinstallation completed
+
+#### Scenario: Return error when --force used without --install
+
+- **WHEN** user runs `twiggit init bash --force` without --install
+- **THEN** system SHALL return validation error
+- **AND** error message SHALL indicate --force requires --install flag
 
 #### Scenario: Handle missing end delimiter on force
 
-- **WHEN** user runs `twiggit init <config-file> --force`
+- **WHEN** user runs `twiggit init bash --install --force`
 - **AND** config file contains only BEGIN delimiter without END delimiter (WRAPPER or COMPLETION block)
 - **THEN** system SHALL treat as incomplete installation
 - **AND** system SHALL remove partial blocks
@@ -129,7 +109,7 @@ The system SHALL remove existing wrapper blocks before reinstalling when --force
 
 #### Scenario: Handle missing begin delimiter on force
 
-- **WHEN** user runs `twiggit init <config-file> --force`
+- **WHEN** user runs `twiggit init bash --install --force`
 - **AND** config file contains only END delimiter without BEGIN delimiter (WRAPPER or COMPLETION block)
 - **THEN** system SHALL treat as orphaned delimiter
 - **AND** system SHALL remove orphaned delimiters
@@ -138,16 +118,41 @@ The system SHALL remove existing wrapper blocks before reinstalling when --force
 
 ---
 
-### Requirement: Auto-Detect Shell and Config File
+### Requirement: Stdout Output Mode
 
-The system SHALL automatically detect shell type from SHELL environment variable and config file location when neither are specified, enabling simplest possible usage.
+The system SHALL output shell wrapper to stdout by default (without --install), enabling eval-based activation without file modification.
 
-#### Scenario: Auto-detect both shell and config file
+#### Scenario: Output wrapper to stdout with auto-detected shell
 
-- **WHEN** user runs `twiggit init` without arguments
-- **AND** SHELL environment variable is set to supported shell (bash, zsh, or fish)
-- **AND** no config file path is provided
+- **WHEN** user runs `twiggit init` without --install flag
+- **AND** SHELL environment variable is set to supported shell
 - **THEN** system SHALL detect shell type from SHELL environment variable
-- **AND** system SHALL auto-detect appropriate config file path for detected shell
-- **AND** system SHALL proceed with installation using detected values
-- **AND** success message SHALL indicate detected shell type and config file path
+- **AND** system SHALL generate shell-specific wrapper
+- **AND** system SHALL output wrapper to stdout
+- **AND** output SHALL be eval-safe (no metadata, only wrapper block)
+- **AND** output SHALL include block delimiters
+- **AND** output SHALL include Carapace completion sourcing
+- **AND** system SHALL NOT modify any files
+
+#### Scenario: Output wrapper to stdout with explicit shell
+
+- **WHEN** user runs `twiggit init zsh` without --install flag
+- **THEN** system SHALL generate zsh-specific wrapper
+- **AND** system SHALL output wrapper to stdout
+- **AND** output SHALL be eval-safe (no metadata, only wrapper block)
+- **AND** system SHALL NOT modify any files
+
+#### Scenario: Eval activation works correctly
+
+- **WHEN** user runs `eval "$(twiggit init bash)"`
+- **THEN** twiggit shell function SHALL be defined in current shell
+- **AND** Carapace completion SHALL be sourced
+- **AND** `twiggit cd <branch>` SHALL change directory
+- **AND** `builtin cd <path>` SHALL use shell built-in
+
+#### Scenario: Stdout output includes completion
+
+- **WHEN** user runs `twiggit init bash` without --install
+- **THEN** output SHALL include wrapper block with delimiters
+- **AND** output SHALL include completion block with delimiters
+- **AND** completion block SHALL source Carapace for the specified shell
