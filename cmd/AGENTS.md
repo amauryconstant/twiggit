@@ -78,10 +78,13 @@ Flags: None (target required)
 Behavior: Navigation via shell wrapper, escape hatch for builtin cd
 
 ### init
-Optional: `[config-file]` (auto-detected if omitted)
-Flags: `--check`, `-f, --force`, `--dry-run`, `--shell <bash|zsh|fish>` (alphabetical)
-Behavior: Auto-detects shell/config file from SHELL env var, generates wrapper, adds to shell config
-Usage: `twiggit init` | `twiggit init ~/.bashrc` | `twiggit init --shell=zsh`
+Default: Print shell wrapper to stdout (eval-safe, no metadata)
+Optional: `[shell]` (bash|zsh|fish, auto-detected from $SHELL if omitted)
+Flags: `-i, --install` (file mode), `-c, --config <path>` (requires --install), `-f, --force` (requires --install)
+Behavior:
+  - Default (no flags): Print wrapper to stdout for eval-based activation
+  - With `--install`: Write wrapper to shell config file
+Usage: `eval "$(twiggit init)"` | `twiggit init bash` | `twiggit init --install` | `twiggit init zsh --install -c ~/.zshrc`
 
 ### prune
 Purpose: Delete merged worktrees for post-merge cleanup
