@@ -47,10 +47,9 @@
 - [ ] 5.7 Add E2E test: `twiggit init --force` errors without `--install`
 - [ ] 5.8 Remove E2E tests for removed flags (`--dry-run`, `--shell`, `--check`)
 
-## 6. Update Documentation
+## 6. Update Shell Completion
 
-- [ ] 6.1 Update `cmd/AGENTS.md` init command specification
-- [ ] 6.2 Update shell completion if needed for new positional argument
+- [ ] 6.1 Update shell completion if needed for new positional argument
 
 ## 7. Verification
 
