@@ -1,21 +1,74 @@
 #!/usr/bin/env bash
+# OpenSpec Autonomous Workflow Orchestrator
+# Version is read from manifest.json at runtime
+# Usage: openspec-auto <change-name> [options]
 
 set -euo pipefail
 
-readonly SCRIPT_VERSION="0.3.2"
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly DEFAULT_TIMEOUT=1800
-readonly DEFAULT_MAX_ITERATIONS=10
+# ==============================================================================
+# FUNCTION RETURN CONVENTIONS
+# ==============================================================================
+#
+# check_* functions: Return 0/1 as boolean (use in conditionals)
+#   - check_phase_complete: Returns 0 if complete, 1 if not
+#   - check_transition: Returns 0 + echoes target if set, 1 if not set
+#   - check_complete: Returns 0 if complete.json exists, 1 if not
+#
+# get_* functions: Always succeed (return 0), echo default on error
+#   - get_current_phase: Returns phase from state.json
+#   - get_phase_iteration: Returns iteration count (0 if error)
+#   - get_transition_reason: Returns reason or "unknown"
+#   - get_transition_details: Returns details or ""
+#
+# IMPORTANT: When using check_* functions for their output value,
+# use conditional pattern: if value=$(check_func) && [[ -n "$value" ]]; then
+# ==============================================================================
 
-declare -A PHASE_NAMES=(
-  ["PHASE0"]="ARTIFACT REVIEW"
-  ["PHASE1"]="IMPLEMENTATION"
-  ["PHASE2"]="REVIEW"
-  ["PHASE3"]="MAINTAIN-DOCS"
-  ["PHASE4"]="SYNC"
-  ["PHASE5"]="ARCHIVE"
-  ["PHASE6"]="SELF-REFLECTION"
-)
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/osc-common"
+readonly SCRIPT_VERSION=$(jq -r '.resources.scripts["openspec-auto"].version // "unknown"' \
+  "$SCRIPT_DIR/../manifest.json" 2>/dev/null || echo "unknown")
+readonly DEFAULT_TIMEOUT=1800
+readonly DEFAULT_MAX_PHASE_ITERATIONS=10
+
+get_phase_name() {
+  case "$1" in
+    PHASE0) echo "ARTIFACT REVIEW" ;;
+    PHASE1) echo "IMPLEMENTATION" ;;
+    PHASE2) echo "REVIEW" ;;
+    PHASE3) echo "MAINTAIN DOCS" ;;
+    PHASE4) echo "SYNC" ;;
+    PHASE5) echo "SELF-REFLECTION" ;;
+    PHASE6) echo "ARCHIVE" ;;
+    *)      echo "UNKNOWN" ;;
+  esac
+}
+
+get_phase_command() {
+  case "$1" in
+    PHASE0) echo "openspec-phase0" ;;
+    PHASE1) echo "openspec-phase1" ;;
+    PHASE2) echo "openspec-phase2" ;;
+    PHASE3) echo "openspec-phase3" ;;
+    PHASE4) echo "openspec-phase4" ;;
+    PHASE5) echo "openspec-phase5" ;;
+    PHASE6) echo "openspec-phase6" ;;
+    *)      echo "" ;;
+  esac
+}
+
+get_phase_agent() {
+  case "$1" in
+    PHASE0) echo "openspec-analyzer" ;;
+    PHASE1) echo "openspec-builder" ;;
+    PHASE2) echo "openspec-analyzer" ;;
+    PHASE3) echo "openspec-maintainer" ;;
+    PHASE4) echo "openspec-maintainer" ;;
+    PHASE5) echo "openspec-analyzer" ;;
+    PHASE6) echo "openspec-maintainer" ;;
+    *)      echo "" ;;
+  esac
+}
 
 readonly REQUIRED_SKILLS=(
   "openspec-concepts"
@@ -29,10 +82,10 @@ readonly REQUIRED_SKILLS=(
   "openspec-archive-change"
 )
 
-MODEL="zai-coding-plan/glm-5"
+MODEL=""
 CHANGE_ID=""
 CHANGE_DIR=""
-MAX_ITERATIONS=$DEFAULT_MAX_ITERATIONS
+MAX_PHASE_ITERATIONS=$DEFAULT_MAX_PHASE_ITERATIONS
 TIMEOUT=$DEFAULT_TIMEOUT
 VERBOSE=false
 DRY_RUN=false
@@ -44,10 +97,13 @@ FROM_PHASE=""
 NO_COLOR=false
 INTERRUPTED=false
 CHILD_PID=""
+LOG_FILE=""
+LOG_ENABLED=false
+LOG_USER_SPECIFIED=false
 
 AI_PLATFORM=""
-AI_BINARY=""
 SKILLS_DIR=""
+COMMANDS_DIR=""
 
 readonly COLOR_GREEN='\033[0;32m'
 readonly COLOR_YELLOW='\033[0;33m'
@@ -55,54 +111,72 @@ readonly COLOR_RED='\033[0;31m'
 readonly COLOR_BLUE='\033[0;34m'
 readonly COLOR_RESET='\033[0m'
 
+_timestamp() {
+  date -u +%Y-%m-%dT%H:%M:%SZ
+}
+
 log() {
+  local msg="$(_timestamp) [INFO] $*"
   if [[ "$NO_COLOR" == true ]]; then
-    echo "[INFO] $*"
+    echo "$msg"
   else
-    echo -e "${COLOR_BLUE}[INFO]${COLOR_RESET} $*"
+    echo -e "${COLOR_BLUE}$msg${COLOR_RESET}"
   fi
 }
 
 log_success() {
+  local msg="$(_timestamp) [OK] $*"
   if [[ "$NO_COLOR" == true ]]; then
-    echo "[OK] $*"
+    echo "$msg"
   else
-    echo -e "${COLOR_GREEN}[OK]${COLOR_RESET} $*"
+    echo -e "${COLOR_GREEN}$msg${COLOR_RESET}"
   fi
 }
 
 log_warning() {
+  local msg="$(_timestamp) [WARN] $*"
   if [[ "$NO_COLOR" == true ]]; then
-    echo "[WARN] $*" >&2
+    echo "$msg" >&2
   else
-    echo -e "${COLOR_YELLOW}[WARN]${COLOR_RESET} $*" >&2
+    echo -e "${COLOR_YELLOW}$msg${COLOR_RESET}" >&2
   fi
 }
 
 log_error() {
+  local msg="$(_timestamp) [ERROR] $*"
   if [[ "$NO_COLOR" == true ]]; then
-    echo "[ERROR] $*" >&2
+    echo "$msg" >&2
   else
-    echo -e "${COLOR_RED}[ERROR]${COLOR_RESET} $*" >&2
+    echo -e "${COLOR_RED}$msg${COLOR_RESET}" >&2
+  fi
+}
+
+log_verbose() {
+  local msg="$(_timestamp) [VERBOSE] $*"
+
+  if [[ "$VERBOSE" == true ]]; then
+    # When verbose, write to stdout (goes through tee to log file with colors stripped)
+    if [[ "$NO_COLOR" == true ]]; then
+      echo "$msg"
+    else
+      echo -e "${COLOR_BLUE}$msg${COLOR_RESET}"
+    fi
+  elif [[ -n "$LOG_FILE" ]]; then
+    # When not verbose but logging enabled, write directly to log file
+    echo "$msg" >> "$LOG_FILE"
   fi
 }
 
 detect_platform() {
   if command -v opencode &> /dev/null; then
     AI_PLATFORM="opencode"
-    AI_BINARY="opencode"
     SKILLS_DIR=".opencode/skills"
-    log "Detected platform: OpenCode"
-    return 0
-  elif command -v claude &> /dev/null; then
-    AI_PLATFORM="claude"
-    AI_BINARY="claude"
-    SKILLS_DIR=".claude/skills"
-    log "Detected platform: Claude Code"
+    COMMANDS_DIR=".opencode/commands"
+    log_verbose "Detected platform: OpenCode"
     return 0
   else
-    log_error "No supported AI platform found"
-    log_error "Install either opencode or claude"
+    log_error "OpenCode not found"
+    log_error "Install opencode: https://opencode.ai"
     exit 1
   fi
 }
@@ -114,25 +188,28 @@ Usage: $0 <change-id> [OPTIONS]
 Arguments:
   change-id        OpenSpec change ID (e.g., reverse-transformation)
 
-  Options:
-  --max-iterations N  Maximum number of iterations (default: 10, -1 for unlimited)
-  --timeout N        Timeout per iteration in seconds (default: 1800)
-  --model MODEL      Model to use for AI assistant (default: zai-coding-plan/glm-4.7)
-  --verbose          Show detailed progress information
-  --dry-run          Show what would be done without executing
-  --force            Continue without prompts (for CI/CD)
-  --clean            Clean up state files for fresh start
-  --from-phase PHASEX Resume from specific phase (skips pre-flight validation)
-  --no-color         Disable colored output
-  --version          Show version and exit
-  --help, -h         Show this help message
-  --list             List available changes and exit
+Options:
+  -t, --timeout N          Timeout per iteration in seconds (default: 1800)
+  -m, --model MODEL        Model to use for AI assistant (optional)
+  -l, --log-file [PATH]    Log output to file (default: openspec/changes/<change>/openspec-auto.log)
+  -v, --verbose            Show detailed progress information
+  -d, --dry-run            Show what would be done without executing
+  -f, --force              Continue without prompts (for CI/CD)
+  -c, --clean              Clean up state files for fresh start
+  -n, --no-color           Disable colored output
+  -V, --version            Show version and exit
+  -h, --help               Show this help message
+      --list               List available changes and exit
+      --max-phase-iterations N  Max retries per phase (default: 10, -1 for unlimited)
+      --from-phase PHASEX  Resume from specific phase (skips pre-flight validation)
 
 Examples:
   $0 reverse-transformation
-  $0 reverse-transformation --max-iterations 20
-  $0 reverse-transformation --from-phase PHASE3 --verbose
-  $0 reverse-transformation --clean --force
+  $0 reverse-transformation -l
+  $0 reverse-transformation -l /tmp/rt.log -v
+  $0 reverse-transformation -t 3600 -m claude-3-opus
+  $0 reverse-transformation --from-phase PHASE3 -v
+  $0 reverse-transformation -c -f
   $0 --list
 
 Version: $SCRIPT_VERSION
@@ -155,6 +232,18 @@ parse_args() {
         list_changes
         exit 0
         ;;
+      --max-phase-iterations)
+        if [[ ! "$2" =~ ^-?[0-9]+$ ]]; then
+          log_error "Invalid max-phase-iterations value: $2 (must be integer or -1 for unlimited)"
+          usage --error
+        fi
+        if [[ "$2" -lt -1 ]] || [[ "$2" -eq 0 ]]; then
+          log_error "Invalid max-phase-iterations value: $2 (must be -1, 1, or greater)"
+          usage --error
+        fi
+        MAX_PHASE_ITERATIONS="$2"
+        shift 2
+        ;;
       --max-iterations)
         if [[ ! "$2" =~ ^-?[0-9]+$ ]]; then
           log_error "Invalid max-iterations value: $2 (must be integer or -1 for unlimited)"
@@ -164,10 +253,10 @@ parse_args() {
           log_error "Invalid max-iterations value: $2 (must be -1, 1, or greater)"
           usage --error
         fi
-        MAX_ITERATIONS="$2"
+        MAX_PHASE_ITERATIONS="$2"
         shift 2
         ;;
-      --timeout)
+      --timeout|-t)
         if [[ ! "$2" =~ ^[0-9]+$ ]]; then
           log_error "Invalid timeout value: $2 (must be positive integer in seconds)"
           usage --error
@@ -183,23 +272,33 @@ parse_args() {
         TIMEOUT="$2"
         shift 2
         ;;
-      --model)
+      --model|-m)
         MODEL="$2"
         shift 2
         ;;
-      --verbose)
+      --log-file|-l)
+        if [[ -n "${2:-}" ]] && [[ ! "$2" =~ ^- ]]; then
+          LOG_FILE="$2"
+          LOG_USER_SPECIFIED=true
+          shift 2
+        else
+          LOG_ENABLED=true
+          shift
+        fi
+        ;;
+      --verbose|-v)
         VERBOSE=true
         shift
         ;;
-      --dry-run)
+      --dry-run|-d)
         DRY_RUN=true
         shift
         ;;
-      --force)
+      --force|-f)
         FORCE=true
         shift
         ;;
-      --clean)
+      --clean|-c)
         CLEAN=true
         shift
         ;;
@@ -207,7 +306,7 @@ parse_args() {
         FROM_PHASE="$2"
         shift 2
         ;;
-      --no-color)
+      --no-color|-n)
         NO_COLOR=true
         COLOR_GREEN=''
         COLOR_YELLOW=''
@@ -216,7 +315,7 @@ parse_args() {
         COLOR_RESET=''
         shift
         ;;
-      --version)
+      --version|-V)
         echo "$SCRIPT_VERSION"
         exit 0
         ;;
@@ -293,36 +392,89 @@ require_tool() {
     log_error "Please install $tool or ensure it's in PATH"
     exit 1
   fi
-  log_success "Tool found: $tool"
+  log_verbose "Tool found: $tool"
+}
+
+run_lib_script() {
+  local script="$1"
+  shift
+  local args=("$@")
+
+  local stderr_file
+  stderr_file=$(mktemp)
+
+  local result
+  result=$("$SCRIPT_DIR/lib/$script" "${args[@]}" 2>"$stderr_file")
+  local exit_code=$?
+
+  if [[ $exit_code -ne 0 ]]; then
+    if [[ -s "$stderr_file" ]]; then
+      log_error "Script $script failed:"
+      cat "$stderr_file" >&2
+    fi
+    rm -f "$stderr_file"
+    echo ""
+    return 1
+  fi
+
+  rm -f "$stderr_file"
+  echo "$result"
+  return 0
+}
+
+is_valid_json_result() {
+  local result="$1"
+  [[ -n "$result" ]] && [[ $(echo "$result" | jq -r '.valid' 2>/dev/null) == "true" ]]
+}
+
+print_validation_errors() {
+  local result="$1"
+  echo "$result" | jq -r '.errors[]?.message' 2>/dev/null | while read -r msg; do
+    [[ -n "$msg" ]] && log_error "$msg"
+  done
 }
 
 validate_skills() {
   log "Validating required skills..."
 
-  for skill in "${REQUIRED_SKILLS[@]}"; do
-    local skill_path="$SKILLS_DIR/$skill/SKILL.md"
-    if [[ ! -f "$skill_path" ]]; then
-      log_error "Required skill not found: $skill"
-      log_error "Expected at: $skill_path"
-      local platform_name=$(basename "$SKILLS_DIR")
-      log_error "Run: openspecx install $platform_name"
-      exit 1
-    fi
-  done
+  local result
+  result=$(run_lib_script "osc-validate" "$CHANGE_ID" skills)
 
-  log_success "All required skills found"
+  if ! is_valid_json_result "$result"; then
+    log_error "Required skills validation failed"
+    print_validation_errors "$result"
+    local platform_name=$(basename "$SKILLS_DIR")
+    log_error "Run: openspecx install $platform_name"
+    exit 1
+  fi
+
+  log_verbose "All required skills found"
+}
+
+validate_commands() {
+  log "Validating required commands..."
+
+  local result
+  result=$(run_lib_script "osc-validate" "$CHANGE_ID" commands)
+
+  if ! is_valid_json_result "$result"; then
+    log_error "Required commands validation failed"
+    print_validation_errors "$result"
+    log_error "Run: openspecx install opencode"
+    exit 1
+  fi
+
+  log_verbose "All required commands found"
 }
 
 validate_json() {
   local file="$1"
 
-  if [[ ! -f "$file" ]]; then
-    log_error "File not found: $file"
-    return 1
-  fi
+  local result
+  result=$(run_lib_script "osc-validate" "$CHANGE_ID" json "$file")
 
-  if ! jq empty "$file" 2>/dev/null; then
-    log_error "Invalid JSON in file: $file"
+  if ! is_valid_json_result "$result"; then
+    log_error "$(echo "$result" | jq -r '.errors[0].message // "Invalid JSON"' 2>/dev/null)"
     return 1
   fi
 
@@ -332,27 +484,17 @@ validate_json() {
 validate_change_dir() {
   log "Validating change directory..."
 
-  if [[ ! -d "$CHANGE_DIR" ]]; then
-    log_error "Change directory not found: $CHANGE_DIR"
+  local result
+  result=$(run_lib_script "osc-validate" "$CHANGE_ID" change-dir)
+
+  if ! is_valid_json_result "$result"; then
+    log_error "Change directory validation failed"
+    print_validation_errors "$result"
+    log_error "Change directory: $CHANGE_DIR"
     exit 1
   fi
 
-  local required_files=("tasks.md" "proposal.md" "design.md")
-  for file in "${required_files[@]}"; do
-    if [[ ! -f "$CHANGE_DIR/$file" ]]; then
-      log_error "Required file not found: $file"
-      log_error "Change directory: $CHANGE_DIR"
-      log_error "The change must have: ${required_files[*]}"
-      exit 1
-    fi
-  done
-
-  if [[ ! -d "$CHANGE_DIR/specs" ]] || [[ -z "$(find "$CHANGE_DIR/specs" -name "*.md" 2>/dev/null)" ]]; then
-    log_error "No spec files found in $CHANGE_DIR/specs/"
-    exit 1
-  fi
-
-  log_success "Change directory validated"
+  log_verbose "Change directory validated"
 }
 
 validate_git() {
@@ -385,28 +527,23 @@ validate_git() {
     fi
   fi
 
-  log_success "Git repository is ready"
+  log_verbose "Git repository is ready"
 }
 
 record_baseline() {
   log "Recording baseline..."
 
-  local commit branch
-  commit=$(git rev-parse HEAD)
-  branch=$(git branch --show-current)
+  local result
+  result=$(run_lib_script "osc-baseline" record)
 
-  local baseline_json
-  baseline_json=$(cat <<EOF
-{
-  "commit": "$commit",
-  "branch": "$branch",
-  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-}
-EOF
-  )
+  if [[ -z "$result" ]] || [[ $(echo "$result" | jq -r '.commit // empty' 2>/dev/null) == "" ]]; then
+    log_error "Failed to record baseline"
+    exit 1
+  fi
 
-  echo "$baseline_json" > ".openspec-baseline.json"
-  log_success "Baseline recorded: $commit"
+  local commit
+  commit=$(echo "$result" | jq -r '.commit')
+  log_verbose "Baseline recorded: $commit"
 }
 
 read_state() {
@@ -446,14 +583,31 @@ read_state() {
 write_state() {
   local phase="$1"
   local iteration="${2:-1}"
+  local phase_complete="${3:-false}"
+  local is_new_iteration="${4:-true}"
+
+  local phase_iterations="{}"
+
+  if [[ -f "$CHANGE_DIR/state.json" ]]; then
+    phase_iterations=$(jq -c '.phase_iterations // {}' "$CHANGE_DIR/state.json" 2>/dev/null || echo "{}")
+  fi
+
+  if [[ "$is_new_iteration" == "true" ]]; then
+    local current_count
+    current_count=$(echo "$phase_iterations" | jq -r ".\"$phase\" // 0")
+    local new_count=$((current_count + 1))
+    phase_iterations=$(echo "$phase_iterations" | jq -c --arg phase "$phase" --argjson count "$new_count" '.[$phase] = $count')
+  fi
 
   local state_json
   state_json=$(cat <<EOF
 {
   "phase": "$phase",
-  "phase_name": "${PHASE_NAMES[$phase]}",
+  "phase_name": "$(get_phase_name "$phase")",
   "iteration": $iteration,
+  "phase_complete": $phase_complete,
   "total_invocations": $TOTAL_INVOCATIONS,
+  "phase_iterations": $phase_iterations,
   "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "last_updated": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 }
@@ -461,21 +615,14 @@ EOF
   )
 
   echo "$state_json" > "$CHANGE_DIR/state.json"
-
-  if [[ "$VERBOSE" == true ]]; then
-    log "State updated: $phase (iteration $iteration)"
-  fi
+  log_verbose "State updated: $phase (iteration $iteration, complete: $phase_complete)"
 }
 
 check_complete() {
-  local complete_file="$CHANGE_DIR/complete.json"
+  local result
+  result=$(run_lib_script "osc-complete" "$CHANGE_ID" check)
 
-  if [[ ! -f "$complete_file" ]]; then
-    return 1
-  fi
-
-  if ! validate_json "$complete_file"; then
-    log_error "Complete file is corrupted"
+  if [[ $(echo "$result" | jq -r '.exists // false' 2>/dev/null) != "true" ]]; then
     return 1
   fi
 
@@ -483,53 +630,124 @@ check_complete() {
 }
 
 read_completion() {
-  local complete_file="$CHANGE_DIR/complete.json"
+  local result
+  result=$(run_lib_script "osc-complete" "$CHANGE_ID" get)
 
-  if ! check_complete; then
+  if [[ -z "$result" ]] || [[ $(echo "$result" | jq -r '.status // empty' 2>/dev/null) == "" ]]; then
     return 1
   fi
 
   local status
-  status=$(jq -r '.status // empty' "$complete_file" 2>/dev/null)
-
-  if [[ -z "$status" ]]; then
-    return 1
-  fi
+  status=$(echo "$result" | jq -r '.status')
 
   echo "$status"
   return 0
 }
 
 get_current_phase() {
-  local state_file="$CHANGE_DIR/state.json"
+  local result
+  result=$(run_lib_script "osc-phase" "$CHANGE_ID" current)
 
-  if ! read_state; then
+  if [[ -z "$result" ]] || [[ $(echo "$result" | jq -r '.phase // empty' 2>/dev/null) == "" ]]; then
     return 1
   fi
 
   local phase
-  phase=$(jq -r '.phase // empty' "$state_file" 2>/dev/null)
-
-  if [[ -z "$phase" ]]; then
-    return 1
-  fi
+  phase=$(echo "$result" | jq -r '.phase')
 
   echo "$phase"
   return 0
 }
 
 get_phase_iteration() {
-  local state_file="$CHANGE_DIR/state.json"
+  local result
+  result=$(run_lib_script "osc-phase" "$CHANGE_ID" current)
 
-  if ! read_state; then
+  if [[ -z "$result" ]]; then
     echo 0
     return
   fi
 
   local iteration
-  iteration=$(jq -r '.iteration // "0"' "$state_file" 2>/dev/null)
+  iteration=$(echo "$result" | jq -r '.iteration // 0')
 
   echo "$iteration"
+}
+
+check_phase_complete() {
+  local state_file="$CHANGE_DIR/state.json"
+
+  if [[ ! -f "$state_file" ]]; then
+    return 1
+  fi
+
+  local phase_complete
+  phase_complete=$(jq -r '.phase_complete // false' "$state_file" 2>/dev/null)
+
+  if [[ "$phase_complete" == "true" ]]; then
+    return 0
+  fi
+
+  return 1
+}
+
+clear_phase_complete() {
+  local state_file="$CHANGE_DIR/state.json"
+
+  if [[ ! -f "$state_file" ]]; then
+    return
+  fi
+
+  local updated_json
+  updated_json=$(jq '.phase_complete = false' "$state_file" 2>/dev/null)
+
+  if [[ -n "$updated_json" ]]; then
+    echo "$updated_json" > "$state_file"
+  fi
+}
+
+check_transition() {
+  local state_file="$CHANGE_DIR/state.json"
+
+  if [[ ! -f "$state_file" ]]; then
+    return 1
+  fi
+
+  local transition_target
+  transition_target=$(jq -r '.transition.target // empty' "$state_file" 2>/dev/null)
+
+  if [[ -n "$transition_target" ]]; then
+    echo "$transition_target"
+    return 0
+  fi
+
+  return 1
+}
+
+get_transition_reason() {
+  local state_file="$CHANGE_DIR/state.json"
+
+  if [[ ! -f "$state_file" ]]; then
+    echo "unknown"
+    return
+  fi
+
+  jq -r '.transition.reason // "unknown"' "$state_file" 2>/dev/null
+}
+
+get_transition_details() {
+  local state_file="$CHANGE_DIR/state.json"
+
+  if [[ ! -f "$state_file" ]]; then
+    echo ""
+    return
+  fi
+
+  jq -r '.transition.details // ""' "$state_file" 2>/dev/null
+}
+
+clear_transition() {
+  run_lib_script "osc-state" "$CHANGE_ID" clear-transition >/dev/null 2>&1 || true
 }
 
 is_phase_complete() {
@@ -558,31 +776,38 @@ run_agent() {
   local phase="$1"
 
   if [[ "$DRY_RUN" == true ]]; then
-    log "[DRY RUN] Would run agent for $phase"
+    log "[DRY RUN] Would run command for $phase"
     return 0
   fi
 
-  TOTAL_INVOCATIONS=$((TOTAL_INVOCATIONS + 1))
   log "Agent invocation #$TOTAL_INVOCATIONS for $phase"
 
-  local escaped_change_id
-  escaped_change_id=$(printf '%s\n' "$CHANGE_ID" | sed 's/[&/\]/\\&/g')
-  local prompt_content
-  prompt_content=$(sed "s/{{CHANGE_NAME}}/$escaped_change_id/g" "$SCRIPT_DIR/prompt-template.md")
+  local cmd_name=$(get_phase_command "$phase")
+  local agent_name=$(get_phase_agent "$phase")
+  local title="OpenSpec: $CHANGE_ID - $(get_phase_name "$phase")"
+
+  log_verbose "Using command: /$cmd_name"
+  log_verbose "Using agent: $agent_name"
+  log_verbose "Session title: $title"
 
   local exit_code
 
-  if [[ "$AI_PLATFORM" == "opencode" ]]; then
-    timeout --foreground "$TIMEOUT" "$AI_BINARY" run --model="$MODEL" "$prompt_content" &
-    CHILD_PID=$!
-    wait "$CHILD_PID"
-    exit_code=$?
-  elif [[ "$AI_PLATFORM" == "claude" ]]; then
-    timeout --foreground "$TIMEOUT" "$AI_BINARY" --print --model="$MODEL" "$prompt_content" &
-    CHILD_PID=$!
-    wait "$CHILD_PID"
-    exit_code=$?
+  local model_flag=""
+  if [[ -n "$MODEL" ]]; then
+    model_flag="--model=$MODEL"
   fi
+
+  timeout --foreground "$TIMEOUT" \
+    opencode run \
+    --command "$cmd_name" \
+    --agent "$agent_name" \
+    "$CHANGE_ID" \
+    --title="$title" \
+    $model_flag &
+
+  CHILD_PID=$!
+  wait "$CHILD_PID"
+  exit_code=$?
 
   CHILD_PID=""
 
@@ -602,97 +827,105 @@ run_agent() {
   return 0
 }
 
-check_complete_signal() {
-  if ! check_complete; then
-    return 1
-  fi
-
-  local complete_status
-  complete_status=$(read_completion || echo "")
-
-  if [[ "$complete_status" == "COMPLETE" ]]; then
-    log "Phase complete signaled"
-    return 0
-  fi
-
-  return 1
-}
-
 run_phase() {
   local phase="$1"
-  log "${PHASE_NAMES[$phase]}"
+  log "$(get_phase_name "$phase")"
 
   local iteration=1
 
-  while [[ $iteration -le $MAX_ITERATIONS ]] || [[ $MAX_ITERATIONS -eq -1 ]]; do
+  while [[ $iteration -le $MAX_PHASE_ITERATIONS ]] || [[ $MAX_PHASE_ITERATIONS -eq -1 ]]; do
+    TOTAL_INVOCATIONS=$((TOTAL_INVOCATIONS + 1))
     write_state "$phase" "$iteration"
 
     if ! run_agent "$phase"; then
       return 1
     fi
 
-    if check_complete_signal; then
+    if [[ "$phase" == "PHASE6" ]]; then
+      update_change_dir_if_archived
+    fi
+
+    # PHASE6 completion is detected by archive existence, not state.json
+    # (PHASE6 deletes transient files before archiving)
+    if [[ "$phase" == "PHASE6" ]]; then
+      if validate_archive >/dev/null 2>&1; then
+        log_success "$phase completed in $iteration iteration(s)"
+        return 0
+      fi
+    elif check_phase_complete; then
       log_success "$phase completed in $iteration iteration(s)"
+      clear_phase_complete
       return 0
     fi
 
     iteration=$((iteration + 1))
   done
 
-  log_warning "$phase reached max iterations ($MAX_ITERATIONS)"
+  log_warning "$phase reached max phase iterations ($MAX_PHASE_ITERATIONS)"
   return 1
 }
 
 advance_phase() {
   local current="$1"
-  case "$current" in
-    PHASE0) echo "PHASE1" ;;
-    PHASE1) echo "PHASE2" ;;
-    PHASE2) echo "PHASE3" ;;
-    PHASE3) echo "PHASE4" ;;
-    PHASE4) echo "PHASE5" ;;
-    PHASE5) echo "PHASE6" ;;
-    PHASE6) echo "COMPLETE" ;;
-    *) echo "COMPLETE" ;;
-  esac
+
+  local result
+  result=$(run_lib_script "osc-phase" "$CHANGE_ID" advance)
+
+  if [[ -n "$result" ]]; then
+    echo "$result" | jq -r '.phase // "COMPLETE"'
+  else
+    case "$current" in
+      PHASE0) echo "PHASE1" ;;
+      PHASE1) echo "PHASE2" ;;
+      PHASE2) echo "PHASE3" ;;
+      PHASE3) echo "PHASE4" ;;
+      PHASE4) echo "PHASE5" ;;
+      PHASE5) echo "PHASE6" ;;
+      PHASE6) echo "COMPLETE" ;;
+      *) echo "COMPLETE" ;;
+    esac
+  fi
 }
 
+
 validate_archive() {
-  local archives=()
+  local result
+  result=$(run_lib_script "osc-validate" "$CHANGE_ID" archive)
 
-  for dir in openspec/changes/archive/*-"$CHANGE_ID"; do
-    if [[ -d "$dir" ]]; then
-      archives+=("$dir")
-    fi
-  done
-
-  if [[ ${#archives[@]} -eq 0 ]]; then
-    log_error "Change not archived"
+  if ! is_valid_json_result "$result"; then
+    log_error "$(echo "$result" | jq -r '.errors[0].message // "Archive validation failed"' 2>/dev/null)"
     return 1
   fi
 
-  if [[ ${#archives[@]} -gt 1 ]]; then
-    log_error "Multiple archives found for change: ${#archives[@]}"
-    for archive in "${archives[@]}"; do
-      log_error "  - $archive"
-    done
-    return 1
-  fi
-
-  log_success "Archive found: ${archives[0]}"
+  local archive_path
+  archive_path=$(echo "$result" | jq -r '.archive // ""')
+  log_success "Archive found: $archive_path"
   return 0
 }
 
-validate_iterations() {
-  local iterations_json="$CHANGE_DIR/iterations.json"
-
-  if [[ ! -f "$iterations_json" ]]; then
-    log_error "iterations.json not found"
-    return 1
+update_change_dir_if_archived() {
+  if [[ -d "$CHANGE_DIR" ]]; then
+    return 0
   fi
 
-  if ! validate_json "$iterations_json"; then
-    log_error "iterations.json contains invalid JSON"
+  local new_dir
+  new_dir=$(osc_find_change_dir "$CHANGE_ID") || return 1
+
+  if [[ -n "$new_dir" ]] && [[ -d "$new_dir" ]]; then
+    CHANGE_DIR="$new_dir"
+    log_verbose "CHANGE_DIR updated to: $CHANGE_DIR"
+    return 0
+  fi
+
+  return 1
+}
+
+validate_iterations() {
+  local result
+  result=$(run_lib_script "osc-validate" "$CHANGE_ID" iterations)
+
+  if ! is_valid_json_result "$result"; then
+    log_error "$(echo "$result" | jq -r '.errors[0].message // "Iterations validation failed"' 2>/dev/null)"
     return 1
   fi
 
@@ -702,67 +935,104 @@ validate_iterations() {
 validate_completion() {
   log "Validating completion requirements..."
 
-  local errors=0
+  local result
+  result=$(run_lib_script "osc-validate" "$CHANGE_ID" completion)
 
-  validate_json "$CHANGE_DIR/state.json" || errors=$((errors + 1))
-  validate_json "$CHANGE_DIR/complete.json" || errors=$((errors + 1))
-  validate_iterations || errors=$((errors + 1))
-  validate_archive || errors=$((errors + 1))
-
-  if [[ ! -f "$CHANGE_DIR/decision-log.md" ]]; then
-    log_error "decision-log.md not found"
-    errors=$((errors + 1))
-  fi
-
-  if [[ $errors -eq 0 ]]; then
-    log_success "All validation checks passed"
-    return 0
-  else
-    log_error "Validation failed with $errors error(s)"
+  if ! is_valid_json_result "$result"; then
+    log_error "Completion validation failed"
+    print_validation_errors "$result"
     return 1
   fi
+
+  log_success "All validation checks passed"
+  return 0
 }
 
 show_progress() {
-  echo "================================"
-  echo "Progress Summary"
-  echo "================================"
-  echo "Change ID: $CHANGE_ID"
-  echo "Change directory: $CHANGE_DIR"
-  echo ""
-
-  local current_phase
-  if current_phase=$(get_current_phase); then
-    echo "Current phase: $current_phase - ${PHASE_NAMES[$current_phase]}"
-    local iteration
-    iteration=$(get_phase_iteration)
-    echo "Phase iteration: $iteration"
-  else
-    echo "Current phase: Not started"
-  fi
-
-  echo ""
-  echo "Total invocations: $TOTAL_INVOCATIONS"
-
-  local elapsed
-  elapsed=$(($(date +%s) - START_TIME))
-  local minutes=$((elapsed / 60))
-  local seconds=$((elapsed % 60))
-  echo "Elapsed time: ${minutes}m ${seconds}s"
-
-  if [[ -f "$CHANGE_DIR/iterations.json" ]]; then
+  {
+    echo "================================"
+    echo "Progress Summary"
+    echo "================================"
+    echo "Change ID: $CHANGE_ID"
+    echo "Change directory: $CHANGE_DIR"
     echo ""
-    echo "Iterations by phase:"
-    echo "  PHASE0 (ARTIFACT REVIEW): $(jq 'map(select(.phase == "ARTIFACT_REVIEW")) | length' "$CHANGE_DIR/iterations.json")"
-    echo "  PHASE1 (IMPLEMENTATION): $(jq 'map(select(.phase == "IMPLEMENTATION")) | length' "$CHANGE_DIR/iterations.json")"
-    echo "  PHASE2 (REVIEW): $(jq 'map(select(.phase == "REVIEW")) | length' "$CHANGE_DIR/iterations.json")"
-    echo "  PHASE3 (MAINTAIN-DOCS): $(jq 'map(select(.phase == "MAINTAIN-DOCS")) | length' "$CHANGE_DIR/iterations.json")"
-    echo "  PHASE4 (SYNC): $(jq 'map(select(.phase == "SYNC")) | length' "$CHANGE_DIR/iterations.json")"
-    echo "  PHASE5 (ARCHIVE): $(jq 'map(select(.phase == "ARCHIVE")) | length' "$CHANGE_DIR/iterations.json")"
-    echo "  PHASE6 (SELF-REFLECTION): $(jq 'map(select(.phase == "SELF-REFLECTION")) | length' "$CHANGE_DIR/iterations.json")"
+
+    local current_phase
+    if current_phase=$(get_current_phase); then
+      echo "Current phase: $current_phase - $(get_phase_name "$current_phase")"
+      local iteration
+      iteration=$(get_phase_iteration)
+      echo "Phase iteration: $iteration"
+    else
+      echo "Current phase: Not started"
+    fi
+
+    echo ""
+    echo "Total invocations: $TOTAL_INVOCATIONS"
+
+    local elapsed
+    elapsed=$(($(date +%s) - START_TIME))
+    local minutes=$((elapsed / 60))
+    local seconds=$((elapsed % 60))
+    echo "Elapsed time: ${minutes}m ${seconds}s"
+
+    if [[ -n "$LOG_FILE" ]]; then
+      echo "Log file: $LOG_FILE"
+    fi
+
+    if [[ -f "$CHANGE_DIR/state.json" ]]; then
+      echo ""
+      echo "Iterations by phase:"
+      local p0 p1 p2 p3 p4 p5 p6
+      p0=$(jq -r '.phase_iterations.PHASE0 // 0' "$CHANGE_DIR/state.json")
+      p1=$(jq -r '.phase_iterations.PHASE1 // 0' "$CHANGE_DIR/state.json")
+      p2=$(jq -r '.phase_iterations.PHASE2 // 0' "$CHANGE_DIR/state.json")
+      p3=$(jq -r '.phase_iterations.PHASE3 // 0' "$CHANGE_DIR/state.json")
+      p4=$(jq -r '.phase_iterations.PHASE4 // 0' "$CHANGE_DIR/state.json")
+      p5=$(jq -r '.phase_iterations.PHASE5 // 0' "$CHANGE_DIR/state.json")
+      p6=$(jq -r '.phase_iterations.PHASE6 // 0' "$CHANGE_DIR/state.json")
+      echo "  PHASE0 (ARTIFACT REVIEW): $p0"
+      echo "  PHASE1 (IMPLEMENTATION): $p1"
+      echo "  PHASE2 (REVIEW): $p2"
+      echo "  PHASE3 (MAINTAIN DOCS): $p3"
+      echo "  PHASE4 (SYNC): $p4"
+      echo "  PHASE5 (SELF-REFLECTION): $p5"
+      echo "  PHASE6 (ARCHIVE): $p6"
+    fi
+
+    echo "================================"
+  } | {
+    if [[ -n "$LOG_FILE" ]]; then
+      tee -a "$LOG_FILE" | { [[ "$VERBOSE" == true ]] && cat || cat >/dev/null; }
+    else
+      { [[ "$VERBOSE" == true ]] && cat || cat >/dev/null; }
+    fi
+  }
+}
+
+archive_log_file() {
+  if [[ -z "$LOG_FILE" ]] || [[ ! -f "$LOG_FILE" ]]; then
+    return 0
   fi
 
-  echo "================================"
+  if [[ "$LOG_USER_SPECIFIED" == true ]]; then
+    log_verbose "User-specified log path, not moving to archive"
+    return 0
+  fi
+
+  local archive_log="$CHANGE_DIR/openspec-auto.log"
+
+  if mv "$LOG_FILE" "$archive_log" 2>/dev/null; then
+    log_verbose "Log moved to archive: $archive_log"
+    git add "$archive_log"
+    if git commit --amend --no-edit 2>/dev/null; then
+      log_verbose "Archive commit amended with log file"
+    else
+      log_warning "Failed to amend archive commit with log file"
+    fi
+  else
+    log_warning "Failed to move log file to archive"
+  fi
 }
 
 cleanup() {
@@ -782,7 +1052,7 @@ cleanup() {
     log "  $CHANGE_DIR/state.json"
     log "  $CHANGE_DIR/complete.json"
     log "  $CHANGE_DIR/iterations.json"
-    log "  $CHANGE_DIR/decision-log.md"
+    log "  $CHANGE_DIR/decision-log.json"
     log ""
     log "To resume: Run script again with same change-id"
     exit 130
@@ -795,7 +1065,7 @@ cleanup() {
     log "  $CHANGE_DIR/state.json"
     log "  $CHANGE_DIR/complete.json"
     log "  $CHANGE_DIR/iterations.json"
-    log "  $CHANGE_DIR/decision-log.md"
+    log "  $CHANGE_DIR/decision-log.json"
     log ""
     log "To resume: Run script again with same change-id"
   else
@@ -807,6 +1077,9 @@ cleanup() {
     fi
     if [[ -f ".openspec-baseline.json" ]]; then
       rm ".openspec-baseline.json" || log_warning "Failed to remove .openspec-baseline.json"
+    fi
+    if [[ -n "$LOG_FILE" ]] && [[ "$LOG_USER_SPECIFIED" == false ]] && [[ -f "$LOG_FILE" ]]; then
+      rm "$LOG_FILE" || log_warning "Failed to remove $LOG_FILE"
     fi
   fi
 
@@ -823,7 +1096,7 @@ handle_interrupt() {
 find_change_dir() {
   if [[ -d "openspec/changes/$CHANGE_ID" ]]; then
     CHANGE_DIR="openspec/changes/$CHANGE_ID"
-    log "Found change at: $CHANGE_DIR"
+    log_verbose "Found change at: $CHANGE_DIR"
     return 0
   fi
 
@@ -833,12 +1106,41 @@ find_change_dir() {
 
     if [[ -n "$cli_path" ]]; then
       CHANGE_DIR="$cli_path"
-      log "Found change via CLI lookup at: $CHANGE_DIR"
+      log_verbose "Found change via CLI lookup at: $CHANGE_DIR"
       return 0
     fi
   fi
 
   return 1
+}
+
+setup_logging() {
+  if [[ "$LOG_ENABLED" == true ]] && [[ -z "$LOG_FILE" ]]; then
+    LOG_FILE=".openspec-auto-${CHANGE_ID}.log"
+  fi
+
+  if [[ -n "$LOG_FILE" ]]; then
+    local log_dir
+    log_dir=$(dirname "$LOG_FILE")
+
+    if [[ "$log_dir" != "." ]] && [[ ! -d "$log_dir" ]]; then
+      mkdir -p "$log_dir" || {
+        log_warning "Failed to create log directory: $log_dir"
+        LOG_FILE=""
+        return 1
+      }
+    fi
+
+    if ! touch "$LOG_FILE" 2>/dev/null; then
+      log_warning "Failed to create log file: $LOG_FILE (permission denied?)"
+      LOG_FILE=""
+      return 1
+    fi
+
+    # Redirect stdout to both terminal (with colors) and log file (without colors)
+    exec > >(tee >(sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE")) 2>&1
+    log_verbose "Logging to: $LOG_FILE"
+  fi
 }
 
 main() {
@@ -857,27 +1159,42 @@ main() {
     exit 1
   fi
 
+  if [[ "$CHANGE_DIR" == *"/archive/"* ]] && [[ ! -f "$CHANGE_DIR/state.json" ]]; then
+    log_success "Change '$CHANGE_ID' is already archived and complete"
+    log "Archive location: $CHANGE_DIR"
+    exit 0
+  fi
+
+  setup_logging
+
   START_TIME=$(date +%s)
 
-  echo "================================"
-  echo "OpenSpec Autonomous Implementation"
-  echo "================================"
-  echo "Version: $SCRIPT_VERSION"
-  echo "Change ID: $CHANGE_ID"
-  echo "Change directory: $CHANGE_DIR"
-  echo "Model: $MODEL"
-  echo "Max iterations: $MAX_ITERATIONS"
-  echo "Timeout: $TIMEOUT seconds"
-  echo "================================"
-  echo ""
+  log ""
+  log "================================"
+  log "OpenSpec Autonomous Implementation"
+  log "================================"
+  log "Version: $SCRIPT_VERSION"
+  log "Change ID: $CHANGE_ID"
+  log "Change directory: $CHANGE_DIR"
+  if [[ -n "$MODEL" ]]; then
+    log "Model: $MODEL"
+  fi
+  log "Max phase iterations: $MAX_PHASE_ITERATIONS"
+  log "Timeout: $TIMEOUT seconds"
+  if [[ -n "$LOG_FILE" ]]; then
+    log "Log file: $LOG_FILE"
+  fi
+  log "================================"
+  log ""
 
   if [[ "$CLEAN" == true ]]; then
-    log "Cleaning up state files for fresh start..."
+    log_verbose "Cleaning up state files for fresh start..."
     rm -f "$CHANGE_DIR/state.json" 2>/dev/null || true
     rm -f "$CHANGE_DIR/complete.json" 2>/dev/null || true
     rm -f "$CHANGE_DIR/iterations.json" 2>/dev/null || true
     rm -f ".openspec-baseline.json" 2>/dev/null || true
-    log_success "State files cleaned, starting fresh"
+    rm -f ".openspec-auto-${CHANGE_ID}.log" 2>/dev/null || true
+    log_verbose "State files cleaned, starting fresh"
   fi
 
   if [[ -z "$FROM_PHASE" ]]; then
@@ -886,9 +1203,10 @@ main() {
     require_tool "openspec"
 
     detect_platform
-    require_tool "$AI_BINARY"
+    require_tool "opencode"
 
     validate_skills
+    validate_commands
     validate_git
     validate_change_dir
 
@@ -901,7 +1219,7 @@ main() {
     local current_phase
     current_phase=$(get_current_phase)
 
-    log "Resuming from phase: $current_phase - ${PHASE_NAMES[$current_phase]}"
+    log "Resuming from phase: $current_phase - $(get_phase_name "$current_phase")"
 
     if [[ "$FORCE" == false ]] && [[ -t 0 ]]; then
       echo ""
@@ -926,83 +1244,102 @@ main() {
   while true; do
     if [[ "$started" == false ]] && [[ -n "$FROM_PHASE" ]]; then
       current_phase="$FROM_PHASE"
-      log "Starting from phase: $current_phase - ${PHASE_NAMES[$current_phase]}"
-      write_state "$current_phase" "0"
+      log "Starting from phase: $current_phase - $(get_phase_name "$current_phase")"
       started=true
     elif current_phase=$(get_current_phase); then
       :
     else
       current_phase="PHASE0"
-      write_state "PHASE0" "0"
     fi
 
+    # Check for blocker signal from any phase
     if check_complete; then
-      local complete_status
-      complete_status=$(read_completion || echo "")
+      local with_blocker
+      with_blocker=$(jq -r '.with_blocker // "false"' "$CHANGE_DIR/complete.json" 2>/dev/null)
 
-      if [[ "$complete_status" == "COMPLETE" ]]; then
-        log "Completion signal received"
+      if [[ "$with_blocker" == "true" ]]; then
+        local blocker_reason
+        blocker_reason=$(jq -r '.blocker_reason // "Unknown"' "$CHANGE_DIR/complete.json" 2>/dev/null)
 
-        local with_blocker
-        with_blocker=$(jq -r '.with_blocker // "false"' "$CHANGE_DIR/complete.json" 2>/dev/null)
+        log ""
+        log "================================"
+        log_error "CRITICAL BLOCKER DETECTED"
+        log "================================"
+        log_warning "Blocker: $blocker_reason"
+        log "Review decision-log.json for details"
+        show_progress
 
-        if [[ "$with_blocker" == "true" ]]; then
-          local blocker_reason
-          blocker_reason=$(jq -r '.blocker_reason // "Unknown"' "$CHANGE_DIR/complete.json" 2>/dev/null)
-
-          log_warning "Completion with CRITICAL BLOCKER: $blocker_reason"
-          log "Review decision-log.md for details"
-
-          if [[ "$VERBOSE" == true ]]; then
-            show_progress
-          fi
-
-          exit 1
-        fi
-
-        if validate_completion; then
-          log ""
-          log "================================"
-          log_success "Implementation completed successfully!"
-          log "================================"
-
-          rm "$CHANGE_DIR/state.json"
-          rm "$CHANGE_DIR/complete.json"
-          rm ".openspec-baseline.json"
-
-          log "State files cleaned up"
-
-          if [[ "$VERBOSE" == true ]]; then
-            show_progress
-          fi
-
-          exit 0
-        else
-          log ""
-          log_error "Validation failed - completion criteria not met"
-          log "State files preserved for investigation"
-          exit 1
-        fi
+        exit 1
       fi
     fi
 
     case "$current_phase" in
-      PHASE0|PHASE1|PHASE2|PHASE3|PHASE4|PHASE5|PHASE6)
+      PHASE0|PHASE1|PHASE2|PHASE3|PHASE4|PHASE5)
         if ! run_phase "$current_phase"; then
           log_error "$current_phase failed"
           exit 1
         fi
         show_progress
 
-        local next_phase
-        next_phase=$(advance_phase "$current_phase")
-        write_state "$next_phase" "0"
-        log "Phase transition: $current_phase → $next_phase"
-        current_phase="$next_phase"
+        # Check for explicit transition signal using conditional pattern
+        # (check_transition returns 1 when no transition, which would exit with set -e)
+        local transition_target=""
+        if transition_target=$(check_transition) && [[ -n "$transition_target" ]]; then
+          local transition_reason
+          local transition_details
+          transition_reason=$(get_transition_reason)
+          transition_details=$(get_transition_details)
+
+          log "Explicit transition: $current_phase → $transition_target"
+          log_verbose "Reason: $transition_reason"
+          if [[ -n "$transition_details" ]]; then
+            log_verbose "Details: $transition_details"
+          fi
+
+          clear_transition
+          clear_phase_complete
+          current_phase="$transition_target"
+        else
+          local next_phase
+          next_phase=$(advance_phase "$current_phase")
+          log "Phase transition: $current_phase → $next_phase"
+          current_phase="$next_phase"
+        fi
         ;;
+
+      PHASE6)
+        if ! run_phase "$current_phase"; then
+          log_error "$current_phase failed"
+          exit 1
+        fi
+        # Note: Don't call show_progress here because:
+        # 1. state.json was deleted before archiving
+        # 2. CHANGE_DIR now points to archive (no active state)
+        # 3. get_current_phase would try to create new state.json in archive
+
+        # PHASE6 is terminal - validate archive and exit without calling advance_phase
+        # Note: cleanup_state_files() is NOT called because PHASE6 already cleaned
+        # transient files before archiving (state.json, complete.json, baseline)
+        if validate_archive; then
+          archive_log_file
+          log ""
+          log "================================"
+          log_success "Implementation completed successfully!"
+          log "================================"
+
+          exit 0
+        else
+          log ""
+          log_error "Archive validation failed"
+          log "State files preserved for investigation"
+          exit 1
+        fi
+        ;;
+
       COMPLETE)
         log "All phases complete, validating..."
         ;;
+
       *)
         log_error "Unknown phase: $current_phase"
         exit 1

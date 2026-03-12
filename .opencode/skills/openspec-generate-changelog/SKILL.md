@@ -3,10 +3,6 @@ name: openspec-generate-changelog
 description: Generate CHANGELOG.md in Keep a Changelog format from archived OpenSpec changes. Use after archiving changes, before publishing releases, or when creating release notes. Reads archived proposals and categorizes changes automatically.
 license: MIT
 compatibility: Requires openspec CLI.
-metadata:
-  generatedBy: "0.3.3"
-  author: openspec-extended
-  version: "0.2.0"
 ---
 
 Generate CHANGELOG.md from archived OpenSpec changes using Keep a Changelog format.

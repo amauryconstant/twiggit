@@ -42,5 +42,10 @@ legacy
 openspec/changes/*/state.json
 openspec/changes/*/complete.json
 openspec/changes/*/iterations.json
-openspec/changes/*/decision-log.md
+openspec/changes/*/decision-log.json
+openspec/changes/*/verification-report.md
+openspec/changes/*/reflections.md
+openspec/changes/*/test-compliance-report.md
+openspec/changes/*/suggestions.md
+.openspec-auto-*.log
 # END OpenSpec autonomous workflow state

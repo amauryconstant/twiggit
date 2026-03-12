@@ -3,10 +3,6 @@ name: openspec-review-artifacts
 description: Review OpenSpec artifacts for feasibility, correctness, completeness, and implementation-readiness. Use BEFORE implementation to validate the plan is sound, or during artifact creation to check quality. Part of pre-implementation workflow: review-artifacts → modify-artifacts → apply.
 license: MIT
 compatibility: Requires openspec CLI.
-metadata:
-  generatedBy: "0.3.3"
-  author: openspec-extended
-  version: "0.2.0"
 ---
 
 Review OpenSpec artifacts for feasibility, correctness, completeness, and implementation-readiness.
@@ -195,6 +191,8 @@ This skill is part of the **pre-implementation** review cycle:
 - [ ] Add rate limit error handling
 - [ ] Show retry countdown UI
 ```
+
+**Note**: AGENTS.md documentation updates should NOT be tracked in tasks.md. They are handled by a separate documentation maintenance workflow.
 
 ---
 

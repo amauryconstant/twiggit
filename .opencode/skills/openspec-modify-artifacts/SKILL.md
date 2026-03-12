@@ -3,10 +3,6 @@ name: openspec-modify-artifacts
 description: Modify an existing artifact in an OpenSpec change. Use during pre-implementation review iteration (after review-artifacts feedback) or during implementation when requirements change. Supports natural language descriptions and targeted edits with dependency tracking.
 license: MIT
 compatibility: Requires openspec CLI.
-metadata:
-  generatedBy: "0.3.3"
-  author: openspec-extended
-  version: "0.2.0"
 ---
 
 Modify an existing artifact in an OpenSpec change with dependency-aware updates.
