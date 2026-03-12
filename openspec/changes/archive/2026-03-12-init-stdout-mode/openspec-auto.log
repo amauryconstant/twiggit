@@ -1,0 +1,132 @@
+================================
+Progress Summary
+================================
+Change ID: init-stdout-mode
+Change directory: openspec/changes/init-stdout-mode
+
+Current phase: PHASE0 - ARTIFACT REVIEW
+Phase iteration: 1
+
+Total invocations: 1
+Elapsed time: 3m 54s
+Log file: .openspec-auto-init-stdout-mode.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 0
+  PHASE2 (REVIEW): 0
+  PHASE3 (MAINTAIN DOCS): 0
+  PHASE4 (SYNC): 0
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: init-stdout-mode
+Change directory: openspec/changes/init-stdout-mode
+
+Current phase: PHASE1 - IMPLEMENTATION
+Phase iteration: 1
+
+Total invocations: 2
+Elapsed time: 23m 38s
+Log file: .openspec-auto-init-stdout-mode.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 0
+  PHASE3 (MAINTAIN DOCS): 0
+  PHASE4 (SYNC): 0
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: init-stdout-mode
+Change directory: openspec/changes/init-stdout-mode
+
+Current phase: PHASE2 - REVIEW
+Phase iteration: 1
+
+Total invocations: 3
+Elapsed time: 27m 32s
+Log file: .openspec-auto-init-stdout-mode.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 1
+  PHASE3 (MAINTAIN DOCS): 0
+  PHASE4 (SYNC): 0
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: init-stdout-mode
+Change directory: openspec/changes/init-stdout-mode
+
+Current phase: PHASE3 - MAINTAIN DOCS
+Phase iteration: 1
+
+Total invocations: 4
+Elapsed time: 30m 24s
+Log file: .openspec-auto-init-stdout-mode.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 1
+  PHASE3 (MAINTAIN DOCS): 1
+  PHASE4 (SYNC): 0
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: init-stdout-mode
+Change directory: openspec/changes/init-stdout-mode
+
+Current phase: PHASE4 - SYNC
+Phase iteration: 1
+
+Total invocations: 5
+Elapsed time: 36m 32s
+Log file: .openspec-auto-init-stdout-mode.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 1
+  PHASE3 (MAINTAIN DOCS): 1
+  PHASE4 (SYNC): 1
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: init-stdout-mode
+Change directory: openspec/changes/init-stdout-mode
+
+Current phase: PHASE5 - SELF-REFLECTION
+Phase iteration: 2
+
+Total invocations: 7
+Elapsed time: 45m 57s
+Log file: .openspec-auto-init-stdout-mode.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 1
+  PHASE3 (MAINTAIN DOCS): 1
+  PHASE4 (SYNC): 1
+  PHASE5 (SELF-REFLECTION): 2
+  PHASE6 (ARCHIVE): 0
+================================
