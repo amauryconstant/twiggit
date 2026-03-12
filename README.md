@@ -32,51 +32,47 @@ Download from: https://gitlab.com/amoconst/twiggit/-/releases
  twiggit init --shell=zsh        # Specify shell explicitly
  ```
 
-## Setup
+## Shell Integration
 
-### Enable Shell Completions
+Shell integration enables:
+- **Directory navigation**: `twiggit cd <branch>` changes to the worktree
+- **Completions**: TAB-autocomplete for all commands and flags
 
-Completions allow TAB-autocomplete for all twiggit commands and flags.
+### Using Plugin Files (Recommended)
 
-**Bash:**
-```bash
-echo 'source <(twiggit completion bash)' >> ~/.bashrc
-source ~/.bashrc
+Shell plugins are available in `contrib/` for easy integration with plugin managers.
+
+See [contrib/zsh/README.md](contrib/zsh/README.md), [contrib/bash/README.md](contrib/bash/README.md), or [contrib/fish/README.md](contrib/fish/README.md) for detailed instructions.
+
+### Manual Setup
+
+If you prefer manual configuration:
+
+**Zsh** (add to `~/.zshrc`):
+```zsh
+if (( $+commands[twiggit] )); then
+  eval "$(twiggit init zsh)"
+  source <(twiggit _carapace zsh)
+fi
 ```
 
-**Zsh:**
+**Bash** (add to `~/.bashrc`):
 ```bash
-# Standard zsh
-twiggit completion zsh > ~/.local/share/zsh/site-functions/_twiggit
-
-# Or with plugin managers (antidote, oh-my-zsh, etc.)
-twiggit completion zsh > ~/.config/zsh/.zfunctions/_twiggit
-# Reload: autoload -Uz compinit && compinit
+if command -v twiggit &>/dev/null; then
+  eval "$(twiggit init bash)"
+  source <(twiggit _carapace bash)
+fi
 ```
 
-**Fish:**
-```bash
-twiggit completion fish > ~/.config/fish/completions/twiggit.fish
+**Fish** (add to `~/.config/fish/config.fish`):
+```fish
+if type -q twiggit
+    twiggit init fish | source
+    twiggit _carapace fish | source
+end
 ```
 
-### Enable Directory Navigation
-
-The `twiggit cd` command requires a shell wrapper to change directories:
-
-```bash
-twiggit init                    # Auto-detect shell and config file
-# or
-twiggit init ~/.zshrc           # Specify config file explicitly
-# or
-twiggit init --shell=zsh        # Specify shell explicitly
-```
-
-This installs a wrapper that:
-- Intercepts `twiggit cd` and changes to the target directory
-- Preserves `builtin cd` for normal navigation
-- Passes through all other twiggit commands
-
-Restart your shell after running `init`.
+Restart your shell after adding the configuration.
 
 ## Quick Start
 
@@ -145,25 +141,3 @@ cat .twiggit.toml
 ```
 
 Hooks are opt-in only—without a `.twiggit.toml` file, no commands are executed.
-
-## Troubleshooting
-
-**twiggit command not found**
-- Ensure the installation directory is in your PATH
-- Run: `which twiggit` to locate it
-- Add installation directory to PATH if needed
-
-**TAB completion not working**
-- Verify the completion script is in your shell's fpath
-- Run the appropriate completion setup command from [Setup](#setup)
-- Restart your shell after installing completions
-
-**twiggit cd doesn't change directory**
-- Run: `twiggit init` (auto-detects shell)
-- Or run: `twiggit init --shell=<your-shell>` (explicit)
-- Restart your shell after running init
-
-**Permission denied during installation**
-- Try with sudo: `sudo bash <(curl -fsSL https://gitlab.com/amoconst/twiggit/-/raw/main/install.sh)`
-- Or create directory manually: `mkdir -p ~/.local/bin`
-- Or install to a writable directory and add to PATH
