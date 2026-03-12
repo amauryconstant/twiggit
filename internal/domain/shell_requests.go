@@ -24,9 +24,6 @@ type SetupShellRequest struct {
 
 	// ForceOverwrite specifies whether to overwrite existing wrapper
 	ForceOverwrite bool
-
-	// DryRun specifies whether to perform a dry run without making changes
-	DryRun bool
 }
 
 // GetShellType returns the shell type for validation

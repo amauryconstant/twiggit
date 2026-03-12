@@ -88,18 +88,6 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 		return nil, fmt.Errorf("failed to generate wrapper: %w", err)
 	}
 
-	// Handle dry run
-	if req.DryRun {
-		return &domain.SetupShellResult{
-			ShellType:      shellType,
-			Installed:      false,
-			DryRun:         true,
-			WrapperContent: wrapper,
-			ConfigFile:     configFile,
-			Message:        "Dry run completed",
-		}, nil
-	}
-
 	// Install wrapper
 	if err := s.integration.InstallWrapper(shellType, wrapper, configFile, req.ForceOverwrite); err != nil {
 		// Check if it's already installed error

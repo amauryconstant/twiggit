@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
+	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
 	"twiggit/internal/domain"
@@ -13,65 +15,128 @@ import (
 
 // NewInitCmd creates a new init command
 func NewInitCmd(config *CommandConfig) *cobra.Command {
-	var check, dryRun, force bool
-	var shellTypeStr string
+	var install, force bool
+	var configFile string
 
 	cmd := &cobra.Command{
-		Use:   "init [config-file]",
-		Short: "Install shell wrapper",
-		Long: `Install shell wrapper functions that intercept 'twiggit cd' calls
-		and enable seamless directory navigation between worktrees and projects.
+		Use:   "init [shell]",
+		Short: "Generate or install shell wrapper",
+		Long: `Generate shell wrapper functions that intercept 'twiggit cd' calls
+and enable seamless directory navigation between worktrees and projects.
 
-		The wrapper provides:
-		- Automatic directory change on 'twiggit cd'
-		- Escape hatch with 'builtin cd' for shell built-in
-		- Pass-through for all other commands
+The wrapper provides:
+- Automatic directory change on 'twiggit cd'
+- Escape hatch with 'builtin cd' for shell built-in
+- Pass-through for all other commands
 
-		Supported shells: bash, zsh, fish
+Supported shells: bash, zsh, fish
 
-		Usage:
-		  twiggit init                    # Auto-detect shell and config file
-		  twiggit init ~/.bashrc          # Install to specific config file
-		  twiggit init --shell=zsh        # Explicit shell, auto-detect config file
-		  twiggit init ~/.config/my-zsh --shell=zsh  # Explicit config and shell
+Usage:
+  twiggit init                    # Print wrapper to stdout (eval-safe)
+  twiggit init bash               # Print bash wrapper to stdout
+  twiggit init --install          # Install to auto-detected config file
+  twiggit init bash --install     # Install bash wrapper to auto-detected config
+  twiggit init bash --install -c ~/.bashrc  # Install to specific config file
 
-		Flags:
-		  --check          Check if wrapper is installed
-		  --dry-run        Show what would be done without making changes
-		  -f, --force      Force reinstall even if already installed
-		  --shell <type>   Shell type (bash|zsh|fish) [optional, inferred from config file]`,
+Examples:
+  # Add to your shell config for instant activation:
+  eval "$(twiggit init)"
+
+  # Or install permanently to your shell config:
+  twiggit init --install
+
+Flags:
+  -i, --install    Install wrapper to shell config file
+  -c, --config     Custom config file path (requires --install)
+  -f, --force      Force reinstall even if already installed (requires --install)`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			configFile := ""
-			if len(args) > 0 {
-				configFile = args[0]
+			// Validate flag combinations
+			if configFile != "" && !install {
+				return errors.New("--config requires --install")
 			}
-			return runInit(cmd, config, configFile, check, dryRun, force, shellTypeStr)
+			if force && !install {
+				return errors.New("--force requires --install")
+			}
+
+			// Parse shell type from positional argument
+			var shellType domain.ShellType
+			if len(args) > 0 {
+				shellType = domain.ShellType(args[0])
+			}
+
+			if install {
+				return runInitInstall(cmd, config, shellType, configFile, force)
+			}
+			return runInitStdout(cmd, config, shellType)
 		},
 	}
 
-	cmd.Flags().BoolVar(&check, "check", false, "check if wrapper is installed")
-	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show what would be done without making changes")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "force reinstall even if already installed")
-	cmd.Flags().StringVar(&shellTypeStr, "shell", "", "shell type (bash|zsh|fish) [optional, inferred from config file]")
+	cmd.Flags().BoolVarP(&install, "install", "i", false, "install wrapper to shell config file")
+	cmd.Flags().StringVarP(&configFile, "config", "c", "", "custom config file path (requires --install)")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "force reinstall even if already installed (requires --install)")
+
+	// Shell completion for positional [shell] argument
+	carapace.Gen(cmd).PositionalCompletion(
+		carapace.ActionValues("bash", "zsh", "fish"),
+	)
 
 	return cmd
 }
 
-func runInit(cmd *cobra.Command, config *CommandConfig, configFile string, check, dryRun, force bool, shellTypeStr string) error {
-	if check {
-		return runInitCheck(cmd, config, configFile, shellTypeStr)
+// runInitStdout outputs the shell wrapper to stdout (default behavior)
+func runInitStdout(cmd *cobra.Command, config *CommandConfig, shellType domain.ShellType) error {
+	// Auto-detect shell if not specified
+	if shellType == "" {
+		var err error
+		shellType, err = domain.DetectShellFromEnv()
+		if err != nil {
+			return fmt.Errorf("shell auto-detection failed: %w", err)
+		}
 	}
 
-	var shellType domain.ShellType
-	if shellTypeStr != "" {
-		shellType = domain.ShellType(shellTypeStr)
+	// Validate shell type
+	if !domain.IsValidShellType(shellType) {
+		return domain.NewValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type").
+			WithSuggestions([]string{"Supported shells: bash, zsh, fish"})
+	}
+
+	// Generate wrapper
+	request := &domain.GenerateWrapperRequest{
+		ShellType: shellType,
+	}
+
+	result, err := config.Services.ShellService.GenerateWrapper(context.Background(), request)
+	if err != nil {
+		return fmt.Errorf("failed to generate wrapper: %w", err)
+	}
+
+	// Output wrapper to stdout (no metadata, eval-safe)
+	_, _ = fmt.Fprint(cmd.OutOrStdout(), result.WrapperContent)
+
+	return nil
+}
+
+// runInitInstall installs the wrapper to a shell config file
+func runInitInstall(cmd *cobra.Command, config *CommandConfig, shellType domain.ShellType, configFile string, force bool) error {
+	// Auto-detect shell if not specified
+	if shellType == "" {
+		var err error
+		shellType, err = domain.DetectShellFromEnv()
+		if err != nil {
+			return fmt.Errorf("shell auto-detection failed: %w", err)
+		}
+	}
+
+	// Validate shell type
+	if !domain.IsValidShellType(shellType) {
+		return domain.NewValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type").
+			WithSuggestions([]string{"Supported shells: bash, zsh, fish"})
 	}
 
 	request := &domain.SetupShellRequest{
 		ShellType:      shellType,
 		ForceOverwrite: force,
-		DryRun:         dryRun,
 		ConfigFile:     configFile,
 	}
 
@@ -82,51 +147,17 @@ func runInit(cmd *cobra.Command, config *CommandConfig, configFile string, check
 
 	logv(cmd, 1, "Setting up shell wrapper")
 	logv(cmd, 2, "  shell type: %s", result.ShellType)
-	logv(cmd, 2, "  config file: %s", configFile)
+	logv(cmd, 2, "  config file: %s", result.ConfigFile)
 
-	return displayInitResults(cmd.OutOrStdout(), result, dryRun)
+	return displayInitResults(cmd.OutOrStdout(), result)
 }
 
-func runInitCheck(cmd *cobra.Command, config *CommandConfig, configFile string, shellTypeStr string) error {
-	var shellType domain.ShellType
-	if shellTypeStr != "" {
-		shellType = domain.ShellType(shellTypeStr)
-	}
-
-	request := &domain.ValidateInstallationRequest{
-		ShellType:  shellType,
-		ConfigFile: configFile,
-	}
-
-	result, err := config.Services.ShellService.ValidateInstallation(context.Background(), request)
-	if err != nil {
-		return fmt.Errorf("check failed: %w", err)
-	}
-
-	out := cmd.OutOrStdout()
-	if result.Installed {
-		_, _ = fmt.Fprintf(out, "Shell wrapper is installed\n")
-		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
-	} else {
-		_, _ = fmt.Fprintf(out, "Shell wrapper not installed\n")
-		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
-	}
-
-	return nil
-}
-
-func displayInitResults(out io.Writer, result *domain.SetupShellResult, dryRun bool) error {
+// displayInitResults outputs installation results (for install mode only)
+func displayInitResults(out io.Writer, result *domain.SetupShellResult) error {
 	if result.Skipped {
 		_, _ = fmt.Fprintf(out, "Shell wrapper already installed for %s\n", result.ShellType)
 		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
 		_, _ = fmt.Fprintf(out, "Use --force to reinstall\n")
-		return nil
-	}
-
-	if dryRun {
-		_, _ = fmt.Fprintf(out, "Would install wrapper for %s:\n", result.ShellType)
-		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
-		_, _ = fmt.Fprintf(out, "Wrapper function:\n%s\n", result.WrapperContent)
 		return nil
 	}
 

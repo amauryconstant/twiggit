@@ -11,13 +11,7 @@ type SetupShellResult struct {
 	// Skipped indicates whether the operation was skipped (already installed)
 	Skipped bool
 
-	// DryRun indicates whether this was a dry run operation
-	DryRun bool
-
-	// WrapperContent contains the generated wrapper content (for dry runs)
-	WrapperContent string
-
-	// ConfigFile indicates which config file was used or would be used
+	// ConfigFile indicates which config file was used
 	ConfigFile string
 
 	// Message contains a human-readable message about the operation

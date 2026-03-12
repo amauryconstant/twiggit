@@ -2,78 +2,240 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/domain"
+	"twiggit/test/mocks"
 )
 
-func TestNewInitCmd(t *testing.T) {
-	config := &CommandConfig{}
-	cmd := NewInitCmd(config)
+type InitCmdTestSuite struct {
+	suite.Suite
+	config       *CommandConfig
+	shellService *mocks.MockShellService
+}
 
-	assert.NotNil(t, cmd)
-	assert.Contains(t, cmd.Use, "init")
-	assert.Equal(t, "Install shell wrapper", cmd.Short)
+func (s *InitCmdTestSuite) SetupTest() {
+	s.shellService = mocks.NewMockShellService()
+	s.config = &CommandConfig{
+		Services: &ServiceContainer{
+			ShellService: s.shellService,
+		},
+	}
+}
 
-	checkFlag := cmd.Flags().Lookup("check")
-	assert.NotNil(t, checkFlag)
+func TestInitCmd(t *testing.T) {
+	suite.Run(t, new(InitCmdTestSuite))
+}
+
+func (s *InitCmdTestSuite) TestNewInitCmd_BasicStructure() {
+	cmd := NewInitCmd(s.config)
+
+	s.NotNil(cmd)
+	s.Contains(cmd.Use, "init [shell]")
+	s.Equal("Generate or install shell wrapper", cmd.Short)
+
+	// Check new flags exist
+	installFlag := cmd.Flags().Lookup("install")
+	s.NotNil(installFlag)
+	s.Equal("i", installFlag.Shorthand)
+
+	configFlag := cmd.Flags().Lookup("config")
+	s.NotNil(configFlag)
+	s.Equal("c", configFlag.Shorthand)
 
 	forceFlag := cmd.Flags().Lookup("force")
-	assert.NotNil(t, forceFlag)
-	assert.Equal(t, "f", forceFlag.Shorthand)
+	s.NotNil(forceFlag)
+	s.Equal("f", forceFlag.Shorthand)
+
+	// Check old flags are removed
+	checkFlag := cmd.Flags().Lookup("check")
+	s.Nil(checkFlag)
 
 	dryRunFlag := cmd.Flags().Lookup("dry-run")
-	assert.NotNil(t, dryRunFlag)
+	s.Nil(dryRunFlag)
 
 	shellFlag := cmd.Flags().Lookup("shell")
-	assert.NotNil(t, shellFlag)
+	s.Nil(shellFlag)
 }
 
-func TestNewInitCmd_FShortForm(t *testing.T) {
-	config := &CommandConfig{}
-	cmd := NewInitCmd(config)
+func (s *InitCmdTestSuite) TestNewInitCmd_AcceptsOptionalShellArg() {
+	cmd := NewInitCmd(s.config)
 
-	flag := cmd.Flags().Lookup("force")
-	assert.NotNil(t, flag)
-	assert.Equal(t, "f", flag.Shorthand)
-
-	err := cmd.Flags().Set("force", "true")
-	require.NoError(t, err)
-	require.True(t, flag.Changed)
-
-	force, err := cmd.Flags().GetBool("force")
-	require.NoError(t, err)
-	require.True(t, force)
-}
-
-func TestNewInitCmd_AcceptsOptionalConfigFile(t *testing.T) {
-	config := &CommandConfig{}
-	cmd := NewInitCmd(config)
-
-	// Test with no args (should be valid now)
+	// Test with no args (should be valid)
 	err := cmd.Args(cmd, []string{})
-	require.NoError(t, err)
+	s.Require().NoError(err)
 
 	// Test with one arg (should be valid)
-	err = cmd.Args(cmd, []string{"/home/user/.bashrc"})
-	require.NoError(t, err)
+	err = cmd.Args(cmd, []string{"bash"})
+	s.Require().NoError(err)
 
 	// Test with two args (should be invalid)
-	err = cmd.Args(cmd, []string{"/home/user/.bashrc", "extra"})
-	require.Error(t, err)
+	err = cmd.Args(cmd, []string{"bash", "extra"})
+	s.Require().Error(err)
 }
 
-func TestNewInitCmd_ShellFlagPrecedence(t *testing.T) {
-	config := &CommandConfig{}
-	cmd := NewInitCmd(config)
+func (s *InitCmdTestSuite) TestFlagValidation_ConfigRequiresInstall() {
+	cmd := NewInitCmd(s.config)
 
-	// Verify --shell flag exists
-	flag := cmd.Flags().Lookup("shell")
-	require.NotNil(t, flag)
-	assert.Equal(t, "shell", flag.Name)
+	// Set --config without --install should error
+	err := cmd.Flags().Set("config", "/custom/bashrc")
+	s.Require().NoError(err)
+
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err = cmd.Execute()
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "--config requires --install")
+}
+
+func (s *InitCmdTestSuite) TestFlagValidation_ForceRequiresInstall() {
+	cmd := NewInitCmd(s.config)
+
+	// Set --force without --install should error
+	err := cmd.Flags().Set("force", "true")
+	s.Require().NoError(err)
+
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetErr(buf)
+	err = cmd.Execute()
+	s.Require().Error(err)
+	s.Require().Contains(err.Error(), "--force requires --install")
+}
+
+func (s *InitCmdTestSuite) TestStdoutMode_CallsGenerateWrapper() {
+	s.shellService.On("GenerateWrapper", context.Background(), &domain.GenerateWrapperRequest{
+		ShellType: domain.ShellBash,
+	}).Return(&domain.GenerateWrapperResult{
+		ShellType:      domain.ShellBash,
+		WrapperContent: "# Twiggit bash wrapper\ntwiggit() { echo test; }",
+		Message:        "Wrapper generated successfully",
+	}, nil)
+
+	cmd := NewInitCmd(s.config)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"bash"})
+
+	err := cmd.Execute()
+	s.Require().NoError(err)
+
+	// Should output wrapper content directly (no metadata)
+	output := buf.String()
+	s.Require().Contains(output, "# Twiggit bash wrapper")
+	s.Require().Contains(output, "twiggit() {")
+	// Should NOT contain installation messages
+	s.NotContains(output, "installed")
+	s.NotContains(output, "Config file:")
+
+	s.shellService.AssertExpectations(s.T())
+}
+
+func (s *InitCmdTestSuite) TestStdoutMode_AutoDetectsShell() {
+	s.T().Setenv("SHELL", "/bin/zsh")
+	s.shellService.On("GenerateWrapper", context.Background(), &domain.GenerateWrapperRequest{
+		ShellType: domain.ShellZsh,
+	}).Return(&domain.GenerateWrapperResult{
+		ShellType:      domain.ShellZsh,
+		WrapperContent: "# Twiggit zsh wrapper\ntwiggit() { echo test; }",
+		Message:        "Wrapper generated successfully",
+	}, nil)
+
+	cmd := NewInitCmd(s.config)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{}) // No shell arg
+
+	err := cmd.Execute()
+	s.Require().NoError(err)
+
+	output := buf.String()
+	s.Require().Contains(output, "# Twiggit zsh wrapper")
+
+	s.shellService.AssertExpectations(s.T())
+}
+
+func (s *InitCmdTestSuite) TestInstallMode_CallsSetupShell() {
+	s.shellService.On("SetupShell", context.Background(), &domain.SetupShellRequest{
+		ShellType:      domain.ShellBash,
+		ForceOverwrite: false,
+		ConfigFile:     "",
+	}).Return(&domain.SetupShellResult{
+		ShellType:  domain.ShellBash,
+		Installed:  true,
+		ConfigFile: "/home/user/.bashrc",
+		Message:    "Shell wrapper installed successfully",
+	}, nil)
+
+	cmd := NewInitCmd(s.config)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"bash", "--install"})
+
+	err := cmd.Execute()
+	s.Require().NoError(err)
+
+	output := buf.String()
+	s.Require().Contains(output, "Shell wrapper installed for bash")
+	s.Require().Contains(output, "Config file: /home/user/.bashrc")
+
+	s.shellService.AssertExpectations(s.T())
+}
+
+func (s *InitCmdTestSuite) TestInstallMode_WithCustomConfig() {
+	s.shellService.On("SetupShell", context.Background(), &domain.SetupShellRequest{
+		ShellType:      domain.ShellBash,
+		ForceOverwrite: false,
+		ConfigFile:     "/custom/bashrc",
+	}).Return(&domain.SetupShellResult{
+		ShellType:  domain.ShellBash,
+		Installed:  true,
+		ConfigFile: "/custom/bashrc",
+		Message:    "Shell wrapper installed successfully",
+	}, nil)
+
+	cmd := NewInitCmd(s.config)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"bash", "--install", "--config", "/custom/bashrc"})
+
+	err := cmd.Execute()
+	s.Require().NoError(err)
+
+	output := buf.String()
+	s.Require().Contains(output, "Shell wrapper installed for bash")
+	s.Require().Contains(output, "Config file: /custom/bashrc")
+
+	s.shellService.AssertExpectations(s.T())
+}
+
+func (s *InitCmdTestSuite) TestInstallMode_WithForce() {
+	s.shellService.On("SetupShell", context.Background(), &domain.SetupShellRequest{
+		ShellType:      domain.ShellBash,
+		ForceOverwrite: true,
+		ConfigFile:     "",
+	}).Return(&domain.SetupShellResult{
+		ShellType:  domain.ShellBash,
+		Installed:  true,
+		ConfigFile: "/home/user/.bashrc",
+		Message:    "Shell wrapper installed successfully",
+	}, nil)
+
+	cmd := NewInitCmd(s.config)
+	buf := &bytes.Buffer{}
+	cmd.SetOut(buf)
+	cmd.SetArgs([]string{"bash", "--install", "--force"})
+
+	err := cmd.Execute()
+	s.Require().NoError(err)
+
+	s.shellService.AssertExpectations(s.T())
 }
 
 func TestDisplayInitResults_Skipped(t *testing.T) {
@@ -86,34 +248,13 @@ func TestDisplayInitResults_Skipped(t *testing.T) {
 		Message:    "Shell wrapper already installed",
 	}
 
-	err := displayInitResults(out, result, false)
+	err := displayInitResults(out, result)
 	require.NoError(t, err)
 
 	output := out.String()
 	require.Contains(t, output, "Shell wrapper already installed for bash")
 	require.Contains(t, output, "Config file: /home/user/.bashrc")
 	require.Contains(t, output, "Use --force to reinstall")
-}
-
-func TestDisplayInitResults_DryRun(t *testing.T) {
-	out := &bytes.Buffer{}
-	result := &domain.SetupShellResult{
-		ShellType:      domain.ShellZsh,
-		Installed:      false,
-		DryRun:         true,
-		ConfigFile:     "/home/user/.zshrc",
-		WrapperContent: "# Twiggit wrapper\nfunction twiggit { echo test; }",
-		Message:        "Dry run completed",
-	}
-
-	err := displayInitResults(out, result, true)
-	require.NoError(t, err)
-
-	output := out.String()
-	require.Contains(t, output, "Would install wrapper for zsh")
-	require.Contains(t, output, "Config file: /home/user/.zshrc")
-	require.Contains(t, output, "Wrapper function:")
-	require.Contains(t, output, "# Twiggit wrapper")
 }
 
 func TestDisplayInitResults_Installed(t *testing.T) {
@@ -125,7 +266,7 @@ func TestDisplayInitResults_Installed(t *testing.T) {
 		Message:    "Shell wrapper installed successfully",
 	}
 
-	err := displayInitResults(out, result, false)
+	err := displayInitResults(out, result)
 	require.NoError(t, err)
 
 	output := out.String()
@@ -144,7 +285,7 @@ func TestDisplayInitResults_NotInstalled(t *testing.T) {
 		Message:    "Installation failed",
 	}
 
-	err := displayInitResults(out, result, false)
+	err := displayInitResults(out, result)
 	require.NoError(t, err)
 
 	output := out.String()

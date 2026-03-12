@@ -2,7 +2,7 @@
 // +build e2e
 
 // Package e2e provides end-to-end tests for twiggit init command.
-// Tests validate shell wrapper installation with inference, force, and config file scenarios.
+// Tests validate shell wrapper generation (stdout) and installation modes.
 package e2e
 
 import (
@@ -36,16 +36,90 @@ var _ = Describe("init command", func() {
 		fixture.Cleanup()
 	})
 
-	It("installs to existing config file with inferred shell type", func() {
+	// ========================================
+	// Stdout Mode Tests (Default Behavior)
+	// ========================================
+
+	It("outputs wrapper to stdout by default", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
+
+		session := cli.Run("init")
+		cli.ShouldSucceed(session)
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("# Twiggit bash wrapper"))
+		Expect(output).To(ContainSubstring("twiggit() {"))
+		Expect(output).To(ContainSubstring("### BEGIN TWIGGIT WRAPPER"))
+		Expect(output).To(ContainSubstring("### END TWIGGIT WRAPPER"))
+		// Should NOT contain installation messages (stdout is clean for eval)
+		Expect(output).NotTo(ContainSubstring("Shell wrapper installed"))
+		Expect(output).NotTo(ContainSubstring("Config file:"))
+	})
+
+	It("outputs bash wrapper when shell specified", func() {
+		session := cli.Run("init", "bash")
+		cli.ShouldSucceed(session)
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("# Twiggit bash wrapper"))
+		Expect(output).To(ContainSubstring("twiggit() {"))
+	})
+
+	It("outputs zsh wrapper when shell specified", func() {
+		session := cli.Run("init", "zsh")
+		cli.ShouldSucceed(session)
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("# Twiggit zsh wrapper"))
+		Expect(output).To(ContainSubstring("twiggit() {"))
+	})
+
+	It("outputs fish wrapper when shell specified", func() {
+		session := cli.Run("init", "fish")
+		cli.ShouldSucceed(session)
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("# Twiggit fish wrapper"))
+		Expect(output).To(ContainSubstring("function twiggit"))
+	})
+
+	It("auto-detects shell from SHELL env when no arg provided", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/zsh")
+
+		session := cli.Run("init")
+		cli.ShouldSucceed(session)
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("# Twiggit zsh wrapper"))
+	})
+
+	It("errors with invalid shell type in stdout mode", func() {
+		session := cli.Run("init", "invalid")
+		cli.ShouldFailWithExit(session, 1)
+
+		cli.ShouldErrorOutput(session, "unsupported shell type")
+	})
+
+	It("errors when auto-detection fails in stdout mode", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/sh")
+
+		session := cli.Run("init")
+		cli.ShouldFailWithExit(session, 1)
+
+		cli.ShouldErrorOutput(session, "shell auto-detection failed")
+	})
+
+	// ========================================
+	// Install Mode Tests
+	// ========================================
+
+	It("installs to auto-detected config file with --install", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", bashrcPath)
+		session := cli.Run("init", "--install")
 		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
 
 		output := string(session.Out.Contents())
 		Expect(output).To(ContainSubstring("Shell wrapper installed for bash"))
@@ -58,332 +132,144 @@ var _ = Describe("init command", func() {
 		Expect(string(content)).To(ContainSubstring("### END TWIGGIT WRAPPER"))
 	})
 
-	It("installs to missing config file with inferred shell type", func() {
-		configPath := filepath.Join(fixture.GetTempDir(), ".zshrc")
-
-		session := cli.Run("init", configPath)
-		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Shell wrapper installed for zsh"))
-		Expect(output).To(ContainSubstring("Config file: " + configPath))
-
-		_, err := os.Stat(configPath)
-		Expect(err).NotTo(HaveOccurred())
-
-		content, err := os.ReadFile(configPath)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(string(content)).To(ContainSubstring("### BEGIN TWIGGIT WRAPPER"))
-		Expect(string(content)).To(ContainSubstring("### END TWIGGIT WRAPPER"))
-	})
-
-	It("infers shell type from .bashrc filename", func() {
-		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
-
-		session := cli.Run("init", bashrcPath, "--dry-run")
-		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Would install wrapper for bash"))
-		Expect(output).To(ContainSubstring("Config file: " + bashrcPath))
-	})
-
-	It("infers shell type from .zshrc filename", func() {
-		configDir := filepath.Join(fixture.GetTempDir(), ".config", "fish")
-		Expect(os.MkdirAll(configDir, 0755)).To(Succeed())
-		fishConfigPath := filepath.Join(configDir, "config.fish")
-		Expect(os.WriteFile(fishConfigPath, []byte("# Fish config\n"), 0644)).To(Succeed())
-
-		session := cli.Run("init", fishConfigPath, "--dry-run")
-		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Would install wrapper for fish"))
-		Expect(output).To(ContainSubstring("Config file: " + fishConfigPath))
-	})
-
-	It("infers shell type from config.fish filename", func() {
-		configDir := filepath.Join(fixture.GetTempDir(), ".config", "fish")
-		Expect(os.MkdirAll(configDir, 0755)).To(Succeed())
-		fishConfigPath := filepath.Join(configDir, "config.fish")
-		Expect(os.WriteFile(fishConfigPath, []byte("# Fish config\n"), 0644)).To(Succeed())
-
-		session := cli.Run("init", fishConfigPath, "--dry-run")
-		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Would install wrapper for fish"))
-		Expect(output).To(ContainSubstring("Config file: " + fishConfigPath))
-	})
-
-	It("forces reinstall with block replacement", func() {
-		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
-
-		session1 := cli.Run("init", bashrcPath)
-		cli.ShouldSucceed(session1)
-
-		if session1.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output1 := string(session1.Out.Contents())
-		Expect(output1).To(ContainSubstring("Shell wrapper installed for bash"))
-
-		session2 := cli.Run("init", bashrcPath, "--force")
-		cli.ShouldSucceed(session2)
-
-		if session2.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output2 := string(session2.Out.Contents())
-		Expect(output2).To(ContainSubstring("Shell wrapper installed for bash"))
-
-		content, err := os.ReadFile(bashrcPath)
-		Expect(err).NotTo(HaveOccurred())
-
-		beginCount := 0
-		endCount := 0
-		for _, line := range strings.Split(string(content), "\n") {
-			if strings.Contains(line, "### BEGIN TWIGGIT WRAPPER") {
-				beginCount++
-			}
-			if strings.Contains(line, "### END TWIGGIT WRAPPER") {
-				endCount++
-			}
-		}
-		Expect(beginCount).To(Equal(1))
-		Expect(endCount).To(Equal(1))
-	})
-
-	It("skips when wrapper exists without force flag", func() {
-		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
-
-		session1 := cli.Run("init", bashrcPath)
-		cli.ShouldSucceed(session1)
-
-		if session1.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		session2 := cli.Run("init", bashrcPath)
-		cli.ShouldSucceed(session2)
-
-		if session2.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session2.Out.Contents())
-		Expect(output).To(ContainSubstring("Shell wrapper already installed for bash"))
-		Expect(output).To(ContainSubstring("Config file: " + bashrcPath))
-		Expect(output).To(ContainSubstring("Use --force to reinstall"))
-	})
-
-	It("shows dry-run output without making changes", func() {
-		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
-
-		session := cli.Run("init", bashrcPath, "--dry-run")
-		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Would install wrapper for bash"))
-		Expect(output).To(ContainSubstring("Config file: " + bashrcPath))
-		Expect(output).To(ContainSubstring("Wrapper function:"))
-		Expect(output).To(ContainSubstring("### BEGIN TWIGGIT WRAPPER"))
-		Expect(output).To(ContainSubstring("### END TWIGGIT WRAPPER"))
-		Expect(output).NotTo(ContainSubstring("Shell wrapper installed"))
-		Expect(output).NotTo(ContainSubstring("To activate the wrapper"))
-	})
-
-	It("errors with inference failure for custom path", func() {
-		customConfigPath := filepath.Join(fixture.GetTempDir(), "config.txt")
-
-		session := cli.Run("init", customConfigPath, "--dry-run")
-		cli.ShouldFailWithExit(session, 1)
-
-		if session.ExitCode() != 1 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		cli.ShouldErrorOutput(session, "cannot infer shell type from path")
-		cli.ShouldErrorOutput(session, customConfigPath)
-		cli.ShouldErrorOutput(session, "use --shell to specify shell type")
-	})
-
-	It("accepts explicit --shell override", func() {
-		customConfigPath := filepath.Join(fixture.GetTempDir(), "my-config")
-		Expect(os.WriteFile(customConfigPath, []byte("# Custom config\n"), 0644)).To(Succeed())
-
-		session := cli.Run("init", customConfigPath, "--shell=bash", "--dry-run")
-		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Would install wrapper for bash"))
-		Expect(output).To(ContainSubstring("Config file: " + customConfigPath))
-	})
-
-	It("checks if wrapper is installed with --check flag", func() {
-		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
-
-		session1 := cli.Run("init", bashrcPath)
-		cli.ShouldSucceed(session1)
-
-		session2 := cli.Run("init", bashrcPath, "--check")
-		cli.ShouldSucceed(session2)
-
-		if session2.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session2.Out.Contents())
-		Expect(output).To(ContainSubstring("Shell wrapper is installed"))
-		Expect(output).To(ContainSubstring("Config file: " + bashrcPath))
-	})
-
-	It("shows not installed with --check flag when missing", func() {
-		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
-
-		session := cli.Run("init", bashrcPath, "--check")
-		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Shell wrapper not installed"))
-		Expect(output).To(ContainSubstring("Config file: " + bashrcPath))
-	})
-
-	It("errors with invalid shell type", func() {
-		configPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-
-		session := cli.Run("init", configPath, "--shell=invalid")
-		cli.ShouldFailWithExit(session, 1)
-
-		if session.ExitCode() != 1 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		cli.ShouldErrorOutput(session, "unsupported shell type: invalid")
-	})
-
-	It("auto-detects shell and config file when no arguments provided", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/bash")
-		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
-
-		session := cli.Run("init")
-		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Out.Contents())
-		Expect(output).To(ContainSubstring("Shell wrapper installed for bash"))
-		Expect(output).To(ContainSubstring("Config file: " + bashrcPath))
-	})
-
-	It("uses explicit --shell flag over auto-detection", func() {
+	It("installs with explicit shell and --install", func() {
 		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		zshrcPath := filepath.Join(fixture.GetTempDir(), ".zshrc")
 		Expect(os.WriteFile(zshrcPath, []byte("# Zsh config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", "--shell=zsh")
+		session := cli.Run("init", "zsh", "--install")
 		cli.ShouldSucceed(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
 
 		output := string(session.Out.Contents())
 		Expect(output).To(ContainSubstring("Shell wrapper installed for zsh"))
 		Expect(output).To(ContainSubstring("Config file: " + zshrcPath))
 	})
 
-	It("errors when auto-detection fails without explicit shell", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/sh")
+	It("installs to custom config with --install --config", func() {
+		customConfigPath := filepath.Join(fixture.GetTempDir(), "my-bash-config")
+		Expect(os.WriteFile(customConfigPath, []byte("# Custom config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init")
+		session := cli.Run("init", "bash", "--install", "--config", customConfigPath)
+		cli.ShouldSucceed(session)
+
+		output := string(session.Out.Contents())
+		Expect(output).To(ContainSubstring("Shell wrapper installed for bash"))
+		Expect(output).To(ContainSubstring("Config file: " + customConfigPath))
+
+		content, err := os.ReadFile(customConfigPath)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(content)).To(ContainSubstring("### BEGIN TWIGGIT WRAPPER"))
+	})
+
+	It("creates missing config file when installing", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/zsh")
+		zshrcPath := filepath.Join(fixture.GetTempDir(), ".zshrc")
+
+		session := cli.Run("init", "--install")
+		cli.ShouldSucceed(session)
+
+		_, err := os.Stat(zshrcPath)
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("skips when wrapper already installed", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
+		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+
+		// First install
+		session1 := cli.Run("init", "--install")
+		cli.ShouldSucceed(session1)
+
+		// Second install (should skip)
+		session2 := cli.Run("init", "--install")
+		cli.ShouldSucceed(session2)
+
+		output := string(session2.Out.Contents())
+		Expect(output).To(ContainSubstring("Shell wrapper already installed for bash"))
+		Expect(output).To(ContainSubstring("Use --force to reinstall"))
+	})
+
+	It("forces reinstall with --install --force", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
+		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+
+		// First install
+		session1 := cli.Run("init", "--install")
+		cli.ShouldSucceed(session1)
+
+		// Force reinstall
+		session2 := cli.Run("init", "--install", "--force")
+		cli.ShouldSucceed(session2)
+
+		output := string(session2.Out.Contents())
+		Expect(output).To(ContainSubstring("Shell wrapper installed for bash"))
+
+		// Verify only one wrapper block
+		content, err := os.ReadFile(bashrcPath)
+		Expect(err).NotTo(HaveOccurred())
+		beginCount := strings.Count(string(content), "### BEGIN TWIGGIT WRAPPER")
+		Expect(beginCount).To(Equal(1))
+	})
+
+	// ========================================
+	// Flag Validation Tests
+	// ========================================
+
+	It("errors when --config used without --install", func() {
+		session := cli.Run("init", "--config", "/custom/config")
+		cli.ShouldFailWithExit(session, 2) // Usage error
+
+		cli.ShouldErrorOutput(session, "--config requires --install")
+	})
+
+	It("errors when --force used without --install", func() {
+		session := cli.Run("init", "--force")
+		cli.ShouldFailWithExit(session, 2) // Usage error
+
+		cli.ShouldErrorOutput(session, "--force requires --install")
+	})
+
+	It("errors with invalid shell type in install mode", func() {
+		session := cli.Run("init", "invalid", "--install")
 		cli.ShouldFailWithExit(session, 1)
 
-		if session.ExitCode() != 1 {
-			GinkgoT().Log(fixture.Inspect())
-		}
-
-		output := string(session.Err.Contents())
-		Expect(output).To(ContainSubstring("shell auto-detection failed"))
-		Expect(output).To(ContainSubstring("unsupported shell detected"))
+		cli.ShouldErrorOutput(session, "unsupported shell type")
 	})
 
-	It("shows level 1 verbose output with -v flag", func() {
+	// ========================================
+	// Verbose Output Tests
+	// ========================================
+
+	It("shows level 1 verbose output with -v flag in install mode", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", bashrcPath, "-v")
+		session := cli.Run("init", "--install", "-v")
 		cli.ShouldSucceed(session)
 		cli.ShouldVerboseOutput(session, "Setting up shell wrapper")
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
 	})
 
-	It("shows level 2 verbose output with -vv flag", func() {
+	It("shows level 2 verbose output with -vv flag in install mode", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", bashrcPath, "-vv")
+		session := cli.Run("init", "--install", "-vv")
 		cli.ShouldSucceed(session)
 		cli.ShouldVerboseOutput(session, "Setting up shell wrapper")
 		cli.ShouldVerboseOutput(session, "  shell type: bash")
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
 	})
 
-	It("shows no verbose output by default", func() {
+	It("shows no verbose output by default in install mode", func() {
+		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", bashrcPath)
+		session := cli.Run("init", "--install")
 		cli.ShouldSucceed(session)
 		cli.ShouldNotHaveVerboseOutput(session)
-
-		if session.ExitCode() != 0 {
-			GinkgoT().Log(fixture.Inspect())
-		}
 	})
 })
