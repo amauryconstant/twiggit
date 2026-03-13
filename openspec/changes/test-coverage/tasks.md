@@ -1,22 +1,22 @@
 ## 1. Main Package Tests
 
-- [ ] 1.1 Create `main_test.go` in root directory with `//go:build integration` tag
-- [ ] 1.2 Test config load failure handling (invalid YAML, missing directory)
-- [ ] 1.3 Test successful execution path with valid config
-- [ ] 1.4 Test help command execution
-- [ ] 1.5 Test command execution failure with appropriate exit codes
-- [ ] 1.6 Verify main package coverage >50%
+- [x] 1.1 Create `main_test.go` in root directory with `//go:build integration` tag
+- [x] 1.2 Test config load failure handling (invalid YAML, missing directory)
+- [x] 1.3 Test successful execution path with valid config
+- [x] 1.4 Test help command execution
+- [x] 1.5 Test command execution failure with appropriate exit codes
+- [x] 1.6 Verify main package coverage >50%
 
 ## 2. Concurrent Operation Tests
 
-- [ ] 2.1 Create `test/concurrent/` directory structure
-- [ ] 2.2 Create `test/concurrent/concurrent_test.go` with `//go:build concurrent` tag
-- [ ] 2.3 Test concurrent list operations on same project
-- [ ] 2.4 Test concurrent create operations on different worktrees
-- [ ] 2.5 Test concurrent delete operations on different worktrees
-- [ ] 2.6 Test create and delete different worktrees concurrently
-- [ ] 2.7 Test prune while listing operations
-- [ ] 2.8 Run all tests with race detector: `mise run test:race` (or equivalent with concurrent tag)
+- [x] 2.1 Create `test/concurrent/` directory structure
+- [x] 2.2 Create `test/concurrent/concurrent_test.go` with `//go:build concurrent` tag
+- [x] 2.3 Test concurrent list operations on same project
+- [x] 2.4 Test concurrent create operations on different worktrees
+- [x] 2.5 Test concurrent delete operations on different worktrees
+- [x] 2.6 Test create and delete different worktrees concurrently
+- [x] 2.7 Test prune while listing operations
+- [x] 2.8 Run all tests with race detector: `mise run test:race` (or equivalent with concurrent tag)
 
 ## 3. Edge Case Fixtures
 
