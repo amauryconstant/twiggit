@@ -95,7 +95,7 @@ var _ = Describe("init command", func() {
 
 	It("errors with invalid shell type in stdout mode", func() {
 		session := cli.Run("init", "invalid")
-		cli.ShouldFailWithExit(session, 1)
+		cli.ShouldFailWithExit(session, 5)
 
 		cli.ShouldErrorOutput(session, "unsupported shell type")
 	})
@@ -104,7 +104,7 @@ var _ = Describe("init command", func() {
 		cli = cli.WithEnvironment("SHELL", "/bin/sh")
 
 		session := cli.Run("init")
-		cli.ShouldFailWithExit(session, 1)
+		cli.ShouldFailWithExit(session, 5)
 
 		cli.ShouldErrorOutput(session, "shell auto-detection failed")
 	})
@@ -233,7 +233,7 @@ var _ = Describe("init command", func() {
 
 	It("errors with invalid shell type in install mode", func() {
 		session := cli.Run("init", "invalid", "--install")
-		cli.ShouldFailWithExit(session, 1)
+		cli.ShouldFailWithExit(session, 5)
 
 		cli.ShouldErrorOutput(session, "unsupported shell type")
 	})

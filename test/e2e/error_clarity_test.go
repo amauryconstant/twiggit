@@ -74,16 +74,16 @@ var _ = Describe("Error Clarity", func() {
 				fixture.SetupSingleProject("usage-test")
 			})
 
-			It("returns exit code 1 for unknown flag", func() {
+			It("returns exit code 2 for unknown flag", func() {
 				session := ctxHelper.FromProjectDir("usage-test", "list", "--unknown-flag")
-				// Cobra usage errors return 2, but this might be a general error
-				cli.ShouldFailWithExit(session, 1)
+				// Cobra usage errors return exit code 2
+				cli.ShouldFailWithExit(session, 2)
 			})
 
-			It("returns exit code 1 for missing required argument for cd", func() {
+			It("returns exit code 2 for missing required argument for cd", func() {
 				session := ctxHelper.FromProjectDir("usage-test", "cd")
-				// Cobra usage errors return 2, but this might be a general error
-				cli.ShouldFailWithExit(session, 1)
+				// Cobra usage errors return exit code 2
+				cli.ShouldFailWithExit(session, 2)
 			})
 		})
 
