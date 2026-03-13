@@ -17,7 +17,7 @@
 ## 3. Panic Recovery
 
 - [ ] 3.1 Add panic recovery with defer/recover in `main.go`
-- [ ] 3.2 Display "Internal error: &lt;panic value&gt;" to stderr on panic
+- [ ] 3.2 Display "Internal error: <panic value>" to stderr on panic
 - [ ] 3.3 Check `TWIGGIT_DEBUG` environment variable and show stack trace when set
 - [ ] 3.4 Exit with code 1 on recovered panic
 

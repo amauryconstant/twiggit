@@ -10,12 +10,12 @@ Service error messages SHALL provide context about what operation failed and whi
 
 #### Scenario: Worktree creation failure
 - **WHEN** a worktree creation fails due to a project not existing
-- **THEN** the error message SHALL display "could not create worktree for '&lt;project&gt;'"
+- **THEN** the error message SHALL display "could not create worktree for '<project>'"
 - **AND** the message SHALL NOT include "WorktreeService" or "CreateWorktree"
 
 #### Scenario: Project discovery failure
 - **WHEN** a project discovery fails
-- **THEN** the error message SHALL display "could not find project '&lt;project&gt;'"
+- **THEN** the error message SHALL display "could not find project '<project>'"
 - **AND** the message SHALL NOT include internal service or operation names
 
 #### Scenario: Navigation failure
@@ -60,7 +60,7 @@ Exit codes SHALL be defined as follows:
 
 The system SHALL catch unexpected panics and display a user-friendly error message.
 
-When a panic occurs, the system SHALL display "Internal error: &lt;panic value&gt;" to stderr.
+When a panic occurs, the system SHALL display "Internal error: <panic value>" to stderr.
 
 When `TWIGGIT_DEBUG` environment variable is set, the system SHALL display the full stack trace after the panic message.
 
