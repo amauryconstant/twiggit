@@ -1,5 +1,10 @@
 # twiggit
 
+[![Go Report Card](https://goreportcard.com/badge/gitlab.com/amoconst/twiggit)](https://goreportcard.com/report/gitlab.com/amoconst/twiggit)
+[![GoDoc](https://pkg.go.dev/badge/gitlab.com/amoconst/twiggit)](https://pkg.go.dev/gitlab.com/amoconst/twiggit)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitLab CI](https://gitlab.com/amoconst/twiggit/badges/main/pipeline.svg)](https://gitlab.com/amoconst/twiggit/-/pipelines)
+
 Pragmatic git worktree management tool with focus on rebase workflows.
 
 ## Installation
