@@ -16,10 +16,11 @@ The main package has 0% test coverage and test helpers are only at 43.5%, creati
 - `concurrent-operations`: Test suite for concurrent worktree operations with race detector validation
 - `edge-case-fixtures`: Test fixtures for unusual repository states (corrupted, bare, submodules, detached HEAD)
 - `main-entry-point`: Tests for main package initialization and error handling paths
+- `test-helpers`: Extend coverage for worktree and shell helpers to >70%
 
 ### Modified Capabilities
 
-- `test-helpers`: Extend coverage for worktree and shell helpers to >70%
+*(None)*
 
 ## Impact
 

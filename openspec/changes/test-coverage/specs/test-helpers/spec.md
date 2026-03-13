@@ -1,4 +1,4 @@
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Worktree helper coverage
 The test/helpers package SHALL provide comprehensive worktree utilities with >70% test coverage.
