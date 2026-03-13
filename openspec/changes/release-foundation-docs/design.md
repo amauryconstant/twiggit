@@ -37,7 +37,7 @@ Twiggit is preparing for public open-source release. The codebase is stable, but
    - **Alternatives:** Simple version list (loses context), GitHub Releases only (not in repo)
 
 3. **Badge Selection**
-   - **Choice:** Go Report Card, GoDoc, License, CI status
+   - **Choice:** Go Report Card, GoDoc, License, GitLab CI status
    - **Rationale:** These are the essential quality signals for Go projects
    - **Alternatives:** More badges (coverage, downloads) - can be added later
 

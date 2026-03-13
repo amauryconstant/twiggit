@@ -8,4 +8,4 @@
 
 ## 3. Project Quality Visibility
 
-- [ ] 3.1 Add badges to README.md (Go Report Card, GoDoc, License, CI status)
+- [ ] 3.1 Add badges to README.md (Go Report Card, GoDoc, License, GitLab CI status)
