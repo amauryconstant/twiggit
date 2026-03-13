@@ -30,7 +30,7 @@ The install script will prompt you to:
 
 Download from:
 - **GitLab Releases**: https://gitlab.com/amoconst/twiggit/-/releases
-- **GitHub Releases**: https://github.com/amoconst/twiggit/releases
+- **GitHub Releases**: https://github.com/amauryconstant/twiggit/releases
 
  After manual installation, run:
  ```bash
