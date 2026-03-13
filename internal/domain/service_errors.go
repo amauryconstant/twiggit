@@ -14,7 +14,8 @@ type ServiceError struct {
 }
 
 func (e *ServiceError) Error() string {
-	return fmt.Sprintf("%s.%s failed: %s", e.Service, e.Operation, e.Message)
+	// Return user-friendly message without internal operation names
+	return e.Message
 }
 
 func (e *ServiceError) Unwrap() error {
@@ -116,10 +117,11 @@ type WorktreeServiceError struct {
 }
 
 func (e *WorktreeServiceError) Error() string {
+	// Return user-friendly message without internal operation names
 	if e.BranchName != "" {
-		return fmt.Sprintf("worktree service operation '%s' failed for %s (branch: %s): %s", e.Operation, e.WorktreePath, e.BranchName, e.Message)
+		return fmt.Sprintf("%s for worktree '%s' (branch: %s)", e.Message, e.WorktreePath, e.BranchName)
 	}
-	return fmt.Sprintf("worktree service operation '%s' failed for %s: %s", e.Operation, e.WorktreePath, e.Message)
+	return fmt.Sprintf("%s for worktree '%s'", e.Message, e.WorktreePath)
 }
 
 func (e *WorktreeServiceError) Unwrap() error {
@@ -154,10 +156,11 @@ type ProjectServiceError struct {
 }
 
 func (e *ProjectServiceError) Error() string {
+	// Return user-friendly message without internal operation names
 	if e.ProjectName != "" {
-		return fmt.Sprintf("project service operation '%s' failed for project '%s': %s", e.Operation, e.ProjectName, e.Message)
+		return fmt.Sprintf("%s for project '%s'", e.Message, e.ProjectName)
 	}
-	return fmt.Sprintf("project service operation '%s' failed for %s: %s", e.Operation, e.ProjectPath, e.Message)
+	return fmt.Sprintf("%s for '%s'", e.Message, e.ProjectPath)
 }
 
 func (e *ProjectServiceError) Unwrap() error {
@@ -185,7 +188,11 @@ type NavigationServiceError struct {
 }
 
 func (e *NavigationServiceError) Error() string {
-	return fmt.Sprintf("navigation service operation '%s' failed for target '%s' (context: %s): %s", e.Operation, e.Target, e.Context, e.Message)
+	// Return user-friendly message without internal operation names
+	if e.Context != "" {
+		return fmt.Sprintf("%s for target '%s' (context: %s)", e.Message, e.Target, e.Context)
+	}
+	return fmt.Sprintf("%s for target '%s'", e.Message, e.Target)
 }
 
 func (e *NavigationServiceError) Unwrap() error {

@@ -76,7 +76,7 @@ func formatValidationError(err error) string {
 	return output.String()
 }
 
-// formatWorktreeError formats WorktreeServiceError with emoji indicators
+// formatWorktreeError formats WorktreeServiceError with actionable hints
 func formatWorktreeError(err error) string {
 	worktreeErr := func() *domain.WorktreeServiceError {
 		target := &domain.WorktreeServiceError{}
@@ -85,19 +85,20 @@ func formatWorktreeError(err error) string {
 	}()
 	var output strings.Builder
 
-	if worktreeErr.BranchName != "" {
-		output.WriteString(fmt.Sprintf("Error: worktree '%s' not found\n", worktreeErr.BranchName))
-	} else {
-		output.WriteString(fmt.Sprintf("Error: %s\n", worktreeErr.Message))
-	}
+	// The Error() method already provides user-friendly messages
+	output.WriteString(fmt.Sprintf("Error: %s\n", worktreeErr.Error()))
 
-	// Add helpful suggestion
-	output.WriteString("Hint: Use 'twiggit list' to see available worktrees\n")
+	// Add helpful suggestion based on error type
+	if worktreeErr.IsNotFound() {
+		output.WriteString("Hint: Use 'twiggit list' to see available worktrees\n")
+	} else {
+		output.WriteString("Hint: Check that the worktree exists and you have permission\n")
+	}
 
 	return output.String()
 }
 
-// formatProjectError formats ProjectServiceError with emoji indicators
+// formatProjectError formats ProjectServiceError with actionable hints
 func formatProjectError(err error) string {
 	projectErr := func() *domain.ProjectServiceError {
 		target := &domain.ProjectServiceError{}
@@ -106,11 +107,8 @@ func formatProjectError(err error) string {
 	}()
 	var output strings.Builder
 
-	if projectErr.ProjectName != "" {
-		output.WriteString(fmt.Sprintf("Error: project '%s' not found\n", projectErr.ProjectName))
-	} else {
-		output.WriteString(fmt.Sprintf("Error: %s\n", projectErr.Message))
-	}
+	// The Error() method already provides user-friendly messages
+	output.WriteString(fmt.Sprintf("Error: %s\n", projectErr.Error()))
 
 	// Add helpful suggestion
 	output.WriteString("Hint: Use 'twiggit list --all' to see available projects\n")
@@ -118,7 +116,7 @@ func formatProjectError(err error) string {
 	return output.String()
 }
 
-// formatServiceError formats ServiceError with emoji indicators
+// formatServiceError formats ServiceError with actionable hints
 func formatServiceError(err error) string {
 	serviceErr := func() *domain.ServiceError {
 		target := &domain.ServiceError{}
@@ -127,19 +125,11 @@ func formatServiceError(err error) string {
 	}()
 	var output strings.Builder
 
-	output.WriteString(fmt.Sprintf("Error: %s\n", serviceErr.Message))
+	// The Error() method now returns just the message without operation names
+	output.WriteString(fmt.Sprintf("Error: %s\n", serviceErr.Error()))
 
-	// Add contextual suggestions based on operation
-	switch serviceErr.Operation {
-	case "GetCurrentContext":
-		output.WriteString("Hint: Make sure you're in a git repository or worktree directory\n")
-	case "DiscoverProject":
-		output.WriteString("Hint: Check if the project exists and is accessible\n")
-	case "ResolvePath":
-		output.WriteString("Hint: Verify the target worktree or project exists\n")
-	default:
-		output.WriteString("Hint: Check your configuration and try again\n")
-	}
+	// Add a generic helpful suggestion
+	output.WriteString("Hint: Check your configuration and try again\n")
 
 	return output.String()
 }

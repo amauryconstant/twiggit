@@ -111,22 +111,26 @@ func (s *ServiceErrorsTestSuite) TestWorktreeServiceError_Error_WithBranchName()
 	err := NewWorktreeServiceError("/path/to/worktree", "feature-branch", "CreateWorktree", "failed to create", nil)
 	msg := err.Error()
 
-	s.Contains(msg, "worktree service operation")
-	s.Contains(msg, "CreateWorktree")
+	// New simplified format: "failed to create for worktree '/path/to/worktree' (branch: feature-branch)"
+	s.Contains(msg, "failed to create")
 	s.Contains(msg, "/path/to/worktree")
 	s.Contains(msg, "branch: feature-branch")
-	s.Contains(msg, "failed to create")
+	// Should NOT contain internal operation names
+	s.NotContains(msg, "worktree service operation")
+	s.NotContains(msg, "CreateWorktree")
 }
 
 func (s *ServiceErrorsTestSuite) TestWorktreeServiceError_Error_WithoutBranchName() {
 	err := NewWorktreeServiceError("/path/to/worktree", "", "DeleteWorktree", "failed to delete", nil)
 	msg := err.Error()
 
-	s.Contains(msg, "worktree service operation")
-	s.Contains(msg, "DeleteWorktree")
+	// New simplified format: "failed to delete for worktree '/path/to/worktree'"
+	s.Contains(msg, "failed to delete")
 	s.Contains(msg, "/path/to/worktree")
 	s.NotContains(msg, "branch:")
-	s.Contains(msg, "failed to delete")
+	// Should not contain internal operation names
+	s.NotContains(msg, "worktree service operation")
+	s.NotContains(msg, "DeleteWorktree")
 }
 
 func (s *ServiceErrorsTestSuite) TestWorktreeServiceError_Unwrap() {
@@ -161,21 +165,25 @@ func (s *ServiceErrorsTestSuite) TestProjectServiceError_Error_WithProjectName()
 	err := NewProjectServiceError("test-project", "/path/to/project", "DiscoverProject", "not a git repository", nil)
 	msg := err.Error()
 
-	s.Contains(msg, "project service operation")
-	s.Contains(msg, "DiscoverProject")
-	s.Contains(msg, "test-project")
+	// New simplified format: "not a git repository for project 'test-project'"
 	s.Contains(msg, "not a git repository")
+	s.Contains(msg, "test-project")
+	// Should NOT contain internal operation names
+	s.NotContains(msg, "project service operation")
+	s.NotContains(msg, "DiscoverProject")
 }
 
 func (s *ServiceErrorsTestSuite) TestProjectServiceError_Error_WithoutProjectName() {
 	err := NewProjectServiceError("", "/path/to/project", "ValidateProject", "invalid path", nil)
 	msg := err.Error()
 
-	s.Contains(msg, "project service operation")
-	s.Contains(msg, "ValidateProject")
+	// New simplified format: "invalid path for '/path/to/project'"
+	s.Contains(msg, "invalid path")
 	s.Contains(msg, "/path/to/project")
 	s.NotContains(msg, "project '")
-	s.Contains(msg, "invalid path")
+	// Should not contain internal operation names
+	s.NotContains(msg, "project service operation")
+	s.NotContains(msg, "ValidateProject")
 }
 
 func (s *ServiceErrorsTestSuite) TestProjectServiceError_Unwrap() {
@@ -188,11 +196,13 @@ func (s *ServiceErrorsTestSuite) TestNavigationServiceError_Error() {
 	err := NewNavigationServiceError("feature-branch", "project-root", "Navigate", "worktree not found", nil)
 	msg := err.Error()
 
-	s.Contains(msg, "navigation service operation")
-	s.Contains(msg, "Navigate")
+	// New simplified format: "worktree not found for target 'feature-branch' (context: project-root)"
+	s.Contains(msg, "worktree not found")
 	s.Contains(msg, "feature-branch")
 	s.Contains(msg, "context: project-root")
-	s.Contains(msg, "worktree not found")
+	// Should not contain internal operation names
+	s.NotContains(msg, "navigation service operation")
+	s.NotContains(msg, "Navigate")
 }
 
 func (s *ServiceErrorsTestSuite) TestNavigationServiceError_Unwrap() {
@@ -255,9 +265,11 @@ func (s *ServiceErrorsTestSuite) TestServiceError_Error() {
 	err := NewServiceError("WorktreeService", "CreateWorktree", "failed to create", nil)
 	msg := err.Error()
 
-	s.Contains(msg, "WorktreeService")
-	s.Contains(msg, "CreateWorktree")
-	s.Contains(msg, "failed")
+	// New simplified format: just returns the message without internal names
+	s.Contains(msg, "failed to create")
+	// Should NOT contain internal service/operation names
+	s.NotContains(msg, "WorktreeService")
+	s.NotContains(msg, "CreateWorktree")
 }
 
 func (s *ServiceErrorsTestSuite) TestServiceError_Unwrap() {

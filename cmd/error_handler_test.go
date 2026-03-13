@@ -25,7 +25,7 @@ func (s *ErrorHandlerTestSuite) TestHandleCLIError_ValidationError() {
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	s.Equal(ExitCodeValidation, exitCode)
 }
 
 func (s *ErrorHandlerTestSuite) TestHandleCLIError_GitRepositoryError() {
@@ -33,7 +33,7 @@ func (s *ErrorHandlerTestSuite) TestHandleCLIError_GitRepositoryError() {
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	s.Equal(ExitCodeGit, exitCode)
 }
 
 func (s *ErrorHandlerTestSuite) TestHandleCLIError_GitWorktreeError() {
@@ -41,7 +41,7 @@ func (s *ErrorHandlerTestSuite) TestHandleCLIError_GitWorktreeError() {
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	s.Equal(ExitCodeGit, exitCode)
 }
 
 func (s *ErrorHandlerTestSuite) TestHandleCLIError_WorktreeServiceError() {
@@ -90,7 +90,7 @@ func (s *ErrorHandlerTestSuite) TestGetExitCodeForError_ValidationError() {
 
 	exitCode := GetExitCodeForError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	s.Equal(ExitCodeValidation, exitCode)
 }
 
 func (s *ErrorHandlerTestSuite) TestGetExitCodeForError_GitError() {
@@ -98,7 +98,7 @@ func (s *ErrorHandlerTestSuite) TestGetExitCodeForError_GitError() {
 
 	exitCode := GetExitCodeForError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	s.Equal(ExitCodeGit, exitCode)
 }
 
 func (s *ErrorHandlerTestSuite) TestGetExitCodeForError_UnknownError() {

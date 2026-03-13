@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"runtime/debug"
 
 	"twiggit/cmd"
 	"twiggit/internal/infrastructure"
@@ -9,6 +11,18 @@ import (
 )
 
 func main() {
+	// Set up panic recovery for graceful handling of unexpected errors
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Fprintf(os.Stderr, "Internal error: %v\n", r)
+			if os.Getenv("TWIGGIT_DEBUG") != "" {
+				fmt.Fprintln(os.Stderr, "\nStack trace:")
+				debug.PrintStack()
+			}
+			os.Exit(1)
+		}
+	}()
+
 	// Initialize and load configuration
 	configManager := infrastructure.NewConfigManager()
 	config, err := configManager.Load()

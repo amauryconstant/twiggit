@@ -19,6 +19,14 @@ const (
 	ExitCodeError ExitCode = 1
 	// ExitCodeUsage indicates incorrect command-line usage
 	ExitCodeUsage ExitCode = 2
+	// ExitCodeConfig indicates a configuration error
+	ExitCodeConfig ExitCode = 3
+	// ExitCodeGit indicates a git operation error
+	ExitCodeGit ExitCode = 4
+	// ExitCodeValidation indicates an input validation error
+	ExitCodeValidation ExitCode = 5
+	// ExitCodeNotFound indicates a resource was not found
+	ExitCodeNotFound ExitCode = 6
 )
 
 // ErrorCategory defines categories of errors for consistent handling
@@ -35,6 +43,8 @@ const (
 	ErrorCategoryGit
 	// ErrorCategoryConfig represents configuration errors
 	ErrorCategoryConfig
+	// ErrorCategoryNotFound represents resource not found errors
+	ErrorCategoryNotFound
 	// ErrorCategoryGeneric represents all other errors
 	ErrorCategoryGeneric
 )
@@ -64,7 +74,15 @@ func GetExitCodeForError(err error) ExitCode {
 	switch category {
 	case ErrorCategoryCobra:
 		return ExitCodeUsage
-	case ErrorCategoryValidation, ErrorCategoryService, ErrorCategoryGit, ErrorCategoryConfig:
+	case ErrorCategoryValidation:
+		return ExitCodeValidation
+	case ErrorCategoryConfig:
+		return ExitCodeConfig
+	case ErrorCategoryGit:
+		return ExitCodeGit
+	case ErrorCategoryNotFound:
+		return ExitCodeNotFound
+	case ErrorCategoryService:
 		return ExitCodeError
 	default:
 		return ExitCodeError
@@ -78,13 +96,28 @@ func CategorizeError(err error) ErrorCategory {
 		return ErrorCategoryCobra
 	}
 
+	// Check for not-found errors (check before general category checks)
+	var worktreeServiceErr *domain.WorktreeServiceError
+	if errors.As(err, &worktreeServiceErr) && worktreeServiceErr.IsNotFound() {
+		return ErrorCategoryNotFound
+	}
+
+	var gitRepoErr *domain.GitRepositoryError
+	if errors.As(err, &gitRepoErr) && gitRepoErr.IsNotFound() {
+		return ErrorCategoryNotFound
+	}
+
+	var gitWorktreeErr *domain.GitWorktreeError
+	if errors.As(err, &gitWorktreeErr) && gitWorktreeErr.IsNotFound() {
+		return ErrorCategoryNotFound
+	}
+
 	// Check for specific domain error types using errors.As for wrapped error support
 	var validationErr *domain.ValidationError
 	if errors.As(err, &validationErr) {
 		return ErrorCategoryValidation
 	}
 
-	var worktreeServiceErr *domain.WorktreeServiceError
 	if errors.As(err, &worktreeServiceErr) {
 		return ErrorCategoryService
 	}
@@ -99,12 +132,10 @@ func CategorizeError(err error) ErrorCategory {
 		return ErrorCategoryService
 	}
 
-	var gitRepoErr *domain.GitRepositoryError
 	if errors.As(err, &gitRepoErr) {
 		return ErrorCategoryGit
 	}
 
-	var gitWorktreeErr *domain.GitWorktreeError
 	if errors.As(err, &gitWorktreeErr) {
 		return ErrorCategoryGit
 	}
