@@ -50,6 +50,8 @@ graph TB
 | mise run release:validate | Clean tree check |
 | mise run release:dry-run  | Test GoReleaser  |
 
+**CHANGELOG**: Auto-generated via `openspec-generate-changelog` after archiving changes.
+
 ## Pre-Commit Hooks
 
 Setup: `mise install && pre-commit install`
