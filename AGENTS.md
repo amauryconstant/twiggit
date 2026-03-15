@@ -190,6 +190,16 @@ graph TB
 | `errors.As()` fails | Check error chain, ensure `Unwrap()` implemented |
 | Context detection wrong | Check CWD, verify `.git` file in worktrees |
 | Mock not matching calls | Verify `On()` args match actual call signature |
+| Exit code 2 (usage) | Check command syntax, required arguments |
+| Exit code 3 (config) | Verify config file exists and is valid |
+| Exit code 4 (git) | Check git operations, repository state |
+| Exit code 5 (validation) | Validate input format and values |
+| Exit code 6 (not-found) | Use `twiggit list` to find resources |
+
+**Debugging:**
+- Set `TWIGGIT_DEBUG=1` to see internal error details and stack traces
+- Error messages include actionable hints for common issues
+- Exit codes enable reliable scripting with specific error handling
 
 ## Location-Specific Guides
 

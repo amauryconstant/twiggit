@@ -50,9 +50,38 @@ See `internal/infrastructure/AGENTS.md` for detection rules and resolution.
 - **Contract tests**: `cmd/contract_test.go` verifies service integration
 
 ## Error Handling
-- **Error handling**: `cmd/error_handler.go` - determines error type, formats for CLI output
-- **Error formatting**: `cmd/error_formatter.go` - formats error messages for display
-- **Pattern**: `fmt.Errorf("action failed: %w", err)` for wrapping
+
+**Exit codes:**
+
+| Code | Constant | Meaning | Use case |
+|------|----------|---------|----------|
+| 0 | ExitCodeSuccess | Success | Normal completion |
+| 1 | ExitCodeError | General error | Unclassified errors, panics |
+| 2 | ExitCodeUsage | Usage error | Invalid command syntax |
+| 3 | ExitCodeConfig | Configuration error | Invalid or missing config |
+| 4 | ExitCodeGit | Git operation error | Git command failures |
+| 5 | ExitCodeValidation | Validation error | Input validation failures |
+| 6 | ExitCodeNotFound | Resource not found | Project/worktree not found |
+
+**Error formatting:**
+- Messages are user-friendly without internal operation names
+- Includes actionable hints for recovery (e.g., "Use 'twiggit list' to see available worktrees")
+- Error categories map to specific exit codes via `GetExitCodeForError()`
+
+**Debug mode:**
+- Set `TWIGGIT_DEBUG=1` to enable internal details and stack traces
+- Shows full error context including operation names when set
+- Stack traces displayed for panics only in debug mode
+
+**Panic recovery:**
+- Unexpected panics caught in main.go via defer/recover
+- Displays "Internal error: <panic value>" to stderr
+- Exits with code 1
+
+**Implementation:**
+- `cmd/error_handler.go` - error categorization and exit code mapping
+- `cmd/error_formatter.go` - user-friendly message formatting with hints
+- Pattern: `fmt.Errorf("action failed: %w", err)` for wrapping
 
 ## Command Specifications
 
