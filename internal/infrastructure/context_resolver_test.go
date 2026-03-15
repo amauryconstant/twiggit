@@ -958,3 +958,439 @@ func (s *ContextResolverTestSuite) TestWithExistingOnlyFilter() {
 	_, err := os.Stat("/tmp/nonexistent")
 	s.Require().True(os.IsNotExist(err))
 }
+
+// Task 6.1: Unit tests for fuzzyMatch() function
+func (s *ContextResolverTestSuite) TestFuzzyMatch() {
+	tests := []struct {
+		name     string
+		pattern  string
+		text     string
+		expected bool
+	}{
+		// Basic matches
+		{"empty pattern matches anything", "", "anything", true},
+		{"empty pattern matches empty", "", "", true},
+		{"exact match", "main", "main", true},
+		{"prefix match", "ma", "main", true},
+		{"subsequence match", "mn", "main", true},
+		{"non-matching pattern", "xyz", "main", false},
+
+		// Case insensitivity
+		{"case insensitive - lowercase pattern", "main", "MAIN", true},
+		{"case insensitive - uppercase pattern", "MAIN", "main", true},
+		{"case insensitive - mixed case", "MaIn", "mAiN", true},
+		{"case insensitive subsequence", "mn", "MAIN", true},
+
+		// Fuzzy matching scenarios
+		{"fuzzy - f1 matches feature-1", "f1", "feature-1", true},
+		{"fuzzy - fb matches feature-branch", "fb", "feature-branch", true},
+		{"fuzzy - ftb matches feature-test-branch", "ftb", "feature-test-branch", true},
+		{"fuzzy - fbn does not match feature", "fbn", "feature", false},
+		{"fuzzy - dv matches develop", "dv", "develop", true},
+		{"fuzzy - dvp matches develop", "dvp", "develop", true}, // subsequence: d-v-p in develop
+
+		// Edge cases
+		{"pattern longer than text", "longpattern", "short", false},
+		{"single char match", "m", "main", true},
+		{"single char no match", "x", "main", false},
+		{"unicode characters", "f", "fëätürë", true},
+
+		// Common branch name patterns
+		{"bugfix pattern", "bf", "bugfix-123", true},
+		{"feature pattern", "feat", "feature/new-thing", true},
+		{"hotfix pattern", "hf", "hotfix-urgent", true},
+		{"release pattern", "rel", "release/v1.0", true},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			result := fuzzyMatch(tt.pattern, tt.text)
+			s.Equal(tt.expected, result, "fuzzyMatch(%q, %q)", tt.pattern, tt.text)
+		})
+	}
+}
+
+// Task 6.2: Unit tests for matchesExclusionPatterns() helper
+func (s *ContextResolverTestSuite) TestMatchesExclusionPatterns() {
+	tests := []struct {
+		name        string
+		nameToCheck string
+		patterns    []string
+		expected    bool
+	}{
+		{"no patterns", "main", []string{}, false},
+		{"exact match", "main", []string{"main"}, true},
+		{"no match", "develop", []string{"main"}, false},
+		{"glob wildcard prefix", "dependabot-123", []string{"dependabot-*"}, true},
+		{"glob wildcard suffix", "test-branch", []string{"*-branch"}, true},
+		{"glob multiple patterns - first matches", "renovate-456", []string{"renovate-*", "dependabot-*"}, true},
+		{"glob multiple patterns - second matches", "dependabot-789", []string{"renovate-*", "dependabot-*"}, true},
+		{"glob multiple patterns - none match", "feature-branch", []string{"renovate-*", "dependabot-*"}, false},
+		{"glob question mark", "test1", []string{"test?"}, true},
+		{"glob question mark - no match", "test12", []string{"test?"}, false},
+		{"glob character class", "v1.0", []string{"v[0-9].*"}, true},
+		{"archive pattern", "archive-old-project", []string{"archive/*"}, false}, // '/' not in name
+		{"empty name", "", []string{"*"}, true},
+		{"pattern with invalid glob syntax", "branch", []string{"["}, false}, // invalid pattern should not crash
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			result := matchesExclusionPatterns(tt.nameToCheck, tt.patterns)
+			s.Equal(tt.expected, result, "matchesExclusionPatterns(%q, %v)", tt.nameToCheck, tt.patterns)
+		})
+	}
+}
+
+// Task 6.3: Unit tests for project suggestions from project context
+func (s *ContextResolverTestSuite) TestProjectSuggestionsFromProjectContext() {
+	s.Run("includes other projects when in project context", func() {
+		tempDir := s.T().TempDir()
+		projectsDir := filepath.Join(tempDir, "projects")
+		s.Require().NoError(os.MkdirAll(projectsDir, 0755))
+
+		// Create test projects
+		project1Path := filepath.Join(projectsDir, "project1")
+		project2Path := filepath.Join(projectsDir, "project2")
+		s.Require().NoError(os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
+		s.Require().NoError(os.MkdirAll(filepath.Join(project2Path, ".git"), 0755))
+		s.setupTestRepo(project1Path)
+		s.setupTestRepo(project2Path)
+
+		config := &domain.Config{
+			ProjectsDirectory:  projectsDir,
+			WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
+		}
+
+		mockGitService := mocks.NewMockGitService()
+		mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
+		mockGitService.MockGoGitClient.On("ValidateRepository", project2Path).Return(nil)
+		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, project1Path).
+			Return([]domain.WorktreeInfo{}, nil)
+		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
+			Return([]domain.BranchInfo{}, nil)
+
+		resolver := NewContextResolver(config, mockGitService)
+
+		ctx := &domain.Context{
+			Type:        domain.ContextProject,
+			ProjectName: "project1",
+			Path:        project1Path,
+		}
+
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "proj")
+		s.Require().NoError(err)
+
+		// Should include project2 but exclude current project1
+		var projectNames []string
+		for _, sug := range suggestions {
+			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
+				projectNames = append(projectNames, sug.Text)
+			}
+		}
+		s.Contains(projectNames, "project2", "Should suggest other projects")
+		s.NotContains(projectNames, "project1", "Should not suggest current project")
+	})
+
+	s.Run("respects exclusion patterns for projects", func() {
+		tempDir := s.T().TempDir()
+		projectsDir := filepath.Join(tempDir, "projects")
+		s.Require().NoError(os.MkdirAll(projectsDir, 0755))
+
+		// Create test projects
+		project1Path := filepath.Join(projectsDir, "project1")
+		archivePath := filepath.Join(projectsDir, "archive-old")
+		s.Require().NoError(os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
+		s.Require().NoError(os.MkdirAll(filepath.Join(archivePath, ".git"), 0755))
+		s.setupTestRepo(project1Path)
+		s.setupTestRepo(archivePath)
+
+		config := &domain.Config{
+			ProjectsDirectory:  projectsDir,
+			WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
+			Completion: domain.CompletionConfig{
+				ExcludeProjects: []string{"archive-*"},
+			},
+		}
+
+		mockGitService := mocks.NewMockGitService()
+		mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
+		mockGitService.MockGoGitClient.On("ValidateRepository", archivePath).Return(nil)
+		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, project1Path).
+			Return([]domain.WorktreeInfo{}, nil)
+		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
+			Return([]domain.BranchInfo{}, nil)
+
+		resolver := NewContextResolver(config, mockGitService)
+
+		ctx := &domain.Context{
+			Type:        domain.ContextProject,
+			ProjectName: "project1",
+			Path:        project1Path,
+		}
+
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "")
+		s.Require().NoError(err)
+
+		// Should not include archive-old due to exclusion pattern
+		var projectNames []string
+		for _, sug := range suggestions {
+			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
+				projectNames = append(projectNames, sug.Text)
+			}
+		}
+		s.NotContains(projectNames, "archive-old", "Should exclude projects matching pattern")
+	})
+}
+
+// Task 6.4: Unit tests for project suggestions from worktree context
+func (s *ContextResolverTestSuite) TestProjectSuggestionsFromWorktreeContext() {
+	s.Run("includes other projects when in worktree context", func() {
+		tempDir := s.T().TempDir()
+		projectsDir := filepath.Join(tempDir, "projects")
+		worktreesDir := filepath.Join(tempDir, "worktrees")
+		s.Require().NoError(os.MkdirAll(projectsDir, 0755))
+		s.Require().NoError(os.MkdirAll(worktreesDir, 0755))
+
+		// Create test projects
+		project1Path := filepath.Join(projectsDir, "project1")
+		project2Path := filepath.Join(projectsDir, "project2")
+		s.Require().NoError(os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
+		s.Require().NoError(os.MkdirAll(filepath.Join(project2Path, ".git"), 0755))
+		s.setupTestRepo(project1Path)
+		s.setupTestRepo(project2Path)
+
+		// Create worktree for project1
+		worktreePath := filepath.Join(worktreesDir, "project1", "feature-branch")
+		s.Require().NoError(os.MkdirAll(worktreePath, 0755))
+
+		config := &domain.Config{
+			ProjectsDirectory:  projectsDir,
+			WorktreesDirectory: worktreesDir,
+		}
+
+		mockGitService := mocks.NewMockGitService()
+		mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
+		mockGitService.MockGoGitClient.On("ValidateRepository", project2Path).Return(nil)
+		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, project1Path).
+			Return([]domain.WorktreeInfo{
+				{Branch: "feature-branch", Path: worktreePath},
+			}, nil)
+		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
+			Return([]domain.BranchInfo{}, nil)
+
+		resolver := NewContextResolver(config, mockGitService)
+
+		ctx := &domain.Context{
+			Type:        domain.ContextWorktree,
+			ProjectName: "project1",
+			BranchName:  "feature-branch",
+			Path:        worktreePath,
+		}
+
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "proj")
+		s.Require().NoError(err)
+
+		// Should include project2 but exclude current project1
+		var projectNames []string
+		for _, sug := range suggestions {
+			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
+				projectNames = append(projectNames, sug.Text)
+			}
+		}
+		s.Contains(projectNames, "project2", "Should suggest other projects")
+		s.NotContains(projectNames, "project1", "Should not suggest current project")
+	})
+}
+
+// Task 6.5: Unit tests for exclusion pattern filtering
+func (s *ContextResolverTestSuite) TestExclusionPatternFiltering() {
+	s.Run("excludes branches matching patterns", func() {
+		config := &domain.Config{
+			ProjectsDirectory:  "/home/user/Projects",
+			WorktreesDirectory: "/home/user/Worktrees",
+			Completion: domain.CompletionConfig{
+				ExcludeBranches: []string{"dependabot/*", "renovate/*"},
+			},
+		}
+
+		mockGitService := mocks.NewMockGitService()
+		projectPath := "/home/user/Projects/my-project"
+		worktreePath := "/home/user/Worktrees/my-project/feature-branch"
+
+		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, projectPath).
+			Return([]domain.WorktreeInfo{
+				{Branch: "feature-branch", Path: worktreePath},
+				{Branch: "other-branch", Path: "/home/user/Worktrees/my-project/other-branch"},
+			}, nil)
+		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, projectPath).
+			Return([]domain.BranchInfo{
+				{Name: "main"},
+				{Name: "dependabot/npm-123"},
+				{Name: "renovate/docker-456"},
+			}, nil)
+
+		resolver := NewContextResolver(config, mockGitService)
+
+		ctx := &domain.Context{
+			Type:        domain.ContextProject,
+			ProjectName: "my-project",
+			Path:        "/home/user/Projects/my-project",
+		}
+
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "")
+		s.Require().NoError(err)
+
+		// Collect all suggestions (both worktrees and branches)
+		allNames := make([]string, 0)
+		for _, sug := range suggestions {
+			allNames = append(allNames, sug.Text)
+		}
+
+		s.Contains(allNames, "main", "Should include main branch")
+		s.Contains(allNames, "feature-branch", "Should include feature-branch worktree")
+		s.Contains(allNames, "other-branch", "Should include other-branch worktree")
+		s.NotContains(allNames, "dependabot/npm-123", "Should exclude dependabot branches")
+		s.NotContains(allNames, "renovate/docker-456", "Should exclude renovate branches")
+	})
+
+	s.Run("excludes projects matching patterns", func() {
+		tempDir := s.T().TempDir()
+		projectsDir := filepath.Join(tempDir, "projects")
+		s.Require().NoError(os.MkdirAll(projectsDir, 0755))
+
+		// Create test projects
+		for _, name := range []string{"active-project", "archived-old", "test-project"} {
+			projectPath := filepath.Join(projectsDir, name)
+			s.Require().NoError(os.MkdirAll(filepath.Join(projectPath, ".git"), 0755))
+			s.setupTestRepo(projectPath)
+		}
+
+		config := &domain.Config{
+			ProjectsDirectory:  projectsDir,
+			WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
+			Completion: domain.CompletionConfig{
+				ExcludeProjects: []string{"archived-*"},
+			},
+		}
+
+		mockGitService := mocks.NewMockGitService()
+		for _, name := range []string{"active-project", "archived-old", "test-project"} {
+			projectPath := filepath.Join(projectsDir, name)
+			mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
+		}
+
+		resolver := NewContextResolver(config, mockGitService)
+
+		ctx := &domain.Context{
+			Type: domain.ContextOutsideGit,
+			Path: tempDir,
+		}
+
+		suggestions, err := resolver.GetResolutionSuggestions(ctx, "")
+		s.Require().NoError(err)
+
+		projectNames := make([]string, 0)
+		for _, sug := range suggestions {
+			projectNames = append(projectNames, sug.Text)
+		}
+
+		s.Contains(projectNames, "active-project")
+		s.Contains(projectNames, "test-project")
+		s.NotContains(projectNames, "archived-old", "Should exclude archived projects")
+	})
+}
+
+// Test for fuzzy matching enabled via config
+func (s *ContextResolverTestSuite) TestFuzzyMatchingEnabled() {
+	config := &domain.Config{
+		ProjectsDirectory:  "/home/user/Projects",
+		WorktreesDirectory: "/home/user/Worktrees",
+		Navigation: domain.NavigationConfig{
+			FuzzyMatching: true,
+		},
+	}
+
+	projectPath := "/home/user/Projects/my-project"
+	worktreePath := "/home/user/Worktrees/my-project/feature-branch"
+
+	mockGitService := mocks.NewMockGitService()
+	mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, projectPath).
+		Return([]domain.WorktreeInfo{
+			{Branch: "feature-branch", Path: worktreePath},
+			{Branch: "other-branch", Path: "/home/user/Worktrees/my-project/other-branch"},
+		}, nil)
+	mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, projectPath).
+		Return([]domain.BranchInfo{
+			{Name: "feature-123"},
+			{Name: "main"},
+		}, nil)
+
+	resolver := NewContextResolver(config, mockGitService)
+
+	ctx := &domain.Context{
+		Type:        domain.ContextProject,
+		ProjectName: "my-project",
+		Path:        "/home/user/Projects/my-project",
+	}
+
+	// "f1" should match "feature-123" with fuzzy matching
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "f1")
+	s.Require().NoError(err)
+
+	branchNames := make([]string, 0)
+	for _, sug := range suggestions {
+		branchNames = append(branchNames, sug.Text)
+	}
+
+	s.Contains(branchNames, "feature-123", "Fuzzy match 'f1' should match 'feature-123'")
+}
+
+// Test for IsCurrent and IsDirty fields
+func (s *ContextResolverTestSuite) TestWorktreeStatusFields() {
+	config := &domain.Config{
+		ProjectsDirectory:  "/home/user/Projects",
+		WorktreesDirectory: "/home/user/Worktrees",
+	}
+
+	mockGitService := mocks.NewMockGitService()
+	worktreePath := "/home/user/Worktrees/my-project/feature-branch"
+	projectPath := "/home/user/Projects/my-project"
+
+	// ListWorktrees should be called on the project path, not worktree path
+	mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, projectPath).
+		Return([]domain.WorktreeInfo{
+			{Branch: "feature-branch", Path: worktreePath},
+			{Branch: "other-branch", Path: "/home/user/Worktrees/my-project/other-branch"},
+		}, nil)
+	mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, projectPath).
+		Return([]domain.BranchInfo{}, nil)
+	mockGitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, worktreePath).
+		Return(domain.RepositoryStatus{IsClean: false}, nil)
+	// Note: GetRepositoryStatus should NOT be called for other-branch due to performance optimization
+	// (IsDirty is only set for the current worktree)
+
+	resolver := NewContextResolver(config, mockGitService)
+
+	ctx := &domain.Context{
+		Type:        domain.ContextWorktree,
+		ProjectName: "my-project",
+		BranchName:  "feature-branch",
+		Path:        worktreePath,
+	}
+
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "")
+	s.Require().NoError(err)
+
+	for _, sug := range suggestions {
+		if sug.Text == "feature-branch" {
+			s.True(sug.IsCurrent, "Current worktree should have IsCurrent=true")
+			s.True(sug.IsDirty, "Dirty worktree should have IsDirty=true")
+			s.Contains(sug.Description, "⚠", "Dirty worktree description should have warning indicator")
+		}
+		if sug.Text == "other-branch" {
+			s.False(sug.IsCurrent, "Other worktree should have IsCurrent=false")
+			s.False(sug.IsDirty, "Other worktree should not have IsDirty set (performance optimization)")
+		}
+	}
+}

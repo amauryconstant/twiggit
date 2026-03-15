@@ -72,6 +72,12 @@ type ShellWrapperConfig struct {
 type CompletionConfig struct {
 	// Timeout for completion operations
 	Timeout string `toml:"timeout" koanf:"timeout"`
+
+	// ExcludeBranches contains glob patterns for branches to exclude from suggestions
+	ExcludeBranches []string `toml:"exclude_branches" koanf:"exclude_branches"`
+
+	// ExcludeProjects contains glob patterns for projects to exclude from suggestions
+	ExcludeProjects []string `toml:"exclude_projects" koanf:"exclude_projects"`
 }
 
 // ShellConfig represents shell integration specific configuration
@@ -171,7 +177,9 @@ func DefaultConfig() *Config {
 			},
 		},
 		Completion: CompletionConfig{
-			Timeout: "500ms",
+			Timeout:         "500ms",
+			ExcludeBranches: []string{},
+			ExcludeProjects: []string{},
 		},
 	}
 }

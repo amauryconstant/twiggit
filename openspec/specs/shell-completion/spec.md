@@ -46,12 +46,14 @@ The system SHALL provide context-aware tab completion for command arguments via 
 - **THEN** system SHALL suggest branch names for current project
 - **AND** system SHALL include "main" as a suggestion
 - **AND** suggestions SHALL include descriptions (e.g., "Project root directory", "Worktree for branch X")
+- **AND** system SHALL suggest other project names for cross-project navigation
 
 #### Scenario: Complete cd command from worktree context
 
 - **WHEN** user presses tab after `twiggit cd ` from within a worktree
 - **THEN** system SHALL suggest sibling worktree branch names
-- **AND** system SHALL NOT include "main" (already at project root)
+- **AND** system SHALL include "main" as a suggestion
+- **AND** system SHALL suggest other project names for cross-project navigation
 
 #### Scenario: Complete cd command from outside git context
 
@@ -142,3 +144,25 @@ The system SHALL cache completion results for acceptable performance.
 - **THEN** system SHALL gracefully degrade by returning empty suggestions
 - **AND** system SHALL not return partial results that might be incomplete
 - **AND** user experience SHALL not be degraded by slow git operations
+
+### Requirement: Progressive Project Completion
+
+The system SHALL support progressive completion for project/branch syntax by automatically appending "/" when a project is selected.
+
+#### Scenario: Project suggestion includes slash suffix
+
+- **WHEN** completion suggests a project name
+- **THEN** suggestion SHALL include "/" as a suffix
+- **AND** accepting the suggestion SHALL result in input like "projectname/"
+
+#### Scenario: Slash suffix triggers branch completion
+
+- **WHEN** user accepts a project suggestion with "/" suffix
+- **AND** presses tab again
+- **THEN** system SHALL provide branch suggestions for that project
+
+#### Scenario: Branch suggestions have no suffix
+
+- **WHEN** completion suggests a branch name
+- **THEN** suggestion SHALL NOT include "/" suffix
+- **AND** accepting the suggestion SHALL complete the input without additional characters

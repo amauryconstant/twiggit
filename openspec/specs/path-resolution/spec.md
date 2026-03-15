@@ -98,6 +98,27 @@ The system SHALL resolve target identifiers (branches, projects, worktrees) to c
 - **AND** suggestions SHALL be limited to configured maximum (if configured)
 - **AND** suggestions SHALL be filtered to be relevant to current project if in project context
 
+### Requirement: Provide Completion Suggestions from All Contexts
+
+The system SHALL provide project name suggestions from all context types, not just outside-git context.
+
+#### Scenario: Suggest projects from project context
+
+- **WHEN** user requests completion from project context
+- **THEN** system SHALL suggest other project names for cross-project navigation
+- **AND** system SHALL NOT suggest the current project (redundant with "main")
+
+#### Scenario: Suggest projects from worktree context
+
+- **WHEN** user requests completion from worktree context
+- **THEN** system SHALL suggest other project names for cross-project navigation
+- **AND** system SHALL NOT suggest the current project (redundant with "main")
+
+#### Scenario: Suggest projects from outside git context
+
+- **WHEN** user requests completion from outside git context
+- **THEN** system SHALL suggest all available project names
+
 #### Scenario: Resolve relative path to absolute path
 
 - **WHEN** system validates a path that is relative
@@ -131,6 +152,7 @@ The system SHALL support progressive completion for cross-project references whe
 - **THEN** system SHALL detect the project name before the `/`
 - **AND** system SHALL fetch branches from that project's repository
 - **AND** suggestions SHALL be formatted as `<project>/<branch>`
+- **AND** suggestions SHALL include descriptions for each branch
 - **AND** suggestions SHALL include descriptions for each branch
 
 #### Scenario: Complete branches with partial branch name

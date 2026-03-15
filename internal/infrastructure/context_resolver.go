@@ -39,6 +39,32 @@ func parseCrossProjectReference(identifier string) (project, branch string, vali
 	return parts[0], parts[1], true
 }
 
+// fuzzyMatch performs case-insensitive subsequence matching for fuzzy completion
+// pattern "f1" matches "feature-1", "feat-1", "F1", etc.
+func fuzzyMatch(pattern, text string) bool {
+	pattern = strings.ToLower(pattern)
+	text = strings.ToLower(text)
+	pi := 0
+	patternRunes := []rune(pattern)
+	for _, c := range text {
+		if pi < len(patternRunes) && c == patternRunes[pi] {
+			pi++
+		}
+	}
+	return pi == len(patternRunes)
+}
+
+// matchesExclusionPatterns checks if a name matches any of the given glob patterns
+func matchesExclusionPatterns(name string, patterns []string) bool {
+	for _, pattern := range patterns {
+		matched, err := filepath.Match(pattern, name)
+		if err == nil && matched {
+			return true
+		}
+	}
+	return false
+}
+
 // containsPathTraversal checks if a string contains path traversal sequences
 // Handles literal "..", URL-encoded variants (all cases), and double-encoding
 func containsPathTraversal(s string) bool {
@@ -234,6 +260,9 @@ func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, par
 		}
 	}
 
+	// Add project suggestions (exclude current project for cross-project navigation)
+	suggestions = cr.addProjectSuggestions(suggestions, ctx, partial, true)
+
 	return suggestions
 }
 
@@ -258,30 +287,72 @@ func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSug
 // addWorktreeSuggestions adds suggestions for existing worktrees
 func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, worktrees []domain.WorktreeInfo, config *suggestionConfig) []*domain.ResolutionSuggestion {
 	for _, worktree := range worktrees {
-		if strings.HasPrefix(worktree.Branch, partial) {
-			if config.existingOnly {
-				if _, err := os.Stat(worktree.Path); os.IsNotExist(err) {
-					continue
-				}
+		// Apply fuzzy matching if enabled
+		if cr.config.Navigation.FuzzyMatching {
+			if !fuzzyMatch(partial, worktree.Branch) {
+				continue
 			}
-			suggestions = append(suggestions, &domain.ResolutionSuggestion{
-				Text:        worktree.Branch,
-				Description: "Worktree for branch " + worktree.Branch,
-				Type:        domain.PathTypeWorktree,
-				ProjectName: ctx.ProjectName,
-				BranchName:  worktree.Branch,
-			})
+		} else {
+			if !strings.HasPrefix(worktree.Branch, partial) {
+				continue
+			}
 		}
+
+		// Apply exclusion patterns
+		if matchesExclusionPatterns(worktree.Branch, cr.config.Completion.ExcludeBranches) {
+			continue
+		}
+
+		if config.existingOnly {
+			if _, err := os.Stat(worktree.Path); os.IsNotExist(err) {
+				continue
+			}
+		}
+
+		// Check if this is the current worktree
+		isCurrent := ctx.Type == domain.ContextWorktree && ctx.BranchName == worktree.Branch
+
+		// Check dirty status for current worktree only (performance optimization)
+		var isDirty bool
+		if isCurrent && cr.gitService != nil {
+			if status, err := cr.gitService.GetRepositoryStatus(context.Background(), worktree.Path); err == nil {
+				isDirty = !status.IsClean
+			}
+		}
+
+		// Build enhanced description with remote tracking info
+		description := "Worktree for branch " + worktree.Branch
+		if isDirty {
+			description = "⚠ " + description
+		}
+
+		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+			Text:        worktree.Branch,
+			Description: description,
+			Type:        domain.PathTypeWorktree,
+			ProjectName: ctx.ProjectName,
+			BranchName:  worktree.Branch,
+			IsCurrent:   isCurrent,
+			IsDirty:     isDirty,
+		})
 	}
 	return suggestions
 }
 
 // addBranchSuggestions adds suggestions for branches without worktrees
 func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, existingWorktrees []domain.WorktreeInfo, _ *suggestionConfig) []*domain.ResolutionSuggestion {
-	branches, err := cr.gitService.ListBranches(context.Background(), ctx.Path)
+	// When in worktree context, ListBranches should be called on project path, not worktree path
+	var listPath string
+	if ctx.Type == domain.ContextWorktree {
+		listPath = filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
+	} else {
+		listPath = ctx.Path
+	}
+
+	branches, err := cr.gitService.ListBranches(context.Background(), listPath)
 	if err != nil {
 		// Silent degradation is acceptable for suggestions - errors shouldn't prevent
-		// the operation from proceeding, just reduce the helpfulness of completions
+		// operation from proceeding, just reduce in helpfulness of completions
 		return suggestions
 	}
 
@@ -292,15 +363,81 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.Resolution
 	}
 
 	for _, branch := range branches {
-		if strings.HasPrefix(branch.Name, partial) && !worktreeBranches[branch.Name] {
-			suggestions = append(suggestions, &domain.ResolutionSuggestion{
-				Text:        branch.Name,
-				Description: fmt.Sprintf("Branch %s (create worktree)", branch.Name),
-				Type:        domain.PathTypeProject,
-				ProjectName: ctx.ProjectName,
-				BranchName:  branch.Name,
-			})
+		// Skip if already has worktree
+		if worktreeBranches[branch.Name] {
+			continue
 		}
+
+		// Apply fuzzy matching if enabled
+		if cr.config.Navigation.FuzzyMatching {
+			if !fuzzyMatch(partial, branch.Name) {
+				continue
+			}
+		} else {
+			if !strings.HasPrefix(branch.Name, partial) {
+				continue
+			}
+		}
+
+		// Apply exclusion patterns
+		if matchesExclusionPatterns(branch.Name, cr.config.Completion.ExcludeBranches) {
+			continue
+		}
+
+		// Build enhanced description with remote info
+		description := fmt.Sprintf("Branch %s (create worktree)", branch.Name)
+		if branch.Remote != "" {
+			description = fmt.Sprintf("Branch • %s (create worktree)", branch.Remote)
+		}
+
+		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+			Text:        branch.Name,
+			Description: description,
+			Type:        domain.PathTypeProject,
+			ProjectName: ctx.ProjectName,
+			BranchName:  branch.Name,
+			Remote:      branch.Remote,
+		})
+	}
+	return suggestions
+}
+
+// addProjectSuggestions adds suggestions for other projects (for cross-project navigation)
+func (cr *contextResolver) addProjectSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, excludeCurrentProject bool) []*domain.ResolutionSuggestion {
+	projects, err := cr.discoverProjects()
+	if err != nil {
+		// Graceful degradation - return existing suggestions on error
+		return suggestions
+	}
+
+	for _, project := range projects {
+		// Exclude current project if requested
+		if excludeCurrentProject && project.Name == ctx.ProjectName {
+			continue
+		}
+
+		// Apply fuzzy matching if enabled
+		if cr.config.Navigation.FuzzyMatching {
+			if !fuzzyMatch(partial, project.Name) {
+				continue
+			}
+		} else {
+			if !strings.HasPrefix(project.Name, partial) {
+				continue
+			}
+		}
+
+		// Apply exclusion patterns
+		if matchesExclusionPatterns(project.Name, cr.config.Completion.ExcludeProjects) {
+			continue
+		}
+
+		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+			Text:        project.Name,
+			Description: "Project directory",
+			Type:        domain.PathTypeProject,
+			ProjectName: project.Name,
+		})
 	}
 	return suggestions
 }
@@ -321,10 +458,23 @@ func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, pa
 	suggestions := cr.addMainSuggestion(nil, ctx, partial, config)
 
 	if cr.gitService != nil && ctx.Path != "" {
-		if worktrees, err := cr.gitService.ListWorktrees(context.Background(), ctx.Path); err == nil {
+		// When in worktree context, ListWorktrees should be called on project path, not worktree path
+		// Construct project path from project name and projects directory
+		var listPath string
+		if ctx.Type == domain.ContextWorktree {
+			listPath = filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
+		} else {
+			listPath = ctx.Path
+		}
+
+		if worktrees, err := cr.gitService.ListWorktrees(context.Background(), listPath); err == nil {
 			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees, config)
+			suggestions = cr.addBranchSuggestions(suggestions, ctx, partial, worktrees, config)
 		}
 	}
+
+	// Add project suggestions (exclude current project for cross-project navigation)
+	suggestions = cr.addProjectSuggestions(suggestions, ctx, partial, true)
 
 	return suggestions
 }
@@ -378,14 +528,28 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*do
 	// Filter projects by partial match and create suggestions
 	var suggestions []*domain.ResolutionSuggestion
 	for _, project := range projects {
-		if strings.HasPrefix(project.Name, partial) {
-			suggestions = append(suggestions, &domain.ResolutionSuggestion{
-				Text:        project.Name,
-				Description: "Project directory",
-				Type:        domain.PathTypeProject,
-				ProjectName: project.Name,
-			})
+		// Apply fuzzy matching if enabled
+		if cr.config.Navigation.FuzzyMatching {
+			if !fuzzyMatch(partial, project.Name) {
+				continue
+			}
+		} else {
+			if !strings.HasPrefix(project.Name, partial) {
+				continue
+			}
 		}
+
+		// Apply exclusion patterns
+		if matchesExclusionPatterns(project.Name, cr.config.Completion.ExcludeProjects) {
+			continue
+		}
+
+		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+			Text:        project.Name,
+			Description: "Project directory",
+			Type:        domain.PathTypeProject,
+			ProjectName: project.Name,
+		})
 	}
 
 	return suggestions

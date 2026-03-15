@@ -77,6 +77,18 @@ type ResolutionSuggestion struct {
 	Type        PathType
 	ProjectName string
 	BranchName  string
+
+	// IsCurrent indicates this is the current worktree (for sorting/prioritizing)
+	IsCurrent bool
+
+	// IsDirty indicates the worktree has uncommitted changes (for visual indicator)
+	IsDirty bool
+
+	// Remote contains remote tracking info (e.g., "origin/branch")
+	Remote string
+
+	// StyleHint provides styling information for display
+	StyleHint string
 }
 
 // SuggestionOption is a functional option for configuring resolution suggestions

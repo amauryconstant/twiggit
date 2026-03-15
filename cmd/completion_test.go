@@ -80,13 +80,13 @@ func (s *CompletionTestSuite) TestGetCompletionTimeout() {
 }
 
 func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_EmptySuggestions() {
-	action := suggestionsToCarapaceAction([]*domain.ResolutionSuggestion{})
+	action := suggestionsToCarapaceAction([]*domain.ResolutionSuggestion{}, "main")
 
 	s.NotNil(action)
 }
 
 func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_NilSuggestions() {
-	action := suggestionsToCarapaceAction(nil)
+	action := suggestionsToCarapaceAction(nil, "main")
 
 	s.NotNil(action)
 }
@@ -98,7 +98,7 @@ func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_WithSuggestions() 
 		{Text: "develop", Description: "Branch develop (create worktree)"},
 	}
 
-	action := suggestionsToCarapaceAction(suggestions)
+	action := suggestionsToCarapaceAction(suggestions, "main")
 
 	s.NotNil(action)
 }
@@ -108,7 +108,7 @@ func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_SingleSuggestion()
 		{Text: "main", Description: "Project root directory", Type: domain.PathTypeProject, ProjectName: "test-project"},
 	}
 
-	action := suggestionsToCarapaceAction(suggestions)
+	action := suggestionsToCarapaceAction(suggestions, "main")
 
 	s.NotNil(action)
 }
