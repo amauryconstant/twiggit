@@ -15,7 +15,8 @@ metadata:
   mod_timestamp: '{{ .CommitTimestamp }}'
 
 builds:
-  - env: [CGO_ENABLED=0]
+  - id: twiggit
+    env: [CGO_ENABLED=0]
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     ldflags:
@@ -74,22 +75,29 @@ release:
   mode: replace
   name_template: "v{{ .Version }}"
 
-brews:
+homebrew_casks:
   - name: twiggit
     repository:
       owner: amoconst
       name: homebrew-tap
       branch: main
       token: "{{ .Env.GITHUB_TOKEN }}"
-    directory: Formula
+    directory: Casks
     homepage: https://gitlab.com/amoconst/twiggit
     description: Pragmatic git worktree management tool with focus on rebase workflows
     license: MIT
-    skip_upload: false
-    test: |
-      system "#{bin}/twiggit", "version"
-    install: |
-      bin.install "twiggit"
+    skip_upload: auto
+    binaries:
+      - twiggit
+    url:
+      template: "https://gitlab.com/amoconst/twiggit/-/releases/{{ .Tag }}/downloads/{{ .ArtifactName }}"
+      verified: gitlab.com/amoconst/twiggit
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/twiggit"]
+          end
 
 gomod:
   proxy: false

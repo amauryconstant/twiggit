@@ -6,27 +6,27 @@
 
 ## Requirements
 
-### Requirement: GoReleaser generates Homebrew formula
-The `.goreleaser.yml` configuration SHALL include a `brews` section that generates a Homebrew formula for twiggit.
+### Requirement: GoReleaser generates Homebrew cask
+The `.goreleaser.yml` configuration SHALL include a `homebrew_casks` section that generates a Homebrew cask for twiggit.
 
-#### Scenario: Brews section configuration
+#### Scenario: Homebrew cask configuration
 - **WHEN** GoReleaser runs during release
-- **THEN** a Homebrew formula SHALL be generated with correct binary name, description, and homepage
+- **THEN** a Homebrew cask SHALL be generated with correct binary name, description, and homepage
 
 #### Scenario: Tap repository publishing
 - **WHEN** a release is created
-- **THEN** the formula SHALL be pushed to `amoconst/homebrew-tap` in the `Formula` directory
+- **THEN** the cask SHALL be pushed to `amoconst/homebrew-tap` in the `Casks` directory
 
-### Requirement: Formula includes test command
-The generated Homebrew formula SHALL include a test command that verifies the binary works.
+### Requirement: Cask bypasses macOS quarantine for unsigned binary
+The Homebrew cask SHALL include a post-install hook to remove the quarantine attribute from the unsigned binary.
 
-#### Scenario: Test command execution
-- **WHEN** Homebrew runs `brew test twiggit`
-- **THEN** the command `twiggit version` SHALL execute successfully
+#### Scenario: Quarantine removal on macOS
+- **WHEN** the cask is installed on macOS
+- **THEN** the com.apple.quarantine attribute SHALL be removed from the twiggit binary
 
-### Requirement: Formula installs binary correctly
-The formula SHALL install the twiggit binary to the Homebrew bin directory.
+### Requirement: Cask installs binary correctly
+The cask SHALL install the twiggit binary to the Homebrew bin directory.
 
 #### Scenario: Binary installation
 - **WHEN** user runs `brew install amoconst/tap/twiggit`
-- **THEN** the `twiggit` binary SHALL be available in PATH
+- **THEN** the `twiggit` binary SHALL be available in PATH on macOS

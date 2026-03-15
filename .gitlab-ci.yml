@@ -215,7 +215,7 @@ goreleaser-dry-run:
   variables:
     GIT_DEPTH: 10
   script:
-    - goreleaser release --snapshot --clean --skip=archive,sbom,before
+    - goreleaser release --snapshot --clean --skip=sbom,before
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:

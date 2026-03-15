@@ -9,7 +9,7 @@ Pragmatic git worktree management tool with focus on rebase workflows.
 
 ## Installation
 
-### Homebrew (macOS/Linux)
+### Homebrew (macOS)
 
 ```bash
 brew tap amoconst/homebrew-tap
