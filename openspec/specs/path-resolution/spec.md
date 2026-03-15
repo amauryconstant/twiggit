@@ -153,7 +153,6 @@ The system SHALL support progressive completion for cross-project references whe
 - **AND** system SHALL fetch branches from that project's repository
 - **AND** suggestions SHALL be formatted as `<project>/<branch>`
 - **AND** suggestions SHALL include descriptions for each branch
-- **AND** suggestions SHALL include descriptions for each branch
 
 #### Scenario: Complete branches with partial branch name
 
