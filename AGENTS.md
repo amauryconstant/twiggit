@@ -50,6 +50,7 @@ graph TB
 | mise run release:validate | Clean tree check |
 | mise run release:dry-run  | Test GoReleaser  |
 
+**Distribution**: Homebrew via `amoconst/homebrew-tap`, GitLab artifacts with GitHub discoverability pages
 **CHANGELOG**: Auto-generated via `openspec-generate-changelog` after archiving changes.
 
 ## Pre-Commit Hooks
@@ -194,6 +195,7 @@ graph TB
 
 | File | Purpose |
 | ---- | ------- |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, testing, and contribution guide |
 | [cmd/AGENTS.md](cmd/AGENTS.md) | CLI commands, Cobra patterns, command specs |
 | [internal/application/AGENTS.md](internal/application/AGENTS.md) | Interface definitions |
 | [internal/service/AGENTS.md](internal/service/AGENTS.md) | Service patterns, error handling |
