@@ -12,7 +12,7 @@ Pragmatic git worktree management tool with focus on rebase workflows.
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew tap amoconst/tap
+brew tap amoconst/homebrew-tap
 brew install twiggit
 ```
 

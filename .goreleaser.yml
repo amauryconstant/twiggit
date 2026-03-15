@@ -6,6 +6,7 @@ before:
   hooks:
     - go mod tidy
     - go mod download
+    - bash .goreleaser/hooks/create-github-release.sh
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
