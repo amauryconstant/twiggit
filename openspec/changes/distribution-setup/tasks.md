@@ -3,9 +3,9 @@
 - [x] 1.1 Add `brews` section to `.goreleaser.yml` with tap repository configuration for `amoconst/homebrew-tap`
 - [x] 1.2 Update README.md with Homebrew installation instructions
 
-## 2. GitHub Releases
+## 2. GitHub Discoverability
 
-- [x] 2.1 Add GitHub as secondary release target in `.goreleaser.yml` alongside existing GitLab configuration
+- [x] 2.1 Create hook script for GitHub release pages (discoverability only, artifacts remain on GitLab)
 
 ## 3. Contributor Documentation
 
