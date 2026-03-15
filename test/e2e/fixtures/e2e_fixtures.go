@@ -421,3 +421,91 @@ func (f *E2ETestFixture) ValidateCleanup() error {
 
 	return nil
 }
+
+// SetupCorruptedProject creates a project from the corrupted fixture
+func (f *E2ETestFixture) SetupCorruptedProject(name string) *E2ETestFixture {
+	projectsDir := filepath.Join(f.tempDir, "projects")
+	err := os.MkdirAll(projectsDir, FilePermAll)
+	Expect(err).NotTo(HaveOccurred())
+
+	projectPath := filepath.Join(projectsDir, name)
+	err = extractRepoFixtureToDir("corrupted", projectPath)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract corrupted fixture")
+
+	f.projects[name] = &ProjectInfo{
+		Name: name,
+		Path: projectPath,
+	}
+
+	worktreesDir := filepath.Join(f.tempDir, "worktrees")
+	f.configHelper.WithProjectsDir(projectsDir)
+	f.configHelper.WithWorktreesDir(worktreesDir)
+
+	return f
+}
+
+// SetupBareProject creates a project from the bare-main fixture
+func (f *E2ETestFixture) SetupBareProject(name string) *E2ETestFixture {
+	projectsDir := filepath.Join(f.tempDir, "projects")
+	err := os.MkdirAll(projectsDir, FilePermAll)
+	Expect(err).NotTo(HaveOccurred())
+
+	projectPath := filepath.Join(projectsDir, name)
+	err = extractRepoFixtureToDir("bare-main", projectPath)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract bare-main fixture")
+
+	f.projects[name] = &ProjectInfo{
+		Name: name,
+		Path: projectPath,
+	}
+
+	worktreesDir := filepath.Join(f.tempDir, "worktrees")
+	f.configHelper.WithProjectsDir(projectsDir)
+	f.configHelper.WithWorktreesDir(worktreesDir)
+
+	return f
+}
+
+// SetupSubmoduleProject creates a project from the submodule fixture
+func (f *E2ETestFixture) SetupSubmoduleProject(name string) *E2ETestFixture {
+	projectsDir := filepath.Join(f.tempDir, "projects")
+	err := os.MkdirAll(projectsDir, FilePermAll)
+	Expect(err).NotTo(HaveOccurred())
+
+	projectPath := filepath.Join(projectsDir, name)
+	err = extractRepoFixtureToDir("submodule", projectPath)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract submodule fixture")
+
+	f.projects[name] = &ProjectInfo{
+		Name: name,
+		Path: projectPath,
+	}
+
+	worktreesDir := filepath.Join(f.tempDir, "worktrees")
+	f.configHelper.WithProjectsDir(projectsDir)
+	f.configHelper.WithWorktreesDir(worktreesDir)
+
+	return f
+}
+
+// SetupDetachedProject creates a project from the detached HEAD fixture
+func (f *E2ETestFixture) SetupDetachedProject(name string) *E2ETestFixture {
+	projectsDir := filepath.Join(f.tempDir, "projects")
+	err := os.MkdirAll(projectsDir, FilePermAll)
+	Expect(err).NotTo(HaveOccurred())
+
+	projectPath := filepath.Join(projectsDir, name)
+	err = extractRepoFixtureToDir("detached", projectPath)
+	Expect(err).NotTo(HaveOccurred(), "Failed to extract detached fixture")
+
+	f.projects[name] = &ProjectInfo{
+		Name: name,
+		Path: projectPath,
+	}
+
+	worktreesDir := filepath.Join(f.tempDir, "worktrees")
+	f.configHelper.WithProjectsDir(projectsDir)
+	f.configHelper.WithWorktreesDir(worktreesDir)
+
+	return f
+}

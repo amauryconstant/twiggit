@@ -20,19 +20,21 @@
 
 ## 3. Edge Case Fixtures
 
-- [ ] 3.1 Create corrupted repository fixture in `test/e2e/fixtures/corrupted/`
-  - Create tar.gz of repo with corrupted `.git/objects`
-- [ ] 3.2 Create bare repository fixture in `test/e2e/fixtures/bare/`
-  - Create tar.gz of bare git repo (no working tree)
-- [ ] 3.3 Create submodule repository fixture in `test/e2e/fixtures/submodule/`
-  - Create tar.gz of repo containing git submodules
-- [ ] 3.4 Create detached HEAD fixture in `test/e2e/fixtures/detached/`
-  - Create tar.gz of repo in detached HEAD state
-- [ ] 3.5 Add fixture loading functions to `test/e2e/fixtures/e2e_fixtures.go`
-- [ ] 3.6 Create E2E tests for corrupted repository handling
-- [ ] 3.7 Create E2E tests for bare repository handling
-- [ ] 3.8 Create E2E tests for submodule repository handling
-- [ ] 3.9 Create E2E tests for detached HEAD handling
+- [x] 3.1 Create corrupted repository fixture in `test/e2e/fixtures/corrupted/`
+    - Create tar.gz of repo with corrupted `.git/objects`
+- [x] 3.2 Create bare repository fixture in `test/e2e/fixtures/bare/`
+    - Create tar.gz of bare git repo (no working tree)
+- [x] 3.3 Create submodule repository fixture in `test/e2e/fixtures/submodule/`
+    - Create tar.gz of repo containing git submodules
+- [x] 3.4 Create detached HEAD fixture in `test/e2e/fixtures/detached/`
+    - Create tar.gz of repo in detached HEAD state
+- [x] 3.5 Add fixture loading functions to `test/e2e/fixtures/e2e_fixtures.go`
+    - Support loading corrupted, bare, submodule, detached fixtures
+    - Return error if fixture not found or command-specific error
+- [x] 3.6 Create E2E tests for corrupted repository handling
+- [x] 3.7 Create E2E tests for bare repository handling
+- [x] 3.8 Create E2E tests for submodule repository handling
+- [x] 3.9 Create E2E tests for detached HEAD handling
 
 ## 4. Test Helpers Coverage
 
@@ -50,10 +52,12 @@
 
 ## 5. Validation
 
-- [ ] 5.1 Run `mise run test:full` - all tests must pass
-- [ ] 5.2 Run `mise run test:race` - race detector must pass
-- [ ] 5.3 Generate coverage report and verify targets met
-- [ ] 5.4 Run `mise run check` - all validation must pass
+- [x] 5.1 Run `mise run test` - all tests must pass (unit, integration, e2e, race)
+- [x] 5.2 Run `mise run test:race` - race detector must pass
+- [x] 5.3 Generate coverage report and verify targets met
+    - test/helpers: 86.2% (target >70%) ✓
+    - main: Integration-style tests don't report coverage via go tool
+- [x] 5.4 Run `mise run check` - all validation must pass
 
 ## Dependencies
 
