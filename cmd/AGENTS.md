@@ -155,6 +155,24 @@ source <(twiggit _carapace bash)
 source <(twiggit _carapace zsh)
 ```
 
+**Enhanced Features:**
+| Feature | Description | Config |
+|---------|-------------|--------|
+| Fuzzy matching | Case-insensitive subsequence matching for partial input | `navigation.fuzzy_matching` |
+| Smart sorting | Current worktree → default branch → alphabetical | Automatic |
+| Enhanced descriptions | Remote tracking info, relative dates (e.g., "2 days ago") | Automatic |
+| Status indicators | ⚠ prefix for dirty current worktree only | Automatic |
+| Exclusion patterns | Filter noisy branches/projects via glob patterns | `completion.exclude_branches`, `completion.exclude_projects` |
+| Progressive completion | Auto "/" suffix on project suggestions | Automatic |
+| Cross-project | Complete branches from other projects via `project/branch` syntax | Automatic |
+
+**Configuration:**
+```toml
+[completion]
+exclude_branches = ["dependabot/*", "renovate/*"]
+exclude_projects = ["archive/*"]
+```
+
 **Implementation:** `cmd/suggestions.go` provides action helpers:
 - `actionWorktreeTarget(config, opts...)` - Positional completion with `ActionMultiParts("/")`
 - `actionBranches(config)` - Branch completion for `--source` flag
@@ -167,3 +185,5 @@ carapace.Gen(cmd).PositionalCompletion(
     actionWorktreeTarget(config, WithExistingOnly()),  // for delete/prune
 )
 ```
+
+**Shell Plugins:** See `contrib/bash/`, `contrib/zsh/`, `contrib/fish/` for ready-to-use integrations with navigation.

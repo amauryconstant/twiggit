@@ -56,6 +56,29 @@ Setup: `mise install && pre-commit install`
 Run: `pre-commit run --all-files`
 Skip: `git commit -m "msg" --no-verify`
 
+## Shell Integration
+
+| Plugin | Location | Features |
+|--------|----------|----------|
+| Bash | `contrib/bash/` | Completions + navigation |
+| Zsh | `contrib/zsh/` | Lazy-loaded completions + navigation |
+| Fish | `contrib/fish/` | Completions + navigation |
+
+**Quick setup:**
+```bash
+# Bash
+eval "$(twiggit init bash)"
+source <(twiggit _carapace bash)
+
+# Zsh
+eval "$(twiggit init zsh)"
+source <(twiggit _carapace zsh)
+
+# Fish
+eval "$(twiggit init fish)"
+twiggit _carapace fish | source
+```
+
 ## Specification Keywords
 
 | Keyword       | Meaning              | Usage                  |
