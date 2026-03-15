@@ -7,9 +7,20 @@ Pre-built git repos for fast, reproducible E2E tests
 
 | Fixture | Branches | Use Cases |
 |---------|----------|-----------|
-| bare-main.tar.gz | main | Basic operations |
+| bare-main.tar.gz | main | Basic operations, bare repo handling |
 | single-branch.tar.gz | main | Create/list/delete tests |
 | multi-branch.tar.gz | main, feature-1, feature-2 | Multi-branch scenarios |
+| corrupted.tar.gz | main | Corrupted repository error handling |
+| detached.tar.gz | main (detached HEAD) | Detached HEAD state handling |
+| submodule.tar.gz | main + submodule | Repository with submodules |
+
+## Edge Case Fixtures
+
+| Fixture | State | Use Case |
+|---------|-------|----------|
+| corrupted.tar.gz | Invalid `.git/objects` | Test graceful error handling |
+| detached.tar.gz | HEAD detached at commit | Test detached HEAD detection |
+| submodule.tar.gz | Contains git submodule | Test submodule-aware operations |
 
 ## Creating Fixtures
 

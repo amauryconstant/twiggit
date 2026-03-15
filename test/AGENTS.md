@@ -7,6 +7,8 @@
 | Unit | `internal/**/*_test.go` | Testify | None |
 | Integration | `test/integration/` | Testify | `//go:build integration` |
 | E2E | `test/e2e/` | Ginkgo/Gomega | `//go:build e2e` |
+| Concurrent | `test/concurrent/` | Testify | `//go:build concurrent` |
+| Main | `main_test.go` | Testify | `//go:build integration` |
 | Mocks | `test/mocks/*.go` | testify/mock | - |
 
 **Detailed patterns:** See test/integration/AGENTS.md (Testify suites, mocks, assertions)
@@ -35,6 +37,11 @@ See test/e2e/AGENTS.md for Ginkgo patterns, CLI execution, verbose output testin
 ```go
 //go:build integration  // Integration tests
 //go:build e2e          // E2E tests
+//go:build concurrent   // Concurrent operation tests (race detector)
 
 if testing.Short() { t.Skip() }  // Skip in short mode
 ```
+
+## Concurrent Tests
+
+See test/concurrent/AGENTS.md for race detector validation patterns.

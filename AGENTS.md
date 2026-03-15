@@ -180,4 +180,5 @@ graph TB
 | [test/e2e/AGENTS.md](test/e2e/AGENTS.md) | Ginkgo/Gomega CLI testing |
 | [test/e2e/README.md](test/e2e/README.md) | E2E debugging, cleanup patterns |
 | [test/e2e/fixtures/AGENTS.md](test/e2e/fixtures/AGENTS.md) | E2E fixture usage |
+| [test/concurrent/AGENTS.md](test/concurrent/AGENTS.md) | Concurrent test patterns |
 | [test/helpers/AGENTS.md](test/helpers/AGENTS.md) | Test utilities |
