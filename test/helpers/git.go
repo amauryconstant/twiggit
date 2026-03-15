@@ -95,7 +95,33 @@ func (h *GitTestHelper) CreateRepoWithCommits(commitCount int) string {
 		h.t.Fatalf("Failed to create commits: %v", err)
 	}
 
-	// Create branch if specified
+	// Ensure default branch is named "main" (only if we have commits)
+	if commitCount > 0 {
+		wt, err := repo.Worktree()
+		if err != nil {
+			h.t.Fatalf("Failed to get worktree: %v", err)
+		}
+
+		headRef, err := repo.Head()
+		if err != nil {
+			h.t.Fatalf("Failed to get HEAD: %v", err)
+		}
+
+		// Only rename if the current branch is not already "main"
+		if headRef.Name().Short() != "main" {
+			mainRef := plumbing.NewBranchReferenceName("main")
+			err = wt.Checkout(&git.CheckoutOptions{
+				Branch: mainRef,
+				Create: true,
+				Force:  true,
+			})
+			if err != nil {
+				h.t.Fatalf("Failed to rename branch to main: %v", err)
+			}
+		}
+	}
+
+	// Create additional branch if specified
 	if h.branch != "" && h.branch != "main" {
 		if err := h.CreateBranch(repoPath, h.branch); err != nil {
 			h.t.Fatalf("Failed to create branch: %v", err)

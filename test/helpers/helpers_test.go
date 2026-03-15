@@ -96,7 +96,7 @@ func TestGitTestHelper_ListBranches(t *testing.T) {
 
 	branches, err := helper.ListBranches(repoPath)
 	require.NoError(t, err)
-	assert.Contains(t, branches, "master")
+	assert.Contains(t, branches, "main")
 	assert.Contains(t, branches, "feature-a")
 	assert.Contains(t, branches, "feature-b")
 }

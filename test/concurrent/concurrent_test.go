@@ -86,6 +86,13 @@ func (s *ConcurrentTestSuite) createTestProject(name string) string {
 		s.T().Fatalf("Failed to create initial commit: %v\nOutput: %s", err, string(output))
 	}
 
+	// Rename default branch to main
+	cmd = exec.Command("git", "branch", "-M", "main")
+	cmd.Dir = projectPath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		s.T().Fatalf("Failed to rename branch to main: %v\nOutput: %s", err, string(output))
+	}
+
 	return projectPath
 }
 

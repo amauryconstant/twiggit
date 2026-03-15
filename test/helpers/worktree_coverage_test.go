@@ -194,5 +194,9 @@ func createTestRepoForWorktree(t *testing.T) string {
 	)
 	require.NoError(t, cmd.Run())
 
+	cmd = exec.Command("git", "branch", "-M", "main")
+	cmd.Dir = repoPath
+	require.NoError(t, cmd.Run())
+
 	return repoPath
 }

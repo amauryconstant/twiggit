@@ -72,6 +72,10 @@ func TestContextDetector_Integration(t *testing.T) {
 				cmd.Dir = mainRepo
 				require.NoError(t, cmd.Run())
 
+				cmd = exec.Command("git", "branch", "-M", "main")
+				cmd.Dir = mainRepo
+				require.NoError(t, cmd.Run())
+
 				// Create worktree
 				worktreeDir := filepath.Join(config.WorktreesDirectory, "main-repo", "feature-branch")
 				require.NoError(t, os.MkdirAll(filepath.Dir(worktreeDir), 0755))
@@ -144,6 +148,10 @@ func TestContextResolver_Integration(t *testing.T) {
 	cmd.Dir = mainRepo
 	require.NoError(t, cmd.Run())
 
+	cmd = exec.Command("git", "branch", "-M", "main")
+	cmd.Dir = mainRepo
+	require.NoError(t, cmd.Run())
+
 	// Create worktree
 	worktreeDir := filepath.Join(config.WorktreesDirectory, "test-project", "feature-branch")
 	require.NoError(t, os.MkdirAll(filepath.Dir(worktreeDir), 0755))
@@ -212,6 +220,15 @@ func TestContextService_Integration(t *testing.T) {
 	require.NoError(t, cmd.Run())
 
 	cmd = exec.Command("git", "config", "user.name", "Test User")
+	cmd.Dir = repoDir
+	require.NoError(t, cmd.Run())
+
+	// Create initial commit so we have a main branch
+	cmd = exec.Command("git", "commit", "--allow-empty", "-m", "Initial commit")
+	cmd.Dir = repoDir
+	require.NoError(t, cmd.Run())
+
+	cmd = exec.Command("git", "branch", "-M", "main")
 	cmd.Dir = repoDir
 	require.NoError(t, cmd.Run())
 
