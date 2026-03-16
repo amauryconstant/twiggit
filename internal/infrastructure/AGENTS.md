@@ -101,6 +101,10 @@ type CLIClient interface {
 **Location:** `$HOME/.config/twiggit/config.toml` (XDG)
 **Priority:** defaults → config file → env vars (`TWIGGIT_*`) → flags
 
+**Path expansion:** `$VAR`, `${VAR}`, and `~` expanded in path fields:
+- `ProjectsDirectory`, `WorktreesDirectory`, `Shell.Wrapper.BackupDir`
+- Example: `worktrees_directory = "$HOME/Worktrees"` → `/home/user/Worktrees`
+
 **Completion timeout:**
 ```toml
 [completion]
