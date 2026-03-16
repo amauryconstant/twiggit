@@ -4,7 +4,7 @@ The quiet-mode capability suppresses non-essential output for clean scripting, r
 
 ---
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Quiet flag suppresses non-essential output
 The system SHALL provide a global `--quiet/-q` flag that suppresses success messages and hints while preserving errors and essential data.

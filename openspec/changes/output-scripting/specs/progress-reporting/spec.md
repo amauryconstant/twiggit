@@ -4,7 +4,7 @@ The progress-reporting capability provides feedback during long-running bulk ope
 
 ---
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Progress output during bulk operations
 The system SHALL display progress messages during bulk operations like `prune --all` to indicate what is being processed.

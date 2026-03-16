@@ -4,7 +4,7 @@ The output-formats capability provides machine-readable output formats for CLI c
 
 ---
 
-## Requirements
+## ADDED Requirements
 
 ### Requirement: Output format flag controls output structure
 The system SHALL provide an `--output/-o` flag on supported commands that accepts `text` (default) and `json` values to control output format.
