@@ -29,9 +29,14 @@ func (s *shellInfrastructure) GenerateWrapper(shellType domain.ShellType) (strin
 
 // DetectConfigFile detects the appropriate config file for the shell type
 func (s *shellInfrastructure) DetectConfigFile(shellType domain.ShellType) (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "failed to get home directory", err)
+	// Check HOME env var first (for test isolation), fallback to system home
+	home := os.Getenv("HOME")
+	if home == "" {
+		var err error
+		home, err = os.UserHomeDir()
+		if err != nil {
+			return "", domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "failed to get home directory", err)
+		}
 	}
 
 	configFiles := s.getConfigFiles(shellType)
@@ -40,9 +45,20 @@ func (s *shellInfrastructure) DetectConfigFile(shellType domain.ShellType) (stri
 	}
 
 	// Check for existing config files in order of preference
+	absHome, err := filepath.Abs(home)
+	if err != nil {
+		return "", domain.NewShellError(domain.ErrConfigFileNotFound, string(shellType), "failed to resolve home directory")
+	}
 	for _, configFile := range configFiles {
-		configPath := filepath.Join(home, configFile)
-		if _, err := os.Stat(configPath); err == nil {
+		configPath := filepath.Join(absHome, configFile)
+		absPath, err := filepath.Abs(configPath)
+		if err != nil {
+			continue
+		}
+		if !strings.HasPrefix(absPath, absHome+string(filepath.Separator)) {
+			continue
+		}
+		if _, err := os.Stat(absPath); err == nil { // #nosec G703 -- path validated to stay under home
 			return configPath, nil
 		}
 	}
@@ -71,14 +87,14 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 
 	if !fileExists {
 		// Create the file if it doesn't exist
-		if err := os.WriteFile(configFile, []byte(wrapper), 0644); err != nil {
+		if err := os.WriteFile(configFile, []byte(wrapper), 0644); err != nil { // #nosec G306 -- standard perms for shell configs
 			return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to create config file", err)
 		}
 		return nil
 	}
 
 	// Read existing content
-	content, err := os.ReadFile(configFile)
+	content, err := os.ReadFile(configFile) // #nosec G304 -- configFile from DetectConfigFile which validates path
 	if err != nil {
 		return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to read config file", err)
 	}
@@ -96,7 +112,7 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 
 	// Append wrapper to config file
 	updatedContent := s.appendWrapper(contentStr, wrapper)
-	if err := os.WriteFile(configFile, []byte(updatedContent), 0644); err != nil {
+	if err := os.WriteFile(configFile, []byte(updatedContent), 0644); err != nil { // #nosec G306,G703 -- standard perms for shell configs, path from DetectConfigFile
 		return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to write wrapper to config file", err)
 	}
 
@@ -115,7 +131,7 @@ func (s *shellInfrastructure) ValidateInstallation(shellType domain.ShellType, c
 	}
 
 	// Read config file and check for wrapper
-	content, err := os.ReadFile(configFile)
+	content, err := os.ReadFile(configFile) // #nosec G304 -- configFile from DetectConfigFile which validates path
 	if err != nil {
 		return domain.NewShellErrorWithCause(domain.ErrShellNotInstalled, string(shellType), "failed to read config file", err)
 	}

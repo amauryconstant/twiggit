@@ -14,9 +14,13 @@ import (
 
 var _ = Describe("version command", func() {
 	var cli *helpers.TwiggitCLI
+	var configHelper *helpers.ConfigHelper
 
 	BeforeEach(func() {
 		cli = helpers.NewTwiggitCLI()
+		configHelper = helpers.NewConfigHelper()
+		configDir := configHelper.Build()
+		cli = cli.WithConfigDir(configDir)
 	})
 
 	It("outputs version information", func() {

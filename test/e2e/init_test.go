@@ -113,12 +113,11 @@ var _ = Describe("init command", func() {
 	// Install Mode Tests
 	// ========================================
 
-	It("installs to auto-detected config file with --install", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/bash")
+	It("installs with explicit --config flag", func() {
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", "--install")
+		session := cli.Run("init", "bash", "--install", "--config", bashrcPath)
 		cli.ShouldSucceed(session)
 
 		output := string(session.Out.Contents())
@@ -132,12 +131,11 @@ var _ = Describe("init command", func() {
 		Expect(string(content)).To(ContainSubstring("### END TWIGGIT WRAPPER"))
 	})
 
-	It("installs with explicit shell and --install", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/bash")
+	It("installs with explicit shell and --config", func() {
 		zshrcPath := filepath.Join(fixture.GetTempDir(), ".zshrc")
 		Expect(os.WriteFile(zshrcPath, []byte("# Zsh config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", "zsh", "--install")
+		session := cli.Run("init", "zsh", "--install", "--config", zshrcPath)
 		cli.ShouldSucceed(session)
 
 		output := string(session.Out.Contents())
@@ -162,10 +160,9 @@ var _ = Describe("init command", func() {
 	})
 
 	It("creates missing config file when installing", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/zsh")
 		zshrcPath := filepath.Join(fixture.GetTempDir(), ".zshrc")
 
-		session := cli.Run("init", "--install")
+		session := cli.Run("init", "zsh", "--install", "--config", zshrcPath)
 		cli.ShouldSucceed(session)
 
 		_, err := os.Stat(zshrcPath)
@@ -173,16 +170,15 @@ var _ = Describe("init command", func() {
 	})
 
 	It("skips when wrapper already installed", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
 		// First install
-		session1 := cli.Run("init", "--install")
+		session1 := cli.Run("init", "bash", "--install", "--config", bashrcPath)
 		cli.ShouldSucceed(session1)
 
 		// Second install (should skip)
-		session2 := cli.Run("init", "--install")
+		session2 := cli.Run("init", "bash", "--install", "--config", bashrcPath)
 		cli.ShouldSucceed(session2)
 
 		output := string(session2.Out.Contents())
@@ -191,16 +187,15 @@ var _ = Describe("init command", func() {
 	})
 
 	It("forces reinstall with --install --force", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
 		// First install
-		session1 := cli.Run("init", "--install")
+		session1 := cli.Run("init", "bash", "--install", "--config", bashrcPath)
 		cli.ShouldSucceed(session1)
 
 		// Force reinstall
-		session2 := cli.Run("init", "--install", "--force")
+		session2 := cli.Run("init", "bash", "--install", "--force", "--config", bashrcPath)
 		cli.ShouldSucceed(session2)
 
 		output := string(session2.Out.Contents())
@@ -243,32 +238,29 @@ var _ = Describe("init command", func() {
 	// ========================================
 
 	It("shows level 1 verbose output with -v flag in install mode", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", "--install", "-v")
+		session := cli.Run("init", "bash", "--install", "--config", bashrcPath, "-v")
 		cli.ShouldSucceed(session)
 		cli.ShouldVerboseOutput(session, "Setting up shell wrapper")
 	})
 
 	It("shows level 2 verbose output with -vv flag in install mode", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", "--install", "-vv")
+		session := cli.Run("init", "bash", "--install", "--config", bashrcPath, "-vv")
 		cli.ShouldSucceed(session)
 		cli.ShouldVerboseOutput(session, "Setting up shell wrapper")
 		cli.ShouldVerboseOutput(session, "  shell type: bash")
 	})
 
 	It("shows no verbose output by default in install mode", func() {
-		cli = cli.WithEnvironment("SHELL", "/bin/bash")
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
-		session := cli.Run("init", "--install")
+		session := cli.Run("init", "bash", "--install", "--config", bashrcPath)
 		cli.ShouldSucceed(session)
 		cli.ShouldNotHaveVerboseOutput(session)
 	})

@@ -54,7 +54,7 @@ func (e *DefaultCommandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cm
 	defer cancel()
 
 	// Prepare the command
-	command := exec.CommandContext(timeoutCtx, cmd, args...)
+	command := exec.CommandContext(timeoutCtx, cmd, args...) // #nosec G204 -- cmd is always a git command from internal callers
 	if dir != "" {
 		command.Dir = dir
 	}

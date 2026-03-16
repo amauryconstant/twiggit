@@ -83,16 +83,6 @@ linters:
     gocognit:
       min-complexity: 30
 
-    gosec:
-      excludes:
-        - G104  # unchecked errors (defer/test)
-        - G301  # dir perms
-        - G304  # file inclusion
-        - G306  # file perms
-        - G307  # defers in loops
-        - G204  # subprocess input
-        - G401  # weak crypto for compat
-        - G501  # blocklisted import
 
   exclusions:
     rules:

@@ -60,7 +60,7 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 
 	// Ensure parent directories exist
 	parentDir := filepath.Dir(worktreePath)
-	if err := os.MkdirAll(parentDir, 0755); err != nil {
+	if err := os.MkdirAll(parentDir, 0755); err != nil { // #nosec G301 -- standard directory perms (rwxr-xr-x)
 		return nil, fmt.Errorf("failed to create worktree parent directory: %w", err)
 	}
 
