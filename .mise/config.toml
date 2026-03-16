@@ -16,7 +16,13 @@ experimental = true
 
 [tasks."test"]
 description = "Run all tests (unit, integration, e2e, race)"
-depends = ["test:unit", "test:integration", "test:e2e", "test:race"]
+run = [
+    {task="test:unit"},
+    {task="test:integration"},
+    {task="test:race"},
+    {task="test:e2e"}
+]
+
 
 [tasks."test:unit"]
 description = "Run unit tests only"
@@ -49,7 +55,11 @@ run = "gofmt -w ."
 
 [tasks.check]
 description = "Run all validation checks (quick)"
-depends = ["lint:fix", "test"]
+run = [
+    {task="format"},
+    {task="lint:fix"},
+    {task="test"},
+]
 
 # ========================
 # Building
