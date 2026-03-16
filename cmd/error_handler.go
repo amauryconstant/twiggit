@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
 	"twiggit/internal/domain"
 )
 
@@ -51,6 +52,11 @@ const (
 
 // HandleCLIError is a pure function that maps errors to CLI output and returns exit code
 func HandleCLIError(err error) ExitCode {
+	return HandleCLIErrorWithCommand(nil, err)
+}
+
+// HandleCLIErrorWithCommand maps errors to CLI output and returns exit code, respecting quiet mode from command
+func HandleCLIErrorWithCommand(cmd *cobra.Command, err error) ExitCode {
 	// Check if this is a Cobra argument validation error
 	if IsCobraArgumentError(err) {
 		// Print Cobra's argument validation error since we silenced it in the command
@@ -58,8 +64,14 @@ func HandleCLIError(err error) ExitCode {
 		return ExitCodeUsage
 	}
 
-	// Format and print the error
-	formatter := NewErrorFormatter()
+	// Check for quiet mode (errors always go to stderr - task 3.7)
+	quiet := false
+	if cmd != nil {
+		quiet = isQuiet(cmd)
+	}
+
+	// Format and print error
+	formatter := NewErrorFormatterWithOptions(quiet)
 	formattedError := formatter.Format(err)
 	fmt.Fprint(os.Stderr, formattedError)
 

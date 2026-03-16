@@ -86,12 +86,26 @@ func executePrune(c *cobra.Command, config *CommandConfig, force, deleteBranches
 		SpecificWorktree: specificWorktree,
 	}
 
+	// Create progress reporter for bulk operations (goes to stderr - task 4.6)
+	quiet := isQuiet(c)
+	reporter := NewProgressReporter(quiet, c.ErrOrStderr())
+
+	// Report start of bulk operation - task 4.5
+	if allProjects || specificWorktree == "" {
+		reporter.Report("Pruning merged worktrees...")
+	}
+
 	result, err := config.Services.WorktreeService.PruneMergedWorktrees(ctx, req)
 	if err != nil {
 		return fmt.Errorf("prune failed: %w", err)
 	}
 
 	outputPruneResults(c, result, dryRun)
+
+	// Report completion of bulk operation - task 4.5
+	if allProjects || specificWorktree == "" {
+		reporter.Report("Prune complete")
+	}
 
 	if result.NavigationPath != "" {
 		_, _ = fmt.Fprintln(c.OutOrStdout(), result.NavigationPath)

@@ -69,7 +69,8 @@ func main() {
 
 	// Execute CLI with functional error handling
 	if err := rootCmd.Execute(); err != nil {
-		exitCode := cmd.HandleCLIError(err)
+		// Pass rootCmd to respect quiet mode for hint suppression
+		exitCode := cmd.HandleCLIErrorWithCommand(rootCmd, err)
 		os.Exit(int(exitCode))
 	}
 }

@@ -113,10 +113,12 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 
 	logv(cmd, 2, "  created worktree at: %s", result.Worktree.Path)
 
-	// Display output based on cdFlag
+	// Display output based on cdFlag and quiet mode
 	if cdFlag {
+		// Always output path for -C flag (even in quiet mode) - task 3.6
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), result.Worktree.Path)
-	} else {
+	} else if !isQuiet(cmd) {
+		// Suppress success message in quiet mode - task 3.4
 		if err := displayCreateSuccess(cmd.OutOrStdout(), result.Worktree); err != nil {
 			return err
 		}

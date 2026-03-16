@@ -12,6 +12,7 @@ import (
 // NewListCommand creates a new list command
 func NewListCommand(config *CommandConfig) *cobra.Command {
 	var all bool
+	var output string
 
 	cmd := &cobra.Command{
 		Use:   "list",
@@ -21,17 +22,22 @@ By default, lists worktrees for the detected project context.
 Use --all to list worktrees from all projects.`,
 		Args: cobra.NoArgs, // Reject any positional arguments
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return executeList(cmd, config, all)
+			// Validate output format
+			if output != "" && output != "text" && output != "json" {
+				return fmt.Errorf("invalid output format '%s': must be 'text' or 'json'", output)
+			}
+			return executeList(cmd, config, all, output)
 		},
 	}
 
 	cmd.Flags().BoolVar(&all, "all", false, "List worktrees from all projects")
+	cmd.Flags().StringVarP(&output, "output", "o", "text", "Output format (text or json)")
 
 	return cmd
 }
 
 // executeList executes the list command with the given configuration
-func executeList(cmd *cobra.Command, config *CommandConfig, all bool) error {
+func executeList(cmd *cobra.Command, config *CommandConfig, all bool, output string) error {
 	ctx := context.Background()
 
 	// Detect current context
@@ -66,36 +72,27 @@ func executeList(cmd *cobra.Command, config *CommandConfig, all bool) error {
 		return fmt.Errorf("failed to list worktrees: %w", err)
 	}
 
+	// Select formatter based on output flag
+	var formatter OutputFormatter
+	if output == "json" {
+		formatter = &JSONFormatter{}
+	} else {
+		formatter = &TextFormatter{}
+	}
+
 	// Display results
-	if err := displayWorktrees(cmd.OutOrStdout(), worktrees); err != nil {
+	if err := displayWorktrees(cmd.OutOrStdout(), worktrees, formatter); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// displayWorktrees displays the worktrees in a user-friendly format
-func displayWorktrees(out io.Writer, worktrees []*domain.WorktreeInfo) error {
-	if len(worktrees) == 0 {
-		_, err := fmt.Fprintln(out, "No worktrees found")
-		if err != nil {
-			return fmt.Errorf("failed to display no worktrees message: %w", err)
-		}
-		return nil
-	}
-
-	for _, wt := range worktrees {
-		status := ""
-		if wt.Modified {
-			status = " (modified)"
-		}
-		if wt.IsDetached {
-			status += " (detached)"
-		}
-
-		if _, err := fmt.Fprintf(out, "%s -> %s%s\n", wt.Branch, wt.Path, status); err != nil {
-			return fmt.Errorf("failed to display worktree: %w", err)
-		}
+// displayWorktrees displays the worktrees using the specified formatter
+func displayWorktrees(out io.Writer, worktrees []*domain.WorktreeInfo, formatter OutputFormatter) error {
+	formatted := formatter.FormatWorktrees(worktrees)
+	if _, err := fmt.Fprint(out, formatted); err != nil {
+		return fmt.Errorf("failed to display worktrees: %w", err)
 	}
 	return nil
 }

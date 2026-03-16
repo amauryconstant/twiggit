@@ -44,6 +44,9 @@ across multiple projects.`,
 	// Add persistent verbose flag
 	cmd.PersistentFlags().CountP("verbose", "v", "Increase verbosity (can be used multiple times: -v, -vv)")
 
+	// Add persistent quiet flag
+	cmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
+
 	// Add subcommands
 	cmd.AddCommand(NewListCommand(config))
 	cmd.AddCommand(NewCreateCommand(config))

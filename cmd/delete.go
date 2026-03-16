@@ -173,11 +173,13 @@ func deleteWorktree(ctx context.Context, config *CommandConfig, c *cobra.Command
 	}
 
 	if changeDir {
+		// Always output path for -C flag (even in quiet mode) - task 3.6
 		navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
 		if navigationTarget != "" {
 			_, _ = fmt.Fprintln(c.OutOrStdout(), navigationTarget)
 		}
-	} else {
+	} else if !isQuiet(c) {
+		// Suppress success message in quiet mode - task 3.4
 		_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s\n", worktreePath)
 	}
 
