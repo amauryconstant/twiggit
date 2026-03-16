@@ -26,6 +26,20 @@ The system SHALL provide a persistent `--verbose` flag that accepts multiple occ
 - **AND** level 1 verbose messages (high-level operation flow) are displayed
 - **AND** level 2 verbose messages (detailed parameters) are displayed
 
+### Requirement: Verbose and quiet mutual exclusion
+
+The system SHALL handle the conflict between `--verbose` and `--quiet` flags with verbose taking priority.
+
+#### Scenario: Both quiet and verbose specified
+- **WHEN** user runs any command with both `--quiet` and `--verbose`
+- **THEN** verbose output is displayed (verbose wins)
+- **AND** quiet flag is effectively ignored
+
+#### Scenario: Quiet with single verbose
+- **WHEN** user runs any command with `--quiet -v`
+- **THEN** level 1 verbose output is displayed
+- **AND** success messages are still suppressed (per verbose behavior)
+
 ### Requirement: Level 1 verbose output describes high-level operations
 The system SHALL provide level 1 verbose messages that describe the high-level flow of operations in user-friendly language.
 
@@ -143,3 +157,9 @@ The system SHALL provide a `logv()` helper function in cmd/util.go that handles 
 - **WHEN** logv() is called with any message
 - **THEN** function writes to command's ErrOrStderr()
 - **AND** function writes with newline termination
+
+#### Scenario: logv respects quiet mode
+- **WHEN** logv() is called and quiet mode is enabled
+- **THEN** function checks if verbose flag is also set
+- **AND** if verbose is set, verbose output is displayed (verbose wins)
+- **AND** if verbose is not set, no output is displayed

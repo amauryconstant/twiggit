@@ -14,6 +14,9 @@ The system SHALL use consistent flag naming patterns across all commands.
 - **WHEN** a command has a flag that enables machine-readable output for shell wrapper integration
 - **THEN** the flag SHALL use `-C` as the short form
 
+- **WHEN** a command has an output format flag
+- **THEN** the flag SHALL use `-o` as the short form
+
 - **WHEN** multiple commands share the same flag functionality (e.g., --force)
 - **THEN** the short form SHALL be consistent across all commands
 
@@ -88,6 +91,22 @@ Commands that support shell wrapper integration SHALL use consistent output patt
 - **WHEN** a command with `-C` flag is executed from outside git context
 - **THEN** the command SHALL output nothing (no sensible navigation target)
 
+### Requirement: Global persistent flags
+
+The system SHALL support global flags that apply to all commands.
+
+#### Scenario: Quiet flag as global persistent flag
+
+- **WHEN** the `--quiet/-q` flag is defined on the root command
+- **THEN** the flag SHALL be available on all subcommands
+- **AND** the flag SHALL use PersistentFlags() for registration
+
+#### Scenario: Output format flag as per-command flag
+
+- **WHEN** the `--output/-o` flag is defined on a specific command (e.g., list)
+- **THEN** the flag SHALL only be available on that command
+- **AND** the flag SHALL use Flags() for registration (not PersistentFlags())
+
 ### Requirement: Flag Registration Pattern
 
 Commands SHALL use appropriate flag registration patterns based on flag scope and access pattern.
@@ -153,6 +172,12 @@ Commands SHALL follow consistent output format patterns.
 
 - **WHEN** outputting a path
 - **THEN** the path SHALL be followed by a newline character
+
+#### Scenario: JSON output format
+
+- **WHEN** `--output json` flag is set
+- **THEN** the command SHALL output valid JSON to stdout
+- **AND** human-readable messages SHALL go to stderr
 
 ### Requirement: Backward Compatibility
 
