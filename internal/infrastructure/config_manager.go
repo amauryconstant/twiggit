@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/file"
@@ -13,6 +14,38 @@ import (
 )
 
 // Pure functions extracted from ConfigManager
+
+// expandConfigPath expands environment variables and tilde in a path string.
+// It handles $VAR, ${VAR}, and ~ syntax.
+func expandConfigPath(path string) string {
+	if path == "" {
+		return path
+	}
+
+	// Handle tilde expansion first
+	if strings.HasPrefix(path, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			// Fallback to $HOME env var
+			home = os.Getenv("HOME")
+			if home == "" {
+				// Last resort fallback
+				home = "/tmp"
+			}
+		}
+		return filepath.Join(home, strings.TrimPrefix(path, "~"))
+	}
+
+	// Handle $VAR and ${VAR} expansion
+	return os.ExpandEnv(path)
+}
+
+// normalizeConfigPaths expands environment variables and tilde in all path fields of the config.
+func normalizeConfigPaths(config *domain.Config) {
+	config.ProjectsDirectory = expandConfigPath(config.ProjectsDirectory)
+	config.WorktreesDirectory = expandConfigPath(config.WorktreesDirectory)
+	config.Shell.Wrapper.BackupDir = expandConfigPath(config.Shell.Wrapper.BackupDir)
+}
 
 // resolveConfigPath returns the path to the configuration file following XDG Base Directory specification
 func resolveConfigPath(xdgConfigHome, homeDir string) string {
@@ -99,15 +132,18 @@ func (m *koanfConfigManager) Load() (*domain.Config, error) {
 		return nil, domain.NewConfigError(configPath, "failed to unmarshal configuration", err)
 	}
 
-	// 4. Validate configuration using pure function
+	// 4. Normalize paths (expand environment variables and tilde)
+	normalizeConfigPaths(config)
+
+	// 5. Validate configuration using pure function
 	if err := validateConfig(config); err != nil {
 		return nil, domain.NewConfigError(configPath, "validation failed", err)
 	}
 
-	// 5. Store immutable config
+	// 6. Store immutable config
 	m.config = config
 
-	// 6. Return a copy using pure function to maintain immutability
+	// 7. Return a copy using pure function to maintain immutability
 	return copyConfig(config), nil
 }
 
