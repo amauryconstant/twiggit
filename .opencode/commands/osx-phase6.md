@@ -7,7 +7,7 @@ agent: osx-maintainer
 
 | Tool | Usage |
 |------|-------|
-| `osc` | `.opencode/scripts/lib/osx <domain> <action> [args]` - unified OpenSpec tool |
+| `osx` | `.opencode/scripts/lib/osx <domain> <action> [args]` - unified OpenSpec tool |
 | Domains: `ctx`, `state`, `iterations`, `log`, `complete`, `validate` |
 
 # PHASE6: Archive Change
@@ -20,7 +20,7 @@ Change: $1
 
 - Do NOT stop after archiving files
 - Do NOT stop after committing changes
-- Do NOT stop until step 5 (mark phase complete) is finished
+- Do NOT stop until step 5 (commit archive) is finished
 - Partial completion will trigger unnecessary re-execution of this phase
 
 ## MANDATORY START
@@ -51,9 +51,11 @@ rm -f .openspec-baseline.json
 
 These files are runtime artifacts that should not be archived.
 
+Note: PHASE6 does NOT call `osx state complete`. The orchestrator detects completion by archive directory existence, not by state.json.
+
 ### Step 2: Execute Archive
 
-1. Load skill: Use `osc-archive-change` skill
+1. Load skill: Use `osc-archive-change` (originally `openspec-archive-change`) skill
 
 2. Verify completion status:
    - Check artifact completion in `openspec/changes/$1/tasks.md`
