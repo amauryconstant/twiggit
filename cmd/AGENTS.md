@@ -86,8 +86,12 @@ See `internal/infrastructure/AGENTS.md` for detection rules and resolution.
 ## Command Specifications
 
 ### list
-Output: Tabular format with branch, last commit, status (clean/dirty)
-Flags: `--all` (show all projects, override context)
+Output: Tabular format with branch, last commit, status (clean/dirty) or JSON for scripting
+Flags:
+- `--all` (show all projects, override context)
+- `--output/-o <format>`: Output format: `text` (default) or `json`
+- JSON output structure: `{"worktrees": [{"branch": "...", "path": "...", "status": "clean|modified|detached"}]}`
+- JSON output uses stdout for data, stderr for errors/verbose messages
 
 ### create
 Required: Project name (inferred), branch name, source branch (default: main)
@@ -126,7 +130,9 @@ Behavior:
 - `--delete-branches`: Also delete corresponding git branches after worktree removal
 - `--all`: Prune across all projects (requires confirmation unless --force)
 - Protected branches (main, master, develop, staging, production) are never deleted
+- Progress reporting: Bulk operations (`--all` or no specific target) report progress to stderr
 - Outputs navigation path to stdout for single-worktree prune (for shell wrapper)
+- Progress is suppressed in quiet mode
 Navigation: Single worktree prune outputs project directory path; bulk prune outputs nothing
 
 ## Verbose Output
@@ -166,6 +172,31 @@ logv(cmd, 2, "  to path: %s", path)
 - SHALL NOT add verbose output to service layer
 - SHALL use user-focused language, not developer-focused
 - SHALL NOT use "DEBUG:" prefix
+
+## Quiet Mode
+
+Global `--quiet/-q` flag suppresses non-essential output for scripting scenarios. Available on all commands.
+
+**Behavior:**
+- Suppresses success messages (e.g., "Created worktree...")
+- Suppresses hint messages
+- Preserves error output to stderr
+- Preserves essential output (paths for `-C` mode)
+- Suppressed by `--verbose` flag (verbose wins over quiet)
+
+**Implementation:**
+- Use `isQuiet(cmd)` helper from `cmd/util.go` to check quiet flag
+- Check before outputting success/hint messages
+- `ProgressReporter` automatically respects quiet mode
+
+**Use case:** Cleaner automation scripts where only errors matter
+```bash
+# Script example - only care about failures
+if ! twiggit list --quiet; then
+  echo "Error listing worktrees"
+  exit 1
+fi
+```
 
 ## Shell Completion
 

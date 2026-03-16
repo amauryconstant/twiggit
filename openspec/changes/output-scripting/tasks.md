@@ -36,9 +36,9 @@
 
 ## 5. Documentation Updates
 
-- [ ] 5.1 Update `cmd/AGENTS.md` with `--output/-o` flag documentation for list command (deferred to PHASE3)
-- [ ] 5.2 Update `cmd/AGENTS.md` with global `--quiet/-q` flag documentation (deferred to PHASE3)
-- [ ] 5.3 Update `cmd/AGENTS.md` with progress reporting behavior for prune (deferred to PHASE3)
+- [x] 5.1 Update `cmd/AGENTS.md` with `--output/-o` flag documentation for list command (deferred to PHASE3)
+- [x] 5.2 Update `cmd/AGENTS.md` with global `--quiet/-q` flag documentation (deferred to PHASE3)
+- [x] 5.3 Update `cmd/AGENTS.md` with progress reporting behavior for prune (deferred to PHASE3)
 - [x] 5.4 Update command-flags spec with new flag conventions
 - [x] 5.5 Update verbose-output spec with quiet/verbose mutual exclusion
 
