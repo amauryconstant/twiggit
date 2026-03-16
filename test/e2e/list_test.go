@@ -156,13 +156,13 @@ var _ = Describe("list command", func() {
 	})
 
 	It("outputs JSON format with --output json flag", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
 		session := ctxHelper.FromProjectDir("test", "list", "--output", "json")
 		cli.ShouldSucceed(session)
-		cli.ShouldOutput(session, `{"worktrees":[`)
-		cli.ShouldOutput(session, `"branch":"feature-1"`)
-		cli.ShouldOutput(session, `"status":"clean"`)
+		cli.ShouldContain(session, `{"worktrees":[`)
+		cli.ShouldContain(session, `"branch":"`+result.Feature1Branch+`"`)
+		cli.ShouldContain(session, `"status":"clean"`)
 	})
 
 	It("outputs empty JSON array with --output json and no worktrees", func() {
@@ -170,7 +170,7 @@ var _ = Describe("list command", func() {
 
 		session := ctxHelper.FromProjectDir("empty-project", "list", "--output", "json")
 		cli.ShouldSucceed(session)
-		cli.ShouldOutput(session, `{"worktrees":[]}`)
+		cli.ShouldContain(session, `{"worktrees":[]}`)
 	})
 
 	It("fails with invalid output format", func() {
@@ -182,12 +182,12 @@ var _ = Describe("list command", func() {
 	})
 
 	It("suppresses success messages with --quiet flag", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
 		session := ctxHelper.FromProjectDir("test", "list", "--quiet")
 		cli.ShouldSucceed(session)
 		// Should still show worktree list but not extra messages
-		cli.ShouldOutput(session, "feature-1 ->")
+		cli.ShouldOutput(session, result.Feature1Branch+" ->")
 		// Should NOT show verbose messages even if they exist
 		Eventually(session.Err).ShouldNot(gbytes.Say("Listing worktrees"))
 	})
@@ -195,16 +195,16 @@ var _ = Describe("list command", func() {
 	It("preserves error output with --quiet flag", func() {
 		fixture.SetupSingleProject("test-project")
 
-		session := ctxHelper.FromProjectDir("test-project", "create", "invalid-branch", "--quiet")
+		session := ctxHelper.FromProjectDir("test-project", "create", "invalid@branch", "--quiet")
 		cli.ShouldFailWithExit(session, 5) // ExitCodeValidation
 		// Error should still go to stderr
 		Eventually(session.Err).Should(gbytes.Say("Error:"))
 	})
 
 	It("preserves path output with --quiet -C flag", func() {
-		fixture.CreateWorktreeSetup("test")
+		result := fixture.CreateWorktreeSetup("test")
 
-		session := ctxHelper.FromWorktreeDir("test", "feature-1", "cd", "--quiet")
+		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "cd", "--quiet")
 		cli.ShouldSucceed(session)
 		// Should output only the path, no success message
 		output := cli.GetOutput(session)

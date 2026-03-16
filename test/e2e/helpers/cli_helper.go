@@ -203,6 +203,21 @@ func (cli *TwiggitCLI) ShouldNotHaveVerboseOutput(session *gexec.Session) {
 	Eventually(session.Err).ShouldNot(gbytes.Say("Setting up shell wrapper"))
 }
 
+// ShouldContain asserts stdout contains expected substring (non-regex)
+// Use this for JSON output or any output with special characters like [, ], (, ), etc.
+// This is preferable to ShouldOutput when you want literal string matching
+func (cli *TwiggitCLI) ShouldContain(session *gexec.Session, expected string) {
+	output := cli.GetOutput(session)
+	Expect(output).To(ContainSubstring(expected))
+}
+
+// ShouldErrorContain asserts stderr contains expected substring (non-regex)
+// Use this for JSON error output or any error output with special characters
+func (cli *TwiggitCLI) ShouldErrorContain(session *gexec.Session, expected string) {
+	output := string(session.Err.Contents())
+	Expect(output).To(ContainSubstring(expected))
+}
+
 // DebugSession logs session details and fixture state for debugging
 // Logs if session.ExitCode() != 0, otherwise does nothing
 func (cli *TwiggitCLI) DebugSession(session *gexec.Session, fixtureInfo string) {

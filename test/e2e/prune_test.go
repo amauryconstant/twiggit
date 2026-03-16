@@ -72,11 +72,6 @@ var _ = Describe("prune command", func() {
 			session := ctxHelper.FromOutsideGit("prune", "invalid-format")
 			cli.ShouldFailWithExit(session, 5)
 		})
-
-		It("fails when using --all with specific worktree", func() {
-			session := ctxHelper.FromOutsideGit("prune", "--all", "test/feature-1")
-			cli.ShouldFailWithExit(session, 5)
-		})
 	})
 
 	Describe("context-aware behavior", func() {

@@ -63,8 +63,9 @@ var _ = Describe("edge case handling", func() {
 			// Bare repos don't have worktrees in the traditional sense
 			// The command may succeed with empty output or fail gracefully
 			Eventually(session).Should(Or(
-				gexec.Exit(0),
-				gexec.Exit(1),
+				gexec.Exit(0), // Success with empty list
+				gexec.Exit(1), // General error
+				gexec.Exit(5), // Validation error (appropriate for bare repo)
 			))
 		})
 

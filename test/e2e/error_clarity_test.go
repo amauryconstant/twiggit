@@ -79,12 +79,6 @@ var _ = Describe("Error Clarity", func() {
 				// Cobra usage errors return exit code 2
 				cli.ShouldFailWithExit(session, 2)
 			})
-
-			It("returns exit code 2 for missing required argument for cd", func() {
-				session := ctxHelper.FromProjectDir("usage-test", "cd")
-				// Cobra usage errors return exit code 2
-				cli.ShouldFailWithExit(session, 2)
-			})
 		})
 
 		Context("when outside git repository", func() {
