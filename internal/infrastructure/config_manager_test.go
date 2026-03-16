@@ -199,3 +199,205 @@ func (s *ConfigManagerTestSuite) TestLoadDefaultsErrorHandling() {
 	s.Equal(defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
 	s.Equal(defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
 }
+
+func (s *ConfigManagerTestSuite) TestExpandConfigPath() {
+	// Save original HOME and restore after test
+	originalHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", originalHome)
+
+	// Set up test environment
+	os.Setenv("HOME", "/home/testuser")
+	os.Setenv("TEST_VAR", "/custom/path")
+
+	tests := []struct {
+		name     string
+		input    string
+		setupEnv func()
+		expected string
+	}{
+		{
+			name:     "empty string unchanged",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "tilde expansion",
+			input:    "~/Projects",
+			expected: "/home/testuser/Projects",
+		},
+		{
+			name:     "tilde alone",
+			input:    "~",
+			expected: "/home/testuser",
+		},
+		{
+			name:     "dollar sign variable",
+			input:    "$HOME/Projects",
+			expected: "/home/testuser/Projects",
+		},
+		{
+			name:     "curly brace variable",
+			input:    "${HOME}/Worktrees",
+			expected: "/home/testuser/Worktrees",
+		},
+		{
+			name:     "custom env variable",
+			input:    "$TEST_VAR/subdir",
+			expected: "/custom/path/subdir",
+		},
+		{
+			name:     "absolute path unchanged",
+			input:    "/absolute/path/Projects",
+			expected: "/absolute/path/Projects",
+		},
+		{
+			name:     "undefined env var expands to empty",
+			input:    "$UNDEFINED_VAR/Projects",
+			expected: "/Projects",
+		},
+		{
+			name:     "mixed variables in path",
+			input:    "$HOME/${TEST_VAR}/mixed",
+			expected: "/home/testuser//custom/path/mixed",
+		},
+	}
+
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			if tc.setupEnv != nil {
+				tc.setupEnv()
+			}
+			result := expandConfigPath(tc.input)
+			s.Equal(tc.expected, result)
+		})
+	}
+}
+
+func (s *ConfigManagerTestSuite) TestExpandConfigPathFallbacks() {
+	// Test fallback behavior when os.UserHomeDir would fail
+	// We can't easily mock os.UserHomeDir, but we can test the logic indirectly
+	// by ensuring the function doesn't panic and returns something reasonable
+
+	s.Run("handles paths gracefully", func() {
+		// Test with a simple tilde path - this should always work
+		result := expandConfigPath("~/test")
+		s.NotEmpty(result)
+		s.NotContains(result, "~", "Tilde should be expanded")
+	})
+}
+
+func (s *ConfigManagerTestSuite) TestNormalizeConfigPaths() {
+	// Save original HOME and restore after test
+	originalHome := os.Getenv("HOME")
+	defer os.Setenv("HOME", originalHome)
+	os.Setenv("HOME", "/home/testuser")
+
+	tests := []struct {
+		name              string
+		projectsDir       string
+		worktreesDir      string
+		backupDir         string
+		expectedProjects  string
+		expectedWorktrees string
+		expectedBackupDir string
+	}{
+		{
+			name:              "expand all three path fields",
+			projectsDir:       "$HOME/Projects",
+			worktreesDir:      "${HOME}/Worktrees",
+			backupDir:         "~/.config/twiggit/backups",
+			expectedProjects:  "/home/testuser/Projects",
+			expectedWorktrees: "/home/testuser/Worktrees",
+			expectedBackupDir: "/home/testuser/.config/twiggit/backups",
+		},
+		{
+			name:              "absolute paths unchanged",
+			projectsDir:       "/absolute/projects",
+			worktreesDir:      "/absolute/worktrees",
+			backupDir:         "/absolute/backups",
+			expectedProjects:  "/absolute/projects",
+			expectedWorktrees: "/absolute/worktrees",
+			expectedBackupDir: "/absolute/backups",
+		},
+		{
+			name:              "empty paths remain empty",
+			projectsDir:       "",
+			worktreesDir:      "",
+			backupDir:         "",
+			expectedProjects:  "",
+			expectedWorktrees: "",
+			expectedBackupDir: "",
+		},
+		{
+			name:              "mixed absolute and variable paths",
+			projectsDir:       "/absolute/projects",
+			worktreesDir:      "$HOME/Worktrees",
+			backupDir:         "~/.backups",
+			expectedProjects:  "/absolute/projects",
+			expectedWorktrees: "/home/testuser/Worktrees",
+			expectedBackupDir: "/home/testuser/.backups",
+		},
+	}
+
+	for _, tc := range tests {
+		s.Run(tc.name, func() {
+			config := &domain.Config{
+				ProjectsDirectory:  tc.projectsDir,
+				WorktreesDirectory: tc.worktreesDir,
+				Shell: domain.ShellConfig{
+					Wrapper: domain.ShellWrapperConfig{
+						BackupDir: tc.backupDir,
+					},
+				},
+			}
+
+			normalizeConfigPaths(config)
+
+			s.Equal(tc.expectedProjects, config.ProjectsDirectory)
+			s.Equal(tc.expectedWorktrees, config.WorktreesDirectory)
+			s.Equal(tc.expectedBackupDir, config.Shell.Wrapper.BackupDir)
+		})
+	}
+}
+
+func (s *ConfigManagerTestSuite) TestLoadWithEnvVarExpansion() {
+	// Save original environment
+	originalHome := os.Getenv("HOME")
+	originalXDG := os.Getenv("XDG_CONFIG_HOME")
+	defer func() {
+		os.Setenv("HOME", originalHome)
+		os.Setenv("XDG_CONFIG_HOME", originalXDG)
+	}()
+
+	// Set up test environment
+	os.Setenv("HOME", s.tempDir)
+	os.Setenv("XDG_CONFIG_HOME", s.tempDir)
+	os.Setenv("TWIGGIT_TEST_PROJECTS", "/custom/projects")
+	os.Setenv("TWIGGIT_TEST_WORKTREES", "/custom/worktrees")
+
+	// Create config file with environment variables
+	configDir := filepath.Join(s.tempDir, "twiggit")
+	s.Require().NoError(os.MkdirAll(configDir, 0755))
+
+	configContent := `
+projects_dir = "$TWIGGIT_TEST_PROJECTS"
+worktrees_dir = "${TWIGGIT_TEST_WORKTREES}"
+
+[shell.wrapper]
+backup_dir = "~/backups"
+`
+	configPath := filepath.Join(configDir, "config.toml")
+	s.Require().NoError(os.WriteFile(configPath, []byte(configContent), 0644))
+
+	// Load config
+	manager := NewConfigManager()
+	config, err := manager.Load()
+
+	s.Require().NoError(err)
+	s.Require().NotNil(config)
+
+	// Verify expansion occurred
+	s.Equal("/custom/projects", config.ProjectsDirectory)
+	s.Equal("/custom/worktrees", config.WorktreesDirectory)
+	s.Equal(filepath.Join(s.tempDir, "backups"), config.Shell.Wrapper.BackupDir)
+}
