@@ -1,0 +1,132 @@
+================================
+Progress Summary
+================================
+Change ID: ergonomics-improvements
+Change directory: openspec/changes/ergonomics-improvements
+
+Current phase: PHASE0 - ARTIFACT REVIEW
+Phase iteration: 1
+
+Total invocations: 1
+Elapsed time: 6m 40s
+Log file: .osx-orchestrate-ergonomics-improvements.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 0
+  PHASE2 (REVIEW): 0
+  PHASE3 (MAINTAIN DOCS): 0
+  PHASE4 (SYNC): 0
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: ergonomics-improvements
+Change directory: openspec/changes/ergonomics-improvements
+
+Current phase: PHASE1 - IMPLEMENTATION
+Phase iteration: 1
+
+Total invocations: 2
+Elapsed time: 16m 23s
+Log file: .osx-orchestrate-ergonomics-improvements.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 0
+  PHASE3 (MAINTAIN DOCS): 0
+  PHASE4 (SYNC): 0
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: ergonomics-improvements
+Change directory: openspec/changes/ergonomics-improvements
+
+Current phase: PHASE2 - REVIEW
+Phase iteration: 1
+
+Total invocations: 3
+Elapsed time: 19m 24s
+Log file: .osx-orchestrate-ergonomics-improvements.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 1
+  PHASE3 (MAINTAIN DOCS): 0
+  PHASE4 (SYNC): 0
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: ergonomics-improvements
+Change directory: openspec/changes/ergonomics-improvements
+
+Current phase: PHASE3 - MAINTAIN DOCS
+Phase iteration: 2
+
+Total invocations: 5
+Elapsed time: 26m 46s
+Log file: .osx-orchestrate-ergonomics-improvements.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 1
+  PHASE3 (MAINTAIN DOCS): 2
+  PHASE4 (SYNC): 0
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: ergonomics-improvements
+Change directory: openspec/changes/ergonomics-improvements
+
+Current phase: PHASE4 - SYNC
+Phase iteration: 1
+
+Total invocations: 6
+Elapsed time: 29m 31s
+Log file: .osx-orchestrate-ergonomics-improvements.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 1
+  PHASE3 (MAINTAIN DOCS): 2
+  PHASE4 (SYNC): 1
+  PHASE5 (SELF-REFLECTION): 0
+  PHASE6 (ARCHIVE): 0
+================================
+================================
+Progress Summary
+================================
+Change ID: ergonomics-improvements
+Change directory: openspec/changes/ergonomics-improvements
+
+Current phase: PHASE5 - SELF-REFLECTION
+Phase iteration: 1
+
+Total invocations: 7
+Elapsed time: 33m 27s
+Log file: .osx-orchestrate-ergonomics-improvements.log
+
+Iterations by phase:
+  PHASE0 (ARTIFACT REVIEW): 1
+  PHASE1 (IMPLEMENTATION): 1
+  PHASE2 (REVIEW): 1
+  PHASE3 (MAINTAIN DOCS): 2
+  PHASE4 (SYNC): 1
+  PHASE5 (SELF-REFLECTION): 1
+  PHASE6 (ARCHIVE): 0
+================================
