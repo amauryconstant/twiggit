@@ -226,4 +226,22 @@ var _ = Describe("delete command", func() {
 
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
+
+	It("suppresses success message with --quiet flag", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromProjectDir("test", "delete", result.Feature1Branch, "--quiet")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		stdout := string(session.Out.Contents())
+		Expect(stdout).NotTo(ContainSubstring("Deleted worktree"), "Success message should be suppressed")
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
 })

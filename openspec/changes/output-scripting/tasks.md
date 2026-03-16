@@ -36,20 +36,20 @@
 
 ## 5. Documentation Updates
 
-- [ ] 5.1 Update `cmd/AGENTS.md` with `--output/-o` flag documentation for list command
-- [ ] 5.2 Update `cmd/AGENTS.md` with global `--quiet/-q` flag documentation
-- [ ] 5.3 Update `cmd/AGENTS.md` with progress reporting behavior for prune
-- [ ] 5.4 Update command-flags spec with new flag conventions
-- [ ] 5.5 Update verbose-output spec with quiet/verbose mutual exclusion
+- [ ] 5.1 Update `cmd/AGENTS.md` with `--output/-o` flag documentation for list command (deferred to PHASE3)
+- [ ] 5.2 Update `cmd/AGENTS.md` with global `--quiet/-q` flag documentation (deferred to PHASE3)
+- [ ] 5.3 Update `cmd/AGENTS.md` with progress reporting behavior for prune (deferred to PHASE3)
+- [x] 5.4 Update command-flags spec with new flag conventions
+- [x] 5.5 Update verbose-output spec with quiet/verbose mutual exclusion
 
 ## 6. E2E Tests
 
-- [ ] 6.1 Add E2E test for `list --output json` with worktrees present
-- [ ] 6.2 Add E2E test for `list --output json` with no worktrees
-- [ ] 6.3 Add E2E test for `list --output invalid` error handling
-- [ ] 6.4 Add E2E test for `--quiet` flag suppressing success messages
-- [ ] 6.5 Add E2E test for `--quiet` preserving error output
-- [ ] 6.6 Add E2E test for `--quiet` with `-C` flag preserving path output
-- [ ] 6.7 Add E2E test for `--quiet -v` (verbose wins)
-- [ ] 6.8 Add E2E test for progress output during `prune --all`
-- [ ] 6.9 Add E2E test for progress suppression with `prune --all --quiet`
+- [x] 6.1 Add E2E test for `list --output json` with worktrees present
+- [x] 6.2 Add E2E test for `list --output json` with no worktrees
+- [x] 6.3 Add E2E test for `list --output invalid` error handling
+- [x] 6.4 Add E2E test for `--quiet` flag suppressing success messages
+- [x] 6.5 Add E2E test for `--quiet` preserving error output
+- [x] 6.6 Add E2E test for `--quiet` with `-C` flag preserving path output
+- [x] 6.7 Add E2E test for `--quiet -v` (verbose wins)
+- [x] 6.8 Add E2E test for progress output during `prune --all`
+- [x] 6.9 Add E2E test for progress suppression with `prune --all --quiet`

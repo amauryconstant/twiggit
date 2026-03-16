@@ -278,4 +278,21 @@ commands = ["exit 1"]
 		cli.ShouldErrorOutput(session, "cannot infer project")
 		cli.ShouldErrorOutput(session, "no project specified")
 	})
+
+	It("suppresses success message with --quiet flag", func() {
+		fixture.SetupSingleProject("test-project")
+
+		testID := fixture.GetTestID()
+		branchName := testID.BranchName("feature-quiet")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", branchName, "--quiet")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		stdout := string(session.Out.Contents())
+		Expect(stdout).NotTo(ContainSubstring("Created worktree"), "Success message should be suppressed")
+	})
 })

@@ -188,4 +188,27 @@ var _ = Describe("prune command", func() {
 			Consistently(session.Out).ShouldNot(gbytes.Say("projects"))
 		})
 	})
+
+	Describe("progress reporting", func() {
+		It("shows progress messages for bulk operations", func() {
+			_ = fixture.CreateMergedWorktreeSetup("testprogress")
+
+			session := ctxHelper.FromOutsideGit("prune", "--all", "--force")
+
+			Eventually(session).Should(gexec.Exit(0))
+			Eventually(session.Err).Should(gbytes.Say("Pruning merged worktrees"))
+			Eventually(session.Err).Should(gbytes.Say("Prune complete"))
+		})
+
+		It("suppresses progress with --quiet flag", func() {
+			_ = fixture.CreateMergedWorktreeSetup("testquiet")
+
+			session := ctxHelper.FromOutsideGit("prune", "--all", "--force", "--quiet")
+
+			Eventually(session).Should(gexec.Exit(0))
+			// Progress messages should be suppressed
+			Consistently(session.Err).ShouldNot(gbytes.Say("Pruning merged worktrees"))
+			Consistently(session.Err).ShouldNot(gbytes.Say("Prune complete"))
+		})
+	})
 })

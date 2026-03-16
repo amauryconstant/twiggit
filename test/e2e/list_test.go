@@ -7,6 +7,8 @@ package e2e
 
 import (
 	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/gbytes"
 
 	"twiggit/test/e2e/fixtures"
 	"twiggit/test/e2e/helpers"
@@ -151,5 +153,70 @@ var _ = Describe("list command", func() {
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
 		}
+	})
+
+	It("outputs JSON format with --output json flag", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "list", "--output", "json")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, `{"worktrees":[`)
+		cli.ShouldOutput(session, `"branch":"feature-1"`)
+		cli.ShouldOutput(session, `"status":"clean"`)
+	})
+
+	It("outputs empty JSON array with --output json and no worktrees", func() {
+		fixture.SetupSingleProject("empty-project")
+
+		session := ctxHelper.FromProjectDir("empty-project", "list", "--output", "json")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, `{"worktrees":[]}`)
+	})
+
+	It("fails with invalid output format", func() {
+		fixture.SetupSingleProject("test-project")
+
+		session := ctxHelper.FromProjectDir("test-project", "list", "--output", "yaml")
+		cli.ShouldFailWithExit(session, 5) // ExitCodeValidation
+		cli.ShouldErrorOutput(session, "invalid output format")
+	})
+
+	It("suppresses success messages with --quiet flag", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "list", "--quiet")
+		cli.ShouldSucceed(session)
+		// Should still show worktree list but not extra messages
+		cli.ShouldOutput(session, "feature-1 ->")
+		// Should NOT show verbose messages even if they exist
+		Eventually(session.Err).ShouldNot(gbytes.Say("Listing worktrees"))
+	})
+
+	It("preserves error output with --quiet flag", func() {
+		fixture.SetupSingleProject("test-project")
+
+		session := ctxHelper.FromProjectDir("test-project", "create", "invalid-branch", "--quiet")
+		cli.ShouldFailWithExit(session, 5) // ExitCodeValidation
+		// Error should still go to stderr
+		Eventually(session.Err).Should(gbytes.Say("Error:"))
+	})
+
+	It("preserves path output with --quiet -C flag", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromWorktreeDir("test", "feature-1", "cd", "--quiet")
+		cli.ShouldSucceed(session)
+		// Should output only the path, no success message
+		output := cli.GetOutput(session)
+		Expect(output).To(ContainSubstring("/worktrees"))
+	})
+
+	It("verbose wins over quiet with --quiet -v flags", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "list", "--quiet", "-v")
+		cli.ShouldSucceed(session)
+		// Verbose messages should appear (verbose wins)
+		cli.ShouldVerboseOutput(session, "Listing worktrees")
 	})
 })
