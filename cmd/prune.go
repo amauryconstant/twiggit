@@ -15,7 +15,7 @@ import (
 
 // NewPruneCommand creates a new prune command for deleting merged worktrees.
 func NewPruneCommand(config *CommandConfig) *cobra.Command {
-	var force, deleteBranches, allProjects, dryRun bool
+	var force, yes, deleteBranches, allProjects, dryRun bool
 
 	cmd := &cobra.Command{
 		Use:   "prune [project/branch]",
@@ -27,13 +27,15 @@ Use flags to customize behavior:
 
   --dry-run          Preview what would be deleted without making changes
   --force            Bypass uncommitted changes safety checks
+  --yes, -y          Auto-confirm prompts (keeps safety checks)
   --delete-branches  Also delete the corresponding git branches
-  --all              Prune across all projects (requires confirmation)
+  --all              Prune across all projects (requires confirmation unless --yes or --force)
 
 Examples:
   twiggit prune                       Prune merged worktrees in current project
   twiggit prune --dry-run             Preview what would be deleted
   twiggit prune --all                 Prune across all projects
+  twiggit prune --all --yes           Prune across all projects without confirmation
   twiggit prune myproject/feature     Prune a specific worktree
   twiggit prune --delete-branches     Prune and delete branches`,
 		Args: cobra.MaximumNArgs(1),
@@ -42,11 +44,12 @@ Examples:
 			if len(args) > 0 {
 				specificWorktree = args[0]
 			}
-			return executePrune(c, config, force, deleteBranches, allProjects, dryRun, specificWorktree)
+			return executePrune(c, config, force, yes, deleteBranches, allProjects, dryRun, specificWorktree)
 		},
 	}
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion even with uncommitted changes")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Auto-confirm prompts (keeps safety checks)")
 	cmd.Flags().BoolVar(&deleteBranches, "delete-branches", false, "Delete branches after worktree removal")
 	cmd.Flags().BoolVarP(&allProjects, "all", "a", false, "Prune across all projects")
 	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Preview only, no actual deletion")
@@ -58,7 +61,7 @@ Examples:
 	return cmd
 }
 
-func executePrune(c *cobra.Command, config *CommandConfig, force, deleteBranches, allProjects, dryRun bool, specificWorktree string) error {
+func executePrune(c *cobra.Command, config *CommandConfig, force, yes, deleteBranches, allProjects, dryRun bool, specificWorktree string) error {
 	ctx := context.Background()
 
 	currentCtx, err := config.Services.ContextService.GetCurrentContext()
@@ -66,7 +69,7 @@ func executePrune(c *cobra.Command, config *CommandConfig, force, deleteBranches
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
-	if allProjects && !force && !dryRun {
+	if allProjects && !force && !yes && !dryRun {
 		confirmed, err := confirmBulkPrune(c)
 		if err != nil {
 			return err
