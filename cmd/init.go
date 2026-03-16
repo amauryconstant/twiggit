@@ -31,24 +31,11 @@ The wrapper provides:
 
 Supported shells: bash, zsh, fish
 
-Usage:
-  twiggit init                    # Print wrapper to stdout (eval-safe)
-  twiggit init bash               # Print bash wrapper to stdout
-  twiggit init --install          # Install to auto-detected config file
-  twiggit init bash --install     # Install bash wrapper to auto-detected config
-  twiggit init bash --install -c ~/.bashrc  # Install to specific config file
-
 Examples:
-  # Add to your shell config for instant activation:
-  eval "$(twiggit init)"
-
-  # Or install permanently to your shell config:
-  twiggit init --install
-
-Flags:
-  -i, --install    Install wrapper to shell config file
-  -c, --config     Custom config file path (requires --install)
-  -f, --force      Force reinstall even if already installed (requires --install)`,
+  eval "$(twiggit init)"                  # Add to your shell config for instant activation
+  twiggit init bash                       # Print bash wrapper to stdout
+  twiggit init --install                  # Install to auto-detected config file
+  twiggit init bash --install -c ~/.bashrc  # Install to specific config file`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flag combinations

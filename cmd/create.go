@@ -23,9 +23,11 @@ func NewCreateCommand(config *CommandConfig) *cobra.Command {
 		Long: `Create a new worktree for the specified project and branch.
 If only a branch name is provided, the project is inferred from the current context.
 
-Flags:
-  --source <branch>  Source branch to create from (default: main)
-  -C, --cd          Output worktree path to stdout (for shell wrapper)`,
+Examples:
+  twiggit create feature/my-feature              Create from current project
+  twiggit create myproject/feature/my-feature    Create for specific project
+  twiggit create feature --source develop       Create from specific source branch
+  twiggit create feature -C                     Create and output path for shell`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeCreate(cmd, config, args[0], source, cdFlag)
