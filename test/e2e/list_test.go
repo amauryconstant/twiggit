@@ -219,4 +219,26 @@ var _ = Describe("list command", func() {
 		// Verbose messages should appear (verbose wins)
 		cli.ShouldVerboseOutput(session, "Listing worktrees")
 	})
+
+	It("alias ls behaves like list command", func() {
+		fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "ls")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
+
+	It("list with -a short flag behaves like --all", func() {
+		fixture.SetupMultiProject()
+
+		session := cli.Run("list", "-a")
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+	})
 })

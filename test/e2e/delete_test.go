@@ -244,4 +244,19 @@ var _ = Describe("delete command", func() {
 
 		Expect(worktreePath).NotTo(BeADirectory())
 	})
+
+	It("alias rm behaves like delete command", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
+
+		session := ctxHelper.FromProjectDir("test", "rm", result.Feature1Branch)
+		cli.ShouldSucceed(session)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log(fixture.Inspect())
+		}
+
+		Expect(worktreePath).NotTo(BeADirectory())
+	})
 })

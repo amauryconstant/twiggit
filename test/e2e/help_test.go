@@ -73,4 +73,49 @@ var _ = Describe("help command", func() {
 			GinkgoT().Log("Error:", string(session.Err.Contents()))
 		}
 	})
+
+	It("shows ls alias in list command help", func() {
+		session := cli.Run("help", "list")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "ls")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("shows rm alias in delete command help", func() {
+		session := cli.Run("help", "delete")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "rm")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("shows -a short flag in list command help", func() {
+		session := cli.Run("help", "list")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "-a")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("shows -y short flag in prune command help", func() {
+		session := cli.Run("help", "prune")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "-y")
+		cli.ShouldOutput(session, "--yes")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
 })

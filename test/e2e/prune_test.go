@@ -163,6 +163,28 @@ var _ = Describe("prune command", func() {
 		})
 	})
 
+	Describe("bulk prune with --yes", func() {
+		It("skips confirmation prompt with --yes flag", func() {
+			_ = fixture.CreateMergedWorktreeSetup("testyes")
+
+			session := ctxHelper.FromOutsideGit("prune", "--all", "--delete-branches", "--yes")
+
+			Consistently(session.Err).ShouldNot(gbytes.Say("Continue"))
+			Consistently(session.Err).ShouldNot(gbytes.Say("This will prune merged worktrees across all projects"))
+			Eventually(session).Should(gexec.Exit(0))
+		})
+
+		It("skips confirmation prompt with -y short flag", func() {
+			_ = fixture.CreateMergedWorktreeSetup("testyshort")
+
+			session := ctxHelper.FromOutsideGit("prune", "--all", "--delete-branches", "-y")
+
+			Consistently(session.Err).ShouldNot(gbytes.Say("Continue"))
+			Consistently(session.Err).ShouldNot(gbytes.Say("This will prune merged worktrees across all projects"))
+			Eventually(session).Should(gexec.Exit(0))
+		})
+	})
+
 	Describe("navigation output", func() {
 		It("outputs project path to stdout for single-worktree prune", func() {
 			result := fixture.CreateMergedWorktreeSetup("testnav")
