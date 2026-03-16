@@ -182,7 +182,7 @@ func (cd *contextDetector) checkValidGitWorktree(dir string) bool {
 		return false
 	}
 
-	content, err := os.ReadFile(gitPath)
+	content, err := os.ReadFile(gitPath) // #nosec G304 -- gitPath is always .git file in known worktree location
 	if err != nil {
 		return false
 	}
