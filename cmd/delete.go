@@ -16,15 +16,18 @@ func NewDeleteCommand(config *CommandConfig) *cobra.Command {
 	var force, mergedOnly, changeDir bool
 
 	cmd := &cobra.Command{
-		Use:   "delete <project>/<branch> | <worktree-path>",
-		Short: "Delete a worktree",
+		Use:     "delete <project>/<branch> | <worktree-path>",
+		Aliases: []string{"rm"},
+		Short:   "Delete a worktree",
 		Long: `Delete a worktree with safety checks.
 By default, prevents deletion of worktrees with uncommitted changes.
 
-Flags:
-  -f, --force      Force deletion even with uncommitted changes
-  --merged-only    Only delete if branch is merged
-  -C, --cd         Output navigation target path to stdout (for shell wrapper)`,
+Examples:
+  twiggit delete feature/my-feature         Delete specific worktree
+  twiggit rm feature/my-feature            Same as delete (alias)
+  twiggit delete feature --force           Delete even with uncommitted changes
+  twiggit delete feature --merged-only      Only delete if branch is merged
+  twiggit delete feature -C                 Delete and output navigation path`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return executeDelete(c, config, args[0], force, mergedOnly, changeDir)

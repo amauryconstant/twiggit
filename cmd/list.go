@@ -15,11 +15,16 @@ func NewListCommand(config *CommandConfig) *cobra.Command {
 	var output string
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "List worktrees",
+		Use:     "list",
+		Aliases: []string{"ls"},
+		Short:   "List worktrees",
 		Long: `List worktrees for the current project or all projects.
 By default, lists worktrees for the detected project context.
-Use --all to list worktrees from all projects.`,
+
+Examples:
+  twiggit list              List worktrees for current project
+  twiggit list -a           List worktrees from all projects
+  twiggit list --output json  Output in JSON format for scripts`,
 		Args: cobra.NoArgs, // Reject any positional arguments
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Validate output format
@@ -30,7 +35,7 @@ Use --all to list worktrees from all projects.`,
 		},
 	}
 
-	cmd.Flags().BoolVar(&all, "all", false, "List worktrees from all projects")
+	cmd.Flags().BoolVarP(&all, "all", "a", false, "List worktrees from all projects")
 	cmd.Flags().StringVarP(&output, "output", "o", "text", "Output format (text or json)")
 
 	return cmd
