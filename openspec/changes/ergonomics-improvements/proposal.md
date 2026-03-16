@@ -9,7 +9,7 @@ Daily usage friction slows down workflows. Users type `twiggit list` and `twiggi
 - Add `--yes/-y` flag to `prune` command for auto-confirmation of prompts (distinct from `--force`)
 - Add `-a` as short form for `--all` flag in `list` command
 - Remove duplicate flag descriptions from Long descriptions in `create.go` and `init.go`
-- Add `Examples:` sections to `list` and `delete` commands
+- Add `Examples:` sections to `list`, `delete`, and `create` commands
 
 ## Capabilities
 
