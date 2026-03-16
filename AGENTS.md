@@ -53,6 +53,17 @@ graph TB
 **Distribution**: Homebrew via `amoconst/homebrew-tap`, GitLab artifacts with GitHub discoverability pages
 **CHANGELOG**: Auto-generated via `openspec-generate-changelog` after archiving changes.
 
+## Twiggit CLI Commands
+
+| Command | Aliases | Purpose | Common Flags |
+|---------|---------|---------|--------------|
+| `list` | `ls` | List worktrees | `--all/-a`, `--output/-o` |
+| `create` | - | Create new worktree | `--source`, `-C, --cd` |
+| `delete` | `rm` | Delete worktree | `-f, --force`, `--merged-only` |
+| `prune` | - | Delete merged worktrees | `-n, --dry-run`, `-y, --yes` |
+| `cd` | - | Navigate to worktree | - |
+| `init` | - | Shell integration setup | `-i, --install` |
+
 ## Pre-Commit Hooks
 
 Setup: `mise install && pre-commit install`

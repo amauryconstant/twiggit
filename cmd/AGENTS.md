@@ -86,9 +86,10 @@ See `internal/infrastructure/AGENTS.md` for detection rules and resolution.
 ## Command Specifications
 
 ### list
+Alias: `ls` (Unix-style shortcut)
 Output: Tabular format with branch, last commit, status (clean/dirty) or JSON for scripting
 Flags:
-- `--all` (show all projects, override context)
+- `--all/-a` (show all projects, override context)
 - `--output/-o <format>`: Output format: `text` (default) or `json`
 - JSON output structure: `{"worktrees": [{"branch": "...", "path": "...", "status": "clean|modified|detached"}]}`
 - JSON output uses stdout for data, stderr for errors/verbose messages
@@ -100,6 +101,7 @@ Behavior: Create worktree, execute post-create hooks if `.twiggit.toml` configur
 Output: Worktree info + hook warnings (if any)
 
 ### delete
+Alias: `rm` (Unix-style shortcut)
 Safety checks: Uncommitted changes, current worktree status
 Flags: `-f, --force`, `--merged-only`, `-C, --cd`
 Default behavior: Remove worktree + delete branch
@@ -122,13 +124,14 @@ Usage: `eval "$(twiggit init)"` | `twiggit init bash` | `twiggit init --install`
 ### prune
 Purpose: Delete merged worktrees for post-merge cleanup
 Args: `[project/branch]` (optional, specific worktree to prune)
-Flags: `-n, --dry-run`, `-f, --force`, `--delete-branches`, `-a, --all`
+Flags: `-n, --dry-run`, `-f, --force`, `-y, --yes`, `--delete-branches`, `-a, --all`
 Behavior:
 - Context-aware: Infers project from current directory (worktree > project > outside git)
 - `--dry-run`: Preview what would be deleted without making changes
 - `--force`: Bypass uncommitted changes safety check and bulk confirmation
+- `--yes/-y`: Auto-confirm prompts (keeps safety checks, distinct from --force)
 - `--delete-branches`: Also delete corresponding git branches after worktree removal
-- `--all`: Prune across all projects (requires confirmation unless --force)
+- `--all`: Prune across all projects (requires confirmation unless --yes or --force)
 - Protected branches (main, master, develop, staging, production) are never deleted
 - Progress reporting: Bulk operations (`--all` or no specific target) report progress to stderr
 - Outputs navigation path to stdout for single-worktree prune (for shell wrapper)
