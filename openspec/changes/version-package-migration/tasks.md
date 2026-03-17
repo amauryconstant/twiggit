@@ -19,5 +19,5 @@
 
 ## 4. Verify and Document
 
-- [ ] 4.1 Run mise run build and verify version command output unchanged
-- [ ] 4.2 Run mise run test:full to verify no regressions
+- [x] 4.1 Run mise run build and verify version command output unchanged
+- [x] 4.2 Run mise run test:full to verify no regressions
