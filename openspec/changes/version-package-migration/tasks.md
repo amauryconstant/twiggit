@@ -12,8 +12,12 @@
 
 - [x] 3.1 Update .goreleaser.yml ldflags from `twiggit/cmd.Version` to `twiggit/internal/version.Version`
 - [x] 3.2 Update .goreleaser.yml ldflags for Commit and Date paths
+- [ ] 3.3 Update .mise/config.toml build task ldflags from `twiggit/cmd.version` to `twiggit/internal/version.Version`
+- [ ] 3.4 Update .mise/config.toml build task ldflags for Commit and Date paths
+- [ ] 3.5 Update .mise/config.toml build:local task ldflags from `twiggit/cmd.version` to `twiggit/internal/version.Version`
+- [ ] 3.6 Update .mise/config.toml build:local task ldflags for Commit and Date paths
 
 ## 4. Verify and Document
 
-- [x] 4.1 Run mise run build and verify version command output unchanged
-- [x] 4.2 Run mise run test:full to verify no regressions
+- [ ] 4.1 Run mise run build and verify version command output unchanged
+- [ ] 4.2 Run mise run test:full to verify no regressions

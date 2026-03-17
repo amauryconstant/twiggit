@@ -7,6 +7,7 @@ Version variables currently live in `cmd/version.go`, mixing infrastructure-leve
 - Create `internal/version/version.go` with Version, Commit, Date variables and String() function
 - Update `cmd/version.go` to import from `internal/version` package
 - Update `.goreleaser.yml` ldflags path from `twiggit/cmd.Version` to `twiggit/internal/version.Version`
+- Update `.mise/config.toml` ldflags paths from `twiggit/cmd.version` to `twiggit/internal/version.Version` (both build and build:local tasks)
 
 ## Capabilities
 
@@ -24,3 +25,4 @@ Version variables currently live in `cmd/version.go`, mixing infrastructure-leve
 **Files Modified:**
 - `cmd/version.go` - imports from internal/version
 - `.goreleaser.yml` - updated ldflags paths
+- `.mise/config.toml` - updated ldflags paths in build and build:local tasks
