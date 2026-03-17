@@ -222,6 +222,7 @@ graph TB
 | [internal/service/AGENTS.md](internal/service/AGENTS.md) | Service patterns, error handling |
 | [internal/domain/AGENTS.md](internal/domain/AGENTS.md) | Domain model, context types, error types |
 | [internal/infrastructure/AGENTS.md](internal/infrastructure/AGENTS.md) | Git client routing, config |
+| [internal/version/AGENTS.md](internal/version/AGENTS.md) | Build-time version injection pattern |
 | [test/AGENTS.md](test/AGENTS.md) | Test organization, quality requirements |
 | [test/mocks/AGENTS.md](test/mocks/AGENTS.md) | Mock patterns, testify/mock usage |
 | [test/integration/AGENTS.md](test/integration/AGENTS.md) | Testify suite patterns |
