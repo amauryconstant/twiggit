@@ -1,0 +1,1 @@
+{"worktrees":[{"branch":"feature-1-<commit>","path":"/tmp/fixtures/worktrees/test/feature-1-<commit>","status":"clean"},{"branch":"feature-2-<commit>","path":"/tmp/fixtures/worktrees/test/feature-2-<commit>","status":"clean"}]}

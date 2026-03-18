@@ -12,11 +12,11 @@
 
 > Note: Golden file tests are E2E tests using the Ginkgo framework with //go:build e2e build tag.
 
-- [ ] 3.1 Create golden file tests for list command (text output)
-- [ ] 3.2 Create golden file tests for list command (JSON output)
-- [ ] 3.3a Create golden file tests for validation errors
-- [ ] 3.3b Create golden file tests for service errors
-- [ ] 3.3c Create golden file tests for not-found errors
+- [x] 3.1 Create golden file tests for list command (text output)
+- [x] 3.2 Create golden file tests for list command (JSON output)
+- [x] 3.3a Create golden file tests for validation errors
+- [x] 3.3b Create golden file tests for service errors
+- [x] 3.3c Create golden file tests for not-found errors
 
 ## 4. Verification
 

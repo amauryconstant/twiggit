@@ -20,22 +20,22 @@ import (
 // Example usage:
 //
 //	helpers.CompareGolden(t, "list/basic_output.golden", actualOutput)
-func CompareGolden(t *testing.T, goldenFile string, actual string) {
-	t.Helper()
+func CompareGolden(tb testing.TB, goldenFile string, actual string) {
+	tb.Helper()
 
 	// Build full path to golden file
 	goldenPath := filepath.Join("test", "golden", goldenFile)
 
 	// Check if UPDATE_GOLDEN is set to true
 	if os.Getenv("UPDATE_GOLDEN") == "true" {
-		updateGoldenFile(t, goldenPath, actual)
+		updateGoldenFile(tb, goldenPath, actual)
 		return
 	}
 
 	// Read golden file
 	expected, err := os.ReadFile(goldenPath)
 	if err != nil {
-		t.Fatalf("failed to read golden file %s: %v", goldenPath, err)
+		tb.Fatalf("failed to read golden file %s: %v", goldenPath, err)
 	}
 
 	// Normalize line endings for cross-platform comparison
@@ -46,25 +46,25 @@ func CompareGolden(t *testing.T, goldenFile string, actual string) {
 	if expectedStr != actualStr {
 		// Generate diff
 		diff := generateDiff(expectedStr, actualStr)
-		t.Errorf("output does not match golden file %s\n\n%s\n\nTo update golden file, run: UPDATE_GOLDEN=true go test ./...", goldenPath, diff)
+		tb.Errorf("output does not match golden file %s\n\n%s\n\nTo update golden file, run: UPDATE_GOLDEN=true go test ./...", goldenPath, diff)
 	}
 }
 
 // updateGoldenFile writes actual content to the golden file.
-func updateGoldenFile(t *testing.T, goldenPath string, actual string) {
-	t.Helper()
+func updateGoldenFile(tb testing.TB, goldenPath string, actual string) {
+	tb.Helper()
 
 	// Ensure directory exists
 	if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
-		t.Fatalf("failed to create directory for golden file %s: %v", goldenPath, err)
+		tb.Fatalf("failed to create directory for golden file %s: %v", goldenPath, err)
 	}
 
 	// Write golden file
 	if err := os.WriteFile(goldenPath, []byte(actual), 0644); err != nil {
-		t.Fatalf("failed to write golden file %s: %v", goldenPath, err)
+		tb.Fatalf("failed to write golden file %s: %v", goldenPath, err)
 	}
 
-	t.Logf("updated golden file: %s", goldenPath)
+	tb.Logf("updated golden file: %s", goldenPath)
 }
 
 // normalizeLineEndings converts all line endings to LF for consistent comparison.

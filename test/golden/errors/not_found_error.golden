@@ -1,0 +1,19 @@
+Error: failed to check worktree status: worktree validation failed: invalid git repository for worktree '/tmp/fixtures/worktrees/test-project/non-existent-worktree'
+Usage:
+  twiggit delete <project>/<branch> | <worktree-path> [flags]
+
+Aliases:
+  delete, rm
+
+Flags:
+  -C, --cd            Change directory after deletion (outputs path to stdout)
+  -f, --force         Force deletion even with uncommitted changes
+  -h, --help          help for delete
+      --merged-only   Only delete if branch is merged
+
+Global Flags:
+  -q, --quiet           Suppress non-essential output
+  -v, --verbose count   Increase verbosity (can be used multiple times: -v, -vv)
+
+Error: invalid git repository for worktree '/tmp/fixtures/worktrees/test-project/non-existent-worktree'
+Hint: Check that worktree exists and you have permission

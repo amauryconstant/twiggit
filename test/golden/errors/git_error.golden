@@ -1,0 +1,12 @@
+Error: worktree 'non-existent-worktree' not found
+Usage:
+  twiggit cd <project|project/branch> [flags]
+
+Flags:
+  -h, --help   help for cd
+
+Global Flags:
+  -q, --quiet           Suppress non-essential output
+  -v, --verbose count   Increase verbosity (can be used multiple times: -v, -vv)
+
+Error: worktree 'non-existent-worktree' not found
