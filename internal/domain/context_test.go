@@ -3,23 +3,11 @@ package domain
 import (
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 )
 
-type ContextTestSuite struct {
-	suite.Suite
-}
-
-func TestContextSuite(t *testing.T) {
-	suite.Run(t, new(ContextTestSuite))
-}
-
-func (s *ContextTestSuite) SetupTest() {
-	// Setup if needed
-}
-
 // ContextType String() tests
-func (s *ContextTestSuite) TestContextType_String() {
+func TestContextType_String(t *testing.T) {
 	testCases := []struct {
 		name     string
 		context  ContextType
@@ -34,15 +22,15 @@ func (s *ContextTestSuite) TestContextType_String() {
 	}
 
 	for _, tc := range testCases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			result := tc.context.String()
-			s.Equal(tc.expected, result)
+			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
 // PathType String() tests
-func (s *ContextTestSuite) TestPathType_String() {
+func TestPathType_String(t *testing.T) {
 	testCases := []struct {
 		name     string
 		pathType PathType
@@ -56,15 +44,15 @@ func (s *ContextTestSuite) TestPathType_String() {
 	}
 
 	for _, tc := range testCases {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			result := tc.pathType.String()
-			s.Equal(tc.expected, result)
+			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
 // Data structure tests
-func (s *ContextTestSuite) TestContext_Structure() {
+func TestContext_Structure(t *testing.T) {
 	context := &Context{
 		Type:        ContextProject,
 		ProjectName: "test-project",
@@ -73,14 +61,14 @@ func (s *ContextTestSuite) TestContext_Structure() {
 		Explanation: "Test explanation",
 	}
 
-	s.Equal(ContextProject, context.Type)
-	s.Equal("test-project", context.ProjectName)
-	s.Equal("main", context.BranchName)
-	s.Equal("/test/path", context.Path)
-	s.Equal("Test explanation", context.Explanation)
+	assert.Equal(t, ContextProject, context.Type)
+	assert.Equal(t, "test-project", context.ProjectName)
+	assert.Equal(t, "main", context.BranchName)
+	assert.Equal(t, "/test/path", context.Path)
+	assert.Equal(t, "Test explanation", context.Explanation)
 }
 
-func (s *ContextTestSuite) TestResolutionResult_Structure() {
+func TestResolutionResult_Structure(t *testing.T) {
 	result := &ResolutionResult{
 		ResolvedPath: "/resolved/path",
 		Type:         PathTypeWorktree,
@@ -89,14 +77,14 @@ func (s *ContextTestSuite) TestResolutionResult_Structure() {
 		Explanation:  "Resolved successfully",
 	}
 
-	s.Equal("/resolved/path", result.ResolvedPath)
-	s.Equal(PathTypeWorktree, result.Type)
-	s.Equal("test-project", result.ProjectName)
-	s.Equal("feature-branch", result.BranchName)
-	s.Equal("Resolved successfully", result.Explanation)
+	assert.Equal(t, "/resolved/path", result.ResolvedPath)
+	assert.Equal(t, PathTypeWorktree, result.Type)
+	assert.Equal(t, "test-project", result.ProjectName)
+	assert.Equal(t, "feature-branch", result.BranchName)
+	assert.Equal(t, "Resolved successfully", result.Explanation)
 }
 
-func (s *ContextTestSuite) TestResolutionSuggestion_Structure() {
+func TestResolutionSuggestion_Structure(t *testing.T) {
 	suggestion := &ResolutionSuggestion{
 		Text:        "feature-branch",
 		Description: "Feature branch suggestion",
@@ -105,53 +93,45 @@ func (s *ContextTestSuite) TestResolutionSuggestion_Structure() {
 		BranchName:  "feature-branch",
 	}
 
-	s.Equal("feature-branch", suggestion.Text)
-	s.Equal("Feature branch suggestion", suggestion.Description)
-	s.Equal(PathTypeWorktree, suggestion.Type)
-	s.Equal("test-project", suggestion.ProjectName)
-	s.Equal("feature-branch", suggestion.BranchName)
+	assert.Equal(t, "feature-branch", suggestion.Text)
+	assert.Equal(t, "Feature branch suggestion", suggestion.Description)
+	assert.Equal(t, PathTypeWorktree, suggestion.Type)
+	assert.Equal(t, "test-project", suggestion.ProjectName)
+	assert.Equal(t, "feature-branch", suggestion.BranchName)
 }
 
 // Edge case tests for zero values
-func (s *ContextTestSuite) TestContext_ZeroValues() {
+func TestContext_ZeroValues(t *testing.T) {
 	context := &Context{}
 
-	s.Equal(ContextUnknown, context.Type)
-	s.Empty(context.ProjectName)
-	s.Empty(context.BranchName)
-	s.Empty(context.Path)
-	s.Empty(context.Explanation)
+	assert.Equal(t, ContextUnknown, context.Type)
+	assert.Empty(t, context.ProjectName)
+	assert.Empty(t, context.BranchName)
+	assert.Empty(t, context.Path)
+	assert.Empty(t, context.Explanation)
 }
 
-func (s *ContextTestSuite) TestResolutionResult_ZeroValues() {
+func TestResolutionResult_ZeroValues(t *testing.T) {
 	result := &ResolutionResult{}
 
-	s.Empty(result.ResolvedPath)
-	s.Equal(PathTypeProject, result.Type) // Zero value should be PathTypeProject (iota = 0)
-	s.Empty(result.ProjectName)
-	s.Empty(result.BranchName)
-	s.Empty(result.Explanation)
+	assert.Empty(t, result.ResolvedPath)
+	assert.Equal(t, PathTypeProject, result.Type) // Zero value should be PathTypeProject (iota = 0)
+	assert.Empty(t, result.ProjectName)
+	assert.Empty(t, result.BranchName)
+	assert.Empty(t, result.Explanation)
 }
 
-func (s *ContextTestSuite) TestResolutionSuggestion_ZeroValues() {
+func TestResolutionSuggestion_ZeroValues(t *testing.T) {
 	suggestion := &ResolutionSuggestion{}
 
-	s.Empty(suggestion.Text)
-	s.Empty(suggestion.Description)
-	s.Equal(PathTypeProject, suggestion.Type) // Zero value should be PathTypeProject (iota = 0)
-	s.Empty(suggestion.ProjectName)
-	s.Empty(suggestion.BranchName)
+	assert.Empty(t, suggestion.Text)
+	assert.Empty(t, suggestion.Description)
+	assert.Equal(t, PathTypeProject, suggestion.Type) // Zero value should be PathTypeProject (iota = 0)
+	assert.Empty(t, suggestion.ProjectName)
+	assert.Empty(t, suggestion.BranchName)
 }
 
-type SuggestionOptionTestSuite struct {
-	suite.Suite
-}
-
-func TestSuggestionOptionSuite(t *testing.T) {
-	suite.Run(t, new(SuggestionOptionTestSuite))
-}
-
-func (s *SuggestionOptionTestSuite) TestWithExistingOnly() {
+func TestWithExistingOnly(t *testing.T) {
 	tests := []struct {
 		name     string
 		option   SuggestionOption
@@ -165,11 +145,11 @@ func (s *SuggestionOptionTestSuite) TestWithExistingOnly() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			if tt.option == nil {
-				s.T().Fatal("option should not be nil")
+				t.Fatal("option should not be nil")
 			}
-			s.NotNil(tt.option, "option should not be nil")
+			assert.NotNil(t, tt.option, "option should not be nil")
 		})
 	}
 }

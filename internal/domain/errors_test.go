@@ -3,19 +3,11 @@ package domain
 import (
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 )
 
-type ErrorsTestSuite struct {
-	suite.Suite
-}
-
-func TestErrors(t *testing.T) {
-	suite.Run(t, new(ErrorsTestSuite))
-}
-
-func (s *ErrorsTestSuite) TestGitWorktreeError_FormatErrorMessage() {
-	s.Run("with branch name and cause", func() {
+func TestGitWorktreeError_FormatErrorMessage(t *testing.T) {
+	t.Run("with branch name and cause", func(t *testing.T) {
 		cause := &GitCommandError{
 			Command:  "git",
 			Args:     []string{"worktree", "add"},
@@ -26,57 +18,57 @@ func (s *ErrorsTestSuite) TestGitWorktreeError_FormatErrorMessage() {
 		err := NewGitWorktreeError("/path/to/worktree", "feature-branch", "failed", cause)
 		msg := err.Error()
 
-		s.Contains(msg, "git worktree operation failed")
-		s.Contains(msg, "/path/to/worktree")
-		s.Contains(msg, "branch: feature-branch")
-		s.Contains(msg, "failed")
-		s.Contains(msg, "caused by:")
-		s.Contains(msg, "git command failed")
+		assert.Contains(t, msg, "git worktree operation failed")
+		assert.Contains(t, msg, "/path/to/worktree")
+		assert.Contains(t, msg, "branch: feature-branch")
+		assert.Contains(t, msg, "failed")
+		assert.Contains(t, msg, "caused by:")
+		assert.Contains(t, msg, "git command failed")
 	})
 
-	s.Run("with branch name but no cause", func() {
+	t.Run("with branch name but no cause", func(t *testing.T) {
 		err := NewGitWorktreeError("/path/to/worktree", "feature-branch", "failed", nil)
 		msg := err.Error()
 
-		s.Contains(msg, "git worktree operation failed")
-		s.Contains(msg, "/path/to/worktree")
-		s.Contains(msg, "branch: feature-branch")
-		s.Contains(msg, "failed")
-		s.NotContains(msg, "caused by:")
+		assert.Contains(t, msg, "git worktree operation failed")
+		assert.Contains(t, msg, "/path/to/worktree")
+		assert.Contains(t, msg, "branch: feature-branch")
+		assert.Contains(t, msg, "failed")
+		assert.NotContains(t, msg, "caused by:")
 	})
 
-	s.Run("without branch name but with cause", func() {
+	t.Run("without branch name but with cause", func(t *testing.T) {
 		cause := NewGitCommandError("git", []string{"worktree", "add"}, 128, "", "fatal: error", "failed", nil)
 		err := NewGitWorktreeError("/path/to/worktree", "", "failed", cause)
 		msg := err.Error()
 
-		s.Contains(msg, "git worktree operation failed")
-		s.Contains(msg, "/path/to/worktree")
-		s.NotContains(msg, "branch:")
-		s.Contains(msg, "failed")
-		s.Contains(msg, "caused by:")
+		assert.Contains(t, msg, "git worktree operation failed")
+		assert.Contains(t, msg, "/path/to/worktree")
+		assert.NotContains(t, msg, "branch:")
+		assert.Contains(t, msg, "failed")
+		assert.Contains(t, msg, "caused by:")
 	})
 
-	s.Run("without branch name and without cause", func() {
+	t.Run("without branch name and without cause", func(t *testing.T) {
 		err := NewGitWorktreeError("/path/to/worktree", "", "failed", nil)
 		msg := err.Error()
 
-		s.Contains(msg, "git worktree operation failed")
-		s.Contains(msg, "/path/to/worktree")
-		s.NotContains(msg, "branch:")
-		s.Contains(msg, "failed")
-		s.NotContains(msg, "caused by:")
+		assert.Contains(t, msg, "git worktree operation failed")
+		assert.Contains(t, msg, "/path/to/worktree")
+		assert.NotContains(t, msg, "branch:")
+		assert.Contains(t, msg, "failed")
+		assert.NotContains(t, msg, "caused by:")
 	})
 }
 
-func (s *ErrorsTestSuite) TestGitWorktreeError_GetCauseDetails() {
-	s.Run("nil cause returns empty string", func() {
+func TestGitWorktreeError_GetCauseDetails(t *testing.T) {
+	t.Run("nil cause returns empty string", func(t *testing.T) {
 		err := &GitWorktreeError{Cause: nil}
 		details := err.getCauseDetails()
-		s.Empty(details)
+		assert.Empty(t, details)
 	})
 
-	s.Run("GitCommandError cause returns formatted error", func() {
+	t.Run("GitCommandError cause returns formatted error", func(t *testing.T) {
 		gitCmdErr := &GitCommandError{
 			Command:  "git",
 			Args:     []string{"worktree", "add"},
@@ -87,46 +79,46 @@ func (s *ErrorsTestSuite) TestGitWorktreeError_GetCauseDetails() {
 		err := &GitWorktreeError{Cause: gitCmdErr}
 		details := err.getCauseDetails()
 
-		s.Contains(details, "git command failed")
-		s.Contains(details, "git")
-		s.Contains(details, "worktree add")
-		s.Contains(details, "exit code 128")
+		assert.Contains(t, details, "git command failed")
+		assert.Contains(t, details, "git")
+		assert.Contains(t, details, "worktree add")
+		assert.Contains(t, details, "exit code 128")
 	})
 
-	s.Run("generic error cause returns error message", func() {
+	t.Run("generic error cause returns error message", func(t *testing.T) {
 		genericErr := NewValidationError("request", "field", "value", "validation failed")
 		err := &GitWorktreeError{Cause: genericErr}
 		details := err.getCauseDetails()
 
-		s.Contains(details, "validation failed")
-		s.Contains(details, "field")
-		s.Contains(details, "value")
+		assert.Contains(t, details, "validation failed")
+		assert.Contains(t, details, "field")
+		assert.Contains(t, details, "value")
 	})
 }
 
-func (s *ErrorsTestSuite) TestGitCommandError_HasUsefulStderr() {
-	s.Run("stderr with useful content returns true", func() {
+func TestGitCommandError_HasUsefulStderr(t *testing.T) {
+	t.Run("stderr with useful content returns true", func(t *testing.T) {
 		err := &GitCommandError{Stderr: "fatal: Invalid refspec"}
-		s.True(err.hasUsefulStderr())
+		assert.True(t, err.hasUsefulStderr())
 	})
 
-	s.Run("empty stderr returns false", func() {
+	t.Run("empty stderr returns false", func(t *testing.T) {
 		err := &GitCommandError{Stderr: ""}
-		s.False(err.hasUsefulStderr())
+		assert.False(t, err.hasUsefulStderr())
 	})
 
-	s.Run("whitespace-only stderr returns false", func() {
+	t.Run("whitespace-only stderr returns false", func(t *testing.T) {
 		err := &GitCommandError{Stderr: "   \n\t  "}
-		s.False(err.hasUsefulStderr())
+		assert.False(t, err.hasUsefulStderr())
 	})
 
-	s.Run("stderr with mixed whitespace and content returns true", func() {
+	t.Run("stderr with mixed whitespace and content returns true", func(t *testing.T) {
 		err := &GitCommandError{Stderr: "  fatal: error\n"}
-		s.True(err.hasUsefulStderr())
+		assert.True(t, err.hasUsefulStderr())
 	})
 }
 
-func (s *ErrorsTestSuite) TestContainsOnlyWhitespace() {
+func TestContainsOnlyWhitespace(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -175,15 +167,15 @@ func (s *ErrorsTestSuite) TestContainsOnlyWhitespace() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := containsOnlyWhitespace(tt.input)
-			s.Equal(tt.expected, result)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func (s *ErrorsTestSuite) TestGitCommandError_FormatErrorMessage() {
-	s.Run("with useful stderr includes stderr", func() {
+func TestGitCommandError_FormatErrorMessage(t *testing.T) {
+	t.Run("with useful stderr includes stderr", func(t *testing.T) {
 		err := &GitCommandError{
 			Command:  "git",
 			Args:     []string{"worktree", "add"},
@@ -193,16 +185,16 @@ func (s *ErrorsTestSuite) TestGitCommandError_FormatErrorMessage() {
 		}
 		msg := err.Error()
 
-		s.Contains(msg, "git command failed")
-		s.Contains(msg, "git")
-		s.Contains(msg, "worktree add")
-		s.Contains(msg, "exit code 128")
-		s.Contains(msg, "failed")
-		s.Contains(msg, "stderr:")
-		s.Contains(msg, "fatal: Invalid refspec")
+		assert.Contains(t, msg, "git command failed")
+		assert.Contains(t, msg, "git")
+		assert.Contains(t, msg, "worktree add")
+		assert.Contains(t, msg, "exit code 128")
+		assert.Contains(t, msg, "failed")
+		assert.Contains(t, msg, "stderr:")
+		assert.Contains(t, msg, "fatal: Invalid refspec")
 	})
 
-	s.Run("with empty stderr does not include stderr", func() {
+	t.Run("with empty stderr does not include stderr", func(t *testing.T) {
 		err := &GitCommandError{
 			Command:  "git",
 			Args:     []string{"worktree", "add"},
@@ -212,11 +204,11 @@ func (s *ErrorsTestSuite) TestGitCommandError_FormatErrorMessage() {
 		}
 		msg := err.Error()
 
-		s.Contains(msg, "git command failed")
-		s.NotContains(msg, "stderr:")
+		assert.Contains(t, msg, "git command failed")
+		assert.NotContains(t, msg, "stderr:")
 	})
 
-	s.Run("with whitespace-only stderr does not include stderr", func() {
+	t.Run("with whitespace-only stderr does not include stderr", func(t *testing.T) {
 		err := &GitCommandError{
 			Command:  "git",
 			Args:     []string{"worktree", "add"},
@@ -226,38 +218,38 @@ func (s *ErrorsTestSuite) TestGitCommandError_FormatErrorMessage() {
 		}
 		msg := err.Error()
 
-		s.Contains(msg, "git command failed")
-		s.NotContains(msg, "stderr:")
+		assert.Contains(t, msg, "git command failed")
+		assert.NotContains(t, msg, "stderr:")
 	})
 }
 
-func (s *ErrorsTestSuite) TestGitWorktreeError_Unwrap() {
-	s.Run("nil cause returns nil", func() {
+func TestGitWorktreeError_Unwrap(t *testing.T) {
+	t.Run("nil cause returns nil", func(t *testing.T) {
 		err := &GitWorktreeError{Cause: nil}
-		s.NoError(err.Unwrap())
+		assert.NoError(t, err.Unwrap())
 	})
 
-	s.Run("returns cause error", func() {
+	t.Run("returns cause error", func(t *testing.T) {
 		cause := NewValidationError("request", "field", "value", "error")
 		err := &GitWorktreeError{Cause: cause}
-		s.Equal(cause, err.Unwrap())
+		assert.Equal(t, cause, err.Unwrap())
 	})
 }
 
-func (s *ErrorsTestSuite) TestGitCommandError_Unwrap() {
-	s.Run("nil cause returns nil", func() {
+func TestGitCommandError_Unwrap(t *testing.T) {
+	t.Run("nil cause returns nil", func(t *testing.T) {
 		err := &GitCommandError{Cause: nil}
-		s.NoError(err.Unwrap())
+		assert.NoError(t, err.Unwrap())
 	})
 
-	s.Run("returns cause error", func() {
+	t.Run("returns cause error", func(t *testing.T) {
 		cause := NewValidationError("request", "field", "value", "error")
 		err := &GitCommandError{Cause: cause}
-		s.Equal(cause, err.Unwrap())
+		assert.Equal(t, cause, err.Unwrap())
 	})
 }
 
-func (s *ErrorsTestSuite) TestGitRepositoryError_IsNotFound() {
+func TestGitRepositoryError_IsNotFound(t *testing.T) {
 	tests := []struct {
 		name     string
 		message  string
@@ -273,14 +265,14 @@ func (s *ErrorsTestSuite) TestGitRepositoryError_IsNotFound() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			err := NewGitRepositoryError("/path", tt.message, nil)
-			s.Equal(tt.expected, err.IsNotFound())
+			assert.Equal(t, tt.expected, err.IsNotFound())
 		})
 	}
 }
 
-func (s *ErrorsTestSuite) TestGitWorktreeError_IsNotFound() {
+func TestGitWorktreeError_IsNotFound(t *testing.T) {
 	tests := []struct {
 		name     string
 		message  string
@@ -294,9 +286,9 @@ func (s *ErrorsTestSuite) TestGitWorktreeError_IsNotFound() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			err := NewGitWorktreeError("/path", "branch", tt.message, nil)
-			s.Equal(tt.expected, err.IsNotFound())
+			assert.Equal(t, tt.expected, err.IsNotFound())
 		})
 	}
 }

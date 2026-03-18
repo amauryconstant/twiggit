@@ -3,29 +3,22 @@ package domain
 import (
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-type ConfigTestSuite struct {
-	suite.Suite
-}
-
-func TestConfigSuite(t *testing.T) {
-	suite.Run(t, new(ConfigTestSuite))
-}
-
-func (s *ConfigTestSuite) TestDefaultConfig() {
+func TestDefaultConfig(t *testing.T) {
 	config := DefaultConfig()
 
-	s.Require().NotNil(config)
-	s.NotEmpty(config.ProjectsDirectory)
-	s.NotEmpty(config.WorktreesDirectory)
-	s.Equal("main", config.DefaultSourceBranch)
-	s.Equal([]string{"main", "master", "develop", "staging", "production"}, config.Validation.ProtectedBranches)
+	require.NotNil(t, config)
+	assert.NotEmpty(t, config.ProjectsDirectory)
+	assert.NotEmpty(t, config.WorktreesDirectory)
+	assert.Equal(t, "main", config.DefaultSourceBranch)
+	assert.Equal(t, []string{"main", "master", "develop", "staging", "production"}, config.Validation.ProtectedBranches)
 }
 
-func (s *ConfigTestSuite) TestValidate() {
-	s.Run("valid configuration", func() {
+func TestValidate(t *testing.T) {
+	t.Run("valid configuration", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:   "/valid/projects",
 			WorktreesDirectory:  "/valid/worktrees",
@@ -33,10 +26,10 @@ func (s *ConfigTestSuite) TestValidate() {
 		}
 
 		err := config.Validate()
-		s.NoError(err)
+		assert.NoError(t, err)
 	})
 
-	s.Run("invalid projects directory", func() {
+	t.Run("invalid projects directory", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:   "relative/path",
 			WorktreesDirectory:  "/valid/worktrees",
@@ -44,11 +37,11 @@ func (s *ConfigTestSuite) TestValidate() {
 		}
 
 		err := config.Validate()
-		s.Require().Error(err)
-		s.Contains(err.Error(), "projects_directory must be absolute path")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "projects_directory must be absolute path")
 	})
 
-	s.Run("invalid worktrees directory", func() {
+	t.Run("invalid worktrees directory", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:   "/valid/projects",
 			WorktreesDirectory:  "relative/path",
@@ -56,11 +49,11 @@ func (s *ConfigTestSuite) TestValidate() {
 		}
 
 		err := config.Validate()
-		s.Require().Error(err)
-		s.Contains(err.Error(), "worktrees_directory must be absolute path")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "worktrees_directory must be absolute path")
 	})
 
-	s.Run("empty default source branch", func() {
+	t.Run("empty default source branch", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:   "/valid/projects",
 			WorktreesDirectory:  "/valid/worktrees",
@@ -68,11 +61,11 @@ func (s *ConfigTestSuite) TestValidate() {
 		}
 
 		err := config.Validate()
-		s.Require().Error(err)
-		s.Contains(err.Error(), "default_source_branch cannot be empty")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "default_source_branch cannot be empty")
 	})
 
-	s.Run("multiple validation errors", func() {
+	t.Run("multiple validation errors", func(t *testing.T) {
 		config := &Config{
 			ProjectsDirectory:   "relative/path",
 			WorktreesDirectory:  "another/relative/path",
@@ -80,11 +73,11 @@ func (s *ConfigTestSuite) TestValidate() {
 		}
 
 		err := config.Validate()
-		s.Require().Error(err)
-		s.Contains(err.Error(), "config validation failed")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "config validation failed")
 		// Should contain all validation errors
-		s.Contains(err.Error(), "projects_directory must be absolute path")
-		s.Contains(err.Error(), "worktrees_directory must be absolute path")
-		s.Contains(err.Error(), "default_source_branch cannot be empty")
+		assert.Contains(t, err.Error(), "projects_directory must be absolute path")
+		assert.Contains(t, err.Error(), "worktrees_directory must be absolute path")
+		assert.Contains(t, err.Error(), "default_source_branch cannot be empty")
 	})
 }
