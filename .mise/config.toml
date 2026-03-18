@@ -43,11 +43,11 @@ run = "ginkgo --tags=e2e --keep-going ./test/e2e/..."
 
 [tasks."test:golden"]
 description = "Run golden file tests"
-run = "go test -tags=e2e ./test/e2e/... -run Golden"
+run = "ginkgo --tags=e2e --focus=Golden --keep-going ./test/e2e/..."
 
 [tasks."test:golden:update"]
 description = "Update golden files"
-run = "UPDATE_GOLDEN=true go test -tags=e2e ./test/e2e/... -run Golden"
+run = "UPDATE_GOLDEN=true ginkgo --tags=e2e --focus=Golden --keep-going ./test/e2e/..."
 
 [tasks."lint:check"]
 description = "Run linting and formatting checks"

@@ -20,7 +20,7 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Run mise run test:golden to verify infrastructure
+- [x] 4.1 Run mise run test:golden to verify infrastructure
 
 ## 5. Documentation
 
