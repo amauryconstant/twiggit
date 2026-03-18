@@ -83,6 +83,53 @@ See `internal/infrastructure/AGENTS.md` for detection rules and resolution.
 - `cmd/error_formatter.go` - user-friendly message formatting with hints
 - Pattern: `fmt.Errorf("action failed: %w", err)` for wrapping
 
+### Explicit Error Formatter Pattern
+
+The error formatter uses an explicit strategy pattern with `errors.As()` matching instead of reflection.
+
+**Core types:**
+```go
+type matcherFunc func(error) bool      // Checks if error matches a type
+type formatterFunc func(error) string   // Formats error into user-friendly message
+```
+
+**Matcher functions** (use `errors.As()` for type matching):
+- `isValidationError(err)` - matches `domain.ValidationError`
+- `isWorktreeError(err)` - matches `domain.WorktreeServiceError`
+- `isProjectError(err)` - matches `domain.ProjectServiceError`
+- `isServiceError(err)` - matches `domain.ServiceError`
+
+**Registration pattern** (in `NewErrorFormatterWithOptions`):
+```go
+formatter.register(isValidationError, formatValidationError)
+formatter.register(isWorktreeError, formatWorktreeError)
+formatter.register(isProjectError, formatProjectError)
+formatter.register(isServiceError, formatServiceError)
+```
+
+**Important:** Registration order determines priority - more specific errors first.
+
+**Adding a new error type:**
+1. Create matcher function in `cmd/error_formatter.go`:
+   ```go
+   func isMyCustomError(err error) bool {
+       var target *domain.MyCustomError
+       return errors.As(err, &target)
+   }
+   ```
+2. Create formatter function:
+   ```go
+   func formatMyCustomError(err error) string {
+       customErr := func() *domain.MyCustomError {
+           target := &domain.MyCustomError{}
+           _ = errors.As(err, &target)
+           return target
+       }()
+       return fmt.Sprintf("Error: %s\n", customErr.Error())
+   }
+   ```
+3. Register in `NewErrorFormatterWithOptions` before generic `formatServiceError`
+
 ## Command Specifications
 
 ### list
