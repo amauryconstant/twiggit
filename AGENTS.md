@@ -34,14 +34,16 @@ graph TB
 
 ## Essential Commands
 
-| Command            | Purpose                                     |
-| ------------------ | ------------------------------------------- |
-| mise run test      | Quick tests                                 |
-| mise run test:full | Full test suite (unit/integration/e2e/race) |
-| mise run lint:fix  | Lint + format                               |
-| mise run check     | All validation                              |
-| mise run build     | Build binary                                |
-| mise tasks         | List all tasks                              |
+| Command                | Purpose                                       |
+| ---------------------- | --------------------------------------------- |
+| mise run test          | All tests (unit/integration/e2e/race)         |
+| mise run test:e2e      | CLI end-to-end tests                          |
+| mise run test:golden   | Golden file tests (snapshot testing)          |
+| mise run test:golden:update | Update golden files                      |
+| mise run lint:fix      | Lint + format                                 |
+| mise run check         | All validation                                |
+| mise run build         | Build binary                                  |
+| mise tasks             | List all tasks                                |
 
 ## Release
 
