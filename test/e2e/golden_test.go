@@ -134,8 +134,9 @@ func compareGolden(goldenFile string, actual string) {
 		GinkgoT().Fatalf("failed to read golden file %s: %v", goldenPath, err)
 	}
 
-	// Normalize line endings for cross-platform comparison
-	expectedStr := normalizeLineEndings(string(expected))
+	// Normalize line endings and trim whitespace for cross-platform comparison
+	// This matches the behavior of GetOutput which uses TrimSpace
+	expectedStr := strings.TrimSpace(normalizeLineEndings(string(expected)))
 	actualStr := normalizeLineEndings(actual)
 
 	// Compare actual with expected
