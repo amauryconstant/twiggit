@@ -6,60 +6,32 @@ import (
 	"os"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
 )
 
-type WorktreeServiceTestSuite struct {
-	suite.Suite
-	service        application.WorktreeService
-	gitService     *mocks.MockGitService
-	projectService *mocks.MockProjectService
-	config         *domain.Config
-	testProject    *domain.ProjectInfo
-}
-
-func (s *WorktreeServiceTestSuite) SetupTest() {
-	s.config = domain.DefaultConfig()
-	s.gitService = mocks.NewMockGitService()
-	s.projectService = mocks.NewMockProjectService()
-	s.testProject = &domain.ProjectInfo{
-		Name:        "test-project",
-		Path:        "/path/to/project",
-		GitRepoPath: "/path/to/project/.git",
-		Worktrees: []*domain.WorktreeInfo{
-			{Path: "/path/to/worktree", Branch: "feature-branch", Commit: "abc123", IsBare: false},
-		},
-		Branches: []*domain.BranchInfo{
-			{Name: "main", IsCurrent: true},
-			{Name: "feature-branch", IsCurrent: false},
-		},
-	}
-	s.configureMocks()
-	s.service = NewWorktreeService(s.gitService, s.projectService, s.config, nil)
-}
-
-func (s *WorktreeServiceTestSuite) configureMocks() {
-	s.projectService.On("ListProjects", mock.Anything).Return([]*domain.ProjectInfo{s.testProject}, nil).Maybe()
+func configureWorktreeServiceMocks(gitService *mocks.MockGitService, projectService *mocks.MockProjectService, testProject *domain.ProjectInfo) {
+	projectService.On("ListProjects", mock.Anything).Return([]*domain.ProjectInfo{testProject}, nil).Maybe()
 
 	testSummary := &domain.ProjectSummary{
-		Name:        s.testProject.Name,
-		Path:        s.testProject.Path,
-		GitRepoPath: s.testProject.GitRepoPath,
+		Name:        testProject.Name,
+		Path:        testProject.Path,
+		GitRepoPath: testProject.GitRepoPath,
 	}
-	s.projectService.On("ListProjectSummaries", mock.Anything).Return([]*domain.ProjectSummary{testSummary}, nil).Maybe()
+	projectService.On("ListProjectSummaries", mock.Anything).Return([]*domain.ProjectSummary{testSummary}, nil).Maybe()
 
-	s.projectService.On("DiscoverProject", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("*domain.Context")).Return(s.testProject, nil).Maybe()
+	projectService.On("DiscoverProject", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("*domain.Context")).Return(testProject, nil).Maybe()
 
-	s.projectService.On("GetProjectInfo", mock.Anything, "/path/to/project").Return(s.testProject, nil).Maybe()
-	s.projectService.On("GetProjectInfo", mock.Anything, "").Return(s.testProject, nil).Maybe()
-	s.projectService.On("GetProjectInfo", mock.Anything, mock.AnythingOfType("string")).Return((*domain.ProjectInfo)(nil), nil).Maybe()
+	projectService.On("GetProjectInfo", mock.Anything, "/path/to/project").Return(testProject, nil).Maybe()
+	projectService.On("GetProjectInfo", mock.Anything, "").Return(testProject, nil).Maybe()
+	projectService.On("GetProjectInfo", mock.Anything, mock.AnythingOfType("string")).Return((*domain.ProjectInfo)(nil), nil).Maybe()
 
-	s.projectService.On("ValidateProject", mock.Anything, mock.AnythingOfType("string")).Return(nil).Maybe()
+	projectService.On("ValidateProject", mock.Anything, mock.AnythingOfType("string")).Return(nil).Maybe()
 
 	worktrees := []domain.WorktreeInfo{
 		{
@@ -69,17 +41,17 @@ func (s *WorktreeServiceTestSuite) configureMocks() {
 			IsBare: false,
 		},
 	}
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project/.git").Return(worktrees, nil).Maybe()
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil).Maybe()
-	s.gitService.MockCLIClient.On("CreateWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Maybe()
-	s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("bool")).Return(nil).Maybe()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil).Maybe()
-	s.gitService.MockCLIClient.On("PruneWorktrees", mock.Anything, mock.AnythingOfType("string")).Return(nil).Maybe()
-	s.gitService.MockCLIClient.On("DeleteBranch", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Maybe()
-	s.gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil).Maybe()
-	s.gitService.MockGoGitClient.On("BranchExists", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(false, nil).Maybe()
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project/.git").Return(worktrees, nil).Maybe()
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil).Maybe()
+	gitService.MockCLIClient.On("CreateWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Maybe()
+	gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("bool")).Return(nil).Maybe()
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil).Maybe()
+	gitService.MockCLIClient.On("PruneWorktrees", mock.Anything, mock.AnythingOfType("string")).Return(nil).Maybe()
+	gitService.MockCLIClient.On("DeleteBranch", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Maybe()
+	gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil).Maybe()
+	gitService.MockGoGitClient.On("BranchExists", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(false, nil).Maybe()
 
-	s.gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, mock.AnythingOfType("string")).Return(domain.RepositoryStatus{
+	gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, mock.AnythingOfType("string")).Return(domain.RepositoryStatus{
 		IsClean:   true,
 		Branch:    "feature-branch",
 		Commit:    "abc123",
@@ -92,11 +64,31 @@ func (s *WorktreeServiceTestSuite) configureMocks() {
 	}, nil).Maybe()
 }
 
-func TestWorktreeService(t *testing.T) {
-	suite.Run(t, new(WorktreeServiceTestSuite))
+func setupWorktreeService() (application.WorktreeService, *mocks.MockGitService, *mocks.MockProjectService, *domain.Config) {
+	config := domain.DefaultConfig()
+	gitService := mocks.NewMockGitService()
+	projectService := mocks.NewMockProjectService()
+	testProject := &domain.ProjectInfo{
+		Name:        "test-project",
+		Path:        "/path/to/project",
+		GitRepoPath: "/path/to/project/.git",
+		Worktrees: []*domain.WorktreeInfo{
+			{Path: "/path/to/worktree", Branch: "feature-branch", Commit: "abc123", IsBare: false},
+		},
+		Branches: []*domain.BranchInfo{
+			{Name: "main", IsCurrent: true},
+			{Name: "feature-branch", IsCurrent: false},
+		},
+	}
+	configureWorktreeServiceMocks(gitService, projectService, testProject)
+	service := NewWorktreeService(gitService, projectService, config, nil)
+
+	return service, gitService, projectService, config
 }
 
-func (s *WorktreeServiceTestSuite) TestCreateWorktree() {
+func TestWorktreeService_CreateWorktree(t *testing.T) {
+	service, _, _, _ := setupWorktreeService()
+
 	tests := []struct {
 		name         string
 		request      *domain.CreateWorktreeRequest
@@ -146,23 +138,25 @@ func (s *WorktreeServiceTestSuite) TestCreateWorktree() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			result, err := s.service.CreateWorktree(context.Background(), tc.request)
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := service.CreateWorktree(context.Background(), tc.request)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
+				assert.Nil(t, result)
 			} else {
-				s.Require().NoError(err)
-				s.NotNil(result)
-				s.Equal(tc.request.BranchName, result.Worktree.Branch)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, tc.request.BranchName, result.Worktree.Branch)
 			}
 		})
 	}
 }
 
-func (s *WorktreeServiceTestSuite) TestDeleteWorktree() {
+func TestWorktreeService_DeleteWorktree(t *testing.T) {
+	service, _, _, _ := setupWorktreeService()
+
 	tests := []struct {
 		name         string
 		request      *domain.DeleteWorktreeRequest
@@ -195,21 +189,22 @@ func (s *WorktreeServiceTestSuite) TestDeleteWorktree() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			err := s.service.DeleteWorktree(context.Background(), tc.request)
+		t.Run(tc.name, func(t *testing.T) {
+			err := service.DeleteWorktree(context.Background(), tc.request)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
 			} else {
-				s.Require().NoError(err)
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
-func (s *WorktreeServiceTestSuite) TestDeleteWorktree_Idempotent() {
-	s.Run("non-existent worktree should succeed", func() {
+func TestWorktreeService_DeleteWorktree_Idempotent(t *testing.T) {
+	t.Run("non-existent worktree should succeed", func(t *testing.T) {
+		service, _, _, _ := setupWorktreeService()
 		request := &domain.DeleteWorktreeRequest{
 			WorktreePath: "/non/existent/worktree",
 			Force:        false,
@@ -218,12 +213,14 @@ func (s *WorktreeServiceTestSuite) TestDeleteWorktree_Idempotent() {
 			},
 		}
 
-		err := s.service.DeleteWorktree(context.Background(), request)
-		s.Require().NoError(err, "DeleteWorktree should be idempotent and succeed for non-existent worktrees")
+		err := service.DeleteWorktree(context.Background(), request)
+		assert.NoError(t, err, "DeleteWorktree should be idempotent and succeed for non-existent worktrees")
 	})
 }
 
-func (s *WorktreeServiceTestSuite) TestListWorktrees() {
+func TestWorktreeService_ListWorktrees(t *testing.T) {
+	service, _, _, _ := setupWorktreeService()
+
 	tests := []struct {
 		name        string
 		request     *domain.ListWorktreesRequest
@@ -244,21 +241,23 @@ func (s *WorktreeServiceTestSuite) TestListWorktrees() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			result, err := s.service.ListWorktrees(context.Background(), tc.request)
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := service.ListWorktrees(context.Background(), tc.request)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Nil(t, result)
 			} else {
-				s.Require().NoError(err)
-				s.NotNil(result)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
 			}
 		})
 	}
 }
 
-func (s *WorktreeServiceTestSuite) TestGetWorktreeStatus() {
+func TestWorktreeService_GetWorktreeStatus(t *testing.T) {
+	service, _, _, _ := setupWorktreeService()
+
 	tests := []struct {
 		name         string
 		worktreePath string
@@ -279,22 +278,24 @@ func (s *WorktreeServiceTestSuite) TestGetWorktreeStatus() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			result, err := s.service.GetWorktreeStatus(context.Background(), tc.worktreePath)
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := service.GetWorktreeStatus(context.Background(), tc.worktreePath)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
+				assert.Nil(t, result)
 			} else {
-				s.Require().NoError(err)
-				s.NotNil(result)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
 			}
 		})
 	}
 }
 
-func (s *WorktreeServiceTestSuite) TestValidateWorktree() {
+func TestWorktreeService_ValidateWorktree(t *testing.T) {
+	service, _, _, _ := setupWorktreeService()
+
 	tests := []struct {
 		name         string
 		worktreePath string
@@ -315,21 +316,23 @@ func (s *WorktreeServiceTestSuite) TestValidateWorktree() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			err := s.service.ValidateWorktree(context.Background(), tc.worktreePath)
+		t.Run(tc.name, func(t *testing.T) {
+			err := service.ValidateWorktree(context.Background(), tc.worktreePath)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
 			} else {
-				s.Require().NoError(err)
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_DryRun() {
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil)
+func TestWorktreeService_PruneMergedWorktrees_DryRun(t *testing.T) {
+	service, gitService, _, _ := setupWorktreeService()
+
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil)
 
 	req := &domain.PruneWorktreesRequest{
 		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -338,18 +341,20 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_DryRun() {
 		DeleteBranches: false,
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(0, result.TotalDeleted)
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 0, result.TotalDeleted)
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_ProtectedBranch() {
-	s.gitService.MockCLIClient.ExpectedCalls = nil
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+func TestWorktreeService_PruneMergedWorktrees_ProtectedBranch(t *testing.T) {
+	service, gitService, _, _ := setupWorktreeService()
+
+	gitService.MockCLIClient.ExpectedCalls = nil
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 		{Path: "/path/to/worktree-main", Branch: "main", Commit: "abc123"},
 	}, nil).Once()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil).Maybe()
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil).Maybe()
 
 	req := &domain.PruneWorktreesRequest{
 		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -358,19 +363,21 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_ProtectedBranch() {
 		DeleteBranches: true,
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(0, result.TotalDeleted)
-	s.Len(result.ProtectedSkipped, 1)
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 0, result.TotalDeleted)
+	assert.Len(t, result.ProtectedSkipped, 1)
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_UnmergedBranch() {
-	s.gitService.MockCLIClient.ExpectedCalls = nil
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+func TestWorktreeService_PruneMergedWorktrees_UnmergedBranch(t *testing.T) {
+	service, gitService, _, _ := setupWorktreeService()
+
+	gitService.MockCLIClient.ExpectedCalls = nil
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 		{Path: "/path/to/worktree-feature", Branch: "feature-unmerged", Commit: "abc123"},
 	}, nil)
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-unmerged").Return(false, nil)
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-unmerged").Return(false, nil)
 
 	req := &domain.PruneWorktreesRequest{
 		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -379,31 +386,35 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_UnmergedBranch() {
 		DeleteBranches: false,
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(0, result.TotalDeleted)
-	s.Len(result.UnmergedSkipped, 1)
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 0, result.TotalDeleted)
+	assert.Len(t, result.UnmergedSkipped, 1)
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_InvalidRequest() {
+func TestWorktreeService_PruneMergedWorktrees_InvalidRequest(t *testing.T) {
+	service, _, _, _ := setupWorktreeService()
+
 	req := &domain.PruneWorktreesRequest{
 		AllProjects:      true,
 		SpecificWorktree: "project/branch",
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().Error(err)
-	s.Contains(err.Error(), "cannot use --all with specific worktree")
-	s.Nil(result)
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "cannot use --all with specific worktree")
+	assert.Nil(t, result)
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_ForceFlag() {
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+func TestWorktreeService_PruneMergedWorktrees_ForceFlag(t *testing.T) {
+	service, gitService, _, _ := setupWorktreeService()
+
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 		{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
 	}, nil).Once()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-	s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), true).Return(nil).Once()
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+	gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), true).Return(nil).Once()
 
 	req := &domain.PruneWorktreesRequest{
 		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -412,18 +423,20 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_ForceFlag() {
 		DeleteBranches: false,
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(1, result.TotalDeleted)
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.TotalDeleted)
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_SingleWorktree() {
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+func TestWorktreeService_PruneMergedWorktrees_SingleWorktree(t *testing.T) {
+	service, gitService, _, _ := setupWorktreeService()
+
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 		{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
 	}, nil).Once()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-	s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+	gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
 
 	req := &domain.PruneWorktreesRequest{
 		Context:          &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -433,54 +446,30 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_SingleWorktree() {
 		SpecificWorktree: "test-project/feature-branch",
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(1, result.TotalDeleted)
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.TotalDeleted)
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_NavigationPath() {
-	s.Run("sets navigation path when single worktree deleted with specific worktree and project exists", func() {
-		s.gitService.MockCLIClient.ExpectedCalls = nil
-		s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+func TestWorktreeService_PruneMergedWorktrees_NavigationPath(t *testing.T) {
+	t.Run("sets navigation path when single worktree deleted with specific worktree and project exists", func(t *testing.T) {
+		service, gitService, _, config := setupWorktreeService()
+
+		gitService.MockCLIClient.ExpectedCalls = nil
+		gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 			{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
 		}, nil).Once()
-		s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-		s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
+		gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+		gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
 
-		tempDir := s.T().TempDir()
+		tempDir := t.TempDir()
 		projectDir := tempDir + "/test-project"
-		s.Require().NoError(os.MkdirAll(projectDir, 0755))
+		require.NoError(t, os.MkdirAll(projectDir, 0755))
 
-		originalProjectsDir := s.config.ProjectsDirectory
-		s.config.ProjectsDirectory = tempDir
-		defer func() { s.config.ProjectsDirectory = originalProjectsDir }()
-
-		req := &domain.PruneWorktreesRequest{
-			Context:          &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
-			DryRun:           false,
-			Force:            false,
-			DeleteBranches:   false,
-			SpecificWorktree: "test-project/feature-branch",
-		}
-
-		result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-		s.Require().NoError(err)
-		s.NotNil(result)
-		s.Equal(1, result.TotalDeleted)
-		s.NotEmpty(result.NavigationPath)
-		s.Contains(result.NavigationPath, "test-project")
-	})
-
-	s.Run("does not set navigation path when project path does not exist", func() {
-		s.gitService.MockCLIClient.ExpectedCalls = nil
-		s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
-			{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
-		}, nil).Once()
-		s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-		s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
-
-		s.config.ProjectsDirectory = "/nonexistent/path"
+		originalProjectsDir := config.ProjectsDirectory
+		config.ProjectsDirectory = tempDir
+		defer func() { config.ProjectsDirectory = originalProjectsDir }()
 
 		req := &domain.PruneWorktreesRequest{
 			Context:          &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -490,20 +479,50 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_NavigationPath() {
 			SpecificWorktree: "test-project/feature-branch",
 		}
 
-		result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-		s.Require().NoError(err)
-		s.NotNil(result)
-		s.Equal(1, result.TotalDeleted)
-		s.Empty(result.NavigationPath)
+		result, err := service.PruneMergedWorktrees(context.Background(), req)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, 1, result.TotalDeleted)
+		assert.NotEmpty(t, result.NavigationPath)
+		assert.Contains(t, result.NavigationPath, "test-project")
 	})
 
-	s.Run("does not set navigation path without specific worktree", func() {
-		s.gitService.MockCLIClient.ExpectedCalls = nil
-		s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+	t.Run("does not set navigation path when project path does not exist", func(t *testing.T) {
+		service, gitService, _, config := setupWorktreeService()
+
+		gitService.MockCLIClient.ExpectedCalls = nil
+		gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 			{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
 		}, nil).Once()
-		s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-		s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
+		gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+		gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
+
+		config.ProjectsDirectory = "/nonexistent/path"
+
+		req := &domain.PruneWorktreesRequest{
+			Context:          &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
+			DryRun:           false,
+			Force:            false,
+			DeleteBranches:   false,
+			SpecificWorktree: "test-project/feature-branch",
+		}
+
+		result, err := service.PruneMergedWorktrees(context.Background(), req)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, 1, result.TotalDeleted)
+		assert.Empty(t, result.NavigationPath)
+	})
+
+	t.Run("does not set navigation path without specific worktree", func(t *testing.T) {
+		service, gitService, _, _ := setupWorktreeService()
+
+		gitService.MockCLIClient.ExpectedCalls = nil
+		gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+			{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
+		}, nil).Once()
+		gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+		gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
 
 		req := &domain.PruneWorktreesRequest{
 			Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -512,21 +531,23 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_NavigationPath() {
 			DeleteBranches: false,
 		}
 
-		result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-		s.Require().NoError(err)
-		s.NotNil(result)
-		s.Equal(1, result.TotalDeleted)
-		s.Empty(result.NavigationPath)
+		result, err := service.PruneMergedWorktrees(context.Background(), req)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, 1, result.TotalDeleted)
+		assert.Empty(t, result.NavigationPath)
 	})
 
-	s.Run("does not set navigation path with multiple deletions", func() {
-		s.gitService.MockCLIClient.ExpectedCalls = nil
-		s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+	t.Run("does not set navigation path with multiple deletions", func(t *testing.T) {
+		service, gitService, _, _ := setupWorktreeService()
+
+		gitService.MockCLIClient.ExpectedCalls = nil
+		gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 			{Path: "/path/to/worktree-feature1", Branch: "feature-1", Commit: "abc123"},
 			{Path: "/path/to/worktree-feature2", Branch: "feature-2", Commit: "def456"},
 		}, nil).Once()
-		s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil)
-		s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil)
+		gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil)
+		gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil)
 
 		req := &domain.PruneWorktreesRequest{
 			Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -535,24 +556,26 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_NavigationPath() {
 			DeleteBranches: false,
 		}
 
-		result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-		s.Require().NoError(err)
-		s.NotNil(result)
-		s.Equal(2, result.TotalDeleted)
-		s.Empty(result.NavigationPath)
+		result, err := service.PruneMergedWorktrees(context.Background(), req)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, 2, result.TotalDeleted)
+		assert.Empty(t, result.NavigationPath)
 	})
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_DeleteBranches() {
-	s.Run("deletes branch when DeleteBranches is true", func() {
-		s.gitService.MockCLIClient.ExpectedCalls = nil
-		s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+func TestWorktreeService_PruneMergedWorktrees_DeleteBranches(t *testing.T) {
+	t.Run("deletes branch when DeleteBranches is true", func(t *testing.T) {
+		service, gitService, _, _ := setupWorktreeService()
+
+		gitService.MockCLIClient.ExpectedCalls = nil
+		gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 			{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
 		}, nil).Once()
-		s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-		s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
-		s.gitService.MockCLIClient.On("PruneWorktrees", mock.Anything, mock.AnythingOfType("string")).Return(nil).Once()
-		s.gitService.MockCLIClient.On("DeleteBranch", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(nil).Once()
+		gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+		gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
+		gitService.MockCLIClient.On("PruneWorktrees", mock.Anything, mock.AnythingOfType("string")).Return(nil).Once()
+		gitService.MockCLIClient.On("DeleteBranch", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(nil).Once()
 
 		req := &domain.PruneWorktreesRequest{
 			Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -561,26 +584,28 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_DeleteBranches() {
 			DeleteBranches: true,
 		}
 
-		result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-		s.Require().NoError(err)
-		s.NotNil(result)
-		s.Equal(1, result.TotalDeleted)
-		s.Equal(1, result.TotalBranchesDeleted)
-		s.Len(result.DeletedWorktrees, 1)
-		s.True(result.DeletedWorktrees[0].BranchDeleted)
+		result, err := service.PruneMergedWorktrees(context.Background(), req)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, 1, result.TotalDeleted)
+		assert.Equal(t, 1, result.TotalBranchesDeleted)
+		assert.Len(t, result.DeletedWorktrees, 1)
+		assert.True(t, result.DeletedWorktrees[0].BranchDeleted)
 	})
 
-	s.Run("continues when branch deletion fails", func() {
-		s.gitService.MockCLIClient.ExpectedCalls = nil
-		s.gitService.MockGoGitClient.ExpectedCalls = nil
-		s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+	t.Run("continues when branch deletion fails", func(t *testing.T) {
+		service, gitService, _, _ := setupWorktreeService()
+
+		gitService.MockCLIClient.ExpectedCalls = nil
+		gitService.MockGoGitClient.ExpectedCalls = nil
+		gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 			{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
 		}, nil).Once()
-		s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-		s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
-		s.gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, "/path/to/worktree-feature").Return(domain.RepositoryStatus{IsClean: true}, nil).Once()
-		s.gitService.MockCLIClient.On("PruneWorktrees", mock.Anything, mock.AnythingOfType("string")).Return(nil).Once()
-		s.gitService.MockCLIClient.On("DeleteBranch", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(errors.New("branch in use")).Once()
+		gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+		gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil).Once()
+		gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, "/path/to/worktree-feature").Return(domain.RepositoryStatus{IsClean: true}, nil).Once()
+		gitService.MockCLIClient.On("PruneWorktrees", mock.Anything, mock.AnythingOfType("string")).Return(nil).Once()
+		gitService.MockCLIClient.On("DeleteBranch", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(errors.New("branch in use")).Once()
 
 		req := &domain.PruneWorktreesRequest{
 			Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -589,26 +614,28 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_DeleteBranches() {
 			DeleteBranches: true,
 		}
 
-		result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-		s.Require().NoError(err)
-		s.NotNil(result)
-		s.Equal(1, result.TotalDeleted)
-		s.Equal(0, result.TotalBranchesDeleted)
-		s.Len(result.DeletedWorktrees, 1)
-		s.False(result.DeletedWorktrees[0].BranchDeleted)
-		s.Require().Error(result.DeletedWorktrees[0].Error)
-		s.Contains(result.DeletedWorktrees[0].Error.Error(), "branch deletion failed")
+		result, err := service.PruneMergedWorktrees(context.Background(), req)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Equal(t, 1, result.TotalDeleted)
+		assert.Equal(t, 0, result.TotalBranchesDeleted)
+		assert.Len(t, result.DeletedWorktrees, 1)
+		assert.False(t, result.DeletedWorktrees[0].BranchDeleted)
+		require.Error(t, result.DeletedWorktrees[0].Error)
+		assert.Contains(t, result.DeletedWorktrees[0].Error.Error(), "branch deletion failed")
 	})
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_ForceBypassesUncommittedCheck() {
-	s.gitService.MockCLIClient.ExpectedCalls = nil
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+func TestWorktreeService_PruneMergedWorktrees_ForceBypassesUncommittedCheck(t *testing.T) {
+	service, gitService, _, _ := setupWorktreeService()
+
+	gitService.MockCLIClient.ExpectedCalls = nil
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 		{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
 	}, nil).Once()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-	s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), true).Return(nil).Once()
-	s.gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, "/path/to/worktree-feature").Return(domain.RepositoryStatus{
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+	gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), true).Return(nil).Once()
+	gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, "/path/to/worktree-feature").Return(domain.RepositoryStatus{
 		IsClean:  false,
 		Modified: []string{"file.txt"},
 	}, nil).Maybe()
@@ -620,20 +647,22 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_ForceBypassesUncommi
 		DeleteBranches: false,
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(1, result.TotalDeleted)
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.TotalDeleted)
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_SkipsUncommittedWithoutForce() {
-	s.gitService.MockCLIClient.ExpectedCalls = nil
-	s.gitService.MockGoGitClient.ExpectedCalls = nil
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+func TestWorktreeService_PruneMergedWorktrees_SkipsUncommittedWithoutForce(t *testing.T) {
+	service, gitService, _, _ := setupWorktreeService()
+
+	gitService.MockCLIClient.ExpectedCalls = nil
+	gitService.MockGoGitClient.ExpectedCalls = nil
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 		{Path: "/path/to/worktree-feature", Branch: "feature-branch", Commit: "abc123"},
 	}, nil).Once()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
-	s.gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, "/path/to/worktree-feature").Return(domain.RepositoryStatus{
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+	gitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, "/path/to/worktree-feature").Return(domain.RepositoryStatus{
 		IsClean:  false,
 		Modified: []string{"file.txt"},
 	}, nil).Once()
@@ -645,18 +674,20 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_SkipsUncommittedWith
 		DeleteBranches: false,
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(0, result.TotalDeleted)
-	s.Equal(1, result.TotalSkipped)
-	s.Len(result.SkippedWorktrees, 1)
-	s.Contains(result.SkippedWorktrees[0].SkipReason, "uncommitted changes")
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 0, result.TotalDeleted)
+	assert.Equal(t, 1, result.TotalSkipped)
+	assert.Len(t, result.SkippedWorktrees, 1)
+	assert.Contains(t, result.SkippedWorktrees[0].SkipReason, "uncommitted changes")
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_AllProjects() {
-	s.gitService.MockCLIClient.ExpectedCalls = nil
-	s.projectService.ExpectedCalls = nil
+func TestWorktreeService_PruneMergedWorktrees_AllProjects(t *testing.T) {
+	service, gitService, projectService, _ := setupWorktreeService()
+
+	gitService.MockCLIClient.ExpectedCalls = nil
+	projectService.ExpectedCalls = nil
 
 	project1 := &domain.ProjectInfo{
 		Name:        "project1",
@@ -673,15 +704,15 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_AllProjects() {
 		{Name: project1.Name, Path: project1.Path, GitRepoPath: project1.GitRepoPath},
 		{Name: project2.Name, Path: project2.Path, GitRepoPath: project2.GitRepoPath},
 	}
-	s.projectService.On("ListProjectSummaries", mock.Anything).Return(summaries, nil).Once()
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project1/.git").Return([]domain.WorktreeInfo{
+	projectService.On("ListProjectSummaries", mock.Anything).Return(summaries, nil).Once()
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project1/.git").Return([]domain.WorktreeInfo{
 		{Path: "/path/to/wt1", Branch: "feature-1", Commit: "abc123"},
 	}, nil).Once()
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project2/.git").Return([]domain.WorktreeInfo{
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project2/.git").Return([]domain.WorktreeInfo{
 		{Path: "/path/to/wt2", Branch: "feature-2", Commit: "def456"},
 	}, nil).Once()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil)
-	s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil)
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(true, nil)
+	gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), false).Return(nil)
 
 	req := &domain.PruneWorktreesRequest{
 		Context:     &domain.Context{Type: domain.ContextOutsideGit},
@@ -690,34 +721,36 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_AllProjects() {
 		Force:       false,
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(2, result.TotalDeleted)
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 2, result.TotalDeleted)
 }
 
-func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_CurrentWorktreeSkipped() {
-	tempDir := s.T().TempDir()
+func TestWorktreeService_PruneMergedWorktrees_CurrentWorktreeSkipped(t *testing.T) {
+	service, gitService, _, _ := setupWorktreeService()
+
+	tempDir := t.TempDir()
 	worktreeCurrentPath := tempDir + "/worktree-current"
 	worktreeOtherPath := tempDir + "/worktree-other"
 
-	s.gitService.MockCLIClient.ExpectedCalls = nil
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
+	gitService.MockCLIClient.ExpectedCalls = nil
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{
 		{Path: worktreeCurrentPath, Branch: "feature-current", Commit: "abc123"},
 		{Path: worktreeOtherPath, Branch: "feature-other", Commit: "def456"},
 	}, nil).Once()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-current").Return(true, nil).Maybe()
-	s.gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-other").Return(true, nil).Maybe()
-	s.gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), worktreeOtherPath, mock.AnythingOfType("bool")).Return(nil).Maybe()
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-current").Return(true, nil).Maybe()
+	gitService.MockCLIClient.On("IsBranchMerged", mock.Anything, mock.AnythingOfType("string"), "feature-other").Return(true, nil).Maybe()
+	gitService.MockCLIClient.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("string"), worktreeOtherPath, mock.AnythingOfType("bool")).Return(nil).Maybe()
 
 	originalWd, err := os.Getwd()
-	s.Require().NoError(err)
+	require.NoError(t, err)
 	defer os.Chdir(originalWd)
 
 	err = os.MkdirAll(worktreeCurrentPath, 0755)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 	err = os.Chdir(worktreeCurrentPath)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	req := &domain.PruneWorktreesRequest{
 		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: "/path/to/project"},
@@ -726,12 +759,12 @@ func (s *WorktreeServiceTestSuite) TestPruneMergedWorktrees_CurrentWorktreeSkipp
 		DeleteBranches: false,
 	}
 
-	result, err := s.service.PruneMergedWorktrees(context.Background(), req)
-	s.Require().NoError(err)
-	s.NotNil(result)
-	s.Equal(1, result.TotalDeleted, "should delete non-current worktree")
-	s.Equal(1, result.TotalSkipped, "should skip current worktree")
-	s.Len(result.CurrentWorktreeSkipped, 1)
-	s.Equal("feature-current", result.CurrentWorktreeSkipped[0].BranchName)
-	s.Contains(result.CurrentWorktreeSkipped[0].SkipReason, "cannot prune current worktree")
+	result, err := service.PruneMergedWorktrees(context.Background(), req)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, 1, result.TotalDeleted, "should delete non-current worktree")
+	assert.Equal(t, 1, result.TotalSkipped, "should skip current worktree")
+	assert.Len(t, result.CurrentWorktreeSkipped, 1)
+	assert.Equal(t, "feature-current", result.CurrentWorktreeSkipped[0].BranchName)
+	assert.Contains(t, result.CurrentWorktreeSkipped[0].SkipReason, "cannot prune current worktree")
 }

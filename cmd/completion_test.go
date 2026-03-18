@@ -4,28 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 
 	"twiggit/internal/domain"
 )
 
-type CompletionTestSuite struct {
-	suite.Suite
-	config *CommandConfig
-}
-
-func TestCompletion(t *testing.T) {
-	suite.Run(t, new(CompletionTestSuite))
-}
-
-func (s *CompletionTestSuite) SetupTest() {
-	s.config = &CommandConfig{
-		Services: &ServiceContainer{},
-		Config:   &domain.Config{},
-	}
-}
-
-func (s *CompletionTestSuite) TestGetCompletionTimeout() {
+func TestCompletion_GetCompletionTimeout(t *testing.T) {
 	tests := []struct {
 		name     string
 		config   *domain.Config
@@ -72,26 +56,26 @@ func (s *CompletionTestSuite) TestGetCompletionTimeout() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := getCompletionTimeout(tt.config)
-			s.Equal(tt.expected, result)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_EmptySuggestions() {
+func TestCompletion_SuggestionsToCarapaceAction_EmptySuggestions(t *testing.T) {
 	action := suggestionsToCarapaceAction([]*domain.ResolutionSuggestion{}, "main")
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_NilSuggestions() {
+func TestCompletion_SuggestionsToCarapaceAction_NilSuggestions(t *testing.T) {
 	action := suggestionsToCarapaceAction(nil, "main")
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_WithSuggestions() {
+func TestCompletion_SuggestionsToCarapaceAction_WithSuggestions(t *testing.T) {
 	suggestions := []*domain.ResolutionSuggestion{
 		{Text: "main", Description: "Project root directory"},
 		{Text: "feature-1", Description: "Worktree for branch feature-1"},
@@ -100,44 +84,60 @@ func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_WithSuggestions() 
 
 	action := suggestionsToCarapaceAction(suggestions, "main")
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestSuggestionsToCarapaceAction_SingleSuggestion() {
+func TestCompletion_SuggestionsToCarapaceAction_SingleSuggestion(t *testing.T) {
 	suggestions := []*domain.ResolutionSuggestion{
 		{Text: "main", Description: "Project root directory", Type: domain.PathTypeProject, ProjectName: "test-project"},
 	}
 
 	action := suggestionsToCarapaceAction(suggestions, "main")
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestActionWorktreeTarget_ReturnsAction() {
-	action := actionWorktreeTarget(s.config)
+func TestCompletion_ActionWorktreeTarget_ReturnsAction(t *testing.T) {
+	config := &CommandConfig{
+		Services: &ServiceContainer{},
+		Config:   &domain.Config{},
+	}
+	action := actionWorktreeTarget(config)
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestActionBranches_ReturnsAction() {
-	action := actionBranches(s.config)
+func TestCompletion_ActionBranches_ReturnsAction(t *testing.T) {
+	config := &CommandConfig{
+		Services: &ServiceContainer{},
+		Config:   &domain.Config{},
+	}
+	action := actionBranches(config)
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestActionBranchesForProject_ReturnsAction() {
-	action := actionBranchesForProject("myproject", s.config)
+func TestCompletion_ActionBranchesForProject_ReturnsAction(t *testing.T) {
+	config := &CommandConfig{
+		Services: &ServiceContainer{},
+		Config:   &domain.Config{},
+	}
+	action := actionBranchesForProject("myproject", config)
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestActionWorktreeTarget_WithExistingOnly() {
-	action := actionWorktreeTarget(s.config, domain.WithExistingOnly())
+func TestCompletion_ActionWorktreeTarget_WithExistingOnly(t *testing.T) {
+	config := &CommandConfig{
+		Services: &ServiceContainer{},
+		Config:   &domain.Config{},
+	}
+	action := actionWorktreeTarget(config, domain.WithExistingOnly())
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestActionWorktreeTarget_WithNilConfig() {
+func TestCompletion_ActionWorktreeTarget_WithNilConfig(t *testing.T) {
 	nilConfig := &CommandConfig{
 		Services: &ServiceContainer{},
 		Config:   nil,
@@ -145,11 +145,11 @@ func (s *CompletionTestSuite) TestActionWorktreeTarget_WithNilConfig() {
 
 	action := actionWorktreeTarget(nilConfig)
 
-	s.NotNil(action)
+	assert.NotNil(t, action)
 }
 
-func (s *CompletionTestSuite) TestGetCompletionTimeout_NilConfigSafety() {
+func TestCompletion_GetCompletionTimeout_NilConfigSafety(t *testing.T) {
 	result := getCompletionTimeout(nil)
 
-	s.Equal(500*time.Millisecond, result)
+	assert.Equal(t, 500*time.Millisecond, result)
 }

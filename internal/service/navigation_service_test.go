@@ -4,42 +4,21 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
 )
 
-type NavigationServiceTestSuite struct {
-	suite.Suite
-	service application.NavigationService
-	config  *domain.Config
-}
-
-func (s *NavigationServiceTestSuite) SetupTest() {
-	s.config = domain.DefaultConfig()
-	s.service = s.setupTestNavigationService()
-}
-
-func (s *NavigationServiceTestSuite) setupTestNavigationService() application.NavigationService {
-	projectService := mocks.NewMockProjectService()
-	contextService := mocks.NewMockContextService()
-	return NewNavigationService(projectService, contextService, s.config)
-}
-
 func TestNavigationService(t *testing.T) {
-	suite.Run(t, new(NavigationServiceTestSuite))
-}
-
-func (s *NavigationServiceTestSuite) TestResolvePath() {
 	tests := []struct {
 		name         string
 		request      *domain.ResolvePathRequest
 		expectError  bool
 		errorMessage string
-		setupMocks   func()
+		setupMocks   func(*mocks.MockProjectService, *mocks.MockContextService)
 	}{
 		{
 			name: "valid branch resolution from project context",
@@ -51,7 +30,7 @@ func (s *NavigationServiceTestSuite) TestResolvePath() {
 				},
 			},
 			expectError: false,
-			setupMocks:  func() {},
+			setupMocks:  func(ps *mocks.MockProjectService, cs *mocks.MockContextService) {},
 		},
 		{
 			name: "empty target",
@@ -63,37 +42,53 @@ func (s *NavigationServiceTestSuite) TestResolvePath() {
 			},
 			expectError:  true,
 			errorMessage: "validation failed for ResolvePathRequest.target: cannot be empty",
-			setupMocks:   func() {},
+			setupMocks:   func(ps *mocks.MockProjectService, cs *mocks.MockContextService) {},
 		},
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			// Set up fresh mocks for each test case
+		t.Run(tc.name, func(t *testing.T) {
+			config := domain.DefaultConfig()
+
 			projectService := mocks.NewMockProjectService()
 			contextService := mocks.NewMockContextService()
-			contextService.On("ResolveIdentifierFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
-				Type:         domain.PathTypeWorktree,
-				ResolvedPath: "/path/to/worktree",
-			}, nil)
-			tc.setupMocks()
 
-			service := NewNavigationService(projectService, contextService, s.config)
+			tc.setupMocks(projectService, contextService)
+
+			// Only setup the default expectation if not expecting an error
+			if !tc.expectError {
+				contextService.On("ResolveIdentifierFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
+					Type:         domain.PathTypeWorktree,
+					ResolvedPath: "/path/to/worktree",
+				}, nil)
+			}
+
+			t.Cleanup(func() {
+				projectService.AssertExpectations(t)
+				contextService.AssertExpectations(t)
+			})
+
+			service := NewNavigationService(projectService, contextService, config)
 			result, err := service.ResolvePath(context.Background(), tc.request)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
+				assert.Nil(t, result)
 			} else {
-				s.Require().NoError(err)
-				s.NotNil(result)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
 			}
 		})
 	}
 }
 
-func (s *NavigationServiceTestSuite) TestValidatePath() {
+func TestNavigationService_ValidatePath(t *testing.T) {
+	config := domain.DefaultConfig()
+	projectService := mocks.NewMockProjectService()
+	contextService := mocks.NewMockContextService()
+	service := NewNavigationService(projectService, contextService, config)
+
 	tests := []struct {
 		name         string
 		path         string
@@ -114,20 +109,22 @@ func (s *NavigationServiceTestSuite) TestValidatePath() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			err := s.service.ValidatePath(context.Background(), tc.path)
+		t.Run(tc.name, func(t *testing.T) {
+			err := service.ValidatePath(context.Background(), tc.path)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
 			} else {
-				s.Require().NoError(err)
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
-func (s *NavigationServiceTestSuite) TestGetNavigationSuggestions() {
+func TestNavigationService_GetNavigationSuggestions(t *testing.T) {
+	config := domain.DefaultConfig()
+
 	tests := []struct {
 		name        string
 		context     *domain.Context
@@ -154,10 +151,11 @@ func (s *NavigationServiceTestSuite) TestGetNavigationSuggestions() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			projectService := mocks.NewMockProjectService()
 			contextService := mocks.NewMockContextService()
 
+			// Setup both mock expectations since the service may call either
 			contextService.On("GetCompletionSuggestionsFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string"), []domain.SuggestionOption(nil)).Return([]*domain.ResolutionSuggestion{
 				{
 					Text:        "feature-branch",
@@ -166,7 +164,7 @@ func (s *NavigationServiceTestSuite) TestGetNavigationSuggestions() {
 					ProjectName: "test-project",
 					BranchName:  "feature-branch",
 				},
-			}, nil)
+			}, nil).Maybe()
 
 			contextService.On("GetCompletionSuggestions", mock.AnythingOfType("string"), []domain.SuggestionOption(nil)).Return([]*domain.ResolutionSuggestion{
 				{
@@ -175,17 +173,17 @@ func (s *NavigationServiceTestSuite) TestGetNavigationSuggestions() {
 					Type:        domain.PathTypeProject,
 					ProjectName: "test-project",
 				},
-			}, nil)
+			}, nil).Maybe()
 
-			service := NewNavigationService(projectService, contextService, s.config)
+			service := NewNavigationService(projectService, contextService, config)
 			result, err := service.GetNavigationSuggestions(context.Background(), tc.context, tc.partial)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Nil(t, result)
 			} else {
-				s.Require().NoError(err)
-				s.NotNil(result)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
 			}
 		})
 	}

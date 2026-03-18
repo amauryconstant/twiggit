@@ -7,31 +7,17 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
 )
 
-type ProjectServiceTestSuite struct {
-	suite.Suite
-	service    application.ProjectService
-	gitService *mocks.MockGitService
-	config     *domain.Config
-}
-
-func (s *ProjectServiceTestSuite) SetupTest() {
-	s.config = domain.DefaultConfig()
-	s.gitService = mocks.NewMockGitService()
-	s.configureGitMock()
-	s.service = NewProjectService(s.gitService, mocks.NewMockContextService(), s.config)
-}
-
-func (s *ProjectServiceTestSuite) configureGitMock() {
-	s.gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
-	s.gitService.MockGoGitClient.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+func configureGitMock(gitService *mocks.MockGitService) {
+	gitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
+	gitService.MockGoGitClient.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
 		Path:          "/path/to/project",
 		IsBare:        false,
 		DefaultBranch: "main",
@@ -40,14 +26,15 @@ func (s *ProjectServiceTestSuite) configureGitMock() {
 		Worktrees:     []domain.WorktreeInfo{},
 		Status:        domain.RepositoryStatus{},
 	}, nil).Maybe()
-	s.gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
+	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
 }
 
-func TestProjectService(t *testing.T) {
-	suite.Run(t, new(ProjectServiceTestSuite))
-}
+func TestProjectService_DiscoverProject(t *testing.T) {
+	config := domain.DefaultConfig()
+	gitService := mocks.NewMockGitService()
+	configureGitMock(gitService)
+	service := NewProjectService(gitService, mocks.NewMockContextService(), config)
 
-func (s *ProjectServiceTestSuite) TestDiscoverProject() {
 	tests := []struct {
 		name         string
 		projectName  string
@@ -85,27 +72,32 @@ func (s *ProjectServiceTestSuite) TestDiscoverProject() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			result, err := s.service.DiscoverProject(context.Background(), tc.projectName, tc.context)
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := service.DiscoverProject(context.Background(), tc.projectName, tc.context)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
+				assert.Nil(t, result)
 			} else {
-				s.Require().NoError(err)
-				s.NotNil(result)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
 				expectedName := tc.projectName
 				if expectedName == "" && tc.context != nil {
 					expectedName = tc.context.ProjectName
 				}
-				s.Equal(expectedName, result.Name)
+				assert.Equal(t, expectedName, result.Name)
 			}
 		})
 	}
 }
 
-func (s *ProjectServiceTestSuite) TestValidateProject() {
+func TestProjectService_ValidateProject(t *testing.T) {
+	config := domain.DefaultConfig()
+	gitService := mocks.NewMockGitService()
+	configureGitMock(gitService)
+	service := NewProjectService(gitService, mocks.NewMockContextService(), config)
+
 	tests := []struct {
 		name         string
 		projectPath  string
@@ -126,20 +118,25 @@ func (s *ProjectServiceTestSuite) TestValidateProject() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			err := s.service.ValidateProject(context.Background(), tc.projectPath)
+		t.Run(tc.name, func(t *testing.T) {
+			err := service.ValidateProject(context.Background(), tc.projectPath)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
 			} else {
-				s.Require().NoError(err)
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
-func (s *ProjectServiceTestSuite) TestListProjects() {
+func TestProjectService_ListProjects(t *testing.T) {
+	config := domain.DefaultConfig()
+	gitService := mocks.NewMockGitService()
+	configureGitMock(gitService)
+	service := NewProjectService(gitService, mocks.NewMockContextService(), config)
+
 	tests := []struct {
 		name        string
 		expectError bool
@@ -151,21 +148,26 @@ func (s *ProjectServiceTestSuite) TestListProjects() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			result, err := s.service.ListProjects(context.Background())
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := service.ListProjects(context.Background())
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Nil(t, result)
 			} else {
-				s.Require().NoError(err)
-				s.NotNil(result)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
 			}
 		})
 	}
 }
 
-func (s *ProjectServiceTestSuite) TestGetProjectInfo() {
+func TestProjectService_GetProjectInfo(t *testing.T) {
+	config := domain.DefaultConfig()
+	gitService := mocks.NewMockGitService()
+	configureGitMock(gitService)
+	service := NewProjectService(gitService, mocks.NewMockContextService(), config)
+
 	tests := []struct {
 		name         string
 		projectPath  string
@@ -186,35 +188,36 @@ func (s *ProjectServiceTestSuite) TestGetProjectInfo() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			result, err := s.service.GetProjectInfo(context.Background(), tc.projectPath)
+		t.Run(tc.name, func(t *testing.T) {
+			result, err := service.GetProjectInfo(context.Background(), tc.projectPath)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tc.errorMessage)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tc.errorMessage)
+				assert.Nil(t, result)
 			} else {
-				s.Require().NoError(err)
-				s.NotNil(result)
-				s.Equal(tc.projectPath, result.Path)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
+				assert.Equal(t, tc.projectPath, result.Path)
 			}
 		})
 	}
 }
 
-func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
+func TestProjectService_SearchProjectByName(t *testing.T) {
 	tests := []struct {
 		name           string
-		setupFunc      func() (*projectService, string)
+		setupFunc      func(*testing.T) (*projectService, string)
 		projectName    string
 		expectError    bool
 		errorMessage   string
-		validateResult func(*domain.ProjectInfo)
+		validateResult func(*testing.T, *domain.ProjectInfo)
 	}{
 		{
 			name: "directory not found error",
-			setupFunc: func() (*projectService, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (*projectService, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 				projectsDir := filepath.Join(tempDir, "nonexistent")
 				config := &domain.Config{
 					ProjectsDirectory: projectsDir,
@@ -230,16 +233,17 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 		},
 		{
 			name: "case-insensitive matching",
-			setupFunc: func() (*projectService, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (*projectService, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 				projectsDir := filepath.Join(tempDir, "projects")
-				s.Require().NoError(os.Mkdir(projectsDir, 0755))
+				require.NoError(t, os.Mkdir(projectsDir, 0755))
 
 				projectPath := filepath.Join(projectsDir, "testproject")
-				s.Require().NoError(os.Mkdir(projectPath, 0755))
+				require.NoError(t, os.Mkdir(projectPath, 0755))
 
 				gitDir := filepath.Join(projectPath, ".git")
-				s.Require().NoError(os.Mkdir(gitDir, 0755))
+				require.NoError(t, os.Mkdir(gitDir, 0755))
 
 				config := &domain.Config{
 					ProjectsDirectory: projectsDir,
@@ -265,22 +269,24 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 			},
 			projectName: "TestProject",
 			expectError: false,
-			validateResult: func(result *domain.ProjectInfo) {
-				s.Equal("testproject", result.Name)
+			validateResult: func(t *testing.T, result *domain.ProjectInfo) {
+				t.Helper()
+				assert.Equal(t, "testproject", result.Name)
 			},
 		},
 		{
 			name: "exact match works",
-			setupFunc: func() (*projectService, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (*projectService, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 				projectsDir := filepath.Join(tempDir, "projects")
-				s.Require().NoError(os.Mkdir(projectsDir, 0755))
+				require.NoError(t, os.Mkdir(projectsDir, 0755))
 
 				projectPath := filepath.Join(projectsDir, "myproject")
-				s.Require().NoError(os.Mkdir(projectPath, 0755))
+				require.NoError(t, os.Mkdir(projectPath, 0755))
 
 				gitDir := filepath.Join(projectPath, ".git")
-				s.Require().NoError(os.Mkdir(gitDir, 0755))
+				require.NoError(t, os.Mkdir(gitDir, 0755))
 
 				config := &domain.Config{
 					ProjectsDirectory: projectsDir,
@@ -306,23 +312,25 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 			},
 			projectName: "myproject",
 			expectError: false,
-			validateResult: func(result *domain.ProjectInfo) {
-				s.Equal("myproject", result.Name)
+			validateResult: func(t *testing.T, result *domain.ProjectInfo) {
+				t.Helper()
+				assert.Equal(t, "myproject", result.Name)
 			},
 		},
 		{
 			name: "multiple matches returns first one",
-			setupFunc: func() (*projectService, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (*projectService, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 				projectsDir := filepath.Join(tempDir, "projects")
-				s.Require().NoError(os.Mkdir(projectsDir, 0755))
+				require.NoError(t, os.Mkdir(projectsDir, 0755))
 
 				for _, name := range []string{"aproject", "bproject", "cproject"} {
 					projectPath := filepath.Join(projectsDir, name)
-					s.Require().NoError(os.Mkdir(projectPath, 0755))
+					require.NoError(t, os.Mkdir(projectPath, 0755))
 
 					gitDir := filepath.Join(projectPath, ".git")
-					s.Require().NoError(os.Mkdir(gitDir, 0755))
+					require.NoError(t, os.Mkdir(gitDir, 0755))
 				}
 
 				config := &domain.Config{
@@ -349,16 +357,18 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 			},
 			projectName: "aproject",
 			expectError: false,
-			validateResult: func(result *domain.ProjectInfo) {
-				s.Equal("aproject", result.Name)
+			validateResult: func(t *testing.T, result *domain.ProjectInfo) {
+				t.Helper()
+				assert.Equal(t, "aproject", result.Name)
 			},
 		},
 		{
 			name: "empty directory returns not found",
-			setupFunc: func() (*projectService, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (*projectService, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 				projectsDir := filepath.Join(tempDir, "projects")
-				s.Require().NoError(os.Mkdir(projectsDir, 0755))
+				require.NoError(t, os.Mkdir(projectsDir, 0755))
 
 				config := &domain.Config{
 					ProjectsDirectory: projectsDir,
@@ -375,11 +385,12 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 		},
 		{
 			name: "read directory error",
-			setupFunc: func() (*projectService, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (*projectService, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 				projectsDir := filepath.Join(tempDir, "projects")
 
-				s.Require().NoError(os.WriteFile(projectsDir, []byte("not a directory"), 0644))
+				require.NoError(t, os.WriteFile(projectsDir, []byte("not a directory"), 0644))
 
 				config := &domain.Config{
 					ProjectsDirectory: projectsDir,
@@ -397,97 +408,102 @@ func (s *ProjectServiceTestSuite) TestSearchProjectByName() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			service, _ := tc.setupFunc()
+		t.Run(tc.name, func(t *testing.T) {
+			service, _ := tc.setupFunc(t)
 
 			result, err := service.searchProjectByName(context.Background(), tc.projectName)
 
 			if tc.expectError {
-				s.Require().Error(err)
-				s.Nil(result)
+				require.Error(t, err)
+				assert.Nil(t, result)
 				if tc.errorMessage != "" {
-					s.Contains(err.Error(), tc.errorMessage)
+					assert.Contains(t, err.Error(), tc.errorMessage)
 				}
 			} else {
-				s.Require().NoError(err)
-				s.Require().NotNil(result)
+				require.NoError(t, err)
+				assert.NotNil(t, result)
 				if tc.validateResult != nil {
-					tc.validateResult(result)
+					tc.validateResult(t, result)
 				}
 			}
 		})
 	}
 }
 
-func (s *ProjectServiceTestSuite) TestFindMainRepoFromWorktree() {
+func TestProjectService_FindMainRepoFromWorktree(t *testing.T) {
 	tests := []struct {
 		name      string
-		setupFunc func() (worktreePath string, expectedPath string)
+		setupFunc func(*testing.T) (worktreePath string, expectedPath string)
 	}{
 		{
 			name: "main repo found at parent directory",
-			setupFunc: func() (string, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (string, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 
 				mainRepoPath := tempDir
 				gitDir := filepath.Join(mainRepoPath, ".git")
-				s.Require().NoError(os.Mkdir(gitDir, 0755))
+				require.NoError(t, os.Mkdir(gitDir, 0755))
 
 				headsDir := filepath.Join(gitDir, "heads")
-				s.Require().NoError(os.Mkdir(headsDir, 0755))
+				require.NoError(t, os.Mkdir(headsDir, 0755))
 
 				worktreePath := filepath.Join(tempDir, "worktree")
-				s.Require().NoError(os.Mkdir(worktreePath, 0755))
+				require.NoError(t, os.Mkdir(worktreePath, 0755))
 
 				gitFileContent := fmt.Sprintf("gitdir: %s\n", filepath.ToSlash(gitDir))
 				gitFilePath := filepath.Join(worktreePath, ".git")
-				s.Require().NoError(os.WriteFile(gitFilePath, []byte(gitFileContent), 0644))
+				require.NoError(t, os.WriteFile(gitFilePath, []byte(gitFileContent), 0644))
 
 				return worktreePath, tempDir
 			},
 		},
 		{
 			name: "root directory stops at root",
-			setupFunc: func() (string, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (string, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 				return tempDir, tempDir
 			},
 		},
 		{
 			name: "no main repo found returns input path",
-			setupFunc: func() (string, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (string, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 
 				subdirPath := filepath.Join(tempDir, "subdir1", "subdir2")
-				s.Require().NoError(os.MkdirAll(subdirPath, 0755))
+				require.NoError(t, os.MkdirAll(subdirPath, 0755))
 
 				return subdirPath, subdirPath
 			},
 		},
 		{
 			name: "main repo found at intermediate directory",
-			setupFunc: func() (string, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (string, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 
 				mainRepoPath := filepath.Join(tempDir, "main")
-				s.Require().NoError(os.Mkdir(mainRepoPath, 0755))
+				require.NoError(t, os.Mkdir(mainRepoPath, 0755))
 
 				gitDir := filepath.Join(mainRepoPath, ".git")
-				s.Require().NoError(os.Mkdir(gitDir, 0755))
+				require.NoError(t, os.Mkdir(gitDir, 0755))
 
 				subdirPath := filepath.Join(mainRepoPath, "subdir1", "subdir2")
-				s.Require().NoError(os.MkdirAll(subdirPath, 0755))
+				require.NoError(t, os.MkdirAll(subdirPath, 0755))
 
 				return subdirPath, mainRepoPath
 			},
 		},
 		{
 			name: "worktree directory returns worktree path if no main repo",
-			setupFunc: func() (string, string) {
-				tempDir := s.T().TempDir()
+			setupFunc: func(t *testing.T) (string, string) {
+				t.Helper()
+				tempDir := t.TempDir()
 
 				worktreePath := filepath.Join(tempDir, "worktree")
-				s.Require().NoError(os.Mkdir(worktreePath, 0755))
+				require.NoError(t, os.Mkdir(worktreePath, 0755))
 
 				return worktreePath, worktreePath
 			},
@@ -495,13 +511,13 @@ func (s *ProjectServiceTestSuite) TestFindMainRepoFromWorktree() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
-			worktreePath, expectedPath := tc.setupFunc()
+		t.Run(tc.name, func(t *testing.T) {
+			worktreePath, expectedPath := tc.setupFunc(t)
 
 			service := &projectService{}
 			result := service.findMainRepoFromWorktree(worktreePath)
 
-			s.Equal(expectedPath, result)
+			assert.Equal(t, expectedPath, result)
 		})
 	}
 }

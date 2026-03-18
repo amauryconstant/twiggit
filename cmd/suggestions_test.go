@@ -3,21 +3,12 @@ package cmd
 import (
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 
 	"twiggit/internal/domain"
 )
 
-type SuggestionsTestSuite struct {
-	suite.Suite
-}
-
-func TestSuggestions(t *testing.T) {
-	suite.Run(t, new(SuggestionsTestSuite))
-}
-
-// Task 6.6: Unit tests for smart sorting logic
-func (s *SuggestionsTestSuite) TestSortSuggestions() {
+func TestSuggestions_SortSuggestions(t *testing.T) {
 	defaultBranch := "main"
 
 	tests := []struct {
@@ -114,12 +105,10 @@ func (s *SuggestionsTestSuite) TestSortSuggestions() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			// Make a copy to avoid modifying the original
+		t.Run(tt.name, func(t *testing.T) {
 			suggestions := make([]*domain.ResolutionSuggestion, len(tt.suggestions))
 			copy(suggestions, tt.suggestions)
 
-			// Determine the default branch for this test
 			testDefaultBranch := defaultBranch
 			if tt.name == "custom default branch (develop)" {
 				testDefaultBranch = "develop"
@@ -132,12 +121,12 @@ func (s *SuggestionsTestSuite) TestSortSuggestions() {
 				actualOrder[i] = sug.Text
 			}
 
-			s.Equal(tt.expectedOrder, actualOrder)
+			assert.Equal(t, tt.expectedOrder, actualOrder)
 		})
 	}
 }
 
-func (s *SuggestionsTestSuite) TestGetCompletionTimeout() {
+func TestSuggestions_GetCompletionTimeout(t *testing.T) {
 	tests := []struct {
 		name     string
 		config   *domain.Config
@@ -178,14 +167,14 @@ func (s *SuggestionsTestSuite) TestGetCompletionTimeout() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			duration := getCompletionTimeout(tt.config)
-			s.Equal(tt.expected, duration.String())
+			assert.Equal(t, tt.expected, duration.String())
 		})
 	}
 }
 
-func (s *SuggestionsTestSuite) TestSuggestionsToCarapaceAction() {
+func TestSuggestions_SuggestionsToCarapaceAction(t *testing.T) {
 	tests := []struct {
 		name                 string
 		suggestions          []*domain.ResolutionSuggestion
@@ -251,16 +240,14 @@ func (s *SuggestionsTestSuite) TestSuggestionsToCarapaceAction() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			// We can't easily verify the Carapace action internals,
-			// but we can verify the function doesn't panic and returns a valid action
+		t.Run(tt.name, func(t *testing.T) {
 			action := suggestionsToCarapaceAction(tt.suggestions, tt.defaultBranch)
-			s.NotNil(action, "Should return a valid action")
+			assert.NotNil(t, action, "Should return a valid action")
 		})
 	}
 }
 
-func (s *SuggestionsTestSuite) TestSmartSortingPreservesDescription() {
+func TestSuggestions_SmartSortingPreservesDescription(t *testing.T) {
 	suggestions := []*domain.ResolutionSuggestion{
 		{Text: "feature", IsCurrent: false, Description: "Feature branch"},
 		{Text: "main", IsCurrent: false, Description: "Default branch"},
@@ -269,18 +256,16 @@ func (s *SuggestionsTestSuite) TestSmartSortingPreservesDescription() {
 
 	sortSuggestions(suggestions, "main")
 
-	// Verify order
-	s.Equal("current", suggestions[0].Text)
-	s.Equal("main", suggestions[1].Text)
-	s.Equal("feature", suggestions[2].Text)
+	assert.Equal(t, "current", suggestions[0].Text)
+	assert.Equal(t, "main", suggestions[1].Text)
+	assert.Equal(t, "feature", suggestions[2].Text)
 
-	// Verify descriptions are preserved
-	s.Equal("Current worktree", suggestions[0].Description)
-	s.Equal("Default branch", suggestions[1].Description)
-	s.Equal("Feature branch", suggestions[2].Description)
+	assert.Equal(t, "Current worktree", suggestions[0].Description)
+	assert.Equal(t, "Default branch", suggestions[1].Description)
+	assert.Equal(t, "Feature branch", suggestions[2].Description)
 }
 
-func (s *SuggestionsTestSuite) TestSmartSortingWithDirtyIndicator() {
+func TestSuggestions_SmartSortingWithDirtyIndicator(t *testing.T) {
 	suggestions := []*domain.ResolutionSuggestion{
 		{Text: "clean-branch", IsCurrent: false, IsDirty: false},
 		{Text: "dirty-branch", IsCurrent: true, IsDirty: true},
@@ -289,8 +274,7 @@ func (s *SuggestionsTestSuite) TestSmartSortingWithDirtyIndicator() {
 
 	sortSuggestions(suggestions, "main")
 
-	// Current (dirty) branch should still be first
-	s.Equal("dirty-branch", suggestions[0].Text)
-	s.True(suggestions[0].IsDirty)
-	s.True(suggestions[0].IsCurrent)
+	assert.Equal(t, "dirty-branch", suggestions[0].Text)
+	assert.True(t, suggestions[0].IsDirty)
+	assert.True(t, suggestions[0].IsCurrent)
 }

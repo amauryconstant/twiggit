@@ -5,209 +5,196 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
 
 	"twiggit/internal/domain"
 )
 
-// ErrorHandlerTestSuite tests error handler functions
-type ErrorHandlerTestSuite struct {
-	suite.Suite
-}
-
-func TestErrorHandlerSuite(t *testing.T) {
-	suite.Run(t, new(ErrorHandlerTestSuite))
-}
-
-// Test HandleCLIError with various error types
-func (s *ErrorHandlerTestSuite) TestHandleCLIError_ValidationError() {
+func TestHandleCLIError_ValidationError(t *testing.T) {
 	err := domain.NewValidationError("TestRequest", "field", "value", "invalid field")
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeValidation, exitCode)
+	assert.Equal(t, ExitCodeValidation, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestHandleCLIError_GitRepositoryError() {
+func TestHandleCLIError_GitRepositoryError(t *testing.T) {
 	err := domain.NewGitRepositoryError("/path/to/repo", "failed to open", errors.New("some error"))
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeGit, exitCode)
+	assert.Equal(t, ExitCodeGit, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestHandleCLIError_GitWorktreeError() {
+func TestHandleCLIError_GitWorktreeError(t *testing.T) {
 	err := domain.NewGitWorktreeError("/path/to/worktree", "feature", "failed to delete", errors.New("some error"))
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeGit, exitCode)
+	assert.Equal(t, ExitCodeGit, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestHandleCLIError_WorktreeServiceError() {
+func TestHandleCLIError_WorktreeServiceError(t *testing.T) {
 	err := domain.NewWorktreeServiceError("/path/to/worktree", "feature", "DeleteWorktree", "operation failed", errors.New("some error"))
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	assert.Equal(t, ExitCodeError, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestHandleCLIError_ProjectServiceError() {
+func TestHandleCLIError_ProjectServiceError(t *testing.T) {
 	err := domain.NewProjectServiceError("myproject", "/path/to/project", "DiscoverProject", "operation failed", errors.New("some error"))
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	assert.Equal(t, ExitCodeError, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestHandleCLIError_NavigationServiceError() {
+func TestHandleCLIError_NavigationServiceError(t *testing.T) {
 	err := domain.NewNavigationServiceError("main", "project context", "ResolvePath", "operation failed", errors.New("some error"))
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	assert.Equal(t, ExitCodeError, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestHandleCLIError_ServiceError() {
+func TestHandleCLIError_ServiceError(t *testing.T) {
 	err := domain.NewServiceError("MyService", "DoSomething", "operation failed", errors.New("some error"))
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	assert.Equal(t, ExitCodeError, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestHandleCLIError_GenericError() {
+func TestHandleCLIError_GenericError(t *testing.T) {
 	err := errors.New("generic error")
 
 	exitCode := HandleCLIError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	assert.Equal(t, ExitCodeError, exitCode)
 }
 
-// Test GetExitCodeForError mapping
-func (s *ErrorHandlerTestSuite) TestGetExitCodeForError_ValidationError() {
+func TestGetExitCodeForError_ValidationError(t *testing.T) {
 	err := domain.NewValidationError("TestRequest", "field", "value", "invalid field")
 
 	exitCode := GetExitCodeForError(err)
 
-	s.Equal(ExitCodeValidation, exitCode)
+	assert.Equal(t, ExitCodeValidation, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestGetExitCodeForError_GitError() {
+func TestGetExitCodeForError_GitError(t *testing.T) {
 	err := domain.NewGitRepositoryError("/path/to/repo", "failed to open", errors.New("some error"))
 
 	exitCode := GetExitCodeForError(err)
 
-	s.Equal(ExitCodeGit, exitCode)
+	assert.Equal(t, ExitCodeGit, exitCode)
 }
 
-func (s *ErrorHandlerTestSuite) TestGetExitCodeForError_UnknownError() {
+func TestGetExitCodeForError_UnknownError(t *testing.T) {
 	err := errors.New("unknown error")
 
 	exitCode := GetExitCodeForError(err)
 
-	s.Equal(ExitCodeError, exitCode)
+	assert.Equal(t, ExitCodeError, exitCode)
 }
 
-// Test CategorizeError logic
-func (s *ErrorHandlerTestSuite) TestCategorizeError_ValidationError() {
+func TestCategorizeError_ValidationError(t *testing.T) {
 	err := domain.NewValidationError("TestRequest", "field", "value", "invalid field")
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryValidation, category)
+	assert.Equal(t, ErrorCategoryValidation, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_WorktreeServiceError() {
+func TestCategorizeError_WorktreeServiceError(t *testing.T) {
 	err := domain.NewWorktreeServiceError("/path/to/worktree", "feature", "DeleteWorktree", "operation failed", errors.New("some error"))
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryService, category)
+	assert.Equal(t, ErrorCategoryService, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_ProjectServiceError() {
+func TestCategorizeError_ProjectServiceError(t *testing.T) {
 	err := domain.NewProjectServiceError("myproject", "/path/to/project", "DiscoverProject", "operation failed", errors.New("some error"))
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryService, category)
+	assert.Equal(t, ErrorCategoryService, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_ServiceError() {
+func TestCategorizeError_ServiceError(t *testing.T) {
 	err := domain.NewServiceError("MyService", "DoSomething", "operation failed", errors.New("some error"))
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryService, category)
+	assert.Equal(t, ErrorCategoryService, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_GitRepositoryError() {
+func TestCategorizeError_GitRepositoryError(t *testing.T) {
 	err := domain.NewGitRepositoryError("/path/to/repo", "failed to open", errors.New("some error"))
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryGit, category)
+	assert.Equal(t, ErrorCategoryGit, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_GitWorktreeError() {
+func TestCategorizeError_GitWorktreeError(t *testing.T) {
 	err := domain.NewGitWorktreeError("/path/to/worktree", "feature", "failed to delete", errors.New("some error"))
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryGit, category)
+	assert.Equal(t, ErrorCategoryGit, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_GitCommandError() {
+func TestCategorizeError_GitCommandError(t *testing.T) {
 	err := domain.NewGitCommandError("git", []string{"status"}, 1, "", "error output", "command failed", errors.New("some error"))
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryGit, category)
+	assert.Equal(t, ErrorCategoryGit, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_ConfigError() {
+func TestCategorizeError_ConfigError(t *testing.T) {
 	err := domain.NewConfigError("/path/to/config.toml", "failed to parse config file", nil)
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryConfig, category)
+	assert.Equal(t, ErrorCategoryConfig, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_ConfigErrorWithCause() {
+func TestCategorizeError_ConfigErrorWithCause(t *testing.T) {
 	err := domain.NewConfigError("/path/to/config.toml", "validation failed", errors.New("invalid field"))
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryConfig, category)
+	assert.Equal(t, ErrorCategoryConfig, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_ValidationErrorString() {
+func TestCategorizeError_ValidationErrorString(t *testing.T) {
 	err := errors.New("validation failed: field is required")
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryValidation, category)
+	assert.Equal(t, ErrorCategoryValidation, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_InvalidString() {
+func TestCategorizeError_InvalidString(t *testing.T) {
 	err := errors.New("invalid input")
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryValidation, category)
+	assert.Equal(t, ErrorCategoryValidation, category)
 }
 
-func (s *ErrorHandlerTestSuite) TestCategorizeError_Generic() {
+func TestCategorizeError_Generic(t *testing.T) {
 	err := errors.New("some random error")
 
 	category := CategorizeError(err)
 
-	s.Equal(ErrorCategoryGeneric, category)
+	assert.Equal(t, ErrorCategoryGeneric, category)
 }
 
-// Test IsCobraArgumentError pattern matching
-func (s *ErrorHandlerTestSuite) TestIsCobraArgumentError_AcceptsPattern() {
+func TestIsCobraArgumentError_AcceptsPattern(t *testing.T) {
 	tests := []struct {
 		name  string
 		err   error
@@ -261,23 +248,23 @@ func (s *ErrorHandlerTestSuite) TestIsCobraArgumentError_AcceptsPattern() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := IsCobraArgumentError(tt.err)
-			s.Equal(tt.match, result)
+			assert.Equal(t, tt.match, result)
 		})
 	}
 }
 
-func (s *ErrorHandlerTestSuite) TestIsCobraArgumentError_CobraError() {
+func TestIsCobraArgumentError_CobraError(t *testing.T) {
 	cmd := &cobra.Command{}
 	cmd.SetArgs([]string{"invalid"})
 
 	err := cmd.Execute()
 
 	if err != nil {
-		s.Run("Cobra command error", func() {
+		t.Run("Cobra command error", func(t *testing.T) {
 			result := IsCobraArgumentError(err)
-			s.True(result)
+			assert.True(t, result)
 		})
 	}
 }

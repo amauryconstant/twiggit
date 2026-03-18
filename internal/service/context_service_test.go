@@ -1,59 +1,42 @@
 package service
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	fixtures "twiggit/test/fixtures"
 	"twiggit/test/mocks"
 )
 
-type ContextServiceTestSuite struct {
-	suite.Suite
-	detector *mocks.MockContextDetector
-	resolver *mocks.MockContextResolver
-	service  application.ContextService
-	config   *domain.Config
-}
-
-func (s *ContextServiceTestSuite) SetupTest() {
-	s.detector = mocks.NewMockContextDetector()
-	s.resolver = mocks.NewMockContextResolver()
-	s.config = fixtures.NewTestConfig()
-	s.service = NewContextService(s.detector, s.resolver, s.config)
-}
-
-func TestContextService(t *testing.T) {
-	suite.Run(t, new(ContextServiceTestSuite))
-}
-
-func (s *ContextServiceTestSuite) TestNewContextService() {
+func TestNewContextService(t *testing.T) {
 	detector := mocks.NewMockContextDetector()
 	resolver := mocks.NewMockContextResolver()
 	config := fixtures.NewTestConfig()
 
 	service := NewContextService(detector, resolver, config)
-	s.NotNil(service)
+	if service == nil {
+		t.Error("expected service to be non-nil")
+	}
 }
 
-func (s *ContextServiceTestSuite) TestGetCurrentContext() {
+func TestContextService_GetCurrentContext(t *testing.T) {
 	tests := []struct {
 		name            string
-		setupMock       func()
+		setupMock       func(*mocks.MockContextDetector, *mocks.MockContextResolver)
 		expectedContext *domain.Context
 		expectedError   string
 	}{
 		{
 			name: "successful context detection",
-			setupMock: func() {
-				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				s.resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat", []domain.SuggestionOption(nil)).Return(
+				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat", []domain.SuggestionOption(nil)).Return(
 					[]*domain.ResolutionSuggestion{
 						{
 							Text:        "feature-branch",
@@ -65,52 +48,55 @@ func (s *ContextServiceTestSuite) TestGetCurrentContext() {
 		},
 		{
 			name: "detect context fails",
-			setupMock: func() {
-				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
-					nil, assert.AnError)
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
+					nil, errors.New("detection failed"))
 			},
 			expectedError: "failed to detect context",
 		},
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			s.detector.ExpectedCalls = nil
-			s.resolver.ExpectedCalls = nil
-			s.SetupTest()
+		t.Run(tt.name, func(t *testing.T) {
+			detector := mocks.NewMockContextDetector()
+			resolver := mocks.NewMockContextResolver()
+			config := fixtures.NewTestConfig()
+			service := NewContextService(detector, resolver, config)
 
-			tt.setupMock()
+			tt.setupMock(detector, resolver)
 
-			got, err := s.service.GetCurrentContext()
+			t.Cleanup(func() {
+				detector.AssertExpectations(t)
+			})
+
+			got, err := service.GetCurrentContext()
 
 			if tt.expectedError != "" {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tt.expectedError)
-				s.Nil(got)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, got)
 			} else {
-				s.Require().NoError(err)
-				s.Equal(tt.expectedContext.Type, got.Type)
-				s.Equal(tt.expectedContext.ProjectName, got.ProjectName)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedContext.Type, got.Type)
+				assert.Equal(t, tt.expectedContext.ProjectName, got.ProjectName)
 			}
-
-			s.detector.AssertExpectations(s.T())
 		})
 	}
 }
 
-func (s *ContextServiceTestSuite) TestDetectContextFromPath() {
+func TestContextService_DetectContextFromPath(t *testing.T) {
 	tests := []struct {
 		name            string
 		path            string
-		setupMock       func()
+		setupMock       func(*mocks.MockContextDetector)
 		expectedContext *domain.Context
 		expectedError   string
 	}{
 		{
 			name: "successful detection from valid path",
 			path: "/test/path",
-			setupMock: func() {
-				s.detector.On("DetectContext", "/test/path").Return(
+			setupMock: func(detector *mocks.MockContextDetector) {
+				detector.On("DetectContext", "/test/path").Return(
 					fixtures.NewWorktreeContext(), nil)
 			},
 			expectedContext: fixtures.NewWorktreeContext(),
@@ -118,120 +104,126 @@ func (s *ContextServiceTestSuite) TestDetectContextFromPath() {
 		{
 			name: "detection fails",
 			path: "/invalid/path",
-			setupMock: func() {
-				s.detector.On("DetectContext", "/invalid/path").Return(
-					nil, assert.AnError)
+			setupMock: func(detector *mocks.MockContextDetector) {
+				detector.On("DetectContext", "/invalid/path").Return(
+					nil, errors.New("detection failed"))
 			},
 			expectedError: "failed to detect context from path /invalid/path",
 		},
 		{
 			name: "empty path",
 			path: "",
-			setupMock: func() {
-				s.detector.On("DetectContext", "").Return(
-					nil, assert.AnError)
+			setupMock: func(detector *mocks.MockContextDetector) {
+				detector.On("DetectContext", "").Return(
+					nil, errors.New("detection failed"))
 			},
 			expectedError: "failed to detect context from path",
 		},
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			s.detector.ExpectedCalls = nil
-			s.resolver.ExpectedCalls = nil
-			s.SetupTest()
+		t.Run(tt.name, func(t *testing.T) {
+			detector := mocks.NewMockContextDetector()
+			resolver := mocks.NewMockContextResolver()
+			config := fixtures.NewTestConfig()
+			service := NewContextService(detector, resolver, config)
 
-			tt.setupMock()
+			tt.setupMock(detector)
 
-			got, err := s.service.DetectContextFromPath(tt.path)
+			t.Cleanup(func() {
+				detector.AssertExpectations(t)
+			})
+
+			got, err := service.DetectContextFromPath(tt.path)
 
 			if tt.expectedError != "" {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tt.expectedError)
-				s.Nil(got)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, got)
 			} else {
-				s.Require().NoError(err)
-				s.Equal(tt.expectedContext.Type, got.Type)
-				s.Equal(tt.expectedContext.ProjectName, got.ProjectName)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedContext.Type, got.Type)
+				assert.Equal(t, tt.expectedContext.ProjectName, got.ProjectName)
 			}
-
-			s.detector.AssertExpectations(s.T())
 		})
 	}
 }
 
-func (s *ContextServiceTestSuite) TestResolveIdentifier() {
+func TestContextService_ResolveIdentifier(t *testing.T) {
 	tests := []struct {
 		name           string
 		identifier     string
-		setupMock      func()
+		setupMock      func(*mocks.MockContextDetector, *mocks.MockContextResolver)
 		expectedResult *domain.ResolutionResult
 		expectedError  string
 	}{
 		{
 			name:       "successful resolution",
 			identifier: "main",
-			setupMock: func() {
-				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				s.resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "main").Return(
+				resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "main").Return(
 					fixtures.NewProjectResolutionResult(), nil)
 			},
 			expectedResult: fixtures.NewProjectResolutionResult(),
 		},
 		{
 			name: "get current context fails",
-			setupMock: func() {
-				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
-					nil, assert.AnError)
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
+					nil, errors.New("detection failed"))
 			},
 			expectedError: "failed to get current context",
 		},
 		{
 			name:       "resolver fails",
 			identifier: "invalid-branch",
-			setupMock: func() {
-				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				s.resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "invalid-branch").Return(
-					nil, assert.AnError)
+				resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "invalid-branch").Return(
+					nil, errors.New("resolution failed"))
 			},
 			expectedError: "failed to resolve identifier 'invalid-branch'",
 		},
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			s.detector.ExpectedCalls = nil
-			s.resolver.ExpectedCalls = nil
-			s.SetupTest()
+		t.Run(tt.name, func(t *testing.T) {
+			detector := mocks.NewMockContextDetector()
+			resolver := mocks.NewMockContextResolver()
+			config := fixtures.NewTestConfig()
+			service := NewContextService(detector, resolver, config)
 
-			tt.setupMock()
+			tt.setupMock(detector, resolver)
 
-			got, err := s.service.ResolveIdentifier(tt.identifier)
+			t.Cleanup(func() {
+				detector.AssertExpectations(t)
+				resolver.AssertExpectations(t)
+			})
+
+			got, err := service.ResolveIdentifier(tt.identifier)
 
 			if tt.expectedError != "" {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tt.expectedError)
-				s.Nil(got)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, got)
 			} else {
-				s.Require().NoError(err)
-				s.Equal(tt.expectedResult.Type, got.Type)
-				s.Equal(tt.expectedResult.ProjectName, got.ProjectName)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedResult.Type, got.Type)
+				assert.Equal(t, tt.expectedResult.ProjectName, got.ProjectName)
 			}
-
-			s.detector.AssertExpectations(s.T())
-			s.resolver.AssertExpectations(s.T())
 		})
 	}
 }
 
-func (s *ContextServiceTestSuite) TestResolveIdentifierFromContext() {
+func TestContextService_ResolveIdentifierFromContext(t *testing.T) {
 	tests := []struct {
 		name           string
 		context        *domain.Context
 		identifier     string
-		setupMock      func()
+		setupMock      func(*mocks.MockContextDetector, *mocks.MockContextResolver)
 		expectedResult *domain.ResolutionResult
 		expectedError  string
 	}{
@@ -243,8 +235,8 @@ func (s *ContextServiceTestSuite) TestResolveIdentifierFromContext() {
 				BranchName:  "current-branch",
 			},
 			identifier: "other-branch",
-			setupMock: func() {
-				s.resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "other-branch").Return(
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "other-branch").Return(
 					fixtures.NewWorktreeResolutionResult(), nil)
 			},
 			expectedResult: fixtures.NewWorktreeResolutionResult(),
@@ -255,103 +247,109 @@ func (s *ContextServiceTestSuite) TestResolveIdentifierFromContext() {
 				Type: domain.ContextProject,
 			},
 			identifier: "invalid",
-			setupMock: func() {
-				s.resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "invalid").Return(
-					nil, assert.AnError)
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "invalid").Return(
+					nil, errors.New("resolution failed"))
 			},
 			expectedError: "failed to resolve identifier 'invalid'",
 		},
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			s.detector.ExpectedCalls = nil
-			s.resolver.ExpectedCalls = nil
-			s.SetupTest()
+		t.Run(tt.name, func(t *testing.T) {
+			detector := mocks.NewMockContextDetector()
+			resolver := mocks.NewMockContextResolver()
+			config := fixtures.NewTestConfig()
+			service := NewContextService(detector, resolver, config)
 
-			tt.setupMock()
+			tt.setupMock(detector, resolver)
 
-			got, err := s.service.ResolveIdentifierFromContext(tt.context, tt.identifier)
+			t.Cleanup(func() {
+				resolver.AssertExpectations(t)
+			})
+
+			got, err := service.ResolveIdentifierFromContext(tt.context, tt.identifier)
 
 			if tt.expectedError != "" {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tt.expectedError)
-				s.Nil(got)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, got)
 			} else {
-				s.Require().NoError(err)
-				s.Equal(tt.expectedResult.Type, got.Type)
-				s.Equal(tt.expectedResult.ProjectName, got.ProjectName)
+				require.NoError(t, err)
+				assert.Equal(t, tt.expectedResult.Type, got.Type)
+				assert.Equal(t, tt.expectedResult.ProjectName, got.ProjectName)
 			}
-
-			s.resolver.AssertExpectations(s.T())
 		})
 	}
 }
 
-func (s *ContextServiceTestSuite) TestGetCompletionSuggestions() {
+func TestContextService_GetCompletionSuggestions(t *testing.T) {
 	tests := []struct {
 		name                string
 		partial             string
-		setupMock           func()
+		setupMock           func(*mocks.MockContextDetector, *mocks.MockContextResolver)
 		expectedSuggestions []*domain.ResolutionSuggestion
 		expectedError       string
 	}{
 		{
 			name:    "successful suggestions",
 			partial: "feat",
-			setupMock: func() {
-				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				s.resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat", []domain.SuggestionOption(nil)).Return(
+				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat", []domain.SuggestionOption(nil)).Return(
 					fixtures.NewFeatureSuggestions(), nil)
 			},
 			expectedSuggestions: fixtures.NewFeatureSuggestions(),
 		},
 		{
 			name: "get current context fails",
-			setupMock: func() {
-				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
-					nil, assert.AnError)
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
+					nil, errors.New("detection failed"))
 			},
 			expectedError: "failed to get current context",
 		},
 		{
 			name:    "suggestions_fail",
 			partial: "invalid",
-			setupMock: func() {
-				s.detector.On("DetectContext", mock.AnythingOfType("string")).Return(
+			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
+				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				s.resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "invalid", []domain.SuggestionOption(nil)).Return(
-					nil, assert.AnError)
+				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "invalid", []domain.SuggestionOption(nil)).Return(
+					nil, errors.New("suggestions failed"))
 			},
 			expectedError: "failed to get completion suggestions",
 		},
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			s.detector.ExpectedCalls = nil
-			s.resolver.ExpectedCalls = nil
-			s.SetupTest()
+		t.Run(tt.name, func(t *testing.T) {
+			detector := mocks.NewMockContextDetector()
+			resolver := mocks.NewMockContextResolver()
+			config := fixtures.NewTestConfig()
+			service := NewContextService(detector, resolver, config)
 
-			tt.setupMock()
+			tt.setupMock(detector, resolver)
 
-			got, err := s.service.GetCompletionSuggestions(tt.partial)
+			t.Cleanup(func() {
+				detector.AssertExpectations(t)
+				resolver.AssertExpectations(t)
+			})
+
+			got, err := service.GetCompletionSuggestions(tt.partial)
 
 			if tt.expectedError != "" {
-				s.Require().Error(err)
-				s.Contains(err.Error(), tt.expectedError)
-				s.Nil(got)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				assert.Nil(t, got)
 			} else {
-				s.Require().NoError(err)
-				s.Len(got, len(tt.expectedSuggestions))
+				require.NoError(t, err)
+				assert.Len(t, got, len(tt.expectedSuggestions))
 				if len(tt.expectedSuggestions) > 0 {
-					s.Equal(tt.expectedSuggestions[0].Text, got[0].Text)
+					assert.Equal(t, tt.expectedSuggestions[0].Text, got[0].Text)
 				}
 			}
-
-			s.detector.AssertExpectations(s.T())
-			s.resolver.AssertExpectations(s.T())
 		})
 	}
 }
