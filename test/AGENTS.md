@@ -4,7 +4,7 @@
 
 | Type | Location | Framework | Build Tag |
 |------|----------|-----------|-----------|
-| Unit | `internal/**/*_test.go` | Testify | None |
+| Unit | `internal/**/*_test.go` | Standard Go | None |
 | Integration | `test/integration/` | Testify | `//go:build integration` |
 | E2E | `test/e2e/` | Ginkgo/Gomega | `//go:build e2e` |
 | Concurrent | `test/concurrent/` | Testify | `//go:build concurrent` |
@@ -12,6 +12,37 @@
 | Mocks | `test/mocks/*.go` | testify/mock | - |
 
 **Detailed patterns:** See test/integration/AGENTS.md (Testify suites, mocks, assertions)
+
+## Unit Testing Patterns
+
+Unit tests use standard Go testing with table-driven designs.
+
+**Key patterns:**
+- Use `t.Run()` for subtests (each subtest gets isolated `*testing.T`)
+- Register mock assertions via `t.Cleanup()` at test start
+- Table-driven pattern for 5+ test cases
+- Fresh dependencies per subtest (no suite-level state)
+
+**Table-driven pattern:**
+```go
+tests := []struct {
+    name      string
+    input     string
+    wantErr   bool
+}{
+    {"valid input", "valid", false},
+    {"empty input", "", true},
+}
+for _, tt := range tests {
+    t.Run(tt.name, func(t *testing.T) { ... })
+}
+```
+
+**Mock verification:**
+```go
+mock := mocks.NewMockService(t)
+t.Cleanup(func() { mock.AssertExpectations(t) })
+```
 
 ## Quality Requirements
 

@@ -51,5 +51,5 @@
 - [x] 9.2 Run mise run test:full to verify all tests pass
 - [x] 9.3 Run mise run test:race to verify no race conditions
 - [x] 9.4 Run mise run lint to verify code quality
-- [ ] 9.5 Update test/AGENTS.md with standard Go testing patterns
+- [x] 9.5 Update test/AGENTS.md with standard Go testing patterns
   - Note: Deferred to PHASE3 (MAINTAIN DOCS) per workflow guidelines
