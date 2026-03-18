@@ -7,6 +7,16 @@ Test utilities for unit, integration, and E2E tests
 - **Shell helper**: Shell-related test utilities
 - **Worktree helper**: Worktree test utilities
 
+## Cleanup Patterns
+
+All test helpers provide automatic cleanup via the testing package:
+
+- **t.Helper()**: Called in all helper constructors for accurate error line reporting
+- **t.TempDir()**: Automatic cleanup of temporary directories (testing package guarantee)
+- **t.Cleanup()**: Automatic cleanup registration for helper-specific resources
+
+**No manual cleanup needed** - all resources are automatically cleaned up when tests complete, even on failure or panic.
+
 ## Repository Helper (`repo.go`)
 
 Functional API for test repo creation:
@@ -19,7 +29,9 @@ repo.CreateBranch("feature-2")
 repoPath := repo.Path()
 ```
 
-**Features:** Idempotent operations, auto-cleanup via t.TempDir(), functional API, cross-platform paths.
+**Features:** Idempotent operations, auto-cleanup via t.TempDir() + t.Cleanup(), functional API, cross-platform paths.
+
+**Cleanup:** t.TempDir() handles base directory cleanup, t.Cleanup() registered with Cleanup() method removes created repositories.
 
 ## Git Helper (`git.go`)
 
@@ -32,6 +44,8 @@ git.CreateWorktree(t, repoPath, worktreePath, "feature-1")
 worktrees := git.ListWorktrees(t, repoPath)
 ```
 
+**Cleanup:** Uses t.TempDir() for automatic cleanup of all created repositories (handled by testing package).
+
 ## Shell Helper (`shell.go`)
 
 ```go
@@ -39,6 +53,8 @@ output, err := helpers.ExecuteShellCommand(t, "echo", "test")
 shellPath := helpers.GetShellPath(t)
 configPath := helpers.CreateTempShellConfig(t, "bash")
 ```
+
+**Cleanup:** Uses temporary directories for config files with automatic cleanup via t.TempDir().
 
 ## Worktree Helper (`worktree.go`)
 
