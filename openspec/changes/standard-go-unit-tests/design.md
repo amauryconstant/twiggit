@@ -87,9 +87,9 @@ for _, tt := range tests {
 ## Migration Plan
 
 1. **Phase 5a:** Convert domain layer (7 files)
-2. **Phase 5b:** Convert infrastructure layer (12 files)
+2. **Phase 5b:** Convert infrastructure layer (11 files)
 3. **Phase 5c:** Convert service layer (5 files)
-4. **Phase 5d:** Convert command layer (11 files)
+4. **Phase 5d:** Convert command layer (4 files)
 5. **Phase 5e:** Cleanup - remove import, run full test suite, update docs
 
 Each phase runs `mise run test:full` and `mise run test:race` before proceeding.
