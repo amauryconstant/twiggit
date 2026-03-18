@@ -138,6 +138,7 @@ func compareGolden(goldenFile string, actual string) {
 	// This matches the behavior of GetOutput which uses TrimSpace
 	expectedStr := strings.TrimSpace(normalizeLineEndings(string(expected)))
 	actualStr := normalizeLineEndings(actual)
+	actualStr = strings.TrimSpace(actualStr)
 
 	// Compare actual with expected
 	if expectedStr != actualStr {
