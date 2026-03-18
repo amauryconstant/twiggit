@@ -1,0 +1,411 @@
+[
+  {
+    "phase": "ARTIFACT_REVIEW",
+    "iteration": 1,
+    "commit_hash": "null",
+    "next_steps": "Re-review artifacts to verify fixes",
+    "issues": {
+      "critical": 0,
+      "warning": 1,
+      "suggestion": 0
+    },
+    "artifacts_modified": [
+      "specs/explicit-error-formatting/spec.md"
+    ],
+    "issues_fixed": {
+      "critical": 0,
+      "warning": 1,
+      "suggestion": 0
+    },
+    "fix_details": "Added GIVEN clauses to all 10 scenarios in spec.md",
+    "entry": 1,
+    "timestamp": "2026-03-18T10:24:11Z"
+  },
+  {
+    "phase": "ARTIFACT_REVIEW",
+    "iteration": 2,
+    "commit_hash": "null",
+    "next_steps": "Proceed to PHASE1",
+    "issues": {
+      "critical": 0,
+      "warning": 0,
+      "suggestion": 0
+    },
+    "artifacts_modified": [],
+    "issues_fixed": {
+      "critical": 0,
+      "warning": 0,
+      "suggestion": 0
+    },
+    "review_status": "PASS - All artifacts excellent",
+    "entry": 2,
+    "timestamp": "2026-03-18T10:24:36Z"
+  },
+  {
+    "phase": "ARTIFACT_REVIEW",
+    "iteration": 1,
+    "commit_hash": "76855b79e972d0903e7abcb33cd2fc82f5dd4dc0",
+    "next_steps": "Re-review artifacts to verify fixes",
+    "issues": {
+      "critical": 0,
+      "warning": 1,
+      "suggestion": 0
+    },
+    "artifacts_modified": [
+      "specs/explicit-error-formatting/spec.md"
+    ],
+    "issues_fixed": {
+      "critical": 0,
+      "warning": 1,
+      "suggestion": 0
+    },
+    "fix_details": "Added GIVEN clauses to all 10 scenarios in spec.md",
+    "entry": 3,
+    "timestamp": "2026-03-18T10:25:49Z"
+  },
+  {
+    "phase": "IMPLEMENTATION",
+    "iteration": 1,
+    "summary": "Starting PHASE1 implementation",
+    "next_steps": "Implement all 11 tasks from tasks.md",
+    "errors": [],
+    "assumptions": [
+      "Existing error_formatter.go uses reflection-based type dispatch",
+      "Formatters currently have ErrorFormatter receiver parameter"
+    ],
+    "tasks_completed": [],
+    "tasks_remaining": 11,
+    "commits_made": 0,
+    "cli_status": {
+      "changeName": "explicit-error-formatting",
+      "schemaName": "spec-driven",
+      "isComplete": true,
+      "applyRequires": [
+        "tasks"
+      ],
+      "artifacts": [
+        {
+          "id": "proposal",
+          "outputPath": "proposal.md",
+          "status": "done"
+        },
+        {
+          "id": "design",
+          "outputPath": "design.md",
+          "status": "done"
+        },
+        {
+          "id": "specs",
+          "outputPath": "specs/**/*.md",
+          "status": "done"
+        },
+        {
+          "id": "tasks",
+          "outputPath": "tasks.md",
+          "status": "done"
+        }
+      ]
+    },
+    "cli_instructions": {
+      "changeName": "explicit-error-formatting",
+      "changeDir": "/home/amaury/Projects/twiggit/openspec/changes/explicit-error-formatting",
+      "schemaName": "spec-driven",
+      "progress": {
+        "total": 11,
+        "complete": 0,
+        "remaining": 11
+      },
+      "tasks": [
+        {
+          "id": "1",
+          "description": "1.1 Define matcherFunc func(error) bool and formatterFunc func(error) string types in cmd/error_formatter.go",
+          "done": false
+        },
+        {
+          "id": "2",
+          "description": "2.1 Create isValidationError(err error) bool using errors.As()",
+          "done": false
+        },
+        {
+          "id": "3",
+          "description": "2.2 Create isWorktreeError(err error) bool using errors.As()",
+          "done": false
+        },
+        {
+          "id": "4",
+          "description": "2.3 Create isProjectError(err error) bool using errors.As()",
+          "done": false
+        },
+        {
+          "id": "5",
+          "description": "2.4 Create isServiceError(err error) bool using errors.As()",
+          "done": false
+        },
+        {
+          "id": "6",
+          "description": "3.1 Replace reflection map with matcher-formatter slice in ErrorFormatter struct",
+          "done": false
+        },
+        {
+          "id": "7",
+          "description": "3.2 Refactor register method to accept matcher+formatter pair",
+          "done": false
+        },
+        {
+          "id": "8",
+          "description": "3.3 Refactor Format method to iterate through matchers instead of reflection lookup",
+          "done": false
+        },
+        {
+          "id": "9",
+          "description": "3.4 Update formatter functions to accept error directly (remove ErrorFormatter receiver)",
+          "done": false
+        },
+        {
+          "id": "10",
+          "description": "4.1 Update tests in cmd/error_formatter_test.go to verify behavior unchanged",
+          "done": false
+        },
+        {
+          "id": "11",
+          "description": "4.2 Run mise run test:full to verify no regressions",
+          "done": false
+        }
+      ],
+      "state": "ready",
+      "instruction": "Read context files, work through pending tasks, mark complete as you go.\nPause if you hit blockers or need clarification."
+    },
+    "entry": 4,
+    "timestamp": "2026-03-18T10:27:07Z",
+    "commit_hash": null
+  },
+  {
+    "phase": "IMPLEMENTATION",
+    "iteration": 1,
+    "summary": "Completed all 11 tasks for explicit-error-formatting change: defined matcher and formatter types, created explicit matcher functions, refactored ErrorFormatter to use explicit strategy pattern, updated tests, verified no regressions with full test suite",
+    "next_steps": "Transition to PHASE2 (REVIEW) to verify implementation",
+    "errors": [],
+    "assumptions": [
+      "Existing error_formatter.go uses reflection-based type dispatch",
+      "Formatters currently have ErrorFormatter receiver parameter",
+      "Tests need to be updated to match actual error message format"
+    ],
+    "tasks_completed": [
+      "1.1",
+      "2.1",
+      "2.2",
+      "2.3",
+      "2.4",
+      "3.1",
+      "3.2",
+      "3.3",
+      "3.4",
+      "4.1",
+      "4.2"
+    ],
+    "tasks_remaining": 0,
+    "commits_made": 1,
+    "cli_status": {
+      "changeName": "explicit-error-formatting",
+      "schemaName": "spec-driven",
+      "isComplete": true,
+      "applyRequires": [
+        "tasks"
+      ],
+      "artifacts": [
+        {
+          "id": "proposal",
+          "outputPath": "proposal.md",
+          "status": "done"
+        },
+        {
+          "id": "design",
+          "outputPath": "design.md",
+          "status": "done"
+        },
+        {
+          "id": "specs",
+          "outputPath": "specs/**/*.md",
+          "status": "done"
+        },
+        {
+          "id": "tasks",
+          "outputPath": "tasks.md",
+          "status": "done"
+        }
+      ]
+    },
+    "cli_instructions": {
+      "changeName": "explicit-error-formatting",
+      "changeDir": "/home/amaury/Projects/twiggit/openspec/changes/explicit-error-formatting",
+      "schemaName": "spec-driven",
+      "progress": {
+        "total": 11,
+        "complete": 11,
+        "remaining": 0
+      },
+      "tasks": [
+        {
+          "id": "1",
+          "description": "1.1 Define matcherFunc func(error) bool and formatterFunc func(error) string types in cmd/error_formatter.go",
+          "done": true
+        },
+        {
+          "id": "2",
+          "description": "2.1 Create isValidationError(err error) bool using errors.As()",
+          "done": true
+        },
+        {
+          "id": "3",
+          "description": "2.2 Create isWorktreeError(err error) bool using errors.As()",
+          "done": true
+        },
+        {
+          "id": "4",
+          "description": "2.3 Create isProjectError(err error) bool using errors.As()",
+          "done": true
+        },
+        {
+          "id": "5",
+          "description": "2.4 Create isServiceError(err error) bool using errors.As()",
+          "done": true
+        },
+        {
+          "id": "6",
+          "description": "3.1 Replace reflection map with matcher-formatter slice in ErrorFormatter struct",
+          "done": true
+        },
+        {
+          "id": "7",
+          "description": "3.2 Refactor register method to accept matcher+formatter pair",
+          "done": true
+        },
+        {
+          "id": "8",
+          "description": "3.3 Refactor Format method to iterate through matchers instead of reflection lookup",
+          "done": true
+        },
+        {
+          "id": "9",
+          "description": "3.4 Update formatter functions to accept error directly (remove ErrorFormatter receiver)",
+          "done": true
+        },
+        {
+          "id": "10",
+          "description": "4.1 Update tests in cmd/error_formatter_test.go to verify behavior unchanged",
+          "done": true
+        },
+        {
+          "id": "11",
+          "description": "4.2 Run mise run test:full to verify no regressions",
+          "done": true
+        }
+      ],
+      "state": "all_done",
+      "instruction": "All tasks complete. Ready to archive or review artifacts."
+    },
+    "entry": 5,
+    "timestamp": "2026-03-18T10:33:58Z",
+    "commit_hash": null
+  },
+  {
+    "phase": "REVIEW",
+    "iteration": 1,
+    "summary": "PHASE2 verification checkpoint - CLI status logged",
+    "commit_hash": "null",
+    "next_steps": "Proceed with verification",
+    "cli_status": {
+      "changeName": "explicit-error-formatting",
+      "schemaName": "spec-driven",
+      "isComplete": true,
+      "artifacts": [
+        "proposal",
+        "design",
+        "specs",
+        "tasks"
+      ],
+      "state": "all_done",
+      "progress": {
+        "total": 11,
+        "complete": 11,
+        "remaining": 0
+      }
+    },
+    "cli_instructions": {
+      "changeDir": "/home/amaury/Projects/twiggit/openspec/changes/explicit-error-formatting",
+      "state": "all_done",
+      "instruction": "All tasks are complete! This change is ready to be archived."
+    },
+    "entry": 6,
+    "timestamp": "2026-03-18T10:34:49Z"
+  },
+  {
+    "phase": "REVIEW",
+    "iteration": 1,
+    "summary": "PHASE2 verification complete - PASSED",
+    "commit_hash": "null",
+    "next_steps": "Proceed to PHASE3",
+    "verification_result": "passed",
+    "issues_found": {
+      "critical": 0,
+      "warning": 0,
+      "suggestion": 1
+    },
+    "verification_report_path": "openspec/changes/explicit-error-formatting/verification-report.md",
+    "artifacts_modified": false,
+    "entry": 7,
+    "timestamp": "2026-03-18T10:37:41Z"
+  },
+  {
+    "phase": "MAINTAIN_DOCS",
+    "iteration": 1,
+    "summary": "Documentation updated successfully",
+    "commit_hash": "10b7cf12ffe0fcbf62c081ebcce140576a3e1b41",
+    "next_steps": "Proceeding to PHASE4 (SYNC)",
+    "docs_updated": [
+      "cmd/AGENTS.md"
+    ],
+    "changes_made": [
+      "Added Explicit Error Formatter Pattern subsection with matcher functions, formatter functions, and registration pattern documentation"
+    ],
+    "entry": 8,
+    "timestamp": "2026-03-18T10:40:39Z"
+  },
+  {
+    "phase": "SYNC",
+    "iteration": 1,
+    "summary": "No delta specs found - skipping sync",
+    "commit_hash": "null",
+    "next_steps": "Proceeding to PHASE5 (ARCHIVE)",
+    "delta_specs_found": [],
+    "sync_operations": {
+      "added": 0,
+      "modified": 0,
+      "removed": 0,
+      "renamed": 0
+    },
+    "entry": 9,
+    "timestamp": "2026-03-18T10:42:01Z"
+  },
+  {
+    "phase": "SELF_REFLECTION",
+    "iteration": 1,
+    "summary": "Self-reflection completed. Workflow evaluation finished.",
+    "commit_hash": "4160c52269ffa7e559497b48f7344030233b7ed2",
+    "next_steps": "Self-reflection complete. Proceeding to PHASE6 (ARCHIVE).",
+    "reflections_path": "openspec/changes/explicit-error-formatting/reflections.md",
+    "total_phases": 7,
+    "total_iterations": 7,
+    "entry": 10,
+    "timestamp": "2026-03-18T10:51:50Z"
+  },
+  {
+    "phase": "ARCHIVE",
+    "iteration": 1,
+    "summary": "Change successfully archived",
+    "next_steps": "Archive complete. Workflow finished.",
+    "archive_path": "openspec/changes/archive/2026-03-18-explicit-error-formatting/",
+    "entry": 11,
+    "timestamp": "2026-03-18T10:55:06Z"
+  }
+]
