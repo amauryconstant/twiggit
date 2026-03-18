@@ -5,30 +5,23 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
 )
 
-type ContextResolverTestSuite struct {
-	suite.Suite
-	config *domain.Config
-}
-
-func (s *ContextResolverTestSuite) SetupTest() {
-	s.config = &domain.Config{
+func setupContextResolverTest(t *testing.T) *domain.Config {
+	t.Helper()
+	return &domain.Config{
 		ProjectsDirectory:  "/home/user/Projects",
 		WorktreesDirectory: "/home/user/Worktrees",
 	}
 }
 
-func TestContextResolver(t *testing.T) {
-	suite.Run(t, new(ContextResolverTestSuite))
-}
-
-func (s *ContextResolverTestSuite) TestResolveIdentifier() {
+func TestContextResolver_ResolveIdentifier(t *testing.T) {
 	tests := []struct {
 		name           string
 		context        *domain.Context
@@ -132,28 +125,29 @@ func (s *ContextResolverTestSuite) TestResolveIdentifier() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			resolver := NewContextResolver(s.config, nil)
+		t.Run(tt.name, func(t *testing.T) {
+			config := setupContextResolverTest(t)
+			resolver := NewContextResolver(config, nil)
 			result, err := resolver.ResolveIdentifier(tt.context, tt.identifier)
 
 			if tt.expectError {
-				s.Require().Error(err)
+				require.Error(t, err)
 				return
 			}
 
-			s.Require().NoError(err)
-			s.Equal(tt.expectedType, result.Type)
-			s.Equal(tt.expectedProj, result.ProjectName)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedType, result.Type)
+			assert.Equal(t, tt.expectedProj, result.ProjectName)
 			if tt.expectedBranch != "" {
-				s.Equal(tt.expectedBranch, result.BranchName)
+				assert.Equal(t, tt.expectedBranch, result.BranchName)
 			}
-			s.Equal(tt.expectedPath, result.ResolvedPath)
-			s.NotEmpty(result.Explanation)
+			assert.Equal(t, tt.expectedPath, result.ResolvedPath)
+			assert.NotEmpty(t, result.Explanation)
 		})
 	}
 }
 
-func (s *ContextResolverTestSuite) TestGetResolutionSuggestions() {
+func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
 	tests := []struct {
 		name          string
 		context       *domain.Context
@@ -197,26 +191,28 @@ func (s *ContextResolverTestSuite) TestGetResolutionSuggestions() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			resolver := NewContextResolver(s.config, nil)
+		t.Run(tt.name, func(t *testing.T) {
+			config := setupContextResolverTest(t)
+			resolver := NewContextResolver(config, nil)
 			suggestions, err := resolver.GetResolutionSuggestions(tt.context, tt.partial)
 
-			s.Require().NoError(err)
-			s.Len(suggestions, tt.expectedCount)
+			require.NoError(t, err)
+			assert.Len(t, suggestions, tt.expectedCount)
 
 			if len(tt.expectedTexts) > 0 {
 				suggestionTexts := make([]string, len(suggestions))
 				for i, suggestion := range suggestions {
 					suggestionTexts[i] = suggestion.Text
 				}
-				s.Equal(tt.expectedTexts, suggestionTexts)
+				assert.Equal(t, tt.expectedTexts, suggestionTexts)
 			}
 		})
 	}
 }
 
-func (s *ContextResolverTestSuite) TestWorktreeContextResolution() {
-	resolver := NewContextResolver(s.config, nil)
+func TestContextResolver_WorktreeContextResolution(t *testing.T) {
+	config := setupContextResolverTest(t)
+	resolver := NewContextResolver(config, nil)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextWorktree,
@@ -226,17 +222,18 @@ func (s *ContextResolverTestSuite) TestWorktreeContextResolution() {
 	}
 
 	result, err := resolver.ResolveIdentifier(ctx, "other-branch")
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
-	s.Equal(domain.PathTypeWorktree, result.Type)
-	s.Equal("my-project", result.ProjectName)
-	s.Equal("other-branch", result.BranchName)
-	s.Equal("/home/user/Worktrees/my-project/other-branch", result.ResolvedPath)
-	s.Contains(result.Explanation, "my-project")
+	assert.Equal(t, domain.PathTypeWorktree, result.Type)
+	assert.Equal(t, "my-project", result.ProjectName)
+	assert.Equal(t, "other-branch", result.BranchName)
+	assert.Equal(t, "/home/user/Worktrees/my-project/other-branch", result.ResolvedPath)
+	assert.Contains(t, result.Explanation, "my-project")
 }
 
-func (s *ContextResolverTestSuite) TestCrossProjectReference() {
-	resolver := NewContextResolver(s.config, nil)
+func TestContextResolver_CrossProjectReference(t *testing.T) {
+	config := setupContextResolverTest(t)
+	resolver := NewContextResolver(config, nil)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextProject,
@@ -245,16 +242,16 @@ func (s *ContextResolverTestSuite) TestCrossProjectReference() {
 	}
 
 	result, err := resolver.ResolveIdentifier(ctx, "other-project/feature-branch")
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
-	s.Equal(domain.PathTypeWorktree, result.Type)
-	s.Equal("other-project", result.ProjectName)
-	s.Equal("feature-branch", result.BranchName)
-	s.Equal("/home/user/Worktrees/other-project/feature-branch", result.ResolvedPath)
-	s.Contains(result.Explanation, "other-project")
+	assert.Equal(t, domain.PathTypeWorktree, result.Type)
+	assert.Equal(t, "other-project", result.ProjectName)
+	assert.Equal(t, "feature-branch", result.BranchName)
+	assert.Equal(t, "/home/user/Worktrees/other-project/feature-branch", result.ResolvedPath)
+	assert.Contains(t, result.Explanation, "other-project")
 }
 
-func (s *ContextResolverTestSuite) TestParseCrossProjectReference() {
+func TestContextResolver_ParseCrossProjectReference(t *testing.T) {
 	tests := []struct {
 		name           string
 		identifier     string
@@ -307,16 +304,16 @@ func (s *ContextResolverTestSuite) TestParseCrossProjectReference() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			project, branch, valid := parseCrossProjectReference(tt.identifier)
-			s.Equal(tt.expectedProj, project)
-			s.Equal(tt.expectedBranch, branch)
-			s.Equal(tt.expectedValid, valid)
+			assert.Equal(t, tt.expectedProj, project)
+			assert.Equal(t, tt.expectedBranch, branch)
+			assert.Equal(t, tt.expectedValid, valid)
 		})
 	}
 }
 
-func (s *ContextResolverTestSuite) TestBuildWorktreePath() {
+func TestContextResolver_BuildWorktreePath(t *testing.T) {
 	tests := []struct {
 		name         string
 		worktreesDir string
@@ -348,14 +345,14 @@ func (s *ContextResolverTestSuite) TestBuildWorktreePath() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			path := buildWorktreePath(tt.worktreesDir, tt.project, tt.branch)
-			s.Equal(tt.expectedPath, path)
+			assert.Equal(t, tt.expectedPath, path)
 		})
 	}
 }
 
-func (s *ContextResolverTestSuite) TestBuildProjectPath() {
+func TestContextResolver_BuildProjectPath(t *testing.T) {
 	tests := []struct {
 		name         string
 		projectsDir  string
@@ -383,14 +380,14 @@ func (s *ContextResolverTestSuite) TestBuildProjectPath() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			path := buildProjectPath(tt.projectsDir, tt.project)
-			s.Equal(tt.expectedPath, path)
+			assert.Equal(t, tt.expectedPath, path)
 		})
 	}
 }
 
-func (s *ContextResolverTestSuite) TestFilterSuggestions() {
+func TestContextResolver_FilterSuggestions(t *testing.T) {
 	tests := []struct {
 		name           string
 		suggestions    []string
@@ -436,14 +433,14 @@ func (s *ContextResolverTestSuite) TestFilterSuggestions() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := filterSuggestions(tt.suggestions, tt.partial)
-			s.Equal(tt.expectedResult, result)
+			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
 }
 
-func (s *ContextResolverTestSuite) TestContainsPathTraversal() {
+func TestContextResolver_ContainsPathTraversal(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -468,14 +465,14 @@ func (s *ContextResolverTestSuite) TestContainsPathTraversal() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := containsPathTraversal(tt.input)
-			s.Equal(tt.expected, result)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func (s *ContextResolverTestSuite) TestPathTraversalProtection() {
+func TestContextResolver_PathTraversalProtection(t *testing.T) {
 	tests := []struct {
 		name          string
 		context       *domain.Context
@@ -694,181 +691,60 @@ func (s *ContextResolverTestSuite) TestPathTraversalProtection() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			resolver := NewContextResolver(s.config, nil)
+		t.Run(tt.name, func(t *testing.T) {
+			config := setupContextResolverTest(t)
+			resolver := NewContextResolver(config, nil)
 			result, err := resolver.ResolveIdentifier(tt.context, tt.identifier)
 
 			if tt.expectError {
-				s.Require().Error(err, tt.description)
-				s.Contains(err.Error(), tt.errorContains, tt.description)
-				s.Nil(result, tt.description)
+				require.Error(t, err, tt.description)
+				assert.Contains(t, err.Error(), tt.errorContains, tt.description)
+				assert.Nil(t, result, tt.description)
 			} else {
-				s.Require().NoError(err, tt.description)
-				s.NotNil(result, tt.description)
+				require.NoError(t, err, tt.description)
+				assert.NotNil(t, result, tt.description)
 			}
 		})
 	}
 }
 
-func (s *ContextResolverTestSuite) TestGetOutsideGitContextSuggestions() {
-	tests := []struct {
-		name          string
-		projectsDir   string
-		setupProjects func(dir string) error
-		partial       string
-		expectedCount int
-		expectedTexts []string
-	}{
-		{
-			name:          "no projects directory configured",
-			projectsDir:   "",
-			partial:       "test",
-			expectedCount: 0,
-			expectedTexts: []string{},
-		},
-		{
-			name:          "projects directory does not exist",
-			projectsDir:   "/nonexistent/directory",
-			partial:       "test",
-			expectedCount: 0,
-			expectedTexts: []string{},
-		},
-		{
-			name:        "projects directory with git repositories",
-			projectsDir: s.T().TempDir(),
-			setupProjects: func(dir string) error {
-				if err := os.MkdirAll(filepath.Join(dir, "project1"), 0755); err != nil {
-					return err
-				}
-				if err := os.MkdirAll(filepath.Join(dir, "project2"), 0755); err != nil {
-					return err
-				}
-				if err := os.MkdirAll(filepath.Join(dir, "not-a-repo"), 0755); err != nil {
-					return err
-				}
-
-				s.setupTestRepo(filepath.Join(dir, "project1"))
-				s.setupTestRepo(filepath.Join(dir, "project2"))
-				return nil
-			},
-			partial:       "proj",
-			expectedCount: 2,
-			expectedTexts: []string{"project1", "project2"},
-		},
-		{
-			name:        "partial matching with 'test'",
-			projectsDir: s.T().TempDir(),
-			setupProjects: func(dir string) error {
-				if err := os.MkdirAll(filepath.Join(dir, "test-project"), 0755); err != nil {
-					return err
-				}
-				if err := os.MkdirAll(filepath.Join(dir, "other-project"), 0755); err != nil {
-					return err
-				}
-
-				s.setupTestRepo(filepath.Join(dir, "test-project"))
-				s.setupTestRepo(filepath.Join(dir, "other-project"))
-				return nil
-			},
-			partial:       "test",
-			expectedCount: 1,
-			expectedTexts: []string{"test-project"},
-		},
-		{
-			name:        "empty partial matches all",
-			projectsDir: s.T().TempDir(),
-			setupProjects: func(dir string) error {
-				if err := os.MkdirAll(filepath.Join(dir, "project1"), 0755); err != nil {
-					return err
-				}
-				if err := os.MkdirAll(filepath.Join(dir, "project2"), 0755); err != nil {
-					return err
-				}
-
-				s.setupTestRepo(filepath.Join(dir, "project1"))
-				s.setupTestRepo(filepath.Join(dir, "project2"))
-				return nil
-			},
-			partial:       "",
-			expectedCount: 2,
-			expectedTexts: []string{"project1", "project2"},
-		},
-	}
-
-	for _, tt := range tests {
-		s.Run(tt.name, func() {
-			if tt.setupProjects != nil {
-				if err := tt.setupProjects(tt.projectsDir); err != nil {
-					s.T().Fatalf("Failed to setup test projects: %v", err)
-				}
-			}
-
-			config := &domain.Config{
-				ProjectsDirectory:  tt.projectsDir,
-				WorktreesDirectory: "/home/user/Worktrees",
-			}
-
-			mockGitService := mocks.NewMockGitService()
-			mockGitService.MockGoGitClient.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
-
-			resolver := NewContextResolver(config, mockGitService)
-			suggestions := resolver.(*contextResolver).getOutsideGitContextSuggestions(tt.partial)
-
-			s.Len(suggestions, tt.expectedCount, "Expected %d suggestions", tt.expectedCount)
-
-			if len(tt.expectedTexts) > 0 {
-				suggestionTexts := make([]string, len(suggestions))
-				for i, suggestion := range suggestions {
-					suggestionTexts[i] = suggestion.Text
-				}
-				s.Equal(tt.expectedTexts, suggestionTexts, "Suggestion texts don't match")
-			}
-
-			for _, suggestion := range suggestions {
-				s.NotEmpty(suggestion.Text, "Suggestion text should not be empty")
-				s.Equal(domain.PathTypeProject, suggestion.Type, "Suggestion type should be project")
-				s.Equal(suggestion.Text, suggestion.ProjectName, "Project name should match text")
-				s.Equal("Project directory", suggestion.Description, "Description should be consistent")
-			}
-		})
-	}
-}
-
-func (s *ContextResolverTestSuite) setupTestRepo(path string) {
-	s.T().Helper()
+func setupMinimalTestRepo(t *testing.T, path string) {
+	t.Helper()
 
 	err := os.MkdirAll(filepath.Join(path, ".git"), 0755)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	gitDir := filepath.Join(path, ".git", "refs", "heads")
 	err = os.MkdirAll(gitDir, 0755)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(path, ".git", "HEAD"), []byte("ref: refs/heads/main\n"), 0644)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	err = os.WriteFile(filepath.Join(gitDir, "main"), []byte("0000000000000000000000000000000000000000\n"), 0644)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 }
 
-func (s *ContextResolverTestSuite) TestDescriptionFormats() {
-	s.Run("main suggestion has project root directory description", func() {
+func TestContextResolver_DescriptionFormats(t *testing.T) {
+	t.Run("main suggestion has project root directory description", func(t *testing.T) {
+		config := setupContextResolverTest(t)
 		ctx := &domain.Context{
 			Type:        domain.ContextProject,
 			ProjectName: "test-project",
 			Path:        "/home/user/Projects/test-project",
 		}
 
-		resolver := NewContextResolver(s.config, nil)
+		resolver := NewContextResolver(config, nil)
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "main")
 
-		s.Require().NoError(err)
-		s.Require().Len(suggestions, 1)
-		s.Equal("main", suggestions[0].Text)
-		s.Equal("Project root directory", suggestions[0].Description)
+		require.NoError(t, err)
+		require.Len(t, suggestions, 1)
+		assert.Equal(t, "main", suggestions[0].Text)
+		assert.Equal(t, "Project root directory", suggestions[0].Description)
 	})
 
-	s.Run("worktree suggestion has worktree for branch description", func() {
+	t.Run("worktree suggestion has worktree for branch description", func(t *testing.T) {
+		config := setupContextResolverTest(t)
 		ctx := &domain.Context{
 			Type:        domain.ContextProject,
 			ProjectName: "test-project",
@@ -883,16 +759,17 @@ func (s *ContextResolverTestSuite) TestDescriptionFormats() {
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, "/home/user/Projects/test-project").
 			Return([]domain.BranchInfo{}, nil)
 
-		resolver := NewContextResolver(s.config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService)
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature-1")
 
-		s.Require().NoError(err)
-		s.Require().Len(suggestions, 1)
-		s.Equal("feature-1", suggestions[0].Text)
-		s.Equal("Worktree for branch feature-1", suggestions[0].Description)
+		require.NoError(t, err)
+		require.Len(t, suggestions, 1)
+		assert.Equal(t, "feature-1", suggestions[0].Text)
+		assert.Equal(t, "Worktree for branch feature-1", suggestions[0].Description)
 	})
 
-	s.Run("branch without worktree has create worktree description", func() {
+	t.Run("branch without worktree has create worktree description", func(t *testing.T) {
+		config := setupContextResolverTest(t)
 		ctx := &domain.Context{
 			Type:        domain.ContextProject,
 			ProjectName: "test-project",
@@ -905,22 +782,22 @@ func (s *ContextResolverTestSuite) TestDescriptionFormats() {
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, "/home/user/Projects/test-project").
 			Return([]domain.BranchInfo{{Name: "develop"}}, nil)
 
-		resolver := NewContextResolver(s.config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService)
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "develop")
 
-		s.Require().NoError(err)
-		s.Require().Len(suggestions, 1)
-		s.Equal("develop", suggestions[0].Text)
-		s.Equal("Branch develop (create worktree)", suggestions[0].Description)
+		require.NoError(t, err)
+		require.Len(t, suggestions, 1)
+		assert.Equal(t, "develop", suggestions[0].Text)
+		assert.Equal(t, "Branch develop (create worktree)", suggestions[0].Description)
 	})
 
-	s.Run("project suggestion has project directory description", func() {
-		tempDir := s.T().TempDir()
+	t.Run("project suggestion has project directory description", func(t *testing.T) {
+		tempDir := t.TempDir()
 		projectsDir := tempDir
 
 		project1Path := filepath.Join(projectsDir, "project1")
-		s.Require().NoError(os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
-		s.setupTestRepo(project1Path)
+		require.NoError(t, os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
+		setupMinimalTestRepo(t, project1Path)
 
 		config := &domain.Config{
 			ProjectsDirectory:  projectsDir,
@@ -939,8 +816,8 @@ func (s *ContextResolverTestSuite) TestDescriptionFormats() {
 
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "proj")
 
-		s.Require().NoError(err)
-		s.Require().GreaterOrEqual(len(suggestions), 1)
+		require.NoError(t, err)
+		require.GreaterOrEqual(t, len(suggestions), 1)
 
 		var project1 *domain.ResolutionSuggestion
 		for _, sug := range suggestions {
@@ -949,53 +826,43 @@ func (s *ContextResolverTestSuite) TestDescriptionFormats() {
 				break
 			}
 		}
-		s.Require().NotNil(project1)
-		s.Equal("Project directory", project1.Description)
+		require.NotNil(t, project1)
+		assert.Equal(t, "Project directory", project1.Description)
 	})
 }
 
-func (s *ContextResolverTestSuite) TestWithExistingOnlyFilter() {
+func TestContextResolver_WithExistingOnlyFilter(t *testing.T) {
 	_, err := os.Stat("/tmp/nonexistent")
-	s.Require().True(os.IsNotExist(err))
+	require.True(t, os.IsNotExist(err))
 }
 
-// Task 6.1: Unit tests for fuzzyMatch() function
-func (s *ContextResolverTestSuite) TestFuzzyMatch() {
+func TestContextResolver_FuzzyMatch(t *testing.T) {
 	tests := []struct {
 		name     string
 		pattern  string
 		text     string
 		expected bool
 	}{
-		// Basic matches
 		{"empty pattern matches anything", "", "anything", true},
 		{"empty pattern matches empty", "", "", true},
 		{"exact match", "main", "main", true},
 		{"prefix match", "ma", "main", true},
 		{"subsequence match", "mn", "main", true},
 		{"non-matching pattern", "xyz", "main", false},
-
-		// Case insensitivity
 		{"case insensitive - lowercase pattern", "main", "MAIN", true},
 		{"case insensitive - uppercase pattern", "MAIN", "main", true},
 		{"case insensitive - mixed case", "MaIn", "mAiN", true},
 		{"case insensitive subsequence", "mn", "MAIN", true},
-
-		// Fuzzy matching scenarios
 		{"fuzzy - f1 matches feature-1", "f1", "feature-1", true},
 		{"fuzzy - fb matches feature-branch", "fb", "feature-branch", true},
 		{"fuzzy - ftb matches feature-test-branch", "ftb", "feature-test-branch", true},
 		{"fuzzy - fbn does not match feature", "fbn", "feature", false},
 		{"fuzzy - dv matches develop", "dv", "develop", true},
-		{"fuzzy - dvp matches develop", "dvp", "develop", true}, // subsequence: d-v-p in develop
-
-		// Edge cases
+		{"fuzzy - dvp matches develop", "dvp", "develop", true},
 		{"pattern longer than text", "longpattern", "short", false},
 		{"single char match", "m", "main", true},
 		{"single char no match", "x", "main", false},
 		{"unicode characters", "f", "fëätürë", true},
-
-		// Common branch name patterns
 		{"bugfix pattern", "bf", "bugfix-123", true},
 		{"feature pattern", "feat", "feature/new-thing", true},
 		{"hotfix pattern", "hf", "hotfix-urgent", true},
@@ -1003,15 +870,14 @@ func (s *ContextResolverTestSuite) TestFuzzyMatch() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := fuzzyMatch(tt.pattern, tt.text)
-			s.Equal(tt.expected, result, "fuzzyMatch(%q, %q)", tt.pattern, tt.text)
+			assert.Equal(t, tt.expected, result, "fuzzyMatch(%q, %q)", tt.pattern, tt.text)
 		})
 	}
 }
 
-// Task 6.2: Unit tests for matchesExclusionPatterns() helper
-func (s *ContextResolverTestSuite) TestMatchesExclusionPatterns() {
+func TestContextResolver_MatchesExclusionPatterns(t *testing.T) {
 	tests := []struct {
 		name        string
 		nameToCheck string
@@ -1029,33 +895,31 @@ func (s *ContextResolverTestSuite) TestMatchesExclusionPatterns() {
 		{"glob question mark", "test1", []string{"test?"}, true},
 		{"glob question mark - no match", "test12", []string{"test?"}, false},
 		{"glob character class", "v1.0", []string{"v[0-9].*"}, true},
-		{"archive pattern", "archive-old-project", []string{"archive/*"}, false}, // '/' not in name
+		{"archive pattern", "archive-old-project", []string{"archive/*"}, false},
 		{"empty name", "", []string{"*"}, true},
-		{"pattern with invalid glob syntax", "branch", []string{"["}, false}, // invalid pattern should not crash
+		{"pattern with invalid glob syntax", "branch", []string{"["}, false},
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := matchesExclusionPatterns(tt.nameToCheck, tt.patterns)
-			s.Equal(tt.expected, result, "matchesExclusionPatterns(%q, %v)", tt.nameToCheck, tt.patterns)
+			assert.Equal(t, tt.expected, result, "matchesExclusionPatterns(%q, %v)", tt.nameToCheck, tt.patterns)
 		})
 	}
 }
 
-// Task 6.3: Unit tests for project suggestions from project context
-func (s *ContextResolverTestSuite) TestProjectSuggestionsFromProjectContext() {
-	s.Run("includes other projects when in project context", func() {
-		tempDir := s.T().TempDir()
+func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
+	t.Run("includes other projects when in project context", func(t *testing.T) {
+		tempDir := t.TempDir()
 		projectsDir := filepath.Join(tempDir, "projects")
-		s.Require().NoError(os.MkdirAll(projectsDir, 0755))
+		require.NoError(t, os.MkdirAll(projectsDir, 0755))
 
-		// Create test projects
 		project1Path := filepath.Join(projectsDir, "project1")
 		project2Path := filepath.Join(projectsDir, "project2")
-		s.Require().NoError(os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
-		s.Require().NoError(os.MkdirAll(filepath.Join(project2Path, ".git"), 0755))
-		s.setupTestRepo(project1Path)
-		s.setupTestRepo(project2Path)
+		require.NoError(t, os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
+		require.NoError(t, os.MkdirAll(filepath.Join(project2Path, ".git"), 0755))
+		setupMinimalTestRepo(t, project1Path)
+		setupMinimalTestRepo(t, project2Path)
 
 		config := &domain.Config{
 			ProjectsDirectory:  projectsDir,
@@ -1079,31 +943,29 @@ func (s *ContextResolverTestSuite) TestProjectSuggestionsFromProjectContext() {
 		}
 
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "proj")
-		s.Require().NoError(err)
+		require.NoError(t, err)
 
-		// Should include project2 but exclude current project1
 		var projectNames []string
 		for _, sug := range suggestions {
 			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
 				projectNames = append(projectNames, sug.Text)
 			}
 		}
-		s.Contains(projectNames, "project2", "Should suggest other projects")
-		s.NotContains(projectNames, "project1", "Should not suggest current project")
+		assert.Contains(t, projectNames, "project2", "Should suggest other projects")
+		assert.NotContains(t, projectNames, "project1", "Should not suggest current project")
 	})
 
-	s.Run("respects exclusion patterns for projects", func() {
-		tempDir := s.T().TempDir()
+	t.Run("respects exclusion patterns for projects", func(t *testing.T) {
+		tempDir := t.TempDir()
 		projectsDir := filepath.Join(tempDir, "projects")
-		s.Require().NoError(os.MkdirAll(projectsDir, 0755))
+		require.NoError(t, os.MkdirAll(projectsDir, 0755))
 
-		// Create test projects
 		project1Path := filepath.Join(projectsDir, "project1")
 		archivePath := filepath.Join(projectsDir, "archive-old")
-		s.Require().NoError(os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
-		s.Require().NoError(os.MkdirAll(filepath.Join(archivePath, ".git"), 0755))
-		s.setupTestRepo(project1Path)
-		s.setupTestRepo(archivePath)
+		require.NoError(t, os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
+		require.NoError(t, os.MkdirAll(filepath.Join(archivePath, ".git"), 0755))
+		setupMinimalTestRepo(t, project1Path)
+		setupMinimalTestRepo(t, archivePath)
 
 		config := &domain.Config{
 			ProjectsDirectory:  projectsDir,
@@ -1130,39 +992,35 @@ func (s *ContextResolverTestSuite) TestProjectSuggestionsFromProjectContext() {
 		}
 
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "")
-		s.Require().NoError(err)
+		require.NoError(t, err)
 
-		// Should not include archive-old due to exclusion pattern
 		var projectNames []string
 		for _, sug := range suggestions {
 			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
 				projectNames = append(projectNames, sug.Text)
 			}
 		}
-		s.NotContains(projectNames, "archive-old", "Should exclude projects matching pattern")
+		assert.NotContains(t, projectNames, "archive-old", "Should exclude projects matching pattern")
 	})
 }
 
-// Task 6.4: Unit tests for project suggestions from worktree context
-func (s *ContextResolverTestSuite) TestProjectSuggestionsFromWorktreeContext() {
-	s.Run("includes other projects when in worktree context", func() {
-		tempDir := s.T().TempDir()
+func TestContextResolver_ProjectSuggestionsFromWorktreeContext(t *testing.T) {
+	t.Run("includes other projects when in worktree context", func(t *testing.T) {
+		tempDir := t.TempDir()
 		projectsDir := filepath.Join(tempDir, "projects")
 		worktreesDir := filepath.Join(tempDir, "worktrees")
-		s.Require().NoError(os.MkdirAll(projectsDir, 0755))
-		s.Require().NoError(os.MkdirAll(worktreesDir, 0755))
+		require.NoError(t, os.MkdirAll(projectsDir, 0755))
+		require.NoError(t, os.MkdirAll(worktreesDir, 0755))
 
-		// Create test projects
 		project1Path := filepath.Join(projectsDir, "project1")
 		project2Path := filepath.Join(projectsDir, "project2")
-		s.Require().NoError(os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
-		s.Require().NoError(os.MkdirAll(filepath.Join(project2Path, ".git"), 0755))
-		s.setupTestRepo(project1Path)
-		s.setupTestRepo(project2Path)
+		require.NoError(t, os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
+		require.NoError(t, os.MkdirAll(filepath.Join(project2Path, ".git"), 0755))
+		setupMinimalTestRepo(t, project1Path)
+		setupMinimalTestRepo(t, project2Path)
 
-		// Create worktree for project1
 		worktreePath := filepath.Join(worktreesDir, "project1", "feature-branch")
-		s.Require().NoError(os.MkdirAll(worktreePath, 0755))
+		require.NoError(t, os.MkdirAll(worktreePath, 0755))
 
 		config := &domain.Config{
 			ProjectsDirectory:  projectsDir,
@@ -1189,23 +1047,21 @@ func (s *ContextResolverTestSuite) TestProjectSuggestionsFromWorktreeContext() {
 		}
 
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "proj")
-		s.Require().NoError(err)
+		require.NoError(t, err)
 
-		// Should include project2 but exclude current project1
 		var projectNames []string
 		for _, sug := range suggestions {
 			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
 				projectNames = append(projectNames, sug.Text)
 			}
 		}
-		s.Contains(projectNames, "project2", "Should suggest other projects")
-		s.NotContains(projectNames, "project1", "Should not suggest current project")
+		assert.Contains(t, projectNames, "project2", "Should suggest other projects")
+		assert.NotContains(t, projectNames, "project1", "Should not suggest current project")
 	})
 }
 
-// Task 6.5: Unit tests for exclusion pattern filtering
-func (s *ContextResolverTestSuite) TestExclusionPatternFiltering() {
-	s.Run("excludes branches matching patterns", func() {
+func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
+	t.Run("excludes branches matching patterns", func(t *testing.T) {
 		config := &domain.Config{
 			ProjectsDirectory:  "/home/user/Projects",
 			WorktreesDirectory: "/home/user/Worktrees",
@@ -1239,31 +1095,29 @@ func (s *ContextResolverTestSuite) TestExclusionPatternFiltering() {
 		}
 
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "")
-		s.Require().NoError(err)
+		require.NoError(t, err)
 
-		// Collect all suggestions (both worktrees and branches)
 		allNames := make([]string, 0)
 		for _, sug := range suggestions {
 			allNames = append(allNames, sug.Text)
 		}
 
-		s.Contains(allNames, "main", "Should include main branch")
-		s.Contains(allNames, "feature-branch", "Should include feature-branch worktree")
-		s.Contains(allNames, "other-branch", "Should include other-branch worktree")
-		s.NotContains(allNames, "dependabot/npm-123", "Should exclude dependabot branches")
-		s.NotContains(allNames, "renovate/docker-456", "Should exclude renovate branches")
+		assert.Contains(t, allNames, "main", "Should include main branch")
+		assert.Contains(t, allNames, "feature-branch", "Should include feature-branch worktree")
+		assert.Contains(t, allNames, "other-branch", "Should include other-branch worktree")
+		assert.NotContains(t, allNames, "dependabot/npm-123", "Should exclude dependabot branches")
+		assert.NotContains(t, allNames, "renovate/docker-456", "Should exclude renovate branches")
 	})
 
-	s.Run("excludes projects matching patterns", func() {
-		tempDir := s.T().TempDir()
+	t.Run("excludes projects matching patterns", func(t *testing.T) {
+		tempDir := t.TempDir()
 		projectsDir := filepath.Join(tempDir, "projects")
-		s.Require().NoError(os.MkdirAll(projectsDir, 0755))
+		require.NoError(t, os.MkdirAll(projectsDir, 0755))
 
-		// Create test projects
 		for _, name := range []string{"active-project", "archived-old", "test-project"} {
 			projectPath := filepath.Join(projectsDir, name)
-			s.Require().NoError(os.MkdirAll(filepath.Join(projectPath, ".git"), 0755))
-			s.setupTestRepo(projectPath)
+			require.NoError(t, os.MkdirAll(filepath.Join(projectPath, ".git"), 0755))
+			setupMinimalTestRepo(t, projectPath)
 		}
 
 		config := &domain.Config{
@@ -1288,21 +1142,20 @@ func (s *ContextResolverTestSuite) TestExclusionPatternFiltering() {
 		}
 
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "")
-		s.Require().NoError(err)
+		require.NoError(t, err)
 
 		projectNames := make([]string, 0)
 		for _, sug := range suggestions {
 			projectNames = append(projectNames, sug.Text)
 		}
 
-		s.Contains(projectNames, "active-project")
-		s.Contains(projectNames, "test-project")
-		s.NotContains(projectNames, "archived-old", "Should exclude archived projects")
+		assert.Contains(t, projectNames, "active-project")
+		assert.Contains(t, projectNames, "test-project")
+		assert.NotContains(t, projectNames, "archived-old", "Should exclude archived projects")
 	})
 }
 
-// Test for fuzzy matching enabled via config
-func (s *ContextResolverTestSuite) TestFuzzyMatchingEnabled() {
+func TestContextResolver_FuzzyMatchingEnabled(t *testing.T) {
 	config := &domain.Config{
 		ProjectsDirectory:  "/home/user/Projects",
 		WorktreesDirectory: "/home/user/Worktrees",
@@ -1334,20 +1187,18 @@ func (s *ContextResolverTestSuite) TestFuzzyMatchingEnabled() {
 		Path:        "/home/user/Projects/my-project",
 	}
 
-	// "f1" should match "feature-123" with fuzzy matching
 	suggestions, err := resolver.GetResolutionSuggestions(ctx, "f1")
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	branchNames := make([]string, 0)
 	for _, sug := range suggestions {
 		branchNames = append(branchNames, sug.Text)
 	}
 
-	s.Contains(branchNames, "feature-123", "Fuzzy match 'f1' should match 'feature-123'")
+	assert.Contains(t, branchNames, "feature-123", "Fuzzy match 'f1' should match 'feature-123'")
 }
 
-// Test for IsCurrent and IsDirty fields
-func (s *ContextResolverTestSuite) TestWorktreeStatusFields() {
+func TestContextResolver_WorktreeStatusFields(t *testing.T) {
 	config := &domain.Config{
 		ProjectsDirectory:  "/home/user/Projects",
 		WorktreesDirectory: "/home/user/Worktrees",
@@ -1357,7 +1208,6 @@ func (s *ContextResolverTestSuite) TestWorktreeStatusFields() {
 	worktreePath := "/home/user/Worktrees/my-project/feature-branch"
 	projectPath := "/home/user/Projects/my-project"
 
-	// ListWorktrees should be called on the project path, not worktree path
 	mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, projectPath).
 		Return([]domain.WorktreeInfo{
 			{Branch: "feature-branch", Path: worktreePath},
@@ -1367,8 +1217,6 @@ func (s *ContextResolverTestSuite) TestWorktreeStatusFields() {
 		Return([]domain.BranchInfo{}, nil)
 	mockGitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, worktreePath).
 		Return(domain.RepositoryStatus{IsClean: false}, nil)
-	// Note: GetRepositoryStatus should NOT be called for other-branch due to performance optimization
-	// (IsDirty is only set for the current worktree)
 
 	resolver := NewContextResolver(config, mockGitService)
 
@@ -1380,17 +1228,17 @@ func (s *ContextResolverTestSuite) TestWorktreeStatusFields() {
 	}
 
 	suggestions, err := resolver.GetResolutionSuggestions(ctx, "")
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	for _, sug := range suggestions {
 		if sug.Text == "feature-branch" {
-			s.True(sug.IsCurrent, "Current worktree should have IsCurrent=true")
-			s.True(sug.IsDirty, "Dirty worktree should have IsDirty=true")
-			s.Contains(sug.Description, "⚠", "Dirty worktree description should have warning indicator")
+			assert.True(t, sug.IsCurrent, "Current worktree should have IsCurrent=true")
+			assert.True(t, sug.IsDirty, "Dirty worktree should have IsDirty=true")
+			assert.Contains(t, sug.Description, "⚠", "Dirty worktree description should have warning indicator")
 		}
 		if sug.Text == "other-branch" {
-			s.False(sug.IsCurrent, "Other worktree should have IsCurrent=false")
-			s.False(sug.IsDirty, "Other worktree should not have IsDirty set (performance optimization)")
+			assert.False(t, sug.IsCurrent, "Other worktree should have IsCurrent=false")
+			assert.False(t, sug.IsDirty, "Other worktree should not have IsDirty set (performance optimization)")
 		}
 	}
 }

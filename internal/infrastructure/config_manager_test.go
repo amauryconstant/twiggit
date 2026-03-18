@@ -5,67 +5,61 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/domain"
 )
 
-type ConfigManagerTestSuite struct {
-	suite.Suite
-	manager     domain.ConfigManager
-	tempDir     string
-	originalXDG string
+func setupConfigManagerTest(t *testing.T) (domain.ConfigManager, string, string) {
+	t.Helper()
+	originalXDG := os.Getenv("XDG_CONFIG_HOME")
+	tempDir := t.TempDir()
+	os.Setenv("XDG_CONFIG_HOME", tempDir)
+	manager := NewConfigManager()
+	t.Cleanup(func() {
+		if originalXDG != "" {
+			os.Setenv("XDG_CONFIG_HOME", originalXDG)
+		} else {
+			os.Unsetenv("XDG_CONFIG_HOME")
+		}
+	})
+	return manager, tempDir, originalXDG
 }
 
-func (s *ConfigManagerTestSuite) SetupTest() {
-	s.originalXDG = os.Getenv("XDG_CONFIG_HOME")
-	s.tempDir = s.T().TempDir()
-	os.Setenv("XDG_CONFIG_HOME", s.tempDir)
-	s.manager = NewConfigManager()
-}
-
-func (s *ConfigManagerTestSuite) TearDownTest() {
-	if s.originalXDG != "" {
-		os.Setenv("XDG_CONFIG_HOME", s.originalXDG)
-	} else {
-		os.Unsetenv("XDG_CONFIG_HOME")
-	}
-}
-
-func TestConfigManager(t *testing.T) {
-	suite.Run(t, new(ConfigManagerTestSuite))
-}
-
-func (s *ConfigManagerTestSuite) TestLoadDefaults() {
-	config, err := s.manager.Load()
-	s.Require().NoError(err)
-	s.Require().NotNil(config)
+func TestConfigManager_LoadDefaults(t *testing.T) {
+	manager, _, _ := setupConfigManagerTest(t)
+	config, err := manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, config)
 
 	defaultConfig := domain.DefaultConfig()
 
-	s.Contains(config.ProjectsDirectory, "Projects", "ProjectsDirectory should contain 'Projects'")
-	s.Contains(config.WorktreesDirectory, "Worktrees", "WorktreesDirectory should contain 'Worktrees'")
+	assert.Contains(t, config.ProjectsDirectory, "Projects", "ProjectsDirectory should contain 'Projects'")
+	assert.Contains(t, config.WorktreesDirectory, "Worktrees", "WorktreesDirectory should contain 'Worktrees'")
 
-	s.Equal(defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
-	s.Equal(defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
-	s.Equal(defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
+	assert.Equal(t, defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
+	assert.Equal(t, defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
+	assert.Equal(t, defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
 
-	s.Equal(defaultConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
+	assert.Equal(t, defaultConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
 }
 
-func (s *ConfigManagerTestSuite) TestGetConfigImmutable() {
-	config, err := s.manager.Load()
-	s.Require().NoError(err)
+func TestConfigManager_GetConfigImmutable(t *testing.T) {
+	manager, _, _ := setupConfigManagerTest(t)
+	config, err := manager.Load()
+	require.NoError(t, err)
 
 	config.ProjectsDirectory = "/modified/path"
 
-	newConfig := s.manager.GetConfig()
-	s.NotEqual("/modified/path", newConfig.ProjectsDirectory)
+	newConfig := manager.GetConfig()
+	assert.NotEqual(t, "/modified/path", newConfig.ProjectsDirectory)
 }
 
-func (s *ConfigManagerTestSuite) TestGetConfigDeepCopy() {
-	config, err := s.manager.Load()
-	s.Require().NoError(err)
+func TestConfigManager_GetConfigDeepCopy(t *testing.T) {
+	manager, _, _ := setupConfigManagerTest(t)
+	config, err := manager.Load()
+	require.NoError(t, err)
 
 	originalProjectsDir := config.ProjectsDirectory
 	originalWorktreesDir := config.WorktreesDirectory
@@ -75,13 +69,13 @@ func (s *ConfigManagerTestSuite) TestGetConfigDeepCopy() {
 	config.WorktreesDirectory = "/another/path"
 	config.DefaultSourceBranch = "modified"
 
-	originalConfig := s.manager.GetConfig()
-	s.Equal(originalProjectsDir, originalConfig.ProjectsDirectory)
-	s.Equal(originalWorktreesDir, originalConfig.WorktreesDirectory)
-	s.Equal(originalSourceBranch, originalConfig.DefaultSourceBranch)
+	originalConfig := manager.GetConfig()
+	assert.Equal(t, originalProjectsDir, originalConfig.ProjectsDirectory)
+	assert.Equal(t, originalWorktreesDir, originalConfig.WorktreesDirectory)
+	assert.Equal(t, originalSourceBranch, originalConfig.DefaultSourceBranch)
 }
 
-func (s *ConfigManagerTestSuite) TestResolveConfigPath() {
+func TestConfigManager_ResolveConfigPath(t *testing.T) {
 	tests := []struct {
 		name          string
 		xdgConfigHome string
@@ -109,46 +103,46 @@ func (s *ConfigManagerTestSuite) TestResolveConfigPath() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			path := resolveConfigPath(tc.xdgConfigHome, tc.homeDir)
-			s.Equal(tc.expectedPath, path)
+			assert.Equal(t, tc.expectedPath, path)
 		})
 	}
 }
 
-func (s *ConfigManagerTestSuite) TestBuildDefaultConfig() {
+func TestConfigManager_BuildDefaultConfig(t *testing.T) {
 	config := buildDefaultConfig()
 
-	s.Require().NotNil(config)
+	require.NotNil(t, config)
 
 	expectedConfig := domain.DefaultConfig()
 
-	s.Contains(config.ProjectsDirectory, "Projects")
-	s.Contains(config.WorktreesDirectory, "Worktrees")
-	s.Equal(expectedConfig.DefaultSourceBranch, config.DefaultSourceBranch)
+	assert.Contains(t, config.ProjectsDirectory, "Projects")
+	assert.Contains(t, config.WorktreesDirectory, "Worktrees")
+	assert.Equal(t, expectedConfig.DefaultSourceBranch, config.DefaultSourceBranch)
 
-	s.Equal(expectedConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
-	s.Equal(expectedConfig.Git.CLITimeout, config.Git.CLITimeout)
+	assert.Equal(t, expectedConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
+	assert.Equal(t, expectedConfig.Git.CLITimeout, config.Git.CLITimeout)
 
 	originalProjectsDir := config.ProjectsDirectory
 	config.ProjectsDirectory = "/modified"
 	newConfig := buildDefaultConfig()
-	s.NotEqual("/modified", newConfig.ProjectsDirectory)
-	s.Equal(originalProjectsDir, newConfig.ProjectsDirectory)
+	assert.NotEqual(t, "/modified", newConfig.ProjectsDirectory)
+	assert.Equal(t, originalProjectsDir, newConfig.ProjectsDirectory)
 }
 
-func (s *ConfigManagerTestSuite) TestConfigFileExists() {
+func TestConfigManager_ConfigFileExists(t *testing.T) {
 	exists := configFileExists("/nonexistent/path/config.toml")
-	s.False(exists)
+	assert.False(t, exists)
 
 	goModPath := "../../go.mod"
 	absPath, err := filepath.Abs(goModPath)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 	exists = configFileExists(absPath)
-	s.True(exists)
+	assert.True(t, exists)
 }
 
-func (s *ConfigManagerTestSuite) TestValidateConfig() {
+func TestConfigManager_ValidateConfig(t *testing.T) {
 	validConfig := &domain.Config{
 		ProjectsDirectory:   "/home/user/Projects",
 		WorktreesDirectory:  "/home/user/Worktrees",
@@ -156,7 +150,7 @@ func (s *ConfigManagerTestSuite) TestValidateConfig() {
 	}
 
 	err := validateConfig(validConfig)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
 	invalidConfig := &domain.Config{
 		ProjectsDirectory:   "",
@@ -165,10 +159,10 @@ func (s *ConfigManagerTestSuite) TestValidateConfig() {
 	}
 
 	err = validateConfig(invalidConfig)
-	s.Error(err)
+	assert.Error(t, err)
 }
 
-func (s *ConfigManagerTestSuite) TestCopyConfig() {
+func TestConfigManager_CopyConfig(t *testing.T) {
 	originalConfig := &domain.Config{
 		ProjectsDirectory:   "/home/user/Projects",
 		WorktreesDirectory:  "/home/user/Worktrees",
@@ -177,35 +171,33 @@ func (s *ConfigManagerTestSuite) TestCopyConfig() {
 
 	copiedConfig := copyConfig(originalConfig)
 
-	s.Require().NotNil(copiedConfig)
-	s.Equal(originalConfig.ProjectsDirectory, copiedConfig.ProjectsDirectory)
-	s.Equal(originalConfig.WorktreesDirectory, copiedConfig.WorktreesDirectory)
-	s.Equal(originalConfig.DefaultSourceBranch, copiedConfig.DefaultSourceBranch)
+	require.NotNil(t, copiedConfig)
+	assert.Equal(t, originalConfig.ProjectsDirectory, copiedConfig.ProjectsDirectory)
+	assert.Equal(t, originalConfig.WorktreesDirectory, copiedConfig.WorktreesDirectory)
+	assert.Equal(t, originalConfig.DefaultSourceBranch, copiedConfig.DefaultSourceBranch)
 
 	copiedConfig.ProjectsDirectory = "/modified/path"
-	s.NotEqual("/modified/path", originalConfig.ProjectsDirectory)
-	s.Equal("/home/user/Projects", originalConfig.ProjectsDirectory)
+	assert.NotEqual(t, "/modified/path", originalConfig.ProjectsDirectory)
+	assert.Equal(t, "/home/user/Projects", originalConfig.ProjectsDirectory)
 }
 
-func (s *ConfigManagerTestSuite) TestLoadDefaultsErrorHandling() {
+func TestConfigManager_LoadDefaultsErrorHandling(t *testing.T) {
 	manager := NewConfigManager()
 	config, err := manager.Load()
 
-	s.Require().NoError(err, "Load() should succeed with valid default keys")
-	s.Require().NotNil(config, "Config should be loaded successfully")
+	require.NoError(t, err, "Load() should succeed with valid default keys")
+	require.NotNil(t, config, "Config should be loaded successfully")
 
 	defaultConfig := domain.DefaultConfig()
-	s.Equal(defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
-	s.Equal(defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
-	s.Equal(defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
+	assert.Equal(t, defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
+	assert.Equal(t, defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
+	assert.Equal(t, defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
 }
 
-func (s *ConfigManagerTestSuite) TestExpandConfigPath() {
-	// Save original HOME and restore after test
+func TestConfigManager_ExpandConfigPath(t *testing.T) {
 	originalHome := os.Getenv("HOME")
 	defer os.Setenv("HOME", originalHome)
 
-	// Set up test environment
 	os.Setenv("HOME", "/home/testuser")
 	os.Setenv("TEST_VAR", "/custom/path")
 
@@ -263,31 +255,25 @@ func (s *ConfigManagerTestSuite) TestExpandConfigPath() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			if tc.setupEnv != nil {
 				tc.setupEnv()
 			}
 			result := expandConfigPath(tc.input)
-			s.Equal(tc.expected, result)
+			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
-func (s *ConfigManagerTestSuite) TestExpandConfigPathFallbacks() {
-	// Test fallback behavior when os.UserHomeDir would fail
-	// We can't easily mock os.UserHomeDir, but we can test the logic indirectly
-	// by ensuring the function doesn't panic and returns something reasonable
-
-	s.Run("handles paths gracefully", func() {
-		// Test with a simple tilde path - this should always work
+func TestConfigManager_ExpandConfigPathFallbacks(t *testing.T) {
+	t.Run("handles paths gracefully", func(t *testing.T) {
 		result := expandConfigPath("~/test")
-		s.NotEmpty(result)
-		s.NotContains(result, "~", "Tilde should be expanded")
+		assert.NotEmpty(t, result)
+		assert.NotContains(t, result, "~", "Tilde should be expanded")
 	})
 }
 
-func (s *ConfigManagerTestSuite) TestNormalizeConfigPaths() {
-	// Save original HOME and restore after test
+func TestConfigManager_NormalizeConfigPaths(t *testing.T) {
 	originalHome := os.Getenv("HOME")
 	defer os.Setenv("HOME", originalHome)
 	os.Setenv("HOME", "/home/testuser")
@@ -340,7 +326,7 @@ func (s *ConfigManagerTestSuite) TestNormalizeConfigPaths() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			config := &domain.Config{
 				ProjectsDirectory:  tc.projectsDir,
 				WorktreesDirectory: tc.worktreesDir,
@@ -353,15 +339,14 @@ func (s *ConfigManagerTestSuite) TestNormalizeConfigPaths() {
 
 			normalizeConfigPaths(config)
 
-			s.Equal(tc.expectedProjects, config.ProjectsDirectory)
-			s.Equal(tc.expectedWorktrees, config.WorktreesDirectory)
-			s.Equal(tc.expectedBackupDir, config.Shell.Wrapper.BackupDir)
+			assert.Equal(t, tc.expectedProjects, config.ProjectsDirectory)
+			assert.Equal(t, tc.expectedWorktrees, config.WorktreesDirectory)
+			assert.Equal(t, tc.expectedBackupDir, config.Shell.Wrapper.BackupDir)
 		})
 	}
 }
 
-func (s *ConfigManagerTestSuite) TestLoadWithEnvVarExpansion() {
-	// Save original environment
+func TestConfigManager_LoadWithEnvVarExpansion(t *testing.T) {
 	originalHome := os.Getenv("HOME")
 	originalXDG := os.Getenv("XDG_CONFIG_HOME")
 	defer func() {
@@ -369,15 +354,14 @@ func (s *ConfigManagerTestSuite) TestLoadWithEnvVarExpansion() {
 		os.Setenv("XDG_CONFIG_HOME", originalXDG)
 	}()
 
-	// Set up test environment
-	os.Setenv("HOME", s.tempDir)
-	os.Setenv("XDG_CONFIG_HOME", s.tempDir)
+	tempDir := t.TempDir()
+	os.Setenv("HOME", tempDir)
+	os.Setenv("XDG_CONFIG_HOME", tempDir)
 	os.Setenv("TWIGGIT_TEST_PROJECTS", "/custom/projects")
 	os.Setenv("TWIGGIT_TEST_WORKTREES", "/custom/worktrees")
 
-	// Create config file with environment variables
-	configDir := filepath.Join(s.tempDir, "twiggit")
-	s.Require().NoError(os.MkdirAll(configDir, 0755))
+	configDir := filepath.Join(tempDir, "twiggit")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
 
 	configContent := `
 projects_dir = "$TWIGGIT_TEST_PROJECTS"
@@ -387,17 +371,15 @@ worktrees_dir = "${TWIGGIT_TEST_WORKTREES}"
 backup_dir = "~/backups"
 `
 	configPath := filepath.Join(configDir, "config.toml")
-	s.Require().NoError(os.WriteFile(configPath, []byte(configContent), 0644))
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
 
-	// Load config
 	manager := NewConfigManager()
 	config, err := manager.Load()
 
-	s.Require().NoError(err)
-	s.Require().NotNil(config)
+	require.NoError(t, err)
+	require.NotNil(t, config)
 
-	// Verify expansion occurred
-	s.Equal("/custom/projects", config.ProjectsDirectory)
-	s.Equal("/custom/worktrees", config.WorktreesDirectory)
-	s.Equal(filepath.Join(s.tempDir, "backups"), config.Shell.Wrapper.BackupDir)
+	assert.Equal(t, "/custom/projects", config.ProjectsDirectory)
+	assert.Equal(t, "/custom/worktrees", config.WorktreesDirectory)
+	assert.Equal(t, filepath.Join(tempDir, "backups"), config.Shell.Wrapper.BackupDir)
 }

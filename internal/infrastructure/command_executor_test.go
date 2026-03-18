@@ -9,24 +9,11 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/require"
 )
 
-type CommandExecutorTestSuite struct {
-	suite.Suite
-	executor *DefaultCommandExecutor
-}
-
-func TestCommandExecutorSuite(t *testing.T) {
-	suite.Run(t, new(CommandExecutorTestSuite))
-}
-
-func (s *CommandExecutorTestSuite) SetupTest() {
-	s.executor = NewDefaultCommandExecutor(5 * time.Second)
-}
-
-// TestIsErrorLine tests the pure function for error line detection
-func (s *CommandExecutorTestSuite) TestIsErrorLine() {
+// TestIsErrorLine tests pure function for error line detection
+func TestIsErrorLine(t *testing.T) {
 	testCases := []struct {
 		name     string
 		line     string
@@ -90,15 +77,15 @@ func (s *CommandExecutorTestSuite) TestIsErrorLine() {
 	}
 
 	for _, tt := range testCases {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := isErrorLine(tt.line)
-			s.Equal(tt.expected, result)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-// TestClassifyLines tests the pure function for line classification
-func (s *CommandExecutorTestSuite) TestClassifyLines() {
+// TestClassifyLines tests pure function for line classification
+func TestClassifyLines(t *testing.T) {
 	testCases := []struct {
 		name           string
 		lines          []string
@@ -138,17 +125,17 @@ func (s *CommandExecutorTestSuite) TestClassifyLines() {
 	}
 
 	for _, tt := range testCases {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			stdout, stderr := classifyLines(tt.lines)
-			s.Equal(tt.expectedStdout, stdout)
-			s.Equal(tt.expectedStderr, stderr)
+			assert.Equal(t, tt.expectedStdout, stdout)
+			assert.Equal(t, tt.expectedStderr, stderr)
 		})
 	}
 }
 
 // createTestExitError creates an ExitError for testing
 func createTestExitError(exitCode int) *exec.ExitError {
-	// Create a command that fails with the desired exit code
+	// Create a command that fails with desired exit code
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("exit %d", exitCode))
 	err := cmd.Run()
 	if err != nil {
@@ -162,8 +149,8 @@ func createTestExitError(exitCode int) *exec.ExitError {
 	return &exec.ExitError{}
 }
 
-// TestExtractExitCode tests the pure function for exit code extraction
-func (s *CommandExecutorTestSuite) TestExtractExitCode() {
+// TestExtractExitCode tests pure function for exit code extraction
+func TestExtractExitCode(t *testing.T) {
 	testCases := []struct {
 		name          string
 		err           error
@@ -197,16 +184,16 @@ func (s *CommandExecutorTestSuite) TestExtractExitCode() {
 	}
 
 	for _, tt := range testCases {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			code, found := extractExitCode(tt.err)
-			s.Equal(tt.expectedCode, code)
-			s.Equal(tt.expectedFound, found)
+			assert.Equal(t, tt.expectedCode, code)
+			assert.Equal(t, tt.expectedFound, found)
 		})
 	}
 }
 
-// TestCreateCommandResult tests the pure function for result creation
-func (s *CommandExecutorTestSuite) TestCreateCommandResult() {
+// TestCreateCommandResult tests pure function for result creation
+func TestCreateCommandResult(t *testing.T) {
 	testCases := []struct {
 		name         string
 		cmd          string
@@ -254,46 +241,48 @@ func (s *CommandExecutorTestSuite) TestCreateCommandResult() {
 	}
 
 	for _, tt := range testCases {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := createCommandResult(tt.cmd, tt.args, tt.output, tt.err, tt.duration)
 
-			s.Equal(tt.expectedExit, result.ExitCode)
-			s.Equal(tt.expectedOut, result.Stdout)
-			s.Equal(tt.expectedErr, result.Stderr)
-			s.Equal(tt.duration, result.Duration)
+			assert.Equal(t, tt.expectedExit, result.ExitCode)
+			assert.Equal(t, tt.expectedOut, result.Stdout)
+			assert.Equal(t, tt.expectedErr, result.Stderr)
+			assert.Equal(t, tt.duration, result.Duration)
 		})
 	}
 }
 
-// TestExecuteWithTimeout_Integration tests the refactored method end-to-end
-func (s *CommandExecutorTestSuite) TestExecuteWithTimeout_Integration() {
-	s.Run("successful command", func() {
-		ctx := context.Background()
-		result, err := s.executor.ExecuteWithTimeout(ctx, "", "echo", 1*time.Second, "hello world")
+// TestExecuteWithTimeout_Integration tests refactored method end-to-end
+func TestExecuteWithTimeout_Integration(t *testing.T) {
+	executor := NewDefaultCommandExecutor(5 * time.Second)
 
-		s.Require().NoError(err)
-		s.Equal(0, result.ExitCode)
-		s.Equal("hello world\n", result.Stdout)
-		s.Empty(result.Stderr)
-		s.Greater(result.Duration, time.Duration(0))
+	t.Run("successful command", func(t *testing.T) {
+		ctx := context.Background()
+		result, err := executor.ExecuteWithTimeout(ctx, "", "echo", 1*time.Second, "hello world")
+
+		require.NoError(t, err)
+		assert.Equal(t, 0, result.ExitCode)
+		assert.Equal(t, "hello world\n", result.Stdout)
+		assert.Empty(t, result.Stderr)
+		assert.Greater(t, result.Duration, time.Duration(0))
 	})
 
-	s.Run("command failure", func() {
+	t.Run("command failure", func(t *testing.T) {
 		ctx := context.Background()
-		result, err := s.executor.ExecuteWithTimeout(ctx, "", "false", 1*time.Second)
+		result, err := executor.ExecuteWithTimeout(ctx, "", "false", 1*time.Second)
 
-		s.Require().Error(err) // Error expected for non-zero exit code
-		s.Equal(1, result.ExitCode)
-		s.Empty(result.Stdout)
-		s.Empty(result.Stderr)
-		s.Contains(err.Error(), "command exited with non-zero status")
+		require.Error(t, err) // Error expected for non-zero exit code
+		assert.Equal(t, 1, result.ExitCode)
+		assert.Empty(t, result.Stdout)
+		assert.Empty(t, result.Stderr)
+		assert.Contains(t, err.Error(), "command exited with non-zero status")
 	})
 
-	s.Run("command not found", func() {
+	t.Run("command not found", func(t *testing.T) {
 		ctx := context.Background()
-		_, err := s.executor.ExecuteWithTimeout(ctx, "", "nonexistent-command-12345", 1*time.Second)
+		_, err := executor.ExecuteWithTimeout(ctx, "", "nonexistent-command-12345", 1*time.Second)
 
-		s.Require().Error(err)
-		s.Contains(err.Error(), "failed to execute command")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to execute command")
 	})
 }

@@ -6,84 +6,80 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/domain"
 )
 
-type ShellInfrastructureTestSuite struct {
-	suite.Suite
-}
-
-func TestShellInfrastructure(t *testing.T) {
-	suite.Run(t, new(ShellInfrastructureTestSuite))
-}
-
-func (s *ShellInfrastructureTestSuite) TestGenerateWrapper() {
+func TestShellInfrastructure_GenerateWrapper(t *testing.T) {
 	tests := []struct {
 		name        string
 		shellType   domain.ShellType
 		expectError bool
-		validate    func(wrapper string)
+		validate    func(t *testing.T, wrapper string)
 	}{
 		{
 			name:      "generate bash wrapper",
 			shellType: domain.ShellBash,
-			validate: func(wrapper string) {
-				s.Contains(wrapper, "twiggit() {")
-				s.Contains(wrapper, "builtin cd")
-				s.Contains(wrapper, "command twiggit")
-				s.Contains(wrapper, "# Twiggit bash wrapper")
+			validate: func(t *testing.T, wrapper string) {
+				t.Helper()
+				assert.Contains(t, wrapper, "twiggit() {")
+				assert.Contains(t, wrapper, "builtin cd")
+				assert.Contains(t, wrapper, "command twiggit")
+				assert.Contains(t, wrapper, "# Twiggit bash wrapper")
 			},
 		},
 		{
 			name:      "generate zsh wrapper",
 			shellType: domain.ShellZsh,
-			validate: func(wrapper string) {
-				s.Contains(wrapper, "twiggit() {")
-				s.Contains(wrapper, "builtin cd")
-				s.Contains(wrapper, "command twiggit")
-				s.Contains(wrapper, "# Twiggit zsh wrapper")
+			validate: func(t *testing.T, wrapper string) {
+				t.Helper()
+				assert.Contains(t, wrapper, "twiggit() {")
+				assert.Contains(t, wrapper, "builtin cd")
+				assert.Contains(t, wrapper, "command twiggit")
+				assert.Contains(t, wrapper, "# Twiggit zsh wrapper")
 			},
 		},
 		{
 			name:      "generate fish wrapper",
 			shellType: domain.ShellFish,
-			validate: func(wrapper string) {
-				s.Contains(wrapper, "function twiggit")
-				s.Contains(wrapper, "builtin cd")
-				s.Contains(wrapper, "command twiggit")
-				s.Contains(wrapper, "# Twiggit fish wrapper")
+			validate: func(t *testing.T, wrapper string) {
+				t.Helper()
+				assert.Contains(t, wrapper, "function twiggit")
+				assert.Contains(t, wrapper, "builtin cd")
+				assert.Contains(t, wrapper, "command twiggit")
+				assert.Contains(t, wrapper, "# Twiggit fish wrapper")
 			},
 		},
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			service := NewShellInfrastructure()
 			wrapper, err := service.GenerateWrapper(tc.shellType)
 
 			if tc.expectError {
-				s.Require().Error(err)
+				require.Error(t, err)
 			} else {
-				s.Require().NoError(err)
-				s.NotEmpty(wrapper)
-				tc.validate(wrapper)
+				require.NoError(t, err)
+				assert.NotEmpty(t, wrapper)
+				tc.validate(t, wrapper)
 			}
 		})
 	}
 }
 
-func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_InvalidShellType() {
+func TestShellInfrastructure_GenerateWrapper_InvalidShellType(t *testing.T) {
 	service := NewShellInfrastructure()
 	wrapper, err := service.GenerateWrapper(domain.ShellType("invalid"))
 
-	s.Require().Error(err)
-	s.Empty(wrapper)
-	s.Contains(err.Error(), "unsupported shell type")
+	require.Error(t, err)
+	assert.Empty(t, wrapper)
+	assert.Contains(t, err.Error(), "unsupported shell type")
 }
 
-func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_SyntaxValidation() {
+func TestShellInfrastructure_GenerateWrapper_SyntaxValidation(t *testing.T) {
 	tests := []struct {
 		name      string
 		shellType domain.ShellType
@@ -93,15 +89,15 @@ func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_SyntaxValidation() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			service := NewShellInfrastructure()
 			wrapper, err := service.GenerateWrapper(tc.shellType)
-			s.Require().NoError(err)
+			require.NoError(t, err)
 
-			s.NotContains(wrapper, "]] ]]", "wrapper should not contain double closing brackets")
-			s.Contains(wrapper, "if [[", "wrapper should use if [[ for conditionals")
-			s.Contains(wrapper, "]] || [[", "wrapper should use ]]] || [[ for OR conditionals")
-			s.Contains(wrapper, "]]; then", "wrapper should use ]]; then for conditional end")
+			assert.NotContains(t, wrapper, "]] ]]", "wrapper should not contain double closing brackets")
+			assert.Contains(t, wrapper, "if [[", "wrapper should use if [[ for conditionals")
+			assert.Contains(t, wrapper, "]] || [[", "wrapper should use ]]] || [[ for OR conditionals")
+			assert.Contains(t, wrapper, "]]; then", "wrapper should use ]]; then for conditional end")
 
 			syntaxCheckCmd := "bash"
 			if tc.shellType == domain.ShellZsh {
@@ -110,37 +106,37 @@ func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_SyntaxValidation() {
 
 			if _, err := exec.LookPath(syntaxCheckCmd); err == nil {
 				tmpFile, err := os.CreateTemp("", "wrapper_test_*.sh")
-				s.Require().NoError(err)
+				require.NoError(t, err)
 				defer os.Remove(tmpFile.Name())
 
 				_, err = tmpFile.WriteString(wrapper)
-				s.Require().NoError(err)
+				require.NoError(t, err)
 				tmpFile.Close()
 
 				cmd := exec.Command(syntaxCheckCmd, "-n", tmpFile.Name())
 				output, err := cmd.CombinedOutput()
-				s.Require().NoError(err, "wrapper should have valid %s syntax: %s", syntaxCheckCmd, string(output))
+				require.NoError(t, err, "wrapper should have valid %s syntax: %s", syntaxCheckCmd, string(output))
 			}
 		})
 	}
 }
 
-func (s *ShellInfrastructureTestSuite) TestGenerateWrapper_FishSyntaxValidation() {
+func TestShellInfrastructure_GenerateWrapper_FishSyntaxValidation(t *testing.T) {
 	service := NewShellInfrastructure()
 	wrapper, err := service.GenerateWrapper(domain.ShellFish)
-	s.Require().NoError(err)
+	require.NoError(t, err)
 
-	s.NotContains(wrapper, "]] ]]", "fish wrapper should not contain bash-style double brackets")
-	s.NotContains(wrapper, "if [[", "fish wrapper should not use bash-style if [[")
-	s.Contains(wrapper, "if", "fish wrapper should use fish if syntax")
-	s.Contains(wrapper, "or", "fish wrapper should use 'or' for OR conditionals")
-	s.Contains(wrapper, "end", "fish wrapper should use 'end' for block closure")
+	assert.NotContains(t, wrapper, "]] ]]", "fish wrapper should not contain bash-style double brackets")
+	assert.NotContains(t, wrapper, "if [[", "fish wrapper should not use bash-style if [[")
+	assert.Contains(t, wrapper, "if", "fish wrapper should use fish if syntax")
+	assert.Contains(t, wrapper, "or", "fish wrapper should use 'or' for OR conditionals")
+	assert.Contains(t, wrapper, "end", "fish wrapper should use 'end' for block closure")
 
 	indentCount := strings.Count(wrapper, "    if")
-	s.Positive(indentCount, "fish wrapper should contain properly indented if statements")
+	assert.Positive(t, indentCount, "fish wrapper should contain properly indented if statements")
 }
 
-func (s *ShellInfrastructureTestSuite) TestDetectConfigFile() {
+func TestShellInfrastructure_DetectConfigFile(t *testing.T) {
 	tests := []struct {
 		name        string
 		shellType   domain.ShellType
@@ -161,24 +157,24 @@ func (s *ShellInfrastructureTestSuite) TestDetectConfigFile() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			service := NewShellInfrastructure()
 			configFile, err := service.DetectConfigFile(tc.shellType)
 
 			if tc.expectError {
-				s.Require().Error(err)
+				require.Error(t, err)
 			} else {
-				s.Require().NoError(err)
-				s.NotEmpty(configFile)
-				s.Contains(configFile, "/")
+				require.NoError(t, err)
+				assert.NotEmpty(t, configFile)
+				assert.Contains(t, configFile, "/")
 			}
 		})
 	}
 }
 
-func (s *ShellInfrastructureTestSuite) TestValidateInstallation() {
+func TestShellInfrastructure_ValidateInstallation(t *testing.T) {
 	originalHome := os.Getenv("HOME")
-	tempHome := s.T().TempDir()
+	tempHome := t.TempDir()
 	os.Setenv("HOME", tempHome)
 	defer os.Setenv("HOME", originalHome)
 
@@ -205,31 +201,31 @@ func (s *ShellInfrastructureTestSuite) TestValidateInstallation() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			service := NewShellInfrastructure()
 			configFile := tempHome + "/.bashrc"
 			err := service.ValidateInstallation(tc.shellType, configFile)
 
 			if tc.expectError {
-				s.Require().Error(err)
+				require.Error(t, err)
 				var shellErr *domain.ShellError
-				s.Require().ErrorAs(err, &shellErr)
+				require.ErrorAs(t, err, &shellErr)
 			} else {
-				s.Require().NoError(err)
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
-func (s *ShellInfrastructureTestSuite) TestValidateInstallation_InvalidShellType() {
+func TestShellInfrastructure_ValidateInstallation_InvalidShellType(t *testing.T) {
 	service := NewShellInfrastructure()
 	err := service.ValidateInstallation(domain.ShellType("invalid"), "")
 
-	s.Require().Error(err)
-	s.Contains(err.Error(), "config file path is empty")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config file path is empty")
 }
 
-func (s *ShellInfrastructureTestSuite) TestHasWrapperBlock() {
+func TestShellInfrastructure_HasWrapperBlock(t *testing.T) {
 	service := NewShellInfrastructure()
 	shellInfraImpl := service.(*shellInfrastructure)
 
@@ -271,14 +267,14 @@ func (s *ShellInfrastructureTestSuite) TestHasWrapperBlock() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			result := shellInfraImpl.hasWrapperBlock(tc.content)
-			s.Equal(tc.expectedResult, result)
+			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
 }
 
-func (s *ShellInfrastructureTestSuite) TestRemoveWrapperBlock() {
+func TestShellInfrastructure_RemoveWrapperBlock(t *testing.T) {
 	service := NewShellInfrastructure()
 	shellInfraImpl := service.(*shellInfrastructure)
 
@@ -320,9 +316,9 @@ func (s *ShellInfrastructureTestSuite) TestRemoveWrapperBlock() {
 	}
 
 	for _, tc := range tests {
-		s.Run(tc.name, func() {
+		t.Run(tc.name, func(t *testing.T) {
 			result := shellInfraImpl.removeWrapperBlock(tc.content)
-			s.Equal(tc.expectedResult, result)
+			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
 }

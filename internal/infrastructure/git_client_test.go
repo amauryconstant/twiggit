@@ -5,49 +5,43 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/domain"
 	"twiggit/test/mocks"
 )
 
-// GitClientTestSuite tests CompositeGitClient routing
-type GitClientTestSuite struct {
-	suite.Suite
-	mockGoGitClient *mocks.MockGoGitClient
-	mockCLIClient   *mocks.MockCLIClient
-	compositeClient GitClient
-}
+func TestGitClient_OpenRepository_RoutesToGoGitClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockGoGitClient.AssertExpectations(t)
+	})
 
-func TestGitClientSuite(t *testing.T) {
-	suite.Run(t, new(GitClientTestSuite))
-}
-
-func (s *GitClientTestSuite) SetupTest() {
-	s.mockGoGitClient = mocks.NewMockGoGitClient()
-	s.mockCLIClient = mocks.NewMockCLIClient()
-	s.compositeClient = NewCompositeGitClient(s.mockGoGitClient, s.mockCLIClient)
-}
-
-// Test OpenRepository - routes to GoGitClient
-func (s *GitClientTestSuite) TestOpenRepository_RoutesToGoGitClient() {
 	repoPath := "/path/to/repo"
 	expectedErr := errors.New("failed to open repository")
 
-	s.mockGoGitClient.On("OpenRepository", repoPath).Return(nil, expectedErr)
+	mockGoGitClient.On("OpenRepository", repoPath).Return(nil, expectedErr)
 
-	repo, err := s.compositeClient.OpenRepository(repoPath)
+	repo, err := compositeClient.OpenRepository(repoPath)
 
-	s.Require().Error(err)
-	s.Nil(repo)
+	require.Error(t, err)
+	assert.Nil(t, repo)
 	var gitRepoErr *domain.GitRepositoryError
-	s.ErrorAs(err, &gitRepoErr)
-	s.Contains(gitRepoErr.Error(), "failed to open repository")
-	s.mockGoGitClient.AssertExpectations(s.T())
+	assert.ErrorAs(t, err, &gitRepoErr)
+	assert.Contains(t, gitRepoErr.Error(), "failed to open repository")
 }
 
-// Test ListBranches - routes to GoGitClient
-func (s *GitClientTestSuite) TestListBranches_RoutesToGoGitClient() {
+func TestGitClient_ListBranches_RoutesToGoGitClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockGoGitClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	expectedBranches := []domain.BranchInfo{
@@ -55,32 +49,42 @@ func (s *GitClientTestSuite) TestListBranches_RoutesToGoGitClient() {
 		{Name: "feature", IsCurrent: false},
 	}
 
-	s.mockGoGitClient.On("ListBranches", ctx, repoPath).Return(expectedBranches, nil)
+	mockGoGitClient.On("ListBranches", ctx, repoPath).Return(expectedBranches, nil)
 
-	branches, err := s.compositeClient.ListBranches(ctx, repoPath)
+	branches, err := compositeClient.ListBranches(ctx, repoPath)
 
-	s.Require().NoError(err)
-	s.Equal(expectedBranches, branches)
-	s.mockGoGitClient.AssertExpectations(s.T())
+	require.NoError(t, err)
+	assert.Equal(t, expectedBranches, branches)
 }
 
-// Test BranchExists - routes to GoGitClient
-func (s *GitClientTestSuite) TestBranchExists_RoutesToGoGitClient() {
+func TestGitClient_BranchExists_RoutesToGoGitClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockGoGitClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	branchName := "main"
 
-	s.mockGoGitClient.On("BranchExists", ctx, repoPath, branchName).Return(true, nil)
+	mockGoGitClient.On("BranchExists", ctx, repoPath, branchName).Return(true, nil)
 
-	exists, err := s.compositeClient.BranchExists(ctx, repoPath, branchName)
+	exists, err := compositeClient.BranchExists(ctx, repoPath, branchName)
 
-	s.Require().NoError(err)
-	s.True(exists)
-	s.mockGoGitClient.AssertExpectations(s.T())
+	require.NoError(t, err)
+	assert.True(t, exists)
 }
 
-// Test GetRepositoryStatus - routes to GoGitClient
-func (s *GitClientTestSuite) TestGetRepositoryStatus_RoutesToGoGitClient() {
+func TestGitClient_GetRepositoryStatus_RoutesToGoGitClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockGoGitClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	expectedStatus := domain.RepositoryStatus{
@@ -88,29 +92,39 @@ func (s *GitClientTestSuite) TestGetRepositoryStatus_RoutesToGoGitClient() {
 		Branch:  "main",
 	}
 
-	s.mockGoGitClient.On("GetRepositoryStatus", ctx, repoPath).Return(expectedStatus, nil)
+	mockGoGitClient.On("GetRepositoryStatus", ctx, repoPath).Return(expectedStatus, nil)
 
-	status, err := s.compositeClient.GetRepositoryStatus(ctx, repoPath)
+	status, err := compositeClient.GetRepositoryStatus(ctx, repoPath)
 
-	s.Require().NoError(err)
-	s.Equal(expectedStatus, status)
-	s.mockGoGitClient.AssertExpectations(s.T())
+	require.NoError(t, err)
+	assert.Equal(t, expectedStatus, status)
 }
 
-// Test ValidateRepository - routes to GoGitClient
-func (s *GitClientTestSuite) TestValidateRepository_RoutesToGoGitClient() {
+func TestGitClient_ValidateRepository_RoutesToGoGitClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockGoGitClient.AssertExpectations(t)
+	})
+
 	repoPath := "/path/to/repo"
 
-	s.mockGoGitClient.On("ValidateRepository", repoPath).Return(nil)
+	mockGoGitClient.On("ValidateRepository", repoPath).Return(nil)
 
-	err := s.compositeClient.ValidateRepository(repoPath)
+	err := compositeClient.ValidateRepository(repoPath)
 
-	s.Require().NoError(err)
-	s.mockGoGitClient.AssertExpectations(s.T())
+	require.NoError(t, err)
 }
 
-// Test GetRepositoryInfo - routes to GoGitClient
-func (s *GitClientTestSuite) TestGetRepositoryInfo_RoutesToGoGitClient() {
+func TestGitClient_GetRepositoryInfo_RoutesToGoGitClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockGoGitClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	expectedInfo := &domain.GitRepository{
@@ -118,34 +132,44 @@ func (s *GitClientTestSuite) TestGetRepositoryInfo_RoutesToGoGitClient() {
 		DefaultBranch: "main",
 	}
 
-	s.mockGoGitClient.On("GetRepositoryInfo", ctx, repoPath).Return(expectedInfo, nil)
+	mockGoGitClient.On("GetRepositoryInfo", ctx, repoPath).Return(expectedInfo, nil)
 
-	info, err := s.compositeClient.GetRepositoryInfo(ctx, repoPath)
+	info, err := compositeClient.GetRepositoryInfo(ctx, repoPath)
 
-	s.Require().NoError(err)
-	s.Equal(expectedInfo, info)
-	s.mockGoGitClient.AssertExpectations(s.T())
+	require.NoError(t, err)
+	assert.Equal(t, expectedInfo, info)
 }
 
-// Test ListRemotes - routes to GoGitClient
-func (s *GitClientTestSuite) TestListRemotes_RoutesToGoGitClient() {
+func TestGitClient_ListRemotes_RoutesToGoGitClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockGoGitClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	expectedRemotes := []domain.RemoteInfo{
 		{Name: "origin", FetchURL: "git@github.com:user/repo.git"},
 	}
 
-	s.mockGoGitClient.On("ListRemotes", ctx, repoPath).Return(expectedRemotes, nil)
+	mockGoGitClient.On("ListRemotes", ctx, repoPath).Return(expectedRemotes, nil)
 
-	remotes, err := s.compositeClient.ListRemotes(ctx, repoPath)
+	remotes, err := compositeClient.ListRemotes(ctx, repoPath)
 
-	s.Require().NoError(err)
-	s.Equal(expectedRemotes, remotes)
-	s.mockGoGitClient.AssertExpectations(s.T())
+	require.NoError(t, err)
+	assert.Equal(t, expectedRemotes, remotes)
 }
 
-// Test GetCommitInfo - routes to GoGitClient
-func (s *GitClientTestSuite) TestGetCommitInfo_RoutesToGoGitClient() {
+func TestGitClient_GetCommitInfo_RoutesToGoGitClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockGoGitClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	commitHash := "abc123"
@@ -154,33 +178,41 @@ func (s *GitClientTestSuite) TestGetCommitInfo_RoutesToGoGitClient() {
 		Message: "Test commit",
 	}
 
-	s.mockGoGitClient.On("GetCommitInfo", ctx, repoPath, commitHash).Return(expectedInfo, nil)
+	mockGoGitClient.On("GetCommitInfo", ctx, repoPath, commitHash).Return(expectedInfo, nil)
 
-	info, err := s.compositeClient.GetCommitInfo(ctx, repoPath, commitHash)
+	info, err := compositeClient.GetCommitInfo(ctx, repoPath, commitHash)
 
-	s.Require().NoError(err)
-	s.Equal(expectedInfo, info)
-	s.mockGoGitClient.AssertExpectations(s.T())
+	require.NoError(t, err)
+	assert.Equal(t, expectedInfo, info)
 }
 
-// Test CreateWorktree - routes to CLIClient
-func (s *GitClientTestSuite) TestCreateWorktree_RoutesToCLIClient() {
+func TestGitClient_CreateWorktree_RoutesToCLIClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockCLIClient.AssertExpectations(t)
+		mockGoGitClient.AssertNotCalled(t, "CreateWorktree")
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	branchName := "feature"
 	sourceBranch := "main"
 	worktreePath := "/path/to/worktree"
 
-	s.mockCLIClient.On("CreateWorktree", ctx, repoPath, branchName, sourceBranch, worktreePath).Return(nil)
+	mockCLIClient.On("CreateWorktree", ctx, repoPath, branchName, sourceBranch, worktreePath).Return(nil)
 
-	err := s.compositeClient.CreateWorktree(ctx, repoPath, branchName, sourceBranch, worktreePath)
+	err := compositeClient.CreateWorktree(ctx, repoPath, branchName, sourceBranch, worktreePath)
 
-	s.Require().NoError(err)
-	s.mockCLIClient.AssertExpectations(s.T())
-	s.mockGoGitClient.AssertNotCalled(s.T(), "CreateWorktree")
+	require.NoError(t, err)
 }
 
-func (s *GitClientTestSuite) TestCreateWorktree_ReturnsError() {
+func TestGitClient_CreateWorktree_ReturnsError(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	branchName := "feature"
@@ -188,33 +220,45 @@ func (s *GitClientTestSuite) TestCreateWorktree_ReturnsError() {
 	worktreePath := "/path/to/worktree"
 	expectedErr := errors.New("failed to create worktree")
 
-	s.mockCLIClient.On("CreateWorktree", ctx, repoPath, branchName, sourceBranch, worktreePath).Return(expectedErr)
+	mockCLIClient.On("CreateWorktree", ctx, repoPath, branchName, sourceBranch, worktreePath).Return(expectedErr)
 
-	err := s.compositeClient.CreateWorktree(ctx, repoPath, branchName, sourceBranch, worktreePath)
+	err := compositeClient.CreateWorktree(ctx, repoPath, branchName, sourceBranch, worktreePath)
 
-	s.Require().Error(err)
+	require.Error(t, err)
 	var gitWorktreeErr *domain.GitWorktreeError
-	s.ErrorAs(err, &gitWorktreeErr)
-	s.Contains(gitWorktreeErr.Error(), "failed to create worktree")
+	assert.ErrorAs(t, err, &gitWorktreeErr)
+	assert.Contains(t, gitWorktreeErr.Error(), "failed to create worktree")
 }
 
-// Test DeleteWorktree - routes to CLIClient
-func (s *GitClientTestSuite) TestDeleteWorktree_RoutesToCLIClient() {
+func TestGitClient_DeleteWorktree_RoutesToCLIClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockCLIClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	worktreePath := "/path/to/worktree"
 	force := true
 
-	s.mockCLIClient.On("DeleteWorktree", ctx, repoPath, worktreePath, force).Return(nil)
+	mockCLIClient.On("DeleteWorktree", ctx, repoPath, worktreePath, force).Return(nil)
 
-	err := s.compositeClient.DeleteWorktree(ctx, repoPath, worktreePath, force)
+	err := compositeClient.DeleteWorktree(ctx, repoPath, worktreePath, force)
 
-	s.Require().NoError(err)
-	s.mockCLIClient.AssertExpectations(s.T())
+	require.NoError(t, err)
 }
 
-// Test ListWorktrees - routes to CLIClient
-func (s *GitClientTestSuite) TestListWorktrees_RoutesToCLIClient() {
+func TestGitClient_ListWorktrees_RoutesToCLIClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockCLIClient.AssertExpectations(t)
+		mockGoGitClient.AssertNotCalled(t, "ListWorktrees")
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	expectedWorktrees := []domain.WorktreeInfo{
@@ -222,40 +266,48 @@ func (s *GitClientTestSuite) TestListWorktrees_RoutesToCLIClient() {
 		{Path: "/path/to/worktree2", Branch: "feature2"},
 	}
 
-	s.mockCLIClient.On("ListWorktrees", ctx, repoPath).Return(expectedWorktrees, nil)
+	mockCLIClient.On("ListWorktrees", ctx, repoPath).Return(expectedWorktrees, nil)
 
-	worktrees, err := s.compositeClient.ListWorktrees(ctx, repoPath)
+	worktrees, err := compositeClient.ListWorktrees(ctx, repoPath)
 
-	s.Require().NoError(err)
-	s.Equal(expectedWorktrees, worktrees)
-	s.mockCLIClient.AssertExpectations(s.T())
-	s.mockGoGitClient.AssertNotCalled(s.T(), "ListWorktrees")
+	require.NoError(t, err)
+	assert.Equal(t, expectedWorktrees, worktrees)
 }
 
-// Test PruneWorktrees - routes to CLIClient
-func (s *GitClientTestSuite) TestPruneWorktrees_RoutesToCLIClient() {
+func TestGitClient_PruneWorktrees_RoutesToCLIClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockCLIClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 
-	s.mockCLIClient.On("PruneWorktrees", ctx, repoPath).Return(nil)
+	mockCLIClient.On("PruneWorktrees", ctx, repoPath).Return(nil)
 
-	err := s.compositeClient.PruneWorktrees(ctx, repoPath)
+	err := compositeClient.PruneWorktrees(ctx, repoPath)
 
-	s.Require().NoError(err)
-	s.mockCLIClient.AssertExpectations(s.T())
+	require.NoError(t, err)
 }
 
-// Test IsBranchMerged - routes to CLIClient
-func (s *GitClientTestSuite) TestIsBranchMerged_RoutesToCLIClient() {
+func TestGitClient_IsBranchMerged_RoutesToCLIClient(t *testing.T) {
+	mockGoGitClient := mocks.NewMockGoGitClient()
+	mockCLIClient := mocks.NewMockCLIClient()
+	compositeClient := NewCompositeGitClient(mockGoGitClient, mockCLIClient)
+	t.Cleanup(func() {
+		mockCLIClient.AssertExpectations(t)
+	})
+
 	ctx := context.Background()
 	repoPath := "/path/to/repo"
 	branchName := "feature"
 
-	s.mockCLIClient.On("IsBranchMerged", ctx, repoPath, branchName).Return(true, nil)
+	mockCLIClient.On("IsBranchMerged", ctx, repoPath, branchName).Return(true, nil)
 
-	merged, err := s.compositeClient.IsBranchMerged(ctx, repoPath, branchName)
+	merged, err := compositeClient.IsBranchMerged(ctx, repoPath, branchName)
 
-	s.Require().NoError(err)
-	s.True(merged)
-	s.mockCLIClient.AssertExpectations(s.T())
+	require.NoError(t, err)
+	assert.True(t, merged)
 }

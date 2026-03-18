@@ -6,18 +6,11 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/stretchr/testify/suite"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-type PathUtilsTestSuite struct {
-	suite.Suite
-}
-
-func TestPathUtils(t *testing.T) {
-	suite.Run(t, new(PathUtilsTestSuite))
-}
-
-func (s *PathUtilsTestSuite) TestNormalizePath() {
+func TestPathUtils_NormalizePath(t *testing.T) {
 	tests := []struct {
 		name        string
 		input       string
@@ -81,26 +74,26 @@ func (s *PathUtilsTestSuite) TestNormalizePath() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result, err := NormalizePath(tt.input)
 
 			if tt.expectError {
-				s.Require().Error(err, tt.description)
-				s.Empty(result, tt.description)
+				require.Error(t, err, tt.description)
+				assert.Empty(t, result, tt.description)
 			} else {
-				s.Require().NoError(err, tt.description)
-				s.NotEmpty(result, tt.description)
+				require.NoError(t, err, tt.description)
+				assert.NotEmpty(t, result, tt.description)
 
-				s.True(filepath.IsAbs(result), "Result should be absolute path")
+				assert.True(t, filepath.IsAbs(result), "Result should be absolute path")
 
-				s.NotContains(result, string(filepath.Separator)+".", "Result should not contain '.' components")
-				s.NotContains(result, ".."+string(filepath.Separator), "Result should not contain '..' components")
+				assert.NotContains(t, result, string(filepath.Separator)+".", "Result should not contain '.' components")
+				assert.NotContains(t, result, ".."+string(filepath.Separator), "Result should not contain '..' components")
 			}
 		})
 	}
 }
 
-func (s *PathUtilsTestSuite) TestIsPathUnder() {
+func TestPathUtils_IsPathUnder(t *testing.T) {
 	tests := []struct {
 		name        string
 		base        string
@@ -264,22 +257,22 @@ func (s *PathUtilsTestSuite) TestIsPathUnder() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result, err := IsPathUnder(tt.base, tt.target)
 
 			if tt.expectError {
-				s.Require().Error(err, tt.description)
+				require.Error(t, err, tt.description)
 			} else {
-				s.Require().NoError(err, tt.description)
-				s.Equal(tt.expected, result, tt.description)
+				require.NoError(t, err, tt.description)
+				assert.Equal(t, tt.expected, result, tt.description)
 			}
 		})
 	}
 }
 
-func (s *PathUtilsTestSuite) TestIsPathUnder_CrossPlatform() {
+func TestPathUtils_IsPathUnder_CrossPlatform(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		s.T().Skip("Skipping cross-platform test on Windows")
+		t.Skip("Skipping cross-platform test on Windows")
 	}
 
 	tests := []struct {
@@ -309,36 +302,36 @@ func (s *PathUtilsTestSuite) TestIsPathUnder_CrossPlatform() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result, err := IsPathUnder(tt.base, tt.target)
-			s.Require().NoError(err)
-			s.Equal(tt.expected, result)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func (s *PathUtilsTestSuite) TestIsPathUnder_EdgeCases() {
-	s.Run("case sensitivity", func() {
+func TestPathUtils_IsPathUnder_EdgeCases(t *testing.T) {
+	t.Run("case sensitivity", func(t *testing.T) {
 		if runtime.GOOS == "windows" {
-			s.T().Skip("Skipping case sensitivity test on Windows")
+			t.Skip("Skipping case sensitivity test on Windows")
 		}
 
 		result, err := IsPathUnder("/Foo", "/foo/bar")
-		s.Require().NoError(err)
-		s.False(result)
+		require.NoError(t, err)
+		assert.False(t, result)
 	})
 
-	s.Run("root directory", func() {
+	t.Run("root directory", func(t *testing.T) {
 		if runtime.GOOS == "windows" {
-			s.T().Skip("Skipping root directory test on Windows")
+			t.Skip("Skipping root directory test on Windows")
 		}
 
 		result, err := IsPathUnder("/", "/foo/bar")
-		s.Require().NoError(err)
-		s.True(result)
+		require.NoError(t, err)
+		assert.True(t, result)
 	})
 
-	s.Run("relative path edge cases", func() {
+	t.Run("relative path edge cases", func(t *testing.T) {
 		tests := []struct {
 			base     string
 			target   string
@@ -349,70 +342,70 @@ func (s *PathUtilsTestSuite) TestIsPathUnder_EdgeCases() {
 
 		for _, tt := range tests {
 			result, err := IsPathUnder(tt.base, tt.target)
-			s.Require().NoError(err)
-			s.Equal(tt.expected, result)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
 		}
 	})
 }
 
-func (s *PathUtilsTestSuite) TestIsPathUnder_SymlinkTraversal() {
+func TestPathUtils_IsPathUnder_SymlinkTraversal(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		s.T().Skip("Skipping symlink test on Windows")
+		t.Skip("Skipping symlink test on Windows")
 	}
 
-	s.Run("symlink pointing outside base", func() {
+	t.Run("symlink pointing outside base", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "pathutils-test-*")
-		s.Require().NoError(err)
+		require.NoError(t, err)
 		defer os.RemoveAll(tmpDir)
 
 		baseDir := filepath.Join(tmpDir, "base")
 		outsideDir := filepath.Join(tmpDir, "outside")
-		s.Require().NoError(os.MkdirAll(baseDir, 0755))
-		s.Require().NoError(os.MkdirAll(outsideDir, 0755))
+		require.NoError(t, os.MkdirAll(baseDir, 0755))
+		require.NoError(t, os.MkdirAll(outsideDir, 0755))
 
 		symlinkPath := filepath.Join(baseDir, "link")
-		s.Require().NoError(os.Symlink(outsideDir, symlinkPath))
+		require.NoError(t, os.Symlink(outsideDir, symlinkPath))
 
 		result, err := IsPathUnder(baseDir, symlinkPath)
-		s.Require().NoError(err)
-		s.False(result, "symlink pointing outside base should return false")
+		require.NoError(t, err)
+		assert.False(t, result, "symlink pointing outside base should return false")
 	})
 
-	s.Run("symlink pointing inside base", func() {
+	t.Run("symlink pointing inside base", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "pathutils-test-*")
-		s.Require().NoError(err)
+		require.NoError(t, err)
 		defer os.RemoveAll(tmpDir)
 
 		baseDir := filepath.Join(tmpDir, "base")
 		subDir := filepath.Join(baseDir, "subdir")
-		s.Require().NoError(os.MkdirAll(subDir, 0755))
+		require.NoError(t, os.MkdirAll(subDir, 0755))
 
 		symlinkPath := filepath.Join(baseDir, "link")
-		s.Require().NoError(os.Symlink(subDir, symlinkPath))
+		require.NoError(t, os.Symlink(subDir, symlinkPath))
 
 		result, err := IsPathUnder(baseDir, symlinkPath)
-		s.Require().NoError(err)
-		s.True(result, "symlink pointing inside base should return true")
+		require.NoError(t, err)
+		assert.True(t, result, "symlink pointing inside base should return true")
 	})
 
-	s.Run("broken symlink should not error", func() {
+	t.Run("broken symlink should not error", func(t *testing.T) {
 		tmpDir, err := os.MkdirTemp("", "pathutils-test-*")
-		s.Require().NoError(err)
+		require.NoError(t, err)
 		defer os.RemoveAll(tmpDir)
 
 		baseDir := filepath.Join(tmpDir, "base")
-		s.Require().NoError(os.MkdirAll(baseDir, 0755))
+		require.NoError(t, os.MkdirAll(baseDir, 0755))
 
 		symlinkPath := filepath.Join(baseDir, "broken-link")
-		s.Require().NoError(os.Symlink("/nonexistent/path", symlinkPath))
+		require.NoError(t, os.Symlink("/nonexistent/path", symlinkPath))
 
 		result, err := IsPathUnder(baseDir, symlinkPath)
-		s.Require().NoError(err)
-		s.True(result, "broken symlink should be handled gracefully")
+		require.NoError(t, err)
+		assert.True(t, result, "broken symlink should be handled gracefully")
 	})
 }
 
-func (s *PathUtilsTestSuite) TestExtractProjectFromWorktreePath() {
+func TestPathUtils_ExtractProjectFromWorktreePath(t *testing.T) {
 	tests := []struct {
 		name         string
 		worktreePath string
@@ -486,10 +479,10 @@ func (s *PathUtilsTestSuite) TestExtractProjectFromWorktreePath() {
 	}
 
 	for _, tt := range tests {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result, err := ExtractProjectFromWorktreePath(tt.worktreePath, tt.worktreesDir)
-			s.Require().NoError(err, tt.description)
-			s.Equal(tt.expectedName, result, tt.description)
+			require.NoError(t, err, tt.description)
+			assert.Equal(t, tt.expectedName, result, tt.description)
 		})
 	}
 }

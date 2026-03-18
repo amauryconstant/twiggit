@@ -8,20 +8,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 	"twiggit/internal/domain"
 )
 
-type CLIClientTestSuite struct {
-	suite.Suite
-}
-
-func TestCLIClientSuite(t *testing.T) {
-	suite.Run(t, new(CLIClientTestSuite))
-}
-
-// TestParseWorktreeLine tests the pure function for parsing worktree lines
-func (s *CLIClientTestSuite) TestParseWorktreeLine() {
+func TestCLIClient_ParseWorktreeLine(t *testing.T) {
 	testCases := []struct {
 		name           string
 		line           string
@@ -60,15 +50,14 @@ func (s *CLIClientTestSuite) TestParseWorktreeLine() {
 	}
 
 	for _, tt := range testCases {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			result := parseWorktreeLine(tt.line)
-			s.Equal(tt.expectedResult, result)
+			assert.Equal(t, tt.expectedResult, result)
 		})
 	}
 }
 
-// TestBuildWorktreeAddArgs tests the pure function for building worktree add arguments
-func (s *CLIClientTestSuite) TestBuildWorktreeAddArgs() {
+func TestCLIClient_BuildWorktreeAddArgs(t *testing.T) {
 	testCases := []struct {
 		name         string
 		branchExists bool
@@ -104,15 +93,14 @@ func (s *CLIClientTestSuite) TestBuildWorktreeAddArgs() {
 	}
 
 	for _, tt := range testCases {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			args := buildWorktreeAddArgs(tt.branchExists, tt.branchName, tt.worktreePath, tt.sourceBranch)
-			s.Equal(tt.expectedArgs, args)
+			assert.Equal(t, tt.expectedArgs, args)
 		})
 	}
 }
 
-// TestBuildWorktreeRemoveArgs tests the pure function for building worktree remove arguments
-func (s *CLIClientTestSuite) TestBuildWorktreeRemoveArgs() {
+func TestCLIClient_BuildWorktreeRemoveArgs(t *testing.T) {
 	testCases := []struct {
 		name         string
 		worktreePath string
@@ -134,9 +122,9 @@ func (s *CLIClientTestSuite) TestBuildWorktreeRemoveArgs() {
 	}
 
 	for _, tt := range testCases {
-		s.Run(tt.name, func() {
+		t.Run(tt.name, func(t *testing.T) {
 			args := buildWorktreeRemoveArgs(tt.worktreePath, tt.force)
-			s.Equal(tt.expectedArgs, args)
+			assert.Equal(t, tt.expectedArgs, args)
 		})
 	}
 }
@@ -379,7 +367,6 @@ func TestCLIClient_Timeout(t *testing.T) {
 func TestCLIClient_ParseWorktreeList(t *testing.T) {
 	client := NewCLIClient(nil)
 
-	// Test parsing porcelain output
 	output := `worktree /path/to/repo
 HEAD abcdef1
 branch refs/heads/main
@@ -394,7 +381,6 @@ detached`
 	require.NoError(t, err)
 	assert.Len(t, worktrees, 3)
 
-	// Verify parsed data
 	assert.Equal(t, "/path/to/repo", worktrees[0].Path)
 	assert.Equal(t, "main", worktrees[0].Branch)
 	assert.Equal(t, "abcdef1", worktrees[0].Commit)
@@ -409,8 +395,6 @@ detached`
 	assert.Equal(t, "cdef3ab", worktrees[2].Commit)
 	assert.True(t, worktrees[2].IsDetached)
 }
-
-// Helper functions
 
 func findWorktree(worktrees []domain.WorktreeInfo, path string) *domain.WorktreeInfo {
 	for _, worktree := range worktrees {
