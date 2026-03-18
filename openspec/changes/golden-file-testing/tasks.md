@@ -24,5 +24,5 @@
 
 ## 5. Documentation
 
-- [ ] 5.1 Update test/AGENTS.md with golden file documentation
-- [ ] 5.2 Update test/helpers/AGENTS.md with golden file documentation
+- [x] 5.1 Update test/AGENTS.md with golden file documentation
+- [x] 5.2 Update test/helpers/AGENTS.md with golden file documentation

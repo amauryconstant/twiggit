@@ -6,6 +6,7 @@ Test utilities for unit, integration, and E2E tests
 - **Git helper**: Git operations for test setup
 - **Shell helper**: Shell-related test utilities
 - **Worktree helper**: Worktree test utilities
+- **Golden helper**: Snapshot testing for CLI output verification
 
 ## Cleanup Patterns
 
@@ -63,6 +64,37 @@ worktreePath := helpers.CreateTestWorktree(t, repoPath, "feature-1")
 helpers.ValidateWorktree(t, worktreePath, "feature-1")
 helpers.CleanupWorktree(t, worktreePath)
 ```
+
+## Golden Helper (`golden.go`)
+
+Golden file testing for CLI output verification:
+
+```go
+actualOutput := "List of worktrees:\n  feature-1\n  feature-2"
+helpers.CompareGolden(t, "list/basic_output.golden", actualOutput)
+```
+
+**Features:**
+- Snapshot testing for complex multi-line output
+- UPDATE_GOLDEN environment variable for easy updates
+- Clear diffs on failure with line-by-line comparison
+- Cross-platform line ending normalization
+
+**UPDATE_GOLDEN:**
+```bash
+UPDATE_GOLDEN=true go test ./...
+UPDATE_GOLDEN=true mise run test:golden
+```
+
+When UPDATE_GOLDEN is set to "true", golden files are updated with actual output instead of performing comparison.
+
+**Golden File Location:**
+test/golden/<category>/<name>.golden
+
+Categories: `list/`, `errors/`, etc.
+
+**Error Output:**
+On mismatch, shows diff with expected (-) and actual (+) lines, plus update command hint.
 
 ## Integration Test Repo
 
