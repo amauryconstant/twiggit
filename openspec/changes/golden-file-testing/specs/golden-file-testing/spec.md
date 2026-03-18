@@ -4,6 +4,7 @@
 The test/helpers package SHALL provide a CompareGolden function that compares actual output against a golden file.
 
 #### Scenario: Compare matching output
+- **GIVEN** a golden file exists with expected content
 - **WHEN** CompareGolden is called with actual output matching golden file content
 - **THEN** the test passes
 - **AND** no error is reported
