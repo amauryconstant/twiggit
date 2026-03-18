@@ -47,7 +47,7 @@ func TestErrorFormatter_FormatProjectNotFoundError(t *testing.T) {
 	output := formatter.Format(projectErr)
 
 	assert.Contains(t, output, "Error:")
-	assert.Contains(t, output, "project 'nonexistent-project' not found")
+	assert.Contains(t, output, "project not found for project 'nonexistent-project'")
 }
 
 func TestErrorFormatter_FormatWorktreeNotFoundError(t *testing.T) {
@@ -58,7 +58,8 @@ func TestErrorFormatter_FormatWorktreeNotFoundError(t *testing.T) {
 	output := formatter.Format(worktreeErr)
 
 	assert.Contains(t, output, "Error:")
-	assert.Contains(t, output, "worktree 'feature-branch' not found")
+	assert.Contains(t, output, "worktree not found for worktree '/path/to/worktree'")
+	assert.Contains(t, output, "branch: feature-branch")
 }
 
 func TestErrorFormatter_FormatGenericError(t *testing.T) {
