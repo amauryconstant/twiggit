@@ -1,12 +1,12 @@
 ## 1. Infrastructure Setup
 
-- [ ] 1.1 Create test/helpers/golden.go with CompareGolden function
-- [ ] 1.2 Create test/golden/ directory structure (list/, errors/)
+- [x] 1.1 Create test/helpers/golden.go with CompareGolden function
+- [x] 1.2 Create test/golden/ directory structure (list/, errors/)
 
 ## 2. Core Implementation
 
-- [ ] 2.1 Add UPDATE_GOLDEN environment variable support in CompareGolden
-- [ ] 2.2 Add mise tasks test:golden and test:golden:update to mise/config.toml
+- [x] 2.1 Add UPDATE_GOLDEN environment variable support in CompareGolden
+- [x] 2.2 Add mise tasks test:golden and test:golden:update to mise/config.toml
 
 ## 3. Golden File Tests
 
