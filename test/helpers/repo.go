@@ -20,11 +20,13 @@ type RepoTestHelper struct {
 // NewRepoTestHelper creates a new RepoTestHelper instance
 func NewRepoTestHelper(t *testing.T) *RepoTestHelper {
 	t.Helper()
-	return &RepoTestHelper{
+	helper := &RepoTestHelper{
 		t:       t,
 		baseDir: t.TempDir(),
 		repos:   make(map[string]string),
 	}
+	t.Cleanup(helper.Cleanup)
+	return helper
 }
 
 // WithProject sets the project name for functional composition
