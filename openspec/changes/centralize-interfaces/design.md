@@ -116,29 +116,30 @@ service.NewWorktreeService(gitClient, ...)  // But now accepts application.GitCl
 
 ### Phase 2: Update service layer
 
-3. Update `internal/service/*.go` to import from `application/` instead of `infrastructure/`
+3. Update `internal/service/*.go` to import from `application/` instead of `infrastructure/` or `domain/`
 4. Verify `mise run check` passes
 
-### Phase 3: Update main.go and cmd layer
+### Phase 3: Update infrastructure layer
 
-5. Update `main.go` import paths
-6. Update `cmd/root.go` if it references moved interfaces
-7. Verify `mise run check` passes
+5. Add `var _ Interface = (*Implementation)(nil)` compile-time checks to infrastructure implementations
+6. Verify `mise run check` passes
+7. Remove interface definitions from `internal/infrastructure/interfaces.go` (keep structs and constructors)
 
-### Phase 4: Add compile-time checks
+### Phase 4: Update main.go and cmd layer
 
-8. Add `var _ Interface = (*impl)(nil)` to infrastructure implementations
-9. Verify `mise run check` passes
+8. Update `main.go` import paths
+9. Update `cmd/root.go` if it references moved interfaces
+10. Verify `mise run check` passes
 
 ### Phase 5: Clean up domain layer
 
-10. Remove interface definitions from `domain/config.go` and `domain/context.go`
-11. Verify `mise run check` passes
+11. Remove interface definitions from `domain/config.go` and `domain/context.go`
+12. Verify `mise run check` passes
 
 ### Phase 6: Update test mocks
 
-12. Update `test/mocks/*.go` import paths
-13. Run `mise run test` to verify
+13. Update `test/mocks/*.go` import paths
+14. Run `mise run test` to verify
 
 ### Rollback
 
