@@ -11,6 +11,8 @@ import (
 	"twiggit/internal/infrastructure"
 )
 
+var _ application.ProjectService = (*projectService)(nil)
+
 // projectService implements ProjectService interface
 type projectService struct {
 	gitService     infrastructure.GitClient

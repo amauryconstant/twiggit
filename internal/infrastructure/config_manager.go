@@ -13,6 +13,8 @@ import (
 	"twiggit/internal/domain"
 )
 
+var _ domain.ConfigManager = (*koanfConfigManager)(nil)
+
 // Pure functions extracted from ConfigManager
 
 // expandConfigPath expands environment variables and tilde in a path string.

@@ -10,6 +10,8 @@ import (
 	"twiggit/internal/infrastructure"
 )
 
+var _ application.ShellService = (*shellService)(nil)
+
 // shellService implements the ShellService interface
 type shellService struct {
 	integration infrastructure.ShellInfrastructure

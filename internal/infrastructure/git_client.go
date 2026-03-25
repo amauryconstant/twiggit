@@ -7,6 +7,8 @@ import (
 	"twiggit/internal/domain"
 )
 
+var _ GitClient = (*CompositeGitClient)(nil)
+
 // CompositeGitClient implements GitClient by combining GoGit and CLI functionality
 type CompositeGitClient struct {
 	goGitClient GoGitClient

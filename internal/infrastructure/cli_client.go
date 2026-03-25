@@ -12,6 +12,8 @@ import (
 	"twiggit/internal/domain"
 )
 
+var _ CLIClient = (*CLIClientImpl)(nil)
+
 // parseWorktreeLine parses a single line from git worktree list output
 func parseWorktreeLine(line string) *domain.WorktreeInfo {
 	line = strings.TrimSpace(line)

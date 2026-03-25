@@ -9,6 +9,8 @@ import (
 	"twiggit/internal/domain"
 )
 
+var _ ShellInfrastructure = (*shellInfrastructure)(nil)
+
 type shellInfrastructure struct{}
 
 // NewShellInfrastructure creates a new shell infrastructure instance

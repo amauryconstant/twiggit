@@ -14,6 +14,8 @@ import (
 	"twiggit/internal/domain"
 )
 
+var _ HookRunner = (*hookRunner)(nil)
+
 type hookRunner struct {
 	executor       CommandExecutor
 	defaultTimeout time.Duration

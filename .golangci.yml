@@ -40,6 +40,7 @@ linters:
 
     # Security
     - gosec
+    - depguard
 
     # Tests
     - testifylint
@@ -83,6 +84,14 @@ linters:
     gocognit:
       min-complexity: 30
 
+    depguard:
+      rules:
+        domain:
+          files:
+            - internal/domain/**
+          allow:
+            - $gostd
+            - internal/domain
 
   exclusions:
     rules:

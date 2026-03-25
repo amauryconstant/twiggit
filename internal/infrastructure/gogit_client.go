@@ -12,6 +12,8 @@ import (
 	"twiggit/internal/domain"
 )
 
+var _ GoGitClient = (*GoGitClientImpl)(nil)
+
 // GoGitClientImpl implements GoGitClient using go-git library
 type GoGitClientImpl struct {
 	cache        *lru.Cache[string, *git.Repository]

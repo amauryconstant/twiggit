@@ -50,6 +50,13 @@ repos:
         pass_filenames: false
         types: [go]
 
+      - id: govulncheck
+        name: Run govulncheck
+        entry: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        language: system
+        pass_filenames: false
+        types: [go]
+
 default_language_version:
   golang: "1.25.5"
 

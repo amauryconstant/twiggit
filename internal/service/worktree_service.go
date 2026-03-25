@@ -14,6 +14,8 @@ import (
 	"twiggit/internal/infrastructure"
 )
 
+var _ application.WorktreeService = (*worktreeService)(nil)
+
 // worktreeService implements WorktreeService interface
 type worktreeService struct {
 	gitService     infrastructure.GitClient

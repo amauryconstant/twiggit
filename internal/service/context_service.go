@@ -8,6 +8,8 @@ import (
 	"twiggit/internal/domain"
 )
 
+var _ application.ContextService = (*contextService)(nil)
+
 // contextService provides context-aware operations
 type contextService struct {
 	detector domain.ContextDetector

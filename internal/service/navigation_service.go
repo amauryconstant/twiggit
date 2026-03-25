@@ -9,6 +9,8 @@ import (
 	"twiggit/internal/domain"
 )
 
+var _ application.NavigationService = (*navigationService)(nil)
+
 // navigationService implements NavigationService interface
 type navigationService struct {
 	projectService application.ProjectService
