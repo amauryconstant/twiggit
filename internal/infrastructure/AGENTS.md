@@ -1,5 +1,10 @@
 ## Infrastructure Layer
+
 Layer: External integrations (git, config, CLI execution)
+
+**Interfaces:** Defined in `application/` - implementations here satisfy those contracts.
+
+**Compile-time checks:** Each implementation includes `var _ Interface = (*Implementation)(nil)`.
 
 ## Error Wrapping
 
@@ -24,19 +29,13 @@ Layer: External integrations (git, config, CLI execution)
 | Create/Delete/List worktree, Prune | ❌ | ✅ | go-git lacks support |
 | Is branch merged, Delete branch | ❌ | ✅ | go-git limitations |
 
-## GoGitClient
+## GoGitClient Implementation
 
 ```go
-type GoGitClient interface {
-    OpenRepository(path string) (*git.Repository, error)
-    ListBranches(ctx, repoPath) ([]domain.BranchInfo, error)
-    BranchExists(ctx, repoPath, branchName) (bool, error)
-    GetRepositoryStatus(ctx, repoPath) (domain.RepositoryStatus, error)
-    ValidateRepository(path string) error
-    GetRepositoryInfo(ctx, repoPath) (*domain.GitRepository, error)
-    ListRemotes(ctx, repoPath) ([]domain.RemoteInfo, error)
-    GetCommitInfo(ctx, repoPath, hash) (*domain.CommitInfo, error)
-}
+// Compile-time interface check
+var _ application.GoGitClient = (*GoGitClientImpl)(nil)
+
+type GoGitClientImpl struct { ... }
 ```
 
 **Cache:** LRU cache (default 25 repos) prevents memory leak.
@@ -45,17 +44,13 @@ NewGoGitClient(cacheEnabled...)           // default size 25
 NewGoGitClientWithSize(cacheSize, ...)    // custom size
 ```
 
-## CLIClient
+## CLIClient Implementation
 
 ```go
-type CLIClient interface {
-    CreateWorktree(ctx, repoPath, branch, source, worktreePath) error
-    DeleteWorktree(ctx, repoPath, worktreePath, force bool) error
-    ListWorktrees(ctx, repoPath) ([]domain.WorktreeInfo, error)
-    PruneWorktrees(ctx, repoPath) error
-    IsBranchMerged(ctx, repoPath, branchName) (bool, error)
-    DeleteBranch(ctx, repoPath, branchName) error
-}
+// Compile-time interface check
+var _ application.CLIClient = (*CLIClientImpl)(nil)
+
+type CLIClientImpl struct { ... }
 ```
 
 ## Path Utilities
@@ -80,15 +75,14 @@ type CLIClient interface {
 | Worktree | Different worktree, same project | Different project main | Cross-project worktree |
 | Outside | - | Project main | Cross-project worktree |
 
-## ShellInfrastructure
+## ShellInfrastructure Implementation
 
-| Method | Purpose |
-|--------|---------|
-| GenerateWrapper | Shell-specific wrapper |
-| DetectConfigFile | Find shell config |
-| InstallWrapper | Add wrapper to config |
-| ValidateInstallation | Check installed |
-| ComposeWrapper | Template → final wrapper |
+```go
+// Compile-time interface check
+var _ application.ShellInfrastructure = (*ShellInfrastructureImpl)(nil)
+
+type ShellInfrastructureImpl struct { ... }
+```
 
 | Shell | Config Files (preference order) |
 |-------|--------------------------------|
@@ -113,16 +107,13 @@ timeout = "500ms"  # Optional, default 500ms
 
 Slow git operations gracefully degrade to empty suggestions.
 
-## HookRunner
+## HookRunner Implementation
 
-Executes configured commands after worktree lifecycle events.
-
-**Interface:**
 ```go
-type HookRunner interface {
-    ReadHookConfig(repoPath string) (*domain.HookConfig, error)
-    Run(ctx context.Context, req *HookRunRequest) *domain.HookResult
-}
+// Compile-time interface check
+var _ application.HookRunner = (*HookRunnerImpl)(nil)
+
+type HookRunnerImpl struct { ... }
 ```
 
 **Configuration:** `.twiggit.toml` at repository root
@@ -134,7 +125,7 @@ commands = [
 ]
 ```
 
-**Execution context:** Commands run in new worktree directory with env vars:
+**Env vars set during execution:**
 
 | Variable | Description |
 |----------|-------------|

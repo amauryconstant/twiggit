@@ -50,9 +50,9 @@
 
 ## 7. Update Documentation
 
-- [ ] 7.1 Update internal/application/AGENTS.md interface documentation
-- [ ] 7.2 Update internal/domain/AGENTS.md to clarify no interfaces defined there
-- [ ] 7.3 Update internal/infrastructure/AGENTS.md to remove interface definitions
+- [x] 7.1 Update internal/application/AGENTS.md interface documentation
+- [x] 7.2 Update internal/domain/AGENTS.md to clarify no interfaces defined there
+- [x] 7.3 Update internal/infrastructure/AGENTS.md to remove interface definitions
 
 ## 8. Verification
 

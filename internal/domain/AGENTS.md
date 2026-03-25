@@ -1,6 +1,8 @@
 ## Domain Layer
 Layer: Business logic, entities, no external dependencies
 
+**Note:** NO interfaces are defined in this package. All contracts are in `application/`. Domain only contains types and error types.
+
 ## Context Types
 
 ```go

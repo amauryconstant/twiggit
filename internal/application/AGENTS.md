@@ -1,21 +1,81 @@
 ## Purpose
-Interface definitions for application layer contracts
+
+All interface contracts are defined here. Infrastructure implementations MUST implement these interfaces.
 
 ## Design Rationale
 
-**Why separate interfaces?**
+**Why centralize interfaces?**
+- Service layer depends only on `application/` for contracts
+- Infrastructure implementations satisfy `application/` interfaces
 - Enables mocking in tests (see `test/mocks/AGENTS.md`)
-- Allows implementation swapping without cmd changes
-- Documents service contracts explicitly
 
 **Dependency Rule**:
 ```
 service/ imports application/ ✓
 application/ imports domain/ ✓
-application/ imports service/ ✗
+application/ imports infrastructure/ ✗
 ```
 
-## Core Interfaces
+## Infrastructure Contracts
+
+These interfaces define contracts between service layer and infrastructure implementations:
+
+| Interface | Purpose | Implementation |
+|-----------|---------|----------------|
+| `ConfigManager` | Configuration loading | `infrastructure/` |
+| `ContextDetector` | Git context detection | `infrastructure/` |
+| `ContextResolver` | Identifier resolution | `infrastructure/` |
+| `GitClient` | Unified git operations | `infrastructure/` |
+| `GoGitClient` | go-git operations | `infrastructure/` |
+| `CLIClient` | CLI git operations | `infrastructure/` |
+| `HookRunner` | Hook execution | `infrastructure/` |
+| `ShellInfrastructure` | Shell integration | `infrastructure/` |
+
+### ConfigManager
+- `Load() (*domain.Config, error)` - Load from defaults + config file
+- `GetConfig() *domain.Config` - Returns immutable config after Load
+
+### ContextDetector
+- `DetectContext(dir string) (*domain.Context, error)` - Detect from directory
+
+### ContextResolver
+- `ResolveIdentifier(ctx, identifier) (*domain.ResolutionResult, error)`
+- `GetResolutionSuggestions(ctx, partial, opts...) ([]*domain.ResolutionSuggestion, error)`
+
+### GitClient (Composite)
+- Combines `GoGitClient` + `CLIClient` for unified operations
+
+### GoGitClient
+- `OpenRepository(path) (*git.Repository, error)`
+- `ListBranches(ctx, repoPath) ([]domain.BranchInfo, error)`
+- `BranchExists(ctx, repoPath, branchName) (bool, error)`
+- `GetRepositoryStatus(ctx, repoPath) (domain.RepositoryStatus, error)`
+- `ValidateRepository(path) error`
+- `GetRepositoryInfo(ctx, repoPath) (*domain.GitRepository, error)`
+- `ListRemotes(ctx, repoPath) ([]domain.RemoteInfo, error)`
+- `GetCommitInfo(ctx, repoPath, hash) (*domain.CommitInfo, error)`
+
+### CLIClient
+- `CreateWorktree(ctx, repoPath, branch, source, worktreePath) error`
+- `DeleteWorktree(ctx, repoPath, worktreePath, force) error`
+- `ListWorktrees(ctx, repoPath) ([]domain.WorktreeInfo, error)`
+- `PruneWorktrees(ctx, repoPath) error`
+- `IsBranchMerged(ctx, repoPath, branchName) (bool, error)`
+- `DeleteBranch(ctx, repoPath, branchName) error`
+
+### HookRunner
+- `Run(ctx, *HookRunRequest) (*domain.HookResult, error)`
+- Hook types: `post-create`
+- Env vars: `TWIGGIT_WORKTREE_PATH`, `TWIGGIT_PROJECT_NAME`, `TWIGGIT_BRANCH_NAME`, `TWIGGIT_SOURCE_BRANCH`, `TWIGGIT_MAIN_REPO_PATH`
+
+### ShellInfrastructure
+- `GenerateWrapper(shellType) (string, error)`
+- `ComposeWrapper(template, shellType) string`
+- `DetectConfigFile(shellType) (string, error)`
+- `InstallWrapper(shellType, wrapper, configFile, force) error`
+- `ValidateInstallation(shellType, configFile) error`
+
+## Service Contracts
 
 ### ContextService
 - `GetCurrentContext() (*domain.Context, error)`
@@ -69,8 +129,10 @@ type CreateWorktreeRequest struct {
 
 ```go
 func NewWorktreeService(
-    gitService infrastructure.GitClient,
+    gitClient application.GitClient,
     projectService application.ProjectService,
     config *domain.Config,
 ) application.WorktreeService
 ```
+
+**Compile-time checks:** Infrastructure implementations include `var _ Interface = (*Implementation)(nil)` to verify interface compliance.
