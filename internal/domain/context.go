@@ -103,18 +103,3 @@ func WithExistingOnly() SuggestionOption {
 		}
 	}
 }
-
-// ContextDetector detects the current git context
-type ContextDetector interface {
-	// DetectContext detects the context from the given directory
-	DetectContext(dir string) (*Context, error)
-}
-
-// ContextResolver resolves target identifiers based on current context
-type ContextResolver interface {
-	// ResolveIdentifier resolves target identifier based on context
-	ResolveIdentifier(ctx *Context, identifier string) (*ResolutionResult, error)
-
-	// GetResolutionSuggestions provides completion suggestions
-	GetResolutionSuggestions(ctx *Context, partial string, opts ...SuggestionOption) ([]*ResolutionSuggestion, error)
-}

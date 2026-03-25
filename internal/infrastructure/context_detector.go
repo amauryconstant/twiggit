@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
@@ -24,7 +25,7 @@ type contextDetector struct {
 }
 
 // NewContextDetector creates a new context detector
-func NewContextDetector(cfg *domain.Config) domain.ContextDetector {
+func NewContextDetector(cfg *domain.Config) application.ContextDetector {
 	ttl := parseTTL(cfg.ContextDetection.CacheTTL, 5*time.Second)
 	return &contextDetector{
 		config: cfg,

@@ -9,10 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-var _ CLIClient = (*CLIClientImpl)(nil)
+var _ application.CLIClient = (*CLIClientImpl)(nil)
 
 // parseWorktreeLine parses a single line from git worktree list output
 func parseWorktreeLine(line string) *domain.WorktreeInfo {

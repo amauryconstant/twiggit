@@ -10,10 +10,11 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-var _ domain.ConfigManager = (*koanfConfigManager)(nil)
+var _ application.ConfigManager = (*koanfConfigManager)(nil)
 
 // Pure functions extracted from ConfigManager
 
@@ -106,7 +107,7 @@ type koanfConfigManager struct {
 }
 
 // NewConfigManager creates a new configuration manager
-func NewConfigManager() domain.ConfigManager {
+func NewConfigManager() application.ConfigManager {
 	return &koanfConfigManager{
 		ko: koanf.New("."),
 	}

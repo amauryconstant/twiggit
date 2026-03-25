@@ -1,12 +1,15 @@
 package mocks
 
 import (
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 
 	"github.com/stretchr/testify/mock"
 )
 
-// MockContextDetector is a mock implementation of domain.ContextDetector
+var _ application.ContextDetector = (*MockContextDetector)(nil)
+
+// MockContextDetector is a mock implementation of application.ContextDetector
 type MockContextDetector struct {
 	mock.Mock
 }

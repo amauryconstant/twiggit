@@ -12,13 +12,13 @@ var _ application.ContextService = (*contextService)(nil)
 
 // contextService provides context-aware operations
 type contextService struct {
-	detector domain.ContextDetector
-	resolver domain.ContextResolver
+	detector application.ContextDetector
+	resolver application.ContextResolver
 	config   *domain.Config
 }
 
 // NewContextService creates a new context service
-func NewContextService(detector domain.ContextDetector, resolver domain.ContextResolver, cfg *domain.Config) application.ContextService {
+func NewContextService(detector application.ContextDetector, resolver application.ContextResolver, cfg *domain.Config) application.ContextService {
 	return &contextService{
 		detector: detector,
 		resolver: resolver,

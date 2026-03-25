@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
@@ -167,11 +168,11 @@ func filterSuggestions(suggestions []string, partial string) []string {
 
 type contextResolver struct {
 	config     *domain.Config
-	gitService GitClient
+	gitService application.GitClient
 }
 
 // NewContextResolver creates a new context resolver
-func NewContextResolver(cfg *domain.Config, gitService GitClient) domain.ContextResolver {
+func NewContextResolver(cfg *domain.Config, gitService application.GitClient) application.ContextResolver {
 	return &contextResolver{
 		config:     cfg,
 		gitService: gitService,

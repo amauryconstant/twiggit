@@ -8,10 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-func setupConfigManagerTest(t *testing.T) (domain.ConfigManager, string, string) {
+func setupConfigManagerTest(t *testing.T) (application.ConfigManager, string, string) {
 	t.Helper()
 	originalXDG := os.Getenv("XDG_CONFIG_HOME")
 	tempDir := t.TempDir()

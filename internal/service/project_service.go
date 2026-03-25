@@ -15,14 +15,14 @@ var _ application.ProjectService = (*projectService)(nil)
 
 // projectService implements ProjectService interface
 type projectService struct {
-	gitService     infrastructure.GitClient
+	gitService     application.GitClient
 	contextService application.ContextService
 	config         *domain.Config
 }
 
 // NewProjectService creates a new ProjectService instance
 func NewProjectService(
-	gitService infrastructure.GitClient,
+	gitService application.GitClient,
 	contextService application.ContextService,
 	config *domain.Config,
 ) application.ProjectService {

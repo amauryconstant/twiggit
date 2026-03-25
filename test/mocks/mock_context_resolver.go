@@ -1,12 +1,15 @@
 package mocks
 
 import (
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 
 	"github.com/stretchr/testify/mock"
 )
 
-// MockContextResolver is a mock implementation of domain.ContextResolver
+var _ application.ContextResolver = (*MockContextResolver)(nil)
+
+// MockContextResolver is a mock implementation of application.ContextResolver
 type MockContextResolver struct {
 	mock.Mock
 }

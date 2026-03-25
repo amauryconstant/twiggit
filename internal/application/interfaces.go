@@ -3,8 +3,124 @@ package application
 import (
 	"context"
 
+	"github.com/go-git/go-git/v5"
 	"twiggit/internal/domain"
 )
+
+// ConfigManager defines the interface for configuration management
+type ConfigManager interface {
+	// Load loads configuration from defaults and config file
+	Load() (*domain.Config, error)
+
+	// GetConfig returns the loaded configuration (immutable after Load)
+	GetConfig() *domain.Config
+}
+
+// ContextDetector detects the current git context
+type ContextDetector interface {
+	// DetectContext detects the context from the given directory
+	DetectContext(dir string) (*domain.Context, error)
+}
+
+// ContextResolver resolves target identifiers based on current context
+type ContextResolver interface {
+	// ResolveIdentifier resolves target identifier based on context
+	ResolveIdentifier(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error)
+
+	// GetResolutionSuggestions provides completion suggestions
+	GetResolutionSuggestions(ctx *domain.Context, partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error)
+}
+
+// HookRunRequest contains the context needed to execute hooks
+type HookRunRequest struct {
+	HookType       domain.HookType
+	WorktreePath   string
+	ProjectName    string
+	BranchName     string
+	SourceBranch   string
+	MainRepoPath   string
+	ConfigFilePath string
+}
+
+// HookRunner defines the interface for executing post-create hooks
+type HookRunner interface {
+	// Run executes hooks of the specified type with the given request context
+	Run(ctx context.Context, req *HookRunRequest) (*domain.HookResult, error)
+}
+
+// GoGitClient defines go-git operations (deterministic routing - no CLI fallback)
+// All methods SHALL be idempotent and thread-safe
+type GoGitClient interface {
+	// OpenRepository opens git repository (pure function, idempotent)
+	OpenRepository(path string) (*git.Repository, error)
+
+	// ListBranches lists all branches in repository (idempotent)
+	ListBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error)
+
+	// BranchExists checks if branch exists (idempotent)
+	BranchExists(ctx context.Context, repoPath, branchName string) (bool, error)
+
+	// GetRepositoryStatus returns repository status (idempotent)
+	GetRepositoryStatus(ctx context.Context, repoPath string) (domain.RepositoryStatus, error)
+
+	// ValidateRepository checks if path contains valid git repository (pure function)
+	ValidateRepository(path string) error
+
+	// GetRepositoryInfo returns comprehensive repository information
+	GetRepositoryInfo(ctx context.Context, repoPath string) (*domain.GitRepository, error)
+
+	// ListRemotes lists all remotes in repository
+	ListRemotes(ctx context.Context, repoPath string) ([]domain.RemoteInfo, error)
+
+	// GetCommitInfo returns information about a specific commit
+	GetCommitInfo(ctx context.Context, repoPath, commitHash string) (*domain.CommitInfo, error)
+}
+
+// CLIClient defines CLI operations for worktree management ONLY
+// All methods SHALL be idempotent and thread-safe
+type CLIClient interface {
+	// CreateWorktree creates new worktree using git CLI (idempotent)
+	CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error
+
+	// DeleteWorktree removes worktree using git CLI (idempotent, no-op if already deleted)
+	DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error
+
+	// ListWorktrees lists all worktrees using git CLI (idempotent)
+	ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error)
+
+	// PruneWorktrees removes stale worktree references
+	PruneWorktrees(ctx context.Context, repoPath string) error
+
+	// IsBranchMerged checks if a branch is merged into the current branch
+	IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error)
+
+	// DeleteBranch deletes a branch using git CLI (handles worktree-referenced branches)
+	DeleteBranch(ctx context.Context, repoPath, branchName string) error
+}
+
+// GitClient provides unified git operations with deterministic routing
+type GitClient interface {
+	GoGitClient
+	CLIClient
+}
+
+// ShellInfrastructure defines low-level shell infrastructure operations
+type ShellInfrastructure interface {
+	// GenerateWrapper generates a shell wrapper for the specified shell type
+	GenerateWrapper(shellType domain.ShellType) (string, error)
+
+	// ComposeWrapper composes a custom template with placeholder replacements
+	ComposeWrapper(template string, shellType domain.ShellType) string
+
+	// DetectConfigFile detects the appropriate config file for the shell type
+	DetectConfigFile(shellType domain.ShellType) (string, error)
+
+	// InstallWrapper installs the wrapper to the shell config file
+	InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error
+
+	// ValidateInstallation validates whether the wrapper is installed
+	ValidateInstallation(shellType domain.ShellType, configFile string) error
+}
 
 // ContextService provides context detection and resolution operations
 type ContextService interface {

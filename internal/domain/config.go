@@ -210,12 +210,3 @@ func (c *Config) Validate() error {
 
 	return nil
 }
-
-// ConfigManager defines the interface for configuration management
-type ConfigManager interface {
-	// Load loads configuration from defaults and config file
-	Load() (*Config, error)
-
-	// GetConfig returns the loaded configuration (immutable after Load)
-	GetConfig() *Config
-}

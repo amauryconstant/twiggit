@@ -6,15 +6,16 @@ import (
 	"strings"
 	"time"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-var _ ShellInfrastructure = (*shellInfrastructure)(nil)
+var _ application.ShellInfrastructure = (*shellInfrastructure)(nil)
 
 type shellInfrastructure struct{}
 
 // NewShellInfrastructure creates a new shell infrastructure instance
-func NewShellInfrastructure() ShellInfrastructure {
+func NewShellInfrastructure() application.ShellInfrastructure {
 	return &shellInfrastructure{}
 }
 

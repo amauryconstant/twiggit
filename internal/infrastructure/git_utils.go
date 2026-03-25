@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"twiggit/internal/application"
 )
 
 // GitDir represents a directory containing a git repository
@@ -14,7 +16,7 @@ type GitDir struct {
 
 // FindGitRepositories finds all git repositories in the specified directory
 // Returns a list of directories that contain valid git repositories
-func FindGitRepositories(dir string, gitService GoGitClient) ([]GitDir, error) {
+func FindGitRepositories(dir string, gitService application.GoGitClient) ([]GitDir, error) {
 	_, err := os.Stat(dir)
 	if os.IsNotExist(err) {
 		return []GitDir{}, nil

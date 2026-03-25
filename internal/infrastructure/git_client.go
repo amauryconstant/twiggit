@@ -4,19 +4,20 @@ import (
 	"context"
 
 	"github.com/go-git/go-git/v5"
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-var _ GitClient = (*CompositeGitClient)(nil)
+var _ application.GitClient = (*CompositeGitClient)(nil)
 
 // CompositeGitClient implements GitClient by combining GoGit and CLI functionality
 type CompositeGitClient struct {
-	goGitClient GoGitClient
-	cliClient   CLIClient
+	goGitClient application.GoGitClient
+	cliClient   application.CLIClient
 }
 
 // NewCompositeGitClient creates a new composite GitClient
-func NewCompositeGitClient(goGitClient GoGitClient, cliClient CLIClient) GitClient {
+func NewCompositeGitClient(goGitClient application.GoGitClient, cliClient application.CLIClient) application.GitClient {
 	return &CompositeGitClient{
 		goGitClient: goGitClient,
 		cliClient:   cliClient,

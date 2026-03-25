@@ -22,8 +22,8 @@ import (
 type PruneIntegrationTestSuite struct {
 	suite.Suite
 	executor   *infrastructure.DefaultCommandExecutor
-	cliClient  infrastructure.CLIClient
-	gitService infrastructure.GitClient
+	cliClient  application.CLIClient
+	gitService application.GitClient
 }
 
 func (s *PruneIntegrationTestSuite) SetupSuite() {

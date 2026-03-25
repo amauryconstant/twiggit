@@ -1,12 +1,15 @@
 package mocks
 
 import (
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 
 	"github.com/stretchr/testify/mock"
 )
 
-// MockShellInfrastructure is a mock implementation of infrastructure.ShellInfrastructure for testing
+var _ application.ShellInfrastructure = (*MockShellInfrastructure)(nil)
+
+// MockShellInfrastructure is a mock implementation of application.ShellInfrastructure for testing
 type MockShellInfrastructure struct {
 	mock.Mock
 }

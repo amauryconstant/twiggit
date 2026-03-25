@@ -18,18 +18,18 @@ var _ application.WorktreeService = (*worktreeService)(nil)
 
 // worktreeService implements WorktreeService interface
 type worktreeService struct {
-	gitService     infrastructure.GitClient
+	gitService     application.GitClient
 	projectService application.ProjectService
 	config         *domain.Config
-	hookRunner     infrastructure.HookRunner
+	hookRunner     application.HookRunner
 }
 
 // NewWorktreeService creates a new WorktreeService instance
 func NewWorktreeService(
-	gitService infrastructure.GitClient,
+	gitService application.GitClient,
 	projectService application.ProjectService,
 	config *domain.Config,
-	hookRunner infrastructure.HookRunner,
+	hookRunner application.HookRunner,
 ) application.WorktreeService {
 	return &worktreeService{
 		gitService:     gitService,
@@ -80,7 +80,7 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 
 	var hookResult *domain.HookResult
 	if s.hookRunner != nil {
-		hookReq := &infrastructure.HookRunRequest{
+		hookReq := &application.HookRunRequest{
 			HookType:       domain.HookPostCreate,
 			WorktreePath:   worktreePath,
 			ProjectName:    project.Name,

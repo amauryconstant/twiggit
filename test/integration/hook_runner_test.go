@@ -11,13 +11,14 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 	"twiggit/internal/infrastructure"
 )
 
 type HookRunnerIntegrationSuite struct {
 	suite.Suite
-	runner    infrastructure.HookRunner
+	runner    application.HookRunner
 	tempDir   string
 	configDir string
 }
@@ -43,7 +44,7 @@ commands = ["echo hello"]
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &infrastructure.HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
@@ -70,7 +71,7 @@ commands = [
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &infrastructure.HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
@@ -97,7 +98,7 @@ commands = [
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &infrastructure.HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
@@ -122,7 +123,7 @@ commands = ["printenv TWIGGIT_PROJECT_NAME"]
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &infrastructure.HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ProjectName:    "test-project",
@@ -149,7 +150,7 @@ commands = ["touch marker.txt"]
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &infrastructure.HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
@@ -166,7 +167,7 @@ commands = ["touch marker.txt"]
 }
 
 func (s *HookRunnerIntegrationSuite) TestRun_NoConfigFile_ReturnsNotExecuted() {
-	req := &infrastructure.HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: filepath.Join(s.configDir, "nonexistent.toml"),
@@ -188,7 +189,7 @@ key = "value"
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &infrastructure.HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,

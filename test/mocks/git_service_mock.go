@@ -3,13 +3,16 @@ package mocks
 import (
 	"context"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockGoGitClient implements infrastructure.GoGitClient for testing
+var _ application.GoGitClient = (*MockGoGitClient)(nil)
+
+// MockGoGitClient implements application.GoGitClient for testing
 type MockGoGitClient struct {
 	mock.Mock
 }
@@ -82,7 +85,9 @@ func (m *MockGoGitClient) GetCommitInfo(ctx context.Context, repoPath, commitHas
 	return args.Get(0).(*domain.CommitInfo), args.Error(1)
 }
 
-// MockCLIClient implements infrastructure.CLIClient for testing
+var _ application.CLIClient = (*MockCLIClient)(nil)
+
+// MockCLIClient implements application.CLIClient for testing
 type MockCLIClient struct {
 	mock.Mock
 }
@@ -131,7 +136,9 @@ func (m *MockCLIClient) DeleteBranch(ctx context.Context, repoPath, branchName s
 	return args.Error(0)
 }
 
-// MockGitService implements infrastructure.GitClient for testing
+var _ application.GitClient = (*MockGitService)(nil)
+
+// MockGitService implements application.GitClient for testing
 type MockGitService struct {
 	*MockGoGitClient
 	*MockCLIClient

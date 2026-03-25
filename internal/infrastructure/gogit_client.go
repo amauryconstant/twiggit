@@ -9,10 +9,11 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-var _ GoGitClient = (*GoGitClientImpl)(nil)
+var _ application.GoGitClient = (*GoGitClientImpl)(nil)
 
 // GoGitClientImpl implements GoGitClient using go-git library
 type GoGitClientImpl struct {

@@ -11,10 +11,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-func setupHookRunnerTest(t *testing.T) (HookRunner, *MockCommandExecutor, string) {
+func setupHookRunnerTest(t *testing.T) (application.HookRunner, *MockCommandExecutor, string) {
 	t.Helper()
 	mockExec := NewMockCommandExecutor()
 	runner := NewHookRunner(mockExec)
@@ -25,7 +26,7 @@ func setupHookRunnerTest(t *testing.T) (HookRunner, *MockCommandExecutor, string
 func TestHookRunner_Run_NoConfigFile_ReturnsNotExecuted(t *testing.T) {
 	runner, _, _ := setupHookRunnerTest(t)
 
-	req := &HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   "/tmp/worktree",
 		ConfigFilePath: "/nonexistent/.twiggit.toml",
@@ -46,7 +47,7 @@ func TestHookRunner_Run_EmptyConfigFile_ReturnsNotExecuted(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(""), 0644)
 	require.NoError(t, err)
 
-	req := &HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -75,7 +76,7 @@ commands = ["mise trust", "npm install"]
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
 	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Twice()
 
-	req := &HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   tempDir,
 		ProjectName:    "test-project",
@@ -117,7 +118,7 @@ commands = ["mise trust", "npm install", "echo done"]
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
 	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
 
-	req := &HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -144,7 +145,7 @@ commands = ["mise trust"]
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
 
-	req := &HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -167,7 +168,7 @@ func TestHookRunner_Run_MissingCommandsArray_ReturnsNotExecuted(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
 
-	req := &HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -191,7 +192,7 @@ commands = []
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
 
-	req := &HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -222,7 +223,7 @@ commands = ["echo test"]
 		capturedArgs = args.Get(4).([]string)
 	}).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil)
 
-	req := &HookRunRequest{
+	req := &application.HookRunRequest{
 		HookType:       domain.HookPostCreate,
 		WorktreePath:   "/worktree/path",
 		ProjectName:    "my-project",

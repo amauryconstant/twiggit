@@ -11,10 +11,11 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 
+	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
 
-var _ HookRunner = (*hookRunner)(nil)
+var _ application.HookRunner = (*hookRunner)(nil)
 
 type hookRunner struct {
 	executor       CommandExecutor
@@ -22,14 +23,14 @@ type hookRunner struct {
 }
 
 // NewHookRunner creates a new HookRunner for executing post-create hooks
-func NewHookRunner(executor CommandExecutor) HookRunner {
+func NewHookRunner(executor CommandExecutor) application.HookRunner {
 	return &hookRunner{
 		executor:       executor,
 		defaultTimeout: 30 * time.Second,
 	}
 }
 
-func (r *hookRunner) Run(ctx context.Context, req *HookRunRequest) (*domain.HookResult, error) {
+func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (*domain.HookResult, error) {
 	if req.ConfigFilePath == "" {
 		return &domain.HookResult{
 			HookType: req.HookType,
@@ -111,7 +112,7 @@ func (r *hookRunner) readHookConfig(path string) (*domain.HookConfig, error) {
 	return hookConfig.Hooks, nil
 }
 
-func (r *hookRunner) executeCommands(ctx context.Context, req *HookRunRequest, commands []string) (*domain.HookResult, error) {
+func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookRunRequest, commands []string) (*domain.HookResult, error) {
 	result := &domain.HookResult{
 		HookType: req.HookType,
 		Executed: true,
@@ -154,7 +155,7 @@ func (r *hookRunner) executeCommands(ctx context.Context, req *HookRunRequest, c
 	return result, nil
 }
 
-func (r *hookRunner) buildEnvExports(req *HookRunRequest) string {
+func (r *hookRunner) buildEnvExports(req *application.HookRunRequest) string {
 	var exports strings.Builder
 	if req.WorktreePath != "" {
 		exports.WriteString(fmt.Sprintf("export TWIGGIT_WORKTREE_PATH=%q; ", req.WorktreePath))
