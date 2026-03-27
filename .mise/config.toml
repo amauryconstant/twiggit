@@ -95,3 +95,16 @@ outputs = ["bin/twiggit-e2e"]
 [tasks."build:clean"]
 description = "Clean build artifacts"
 run = "rm -rf bin/ coverage*.out coverage.html"
+
+# ========================
+# Release Management
+# ========================
+
+[tasks.release]
+description = "Validate, update changelog, commit, and tag a release"
+usage = '''
+arg "<bump_type>" help="Version bump type" {
+    choices "patch" "minor" "major"
+}
+'''
+run = "mise run release:prepare ${usage_bump_type} && mise run release:tag ${usage_bump_type}"

@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+#MISE description="Create and push git tag for release"
+#MISE sources=["CHANGELOG.md", "{{cwd}}/.mise/tasks/lib/release-lib.sh"]
+#MISE confirm="This will create and push a git tag. Continue?"
+#USAGE arg "<bump_type>" help="Version bump type" {
+#USAGE   choices "patch" "minor" "major"
+#USAGE }
+
+set -e
+
+source "${MISE_TASK_DIR}/../lib/release-lib.sh"
+
+BUMP_TYPE="${usage_bump_type?}"
+
+release_lib_validate_environment
+release_lib_validate_changelog
+release_lib_validate_goreleaser
+
+LATEST_TAG=$(release_lib_get_latest_tag)
+release_lib_validate_tag_format "$LATEST_TAG"
+release_lib_validate_commits_since_tag "$LATEST_TAG"
+
+NEW_VERSION=$(release_lib_bump_version "$BUMP_TYPE" "$LATEST_TAG")
+NEW_TAG="v${NEW_VERSION}"
+
+echo "Current tag: $LATEST_TAG"
+echo "Bumping $BUMP_TYPE version"
+echo "New tag: $NEW_TAG"
+echo ""
+
+if release_lib_check_tag_exists "$NEW_TAG"; then
+  echo "Error: Tag $NEW_TAG already exists"
+  exit 1
+fi
+
+TEMP_FILE=$(mktemp)
+trap 'rm -f "$TEMP_FILE"' EXIT
+
+release_lib_update_changelog "$NEW_VERSION" "$TEMP_FILE"
+
+EXISTING_COMMIT=$(release_lib_find_release_commit "$NEW_TAG")
+
+if [ -n "$EXISTING_COMMIT" ]; then
+  echo "Found existing release commit: $EXISTING_COMMIT"
+  TAG_TARGET="$EXISTING_COMMIT"
+else
+  echo "No existing release commit found, creating one..."
+
+  NEW_VERSION_BLOCK=$(release_lib_generate_changelog_block "$NEW_VERSION" "$(date +%Y-%m-%d)" "$TEMP_FILE")
+
+  if [ -z "$NEW_VERSION_BLOCK" ]; then
+    echo "Error: Failed to generate changelog with version $NEW_VERSION"
+    exit 1
+  fi
+
+  mv "$TEMP_FILE" CHANGELOG.md
+
+  git add CHANGELOG.md
+  git commit -m "Release ${NEW_TAG}
+
+${NEW_VERSION_BLOCK}"
+
+  TAG_TARGET="HEAD"
+fi
+
+git tag -a "$NEW_TAG" -m "Release $NEW_TAG" "$TAG_TARGET"
+git push origin "$NEW_TAG"
+
+echo ""
+echo "✅ Tag $NEW_TAG created and pushed"
+echo "📋 Monitor CI pipeline at $(git remote get-url origin | sed 's|\.git$||')/-/pipelines"

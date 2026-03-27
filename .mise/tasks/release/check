@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+#MISE description="Validate release prerequisites without executing"
+#MISE sources=["CHANGELOG.md", "{{cwd}}/.mise/tasks/lib/release-lib.sh"]
+#USAGE arg "<bump_type>" help="Version bump type" {
+#USAGE   choices "patch" "minor" "major"
+#USAGE }
+
+set -e
+
+source "${MISE_TASK_DIR}/../lib/release-lib.sh"
+
+release_lib_check "${usage_bump_type?}"

@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+#MISE description="Validate release prerequisites and preview what would happen"
+#MISE sources=["CHANGELOG.md", "{{cwd}}/.mise/tasks/lib/release-lib.sh"]
+#USAGE arg "<bump_type>" help="Version bump type" {
+#USAGE   choices "patch" "minor" "major"
+#USAGE }
+
+set -e
+
+source "${MISE_TASK_DIR}/../lib/release-lib.sh"
+
+BUMP_TYPE="${usage_bump_type?}"
+
+release_lib_check "$BUMP_TYPE"
+
+echo ""
+echo "=== Git operations that would be performed ==="
+echo ""
+
+EXISTING_COMMIT=$(release_lib_find_release_commit "$NEW_TAG")
+
+if [ -n "$EXISTING_COMMIT" ]; then
+  echo "[DRY RUN] Would reuse existing release commit: $EXISTING_COMMIT"
+  echo "[DRY RUN] git tag -a $NEW_TAG -m \"Release $NEW_TAG\" $EXISTING_COMMIT"
+else
+  TEMP_FILE=$(mktemp)
+  release_lib_update_changelog "$NEW_VERSION" "$TEMP_FILE"
+
+  NEW_VERSION_BLOCK=$(release_lib_generate_changelog_block "$NEW_VERSION" "$(date +%Y-%m-%d)" "$TEMP_FILE")
+
+  rm -f "$TEMP_FILE"
+
+  echo "[DRY RUN] Would modify CHANGELOG.md with new version block:"
+  echo ""
+  echo "## [Unreleased] would be replaced with:"
+  echo "## [$NEW_VERSION] - $(date +%Y-%m-%d)"
+  echo ""
+
+  echo "[DRY RUN] Would execute:"
+  echo "[DRY RUN]   git add CHANGELOG.md"
+  echo "[DRY RUN]   git commit -m \"Release ${NEW_TAG}"
+  echo ""
+  echo "Changelog block:"
+  echo "$NEW_VERSION_BLOCK" | sed 's/^/    /'
+  echo ""
+  echo "[DRY RUN]   git tag -a $NEW_TAG -m \"Release $NEW_TAG\" HEAD"
+fi
+
+echo "[DRY RUN]   git push origin $NEW_TAG"
+echo ""
+echo "=== Validation complete ==="
+echo "✅ All checks passed. Run 'mise run release $BUMP_TYPE' to execute."
