@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"time"
 
 	"twiggit/cmd"
 	"twiggit/internal/infrastructure"
@@ -33,9 +34,10 @@ func main() {
 	}
 
 	// Initialize infrastructure services in dependency order
-	commandExecutor := infrastructure.NewDefaultCommandExecutor(30 * 1000000000) // 30 seconds
+	cliTimeout := time.Duration(config.Git.CLITimeout) * time.Second
+	commandExecutor := infrastructure.NewDefaultCommandExecutor(cliTimeout)
 	goGitClient := infrastructure.NewGoGitClient(true)
-	cliClient := infrastructure.NewCLIClient(commandExecutor)
+	cliClient := infrastructure.NewCLIClient(commandExecutor, config.Git.CLITimeout)
 
 	// Create composite GitClient that implements both interfaces
 	gitClient := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
@@ -47,7 +49,7 @@ func main() {
 	contextService := service.NewContextService(contextDetector, contextResolver, config)
 	projectService := service.NewProjectService(gitClient, contextService, config)
 	navigationService := service.NewNavigationService(projectService, contextService, config)
-	hookRunner := infrastructure.NewHookRunner(commandExecutor)
+	hookRunner := infrastructure.NewHookRunner(commandExecutor, config.Shell.HookTimeout)
 	worktreeService := service.NewWorktreeService(gitClient, projectService, config, hookRunner)
 	shellInfra := infrastructure.NewShellInfrastructure()
 	shellService := service.NewShellService(shellInfra, config)

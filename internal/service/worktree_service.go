@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"twiggit/internal/application"
@@ -22,6 +23,8 @@ type worktreeService struct {
 	projectService application.ProjectService
 	config         *domain.Config
 	hookRunner     application.HookRunner
+	// mutex protects result modifications during prune operations
+	mu sync.Mutex
 }
 
 // NewWorktreeService creates a new WorktreeService instance
@@ -323,7 +326,11 @@ func (s *worktreeService) validateCreateRequest(req *domain.CreateWorktreeReques
 	}
 
 	// Validate project context
-	if req.ProjectName == "" && req.Context != nil && req.Context.Type != domain.ContextProject {
+	if req.Context == nil {
+		return domain.NewValidationError("CreateWorktreeRequest", "Context", "", "context is required").
+			WithSuggestions([]string{"Run from within a project or worktree directory"})
+	}
+	if req.ProjectName == "" && req.Context.Type != domain.ContextProject {
 		return domain.NewValidationError("CreateWorktreeRequest", "ProjectName", "", "project name required when not in project context").
 			WithSuggestions([]string{"Specify a project name (e.g., my-project/feature-branch)", "Run from within a project directory"})
 	}
@@ -520,11 +527,15 @@ func (s *worktreeService) pruneProjectWorktrees(ctx context.Context, req *domain
 		}
 
 		if skip := s.checkWorktreeSkip(ctx, wt, project, cwd, req); skip != nil {
+			s.mu.Lock()
 			s.addSkippedResult(result, pruneResult, skip)
+			s.mu.Unlock()
 			continue
 		}
 
+		s.mu.Lock()
 		s.deleteWorktreeAndBranch(ctx, project, wt, req, pruneResult, result)
+		s.mu.Unlock()
 	}
 }
 

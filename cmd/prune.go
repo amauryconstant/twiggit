@@ -50,7 +50,7 @@ Examples:
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion even with uncommitted changes")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Auto-confirm prompts (keeps safety checks)")
-	cmd.Flags().BoolVar(&deleteBranches, "delete-branches", false, "Delete branches after worktree removal")
+	cmd.Flags().BoolVarP(&deleteBranches, "delete-branches", "d", false, "Delete branches after worktree removal")
 	cmd.Flags().BoolVarP(&allProjects, "all", "a", false, "Prune across all projects")
 	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Preview only, no actual deletion")
 
@@ -69,7 +69,32 @@ func executePrune(c *cobra.Command, config *CommandConfig, force, yes, deleteBra
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
+	// Build the base request
+	req := &domain.PruneWorktreesRequest{
+		Context:          currentCtx,
+		Force:            force,
+		DeleteBranches:   deleteBranches,
+		AllProjects:      allProjects,
+		SpecificWorktree: specificWorktree,
+	}
+
+	// Create progress reporter for bulk operations
+	quiet := isQuiet(c)
+	reporter := NewProgressReporter(quiet, c.ErrOrStderr())
+
+	// If confirmation needed, show preview first then ask
 	if allProjects && !force && !yes && !dryRun {
+		// Do dry-run first to show preview
+		previewReq := *req
+		previewReq.DryRun = true
+		reporter.Report("Previewing prune operation...")
+		previewResult, err := config.Services.WorktreeService.PruneMergedWorktrees(ctx, &previewReq)
+		if err != nil {
+			return fmt.Errorf("prune preview failed: %w", err)
+		}
+		outputPruneResults(c, previewResult, true)
+
+		// Now ask for confirmation
 		confirmed, err := confirmBulkPrune(c)
 		if err != nil {
 			return err
@@ -80,24 +105,12 @@ func executePrune(c *cobra.Command, config *CommandConfig, force, yes, deleteBra
 		}
 	}
 
-	req := &domain.PruneWorktreesRequest{
-		Context:          currentCtx,
-		Force:            force,
-		DeleteBranches:   deleteBranches,
-		DryRun:           dryRun,
-		AllProjects:      allProjects,
-		SpecificWorktree: specificWorktree,
-	}
-
-	// Create progress reporter for bulk operations (goes to stderr - task 4.6)
-	quiet := isQuiet(c)
-	reporter := NewProgressReporter(quiet, c.ErrOrStderr())
-
-	// Report start of bulk operation - task 4.5
+	// Report start of bulk operation
 	if allProjects || specificWorktree == "" {
 		reporter.Report("Pruning merged worktrees...")
 	}
 
+	req.DryRun = dryRun
 	result, err := config.Services.WorktreeService.PruneMergedWorktrees(ctx, req)
 	if err != nil {
 		return fmt.Errorf("prune failed: %w", err)
@@ -105,7 +118,7 @@ func executePrune(c *cobra.Command, config *CommandConfig, force, yes, deleteBra
 
 	outputPruneResults(c, result, dryRun)
 
-	// Report completion of bulk operation - task 4.5
+	// Report completion of bulk operation
 	if allProjects || specificWorktree == "" {
 		reporter.Report("Prune complete")
 	}

@@ -90,6 +90,9 @@ type ShellConfig struct {
 
 	// Timeout for shell operations in seconds
 	Timeout int `toml:"timeout" koanf:"timeout"`
+
+	// HookTimeout is the timeout for hook execution in seconds
+	HookTimeout int `toml:"hook_timeout" koanf:"hook_timeout"`
 }
 
 // Config represents the complete application configuration
@@ -166,8 +169,9 @@ func DefaultConfig() *Config {
 			FuzzyMatching:     false,
 		},
 		Shell: ShellConfig{
-			Enabled: true,
-			Timeout: 30,
+			Enabled:     true,
+			Timeout:     30,
+			HookTimeout: 30,
 			Wrapper: ShellWrapperConfig{
 				Enabled:       true,
 				AutoDetect:    true,

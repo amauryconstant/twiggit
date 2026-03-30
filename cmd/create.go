@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -34,7 +33,12 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&source, "source", "main", "Source branch to create from")
+	// Use config default source branch if available, otherwise fallback to "main"
+	defaultSource := "main"
+	if config != nil && config.Config != nil && config.Config.DefaultSourceBranch != "" {
+		defaultSource = config.Config.DefaultSourceBranch
+	}
+	cmd.Flags().StringVar(&source, "source", defaultSource, "Source branch to create from")
 	cmd.Flags().BoolVarP(&cdFlag, "cd", "C", false, "Output worktree path to stdout (for shell wrapper)")
 
 	// Silence usage to prevent double error printing
@@ -86,10 +90,10 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 	// Validate source branch exists before creating worktree
 	sourceBranchExists, err := config.Services.WorktreeService.BranchExists(ctx, project.Path, source)
 	if err != nil {
-		return fmt.Errorf("failed to check if source branch '%s' exists: %w", source, err)
+		return domain.NewValidationError("CreateWorktreeRequest", "source", source, "failed to check if source branch exists: "+err.Error())
 	}
 	if !sourceBranchExists {
-		return fmt.Errorf("source branch '%s' does not exist", source)
+		return domain.NewValidationError("CreateWorktreeRequest", "source", source, fmt.Sprintf("source branch '%s' does not exist", source))
 	}
 
 	// Create worktree request
@@ -139,7 +143,7 @@ func parseProjectBranch(spec string, ctx *domain.Context) (string, string, error
 	if strings.Contains(spec, "/") {
 		parts := strings.SplitN(spec, "/", 2)
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return "", "", errors.New("invalid format: expected <project>/<branch>")
+			return "", "", domain.NewValidationError("parseProjectBranch", "spec", spec, "invalid format: expected <project>/<branch>")
 		}
 		projectName := parts[0]
 
@@ -154,7 +158,7 @@ func parseProjectBranch(spec string, ctx *domain.Context) (string, string, error
 		return ctx.ProjectName, spec, nil
 	}
 
-	return "", "", errors.New("cannot infer project: not in a project context and no project specified")
+	return "", "", domain.NewValidationError("parseProjectBranch", "spec", spec, "cannot infer project: not in a project context and no project specified")
 }
 
 // extractBranchNameForValidation extracts branch name from spec for validation

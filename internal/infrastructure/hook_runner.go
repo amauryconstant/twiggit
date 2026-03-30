@@ -23,10 +23,14 @@ type hookRunner struct {
 }
 
 // NewHookRunner creates a new HookRunner for executing post-create hooks
-func NewHookRunner(executor CommandExecutor) application.HookRunner {
+func NewHookRunner(executor CommandExecutor, hookTimeoutSeconds ...int) application.HookRunner {
+	defaultTimeout := 30 * time.Second
+	if len(hookTimeoutSeconds) > 0 {
+		defaultTimeout = time.Duration(hookTimeoutSeconds[0]) * time.Second
+	}
 	return &hookRunner{
 		executor:       executor,
-		defaultTimeout: 30 * time.Second,
+		defaultTimeout: defaultTimeout,
 	}
 }
 

@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/carapace-sh/carapace"
@@ -45,36 +44,10 @@ Examples:
 func executeCD(cmd *cobra.Command, config *CommandConfig, target string) error {
 	ctx := context.Background()
 
-	// Detect current context
-	currentCtx, err := config.Services.ContextService.GetCurrentContext()
+	// Resolve navigation target with context-aware defaults
+	currentCtx, result, err := resolveNavigationTarget(ctx, config, target)
 	if err != nil {
-		return fmt.Errorf("context detection failed: %w", err)
-	}
-
-	// If no target specified, use default behavior
-	if target == "" {
-		switch currentCtx.Type {
-		case domain.ContextWorktree:
-			// If in a worktree, use the current branch as target
-			target = currentCtx.BranchName
-		case domain.ContextProject:
-			// If in project, use main as default target
-			target = "main"
-		default:
-			return errors.New("no target specified and no default worktree in context")
-		}
-	}
-
-	// Resolve path
-	req := &domain.ResolvePathRequest{
-		Target:  target,
-		Context: currentCtx,
-		Search:  false,
-	}
-
-	result, err := config.Services.NavigationService.ResolvePath(ctx, req)
-	if err != nil {
-		return fmt.Errorf("failed to resolve path for %s: %w", target, err)
+		return err
 	}
 
 	logv(cmd, 1, "Navigating to worktree")
@@ -87,9 +60,9 @@ func executeCD(cmd *cobra.Command, config *CommandConfig, target string) error {
 	// Validate that the resolved path exists
 	if err := config.Services.NavigationService.ValidatePath(ctx, result.ResolvedPath); err != nil {
 		if result.Type == domain.PathTypeWorktree {
-			return fmt.Errorf("worktree '%s' not found", target)
+			return domain.NewNavigationServiceError(target, currentCtx.Path, "ResolvePath", "worktree not found", nil)
 		}
-		return fmt.Errorf("project '%s' not found", target)
+		return domain.NewNavigationServiceError(target, currentCtx.Path, "ResolvePath", "project not found", nil)
 	}
 
 	// Output the resolved path for shell integration

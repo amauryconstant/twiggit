@@ -167,6 +167,13 @@ func (e *ProjectServiceError) Unwrap() error {
 	return e.Cause
 }
 
+// IsNotFound returns true if the error indicates the project was not found.
+func (e *ProjectServiceError) IsNotFound() bool {
+	lowerMsg := strings.ToLower(e.Message)
+	return strings.Contains(lowerMsg, "not found") ||
+		strings.Contains(lowerMsg, "does not exist")
+}
+
 // NewProjectServiceError creates a new project service error
 func NewProjectServiceError(projectName, projectPath, operation, message string, cause error) *ProjectServiceError {
 	return &ProjectServiceError{
@@ -197,6 +204,13 @@ func (e *NavigationServiceError) Error() string {
 
 func (e *NavigationServiceError) Unwrap() error {
 	return e.Cause
+}
+
+// IsNotFound returns true if the error indicates the navigation target was not found.
+func (e *NavigationServiceError) IsNotFound() bool {
+	lowerMsg := strings.ToLower(e.Message)
+	return strings.Contains(lowerMsg, "not found") ||
+		strings.Contains(lowerMsg, "does not exist")
 }
 
 // NewNavigationServiceError creates a new navigation service error
@@ -231,6 +245,13 @@ func (e *ResolutionError) Error() string {
 
 func (e *ResolutionError) Unwrap() error {
 	return e.Cause
+}
+
+// IsNotFound returns true if the error indicates the resolution target was not found.
+func (e *ResolutionError) IsNotFound() bool {
+	lowerMsg := strings.ToLower(e.Message)
+	return strings.Contains(lowerMsg, "not found") ||
+		strings.Contains(lowerMsg, "does not exist")
 }
 
 // NewResolutionError creates a new resolution error

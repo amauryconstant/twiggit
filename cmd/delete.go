@@ -35,7 +35,7 @@ Examples:
 	}
 
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion even with uncommitted changes")
-	cmd.Flags().BoolVar(&mergedOnly, "merged-only", false, "Only delete if branch is merged")
+	cmd.Flags().BoolVarP(&mergedOnly, "merged-only", "m", false, "Only delete if branch is merged")
 	cmd.Flags().BoolVarP(&changeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
 
 	carapace.Gen(cmd).PositionalCompletion(
@@ -81,6 +81,11 @@ func resolveWorktreeTarget(config *CommandConfig, target string) (*domain.Contex
 		return nil, "", fmt.Errorf("invalid target format: %s", resolution.Explanation)
 	}
 
+	// Validate ResolvedPath is non-empty when Type indicates a worktree path was resolved
+	if resolution.Type == domain.PathTypeWorktree && resolution.ResolvedPath == "" {
+		return nil, "", domain.NewValidationError("resolveWorktreeTarget", "ResolvedPath", "", "resolved path cannot be empty")
+	}
+
 	return currentCtx, resolution.ResolvedPath, nil
 }
 
@@ -105,7 +110,7 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra
 			} else {
 				_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s (already removed)\n", worktreePath)
 			}
-			return fmt.Errorf("worktree not found: %s", worktreePath)
+			return domain.NewNavigationServiceError(worktreePath, currentCtx.Path, "DeleteWorktree", "worktree not found", nil)
 		}
 		return fmt.Errorf("failed to check worktree status: %w", err)
 	}
