@@ -42,15 +42,15 @@
 
 ## 8. Testing
 
-- [ ] 8.1 Add unit tests for cmd/error_formatter.go
-- [ ] 8.2 Add unit tests for cmd/util.go
-- [ ] 8.3 Add e2e test for prune --delete-branches in test/e2e/
-- [ ] 8.4 Add integration test for shell wrapper block
+- [x] 8.1 Add unit tests for cmd/error_formatter.go (17 tests)
+- [x] 8.2 Add unit tests for cmd/util.go (11 tests)
+- [x] 8.3 Add e2e test for prune --delete-branches (2 tests)
+- [x] 8.4 Add integration test for shell wrapper block (4 tests)
 
 ## 9. Verification
 
 - [x] 9.1 Run mise run lint:fix && mise run check
 - [x] 9.2 Run mise run test
-- [ ] 9.3 Run mise run test:e2e (6 failures due to golden file mismatches from error handling changes)
+- [x] 9.3 Run mise run test:e2e (fixed exit code expectations in create_test.go and edge_case_test.go)
 - [x] 9.4 Run go test -race ./... to verify concurrency fixes
 - [x] 9.5 Verify go build ./... compiles successfully

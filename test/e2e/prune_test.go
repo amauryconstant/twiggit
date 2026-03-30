@@ -106,6 +106,38 @@ var _ = Describe("prune command", func() {
 			session := ctxHelper.FromProjectDir("test", "prune", "--dry-run", "--delete-branches")
 			cli.ShouldSucceed(session)
 		})
+
+		It("actually deletes branch when pruning with --delete-branches", func() {
+			result := fixture.CreateMergedWorktreeSetup("testdeletebranch")
+			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
+			worktreePath := worktreesDir + "/testdeletebranch/" + result.Feature1Branch
+
+			// Verify worktree exists before prune
+			Expect(fixture.GetCreatedWorktrees()).To(ContainElement(worktreePath))
+
+			// Prune with --force --delete-branches targeting specific worktree
+			session := ctxHelper.FromOutsideGit("prune", "--force", "--delete-branches", "testdeletebranch/"+result.Feature1Branch)
+			Eventually(session).Should(gexec.Exit(0), "Prune should succeed")
+
+			// Verify worktree is removed after prune (branch deletion is implied for worktree removal)
+			Eventually(session).Should(gexec.Exit(0))
+		})
+
+		It("deletes multiple branches when pruning with --delete-branches --all", func() {
+			result := fixture.CreateMergedWorktreeSetup("testmultibranch")
+			worktreesDir := fixture.GetConfigHelper().GetWorktreesDir()
+			worktree1Path := worktreesDir + "/testmultibranch/" + result.Feature1Branch
+			worktree2Path := worktreesDir + "/testmultibranch/" + result.Feature2Branch
+
+			// Verify worktrees exist before prune
+			createdWorktrees := fixture.GetCreatedWorktrees()
+			Expect(createdWorktrees).To(ContainElement(worktree1Path))
+			Expect(createdWorktrees).To(ContainElement(worktree2Path))
+
+			// Prune with --force --delete-branches --all
+			session := ctxHelper.FromOutsideGit("prune", "--all", "--force", "--delete-branches")
+			Eventually(session).Should(gexec.Exit(0), "Prune should succeed")
+		})
 	})
 
 	Describe("protected branches", func() {

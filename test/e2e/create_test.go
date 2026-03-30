@@ -263,7 +263,7 @@ commands = ["exit 1"]
 		branchName := testID.BranchName("feature-test")
 
 		session := ctxHelper.FromProjectDir("test-project", "create", branchName, "--source", "nonexistent-branch")
-		cli.ShouldFailWithExit(session, 1)
+		cli.ShouldFailWithExit(session, 5)
 		cli.ShouldErrorOutput(session, "source branch 'nonexistent-branch' does not exist")
 	})
 
@@ -274,7 +274,7 @@ commands = ["exit 1"]
 		branchName := testID.BranchName("feature-test")
 
 		session := ctxHelper.FromOutsideGit("create", branchName)
-		cli.ShouldFailWithExit(session, 1)
+		cli.ShouldFailWithExit(session, 5)
 		cli.ShouldErrorOutput(session, "cannot infer project")
 		cli.ShouldErrorOutput(session, "no project specified")
 	})

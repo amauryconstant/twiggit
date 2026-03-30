@@ -62,6 +62,130 @@ func TestShellIntegration_Inference(t *testing.T) {
 	}
 }
 
+func TestShellWrapperBlock_Content(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test in short mode")
+	}
+
+	t.Run("bash wrapper contains expected function", func(t *testing.T) {
+		shellInfra := infrastructure.NewShellInfrastructure()
+		shellService := service.NewShellService(shellInfra, &domain.Config{})
+
+		request := &domain.GenerateWrapperRequest{
+			ShellType: domain.ShellBash,
+		}
+
+		result, err := shellService.GenerateWrapper(nil, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		wrapper := result.WrapperContent
+
+		// Verify wrapper has correct structure
+		assert.Contains(t, wrapper, "### BEGIN TWIGGIT WRAPPER")
+		assert.Contains(t, wrapper, "### END TWIGGIT WRAPPER")
+
+		// Verify bash-specific function definition
+		assert.Contains(t, wrapper, "twiggit()")
+		assert.Contains(t, wrapper, "builtin cd")
+
+		// Verify cd command handling
+		assert.Contains(t, wrapper, "target_dir=$(command twiggit")
+		assert.Contains(t, wrapper, "case")
+	})
+
+	t.Run("zsh wrapper contains expected function", func(t *testing.T) {
+		shellInfra := infrastructure.NewShellInfrastructure()
+		shellService := service.NewShellService(shellInfra, &domain.Config{})
+
+		request := &domain.GenerateWrapperRequest{
+			ShellType: domain.ShellZsh,
+		}
+
+		result, err := shellService.GenerateWrapper(nil, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		wrapper := result.WrapperContent
+
+		// Verify wrapper has correct structure
+		assert.Contains(t, wrapper, "### BEGIN TWIGGIT WRAPPER")
+		assert.Contains(t, wrapper, "### END TWIGGIT WRAPPER")
+
+		// Verify zsh-specific function definition
+		assert.Contains(t, wrapper, "twiggit()")
+
+		// Verify cd command handling
+		assert.Contains(t, wrapper, "builtin cd")
+	})
+
+	t.Run("fish wrapper contains expected function", func(t *testing.T) {
+		shellInfra := infrastructure.NewShellInfrastructure()
+		shellService := service.NewShellService(shellInfra, &domain.Config{})
+
+		request := &domain.GenerateWrapperRequest{
+			ShellType: domain.ShellFish,
+		}
+
+		result, err := shellService.GenerateWrapper(nil, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		wrapper := result.WrapperContent
+
+		// Verify wrapper has correct structure
+		assert.Contains(t, wrapper, "### BEGIN TWIGGIT WRAPPER")
+		assert.Contains(t, wrapper, "### END TWIGGIT WRAPPER")
+
+		// Verify fish-specific function definition
+		assert.Contains(t, wrapper, "function twiggit")
+
+		// Verify cd command handling
+		assert.Contains(t, wrapper, "builtin cd")
+	})
+
+	t.Run("wrapper block replaces existing content on reinstall", func(t *testing.T) {
+		tempDir := t.TempDir()
+		configFile := filepath.Join(tempDir, ".bashrc")
+
+		shellInfra := infrastructure.NewShellInfrastructure()
+		shellService := service.NewShellService(shellInfra, &domain.Config{})
+
+		// Create config with existing wrapper block
+		initialContent := `# Bash config
+### BEGIN TWIGGIT WRAPPER
+# Old wrapper content
+### END TWIGGIT WRAPPER
+`
+		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
+
+		request := &domain.SetupShellRequest{
+			ShellType:      domain.ShellBash,
+			ConfigFile:     configFile,
+			ForceOverwrite: true,
+		}
+
+		result, err := shellService.SetupShell(nil, request)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		content, err := os.ReadFile(configFile)
+		require.NoError(t, err)
+
+		contentStr := string(content)
+
+		// Should have exactly one wrapper block after reinstall
+		beginCount := strings.Count(contentStr, "### BEGIN TWIGGIT WRAPPER")
+		endCount := strings.Count(contentStr, "### END TWIGGIT WRAPPER")
+		assert.Equal(t, 1, beginCount, "should have exactly one BEGIN delimiter")
+		assert.Equal(t, 1, endCount, "should have exactly one END delimiter")
+
+		// Should not contain the old wrapper content
+		assert.NotContains(t, contentStr, "# Old wrapper content")
+		assert.Contains(t, contentStr, "# Twiggit bash wrapper", "should contain new wrapper header")
+	})
+}
+
 func TestShellService_ForceReinstall(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping integration test in short mode")

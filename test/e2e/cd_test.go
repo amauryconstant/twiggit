@@ -107,7 +107,7 @@ var _ = Describe("cd command", func() {
 
 		session := ctxHelper.FromProjectDir("test", "cd", "nonexistent")
 		Eventually(session).Should(gexec.Exit(1))
-		cli.ShouldErrorOutput(session, "worktree 'nonexistent' not found")
+		cli.ShouldErrorOutput(session, "worktree not found for target 'nonexistent'")
 	})
 
 	It("shows level 1 verbose output with -v flag", func() {

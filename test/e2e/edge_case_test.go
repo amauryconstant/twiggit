@@ -74,10 +74,11 @@ var _ = Describe("edge case handling", func() {
 
 			session := ctxHelper.FromProjectDir("bare-project", "create", "test-branch")
 			// Bare repos may not support worktree creation
-			// Should handle gracefully - either succeed or fail
+			// Should handle gracefully - either succeed or fail with any error code
 			Eventually(session).Should(Or(
 				gexec.Exit(0),
 				gexec.Exit(1),
+				gexec.Exit(5),
 			))
 		})
 	})
