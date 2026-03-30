@@ -9,7 +9,7 @@ Flags:
   -C, --cd            Change directory after deletion (outputs path to stdout)
   -f, --force         Force deletion even with uncommitted changes
   -h, --help          help for delete
-      --merged-only   Only delete if branch is merged
+  -m, --merged-only   Only delete if branch is merged
 
 Global Flags:
   -q, --quiet           Suppress non-essential output

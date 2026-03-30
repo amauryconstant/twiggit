@@ -1,4 +1,4 @@
-Error: worktree 'non-existent-worktree' not found
+Error: worktree not found for target 'non-existent-worktree' (context: /tmp/fixtures/projects/test-project)
 Usage:
   twiggit cd <project|project/branch> [flags]
 
@@ -9,4 +9,4 @@ Global Flags:
   -q, --quiet           Suppress non-essential output
   -v, --verbose count   Increase verbosity (can be used multiple times: -v, -vv)
 
-Error: worktree 'non-existent-worktree' not found
+Error: worktree not found for target 'non-existent-worktree' (context: /tmp/fixtures/projects/test-project)
