@@ -45,7 +45,7 @@ See `internal/infrastructure/AGENTS.md` for detection rules and resolution.
 - **Outside git**: Require explicit project/branch specification
 
 ## Testing
-- **Unit tests**: None (cmd package tested via E2E only)
+- **Unit tests**: `cmd/error_formatter_test.go` (17 tests), `cmd/util_test.go` (11 tests)
 - **E2E tests**: `test/e2e/<command>_test.go`
 - **Contract tests**: `cmd/contract_test.go` verifies service integration
 
@@ -150,7 +150,7 @@ Output: Worktree info + hook warnings (if any)
 ### delete
 Alias: `rm` (Unix-style shortcut)
 Safety checks: Uncommitted changes, current worktree status
-Flags: `-f, --force`, `--merged-only`, `-C, --cd`
+Flags: `-f, --force`, `-m, --merged-only`, `-C, --cd`
 Default behavior: Remove worktree + delete branch
 Navigation: With -C from worktree context, outputs project root path; from project or outside git, outputs nothing
 
@@ -171,7 +171,7 @@ Usage: `eval "$(twiggit init)"` | `twiggit init bash` | `twiggit init --install`
 ### prune
 Purpose: Delete merged worktrees for post-merge cleanup
 Args: `[project/branch]` (optional, specific worktree to prune)
-Flags: `-n, --dry-run`, `-f, --force`, `-y, --yes`, `--delete-branches`, `-a, --all`
+Flags: `-n, --dry-run`, `-f, --force`, `-y, --yes`, `-d, --delete-branches`, `-a, --all`
 Behavior:
 - Context-aware: Infers project from current directory (worktree > project > outside git)
 - `--dry-run`: Preview what would be deleted without making changes
