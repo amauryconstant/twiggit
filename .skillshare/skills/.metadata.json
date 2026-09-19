@@ -1,0 +1,293 @@
+{
+  "version": 1,
+  "entries": {
+    "golang-cli-architecture": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-cli-architecture",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:39.577898646+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:ff953c00c71f9eaa02898460fa61e704f055162bd51cf7590b903cd9dd401af5",
+        "references/01-architecture.md": "sha256:da0344298c1dca3db1ad6b114edee6aa85522e3e6bf404123e95834b77834c25",
+        "references/02-command-ux.md": "sha256:d30d1c26ff60485b5603eb909913f0fd3f72cd8a4f1e84f41304bf9db80ff785",
+        "references/03-input-config.md": "sha256:53f89b4128d425681e76b5ec81f6d2d0739d81c72e88e4bc331270269548a239",
+        "references/04-output.md": "sha256:585356d4b16364f24550b19d9651bf7ef26a84ef4dfecde921f75d5e9b84d95a",
+        "references/05-errors.md": "sha256:8c7307632cd62d6d018a04b7b7760cfb587df2d175fd010cdd4fd59db8f75bbf",
+        "references/06-concurrency.md": "sha256:94bc4f7d2ae8d1ceef7c3e286688e1f349c7d2a210ae56de9eef14cd44d36a30",
+        "references/07-testing.md": "sha256:92a11ed0d38f1fa1e30812dee8cb4577d7e5c76fda92881ad38f77fd52704dd8",
+        "references/08-completion.md": "sha256:f6a350fc1df77c540fd51bf455f1173586597de9fa0e6bac435c21a5aab3f201",
+        "references/09-logging.md": "sha256:3d34dd7f38199d727b732a50710b9029d400cd2184758117631e0a30d52e1926",
+        "references/10-state.md": "sha256:ac0f98d7884ec71ad1262cf36d06642fe7371263e458cdaae5b605f698c20ec1",
+        "references/11-plugins.md": "sha256:eaa12ffc83beed558583bb9c5872a26f8a5af0464542a386b58eada1a43e17cb",
+        "references/12-tui.md": "sha256:f675fc0237cd1689dd749e71cc0da67d9812444ea42f2de044e7ec34b0434447",
+        "references/13-versioning.md": "sha256:fd234f89407d6c2aae19f5a5bb5801d366560fda574f3643b56d4f7a4c4ae302",
+        "references/14-libraries.md": "sha256:909a6d26e4533c68520a73b9b56e5ebb965d759b0fed166b84fcaf17de1a425f"
+      }
+    },
+    "golang-code-style": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-code-style",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.510310349+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:1c53d6b8405fc2992b92524d4782c826845916d64f90a5af483b9401865b9a76",
+        "evals/evals.json": "sha256:a439625516667ab0e60e58003294da3c0cf5a579d1c4741c5b5a57514ec35356",
+        "references/details.md": "sha256:3969d18fb54e59c032de0463b44b6b5bd125dfe8b726ef0f009190da81f3df07"
+      }
+    },
+    "golang-continuous-integration": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-continuous-integration",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.241033719+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:106f80606011f563fb56565095d08f3eb21f06771577a124c8522088671b9b3b",
+        "assets/claude-code-review.yml": "sha256:44dc118833565ccc5540a6544356c1c62920b819ca493b542a9eece3584693c6",
+        "assets/codecov.yml": "sha256:6fd9fcc281e3c5e78636e8722c5ce6dfa235bc86319a645629f79d0557235365",
+        "assets/codeql-config.yml": "sha256:e656a4bfd48df5172a6bbc627ccc9cc9afee27317c37444c19cd24b0a37c0cf7",
+        "assets/copilot-review-instructions.md": "sha256:87fc280e934242e129e66a2f51a85de22cec15fd3f553ddc02881ef9aa673fff",
+        "assets/dependabot-auto-merge.yml": "sha256:bf51d1604c483aa4fe68be861570203b77cacc06b08ec6f1b448b1641ee87d76",
+        "assets/dependabot.yml": "sha256:e0e1bc6589c17fa8bac435fb7c8087dabf36da82fd4ce6c7fbd0017353237c3e",
+        "assets/docker.yml": "sha256:96e9b83fdde1f01ed0ac63d602395fd57aa2918b340f66d741d3d5785ef60db1",
+        "assets/goreleaser-cli.yml": "sha256:71443d4d6baca1aa79601ef18faa48a6557caf889036556633d4518a1e141e50",
+        "assets/goreleaser-lib.yml": "sha256:55962e46bab389746bebc001b08ba242766fa0a79c36aa925561aa8899a76cd8",
+        "assets/goreleaser-monorepo.yml": "sha256:3726554731cd2baa084aea59b177637cc8c981f8fcc75040e53b87fc86978162",
+        "assets/integration.yml": "sha256:66d55a41c058e816d851d4dc2099b8e3d299d95b85897abb912f0652c86b01b8",
+        "assets/lint.yml": "sha256:f97f43de7ea822d7906d1d360f321826933ec288cb6369d95be19fcad14a0dfc",
+        "assets/release.yml": "sha256:a99ceea9da5f6de14fb97f89c3edddbd6e5167015528554d129261db4f61c05e",
+        "assets/renovate.json": "sha256:56eebfd3354023f302c10758023b1604f50da79ad035124dfd416ac5ed32ebcd",
+        "assets/security.yml": "sha256:fe3de422399a07791960e058974c76d2ce27d5e0a347ae0a24be5cf1eebec987",
+        "assets/test.yml": "sha256:4f6eb041bd997f941335b95f22c4c63d41b8ca01ed6e88b4902bdc346e132de8",
+        "evals/evals.json": "sha256:f0e334bbc94d27b89b0c6a885638a7319faddac69a4dff0453dcb00515dc53e7",
+        "references/repo-security.md": "sha256:925b28aa8119f497c0a08cb7547d7d9bdcf4cc0831a0fb43ee08a628ae28b8bc"
+      }
+    },
+    "golang-dependency-management": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-dependency-management",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.049219475+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:adedc0f78b8a469b8398434b8a9f373a380e50cf3a8a5a7974bb3f4a24c6166b",
+        "evals/evals.json": "sha256:5770c0d59bc309930ba8f3c121f81c6a9afae42d2939f157004bd05a0fc566f4",
+        "references/auditing.md": "sha256:7edc2ee2e5a55a764e9a7dc73c482d197207722bd643362ab1d3cf5fa1687ec2",
+        "references/automated-updates.md": "sha256:6ce7926a2f895fc2ccca7735521902f2575c73cf919c2788fb3bf740fb868b7b",
+        "references/conflicts.md": "sha256:a3f9bc0f606b9395f3f4675bf6085b85a9a53efd3fc5fbd108e4954412654121",
+        "references/versioning.md": "sha256:2c24099d6a648a93c8801521d698727bafd566fc4fea31b349f8398ee0f96860",
+        "references/visualization.md": "sha256:b23c9cff41abf43887224ab391b2f4e43a5f2e0f967246ebc480e0491190d3bd",
+        "references/workspaces.md": "sha256:317022b4f20c2c311eaf9889ffa03be1853e02bfc027fc2780826593a41d7caf"
+      }
+    },
+    "golang-design-patterns": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-design-patterns",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.352252339+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:49bfe0170e71d2768f57415f0322b4e27149d03ea3d86b85ef346631668b0f51",
+        "evals/evals.json": "sha256:7d2d8f0cfe749f3c4af88885c62ce27157c43576cc0550811b691c9fc23722b1",
+        "references/architecture.md": "sha256:c8a790ed9e180b52a412455bae24e7f0e68c6e605ba3acd90ab35cd16fb813eb",
+        "references/clean-architecture.md": "sha256:b4625aa00c641fb106bf5cdabab38f70146f746a4d244f68a71b2b8bd6c7d268",
+        "references/data-handling.md": "sha256:72d78bf015637c7da90c3e298c1df89b20149421006d3dfd03e5f910212c9ce5",
+        "references/ddd.md": "sha256:bcd8382c1369bf505cb8422f83b46bd05e11f4587b6a173ca7eaa1a1a55080e6",
+        "references/hexagonal-architecture.md": "sha256:d904cb06c027521ac86a300ae3834e8d317bdfd8a11cd53fbd4cfdac27407bba",
+        "references/resource-management.md": "sha256:29ea2e753445c1d3e13476bf8e61e28dcfc803769f23309c3a67f6ca71e7383a"
+      }
+    },
+    "golang-documentation": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-documentation",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.733305063+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:a313e2a0037731074ae7e12a14727e42396ea397d84f53873400d3fc5c44fb2d",
+        "assets/templates/CHANGELOG.md": "sha256:1b71c5ec952e6ad9df54301023e9b8e32c84518d5a12205bdd4fc66548a3310c",
+        "assets/templates/CONTRIBUTING.md": "sha256:9f48475bf8e7456260ad386470577f5fba9466df0cdc888bedfb55d6e1188dd5",
+        "assets/templates/README.md": "sha256:4055e43b9c0fdacf84a8fddd503968cc0d49e7555a642979ae81292fb65a47f1",
+        "assets/templates/llms.txt": "sha256:05e60afffcaff165cb416506f6b45f80143ab5453ab33a55499ab56d279b97d9",
+        "evals/evals.json": "sha256:b23fac4a14e8d909e4efa402a23c5585efc33ef2079f5d79992e27f1da4654cf",
+        "references/application.md": "sha256:e9b8ddbfb0aef0090fdd29f41a020b829738a6cb504aa4276fcddff13f4767a5",
+        "references/code-comments.md": "sha256:b30a972c758fe5f75615c91024cd2189a12e2d68f61128026c4e4809fc1679f4",
+        "references/library.md": "sha256:3cb75b20e9965d9f0c0e3a2a1f17d37d7d2d0278ac704dc4b15f9eed1620dd1c",
+        "references/project-docs.md": "sha256:4eb0ec8988743d95b0d6c701a6070e74c54c40a9d775c074577032764c125199"
+      }
+    },
+    "golang-error-handling": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-error-handling",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:39.973852926+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:536c25e624c3cf3def98962d9f89db07b258cde6c9e7fd17009a9eb204ba631f",
+        "evals/evals.json": "sha256:a7b58b4f717745e606b067c1f65c93db55182b4a561b8ffa43158a7f64515fa7",
+        "references/error-creation.md": "sha256:8a5bda5a543ef7774ddc240cd198d34871222ed0335474df599d162f09d253c2",
+        "references/error-handling.md": "sha256:ab9c510305a1fe043502a04fe935f16dac2f95c585820ae9f0568afb2a56d357",
+        "references/error-wrapping.md": "sha256:6293caf2c41eef243dffbc2dbd17d045770f9a04e8ce910c4452b3d2b6abce06"
+      }
+    },
+    "golang-gopls": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-gopls",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:41.41156256+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:198024b700b0011d5caccff80031b975c060c2cdb6bdf980a371bf0533fa34a7",
+        "references/cli.md": "sha256:9f4d5c832a83d61ae04403fcd521b548db29481c37b3fb4aadf23f6bc924de07",
+        "references/features.md": "sha256:4519f0d37f8826f80824b10cd5892da0f0babb9934efecc083f81a70b5e4771f",
+        "references/matrix.md": "sha256:cfa641a7389136377f7841ca471f887e85348597de87b05ecb96e4a4ffdda87f",
+        "references/mcp.md": "sha256:982d7e0d8c3ae3de10451a9e0d05847105c71e9d71c70b4ccc052cfa7b6516a6",
+        "references/settings.md": "sha256:443d18fcc1e1c75dfbc99fb9fb5c5b5fcc3fb703648847be8ca68a92d2eb0896"
+      }
+    },
+    "golang-how-to": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-how-to",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:41.513881579+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:ec364f51bec96667a20d67d3f8e8b5b9b7a2220bb9ed60581edf634f868313c2",
+        "assets/cursor-go-skills.mdc": "sha256:4edbbb2ddef9a2841105613e6c14080b536a25e5ca40d13e6208191b0648ff61",
+        "references/by-category.md": "sha256:e57a7babbe33784e08919e09c43cff35a8e0b27d195cb486a48878f98628d575",
+        "references/disambiguation.md": "sha256:ceb39c9d65c304731c84fdd342265d70f96427c2d6bebdf243c4636731f84ba5",
+        "references/project-config.md": "sha256:739c1d1ed10f7900206bc67bdf33c8d6cbc46eb3c636c75b2d848b782bf1e8ba"
+      }
+    },
+    "golang-lint": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-lint",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.126521364+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:45e510222626ab4367e7831dcef2560c9c54a7f489ec4219eec89f4fdc4e6930",
+        "assets/.golangci.yml": "sha256:ad4284596f57d66bcdbc92687011a4dce1699cc684283eb172cd3dd91047646e",
+        "evals/evals.json": "sha256:b075c4894cb663b067b5cfeaf5525ed49af1dffda24b36c458d09c2f40ffb90a",
+        "references/linter-reference.md": "sha256:0858adf98ca9cdcd8f614176008a58098a267bdbc4a5de976d7180e8a11e4f18",
+        "references/nolint-directives.md": "sha256:be12adeb536e134398243b8cee0433eb27fefabae3f13092b826198c5e461067"
+      }
+    },
+    "golang-modernize": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-modernize",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:41.020193438+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:4690bd30545ecd8bd4af278684773c2cde19981aae5dd97ba45a90f5ea560c60",
+        "evals/evals.json": "sha256:e923a941e050165dbffc51553aa8f6952715fbf81c89b9c9f4e52d6711ec7a91",
+        "references/tooling.md": "sha256:4521eb3455c40f2cd59da2613e0623c871fbcd3993fa69b70dbafdc0c15e3bd9",
+        "references/versions.md": "sha256:01bfbb8e86318eae4a9faf7d6b6010a6aa2686ea958b5a5c185f66346df8ced4"
+      }
+    },
+    "golang-naming": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-naming",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.607392181+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:ff6e9b3d1ba65f8e243d872501f44fe8d48f90da8e9441d682e56d3e6d9e2ac7",
+        "evals/evals.json": "sha256:450298ba90598fcaaff513e057c0de7c1a61ab2f1c8125f1ac26129860b4829c",
+        "references/functions-methods.md": "sha256:859a54edf59b3f72b9176bed12d0173ee4aa8f1f8494e0c6d5e968dbce960d04",
+        "references/identifiers.md": "sha256:857684c5e46e9ec66cf46edb03b952b21054491cef4b06a46bb6cf7cf833fdb4",
+        "references/packages-files.md": "sha256:e507bd5a1b2fd690638de969084c14a9cbd7ca1038e1e51a297120672b27f8c1",
+        "references/testing.md": "sha256:be7066959d1eb1da03b38ea93a2e7d6d69d3ed82b0bb5d0600a9e4065a819471",
+        "references/types-errors.md": "sha256:4402338a460d05026beeab82a92258ea0b81145f43cf6460f4363fd9a877a885"
+      }
+    },
+    "golang-project-layout": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-project-layout",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:39.898861006+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:d23c793c974a868906a95e5ac53fd077ba9630410bb7352d323697a29156c20a",
+        "assets/.gitignore": "sha256:e4c2672f86a9d58a16813d8e81db033ed7d29c9b89493c4f6b9b137f686cb78a",
+        "assets/Makefile": "sha256:27d41a1b5f8b7ff5451f5dfca7e934185df5754f834d86d8b5dec7ce08e0f9ea",
+        "evals/evals.json": "sha256:d27071f04918e4e7808e72117c6ffb3d9e130e257273ecdd52f5d4080d043752",
+        "references/config.md": "sha256:4e0d6440110bba5a77434dd19ffc69f7b4ff3da2bec2a06e06bb100fe34003c1",
+        "references/directory-layouts.md": "sha256:fc36907c26eedaa5ca38105764bc76256d077c6a9bf0eb6e9fda440ec0b33bb5",
+        "references/testing-layout.md": "sha256:e94120a0fea89aa5ede1f41a2bcfe33b1ae06309568b7ab608388579c3f7c80a",
+        "references/workspaces.md": "sha256:f65f5b1b88bffb48843f754ef25e5a7ade23991481a9183c9005bb66e01af68f"
+      }
+    },
+    "golang-refactoring": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-refactoring",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.875130278+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:4b297f823861d6620a5034a3a26b2d4875b1153ab123f2c5059f7ddb73939355",
+        "references/catalog.md": "sha256:79412f57d36f884530e0312018110a7cbca989c4a83ebe3142239e7815626dc4",
+        "references/go-tooling.md": "sha256:1e6756d85ecff0ef18c5998d71bad0e1de8d36cafc9b1d30fa8533919f28ce27",
+        "references/safety-net.md": "sha256:6a19cf4d801a786501d485abb9b3850eafe46e4675518fc685ef7127ca03c066",
+        "references/structural.md": "sha256:73bb125f15602bf5a7fce0b92116829c8ccdfdf606218e9573eae474eac7c6db",
+        "references/workflow.md": "sha256:1944c778e93d63dc3789dda67b5e07e79ac067eb2116843be691b11121ca6fe8"
+      }
+    },
+    "golang-safety": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-safety",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:41.14784266+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:a9bce4568ba98ae804505d6b1d6fbe0376fe7afdc9f30051bfc03f898e26d50e",
+        "evals/evals.json": "sha256:8db07dd44d2c2b4cca7eba15f135bc6858fbbe91c3f805e6c9a8602e06f0e17c",
+        "references/nil-safety.md": "sha256:2f0bcabb4184c1b88e36bab8a3f90e57887d3a95a15f66a2123445025c91dec7",
+        "references/slice-map-safety.md": "sha256:9b048bc51d5153bd554eed7eab6685423b9ad7159462313b0fd6a1294596d86d"
+      }
+    },
+    "golang-spf13-cobra": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-spf13-cobra",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:39.66829504+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:f77b93e6f14c3c0f4b168bb97c617d2866064964c2909c2cd817181190fe51ff",
+        "evals/evals.json": "sha256:6ba662758249b83bcfc9f66adfaa780651c7913400aef51839b2f0afaf00b38c",
+        "references/commands-and-args.md": "sha256:9c26741d541b348e7bc55924ca19b6bc731dc35933382c84a0540399264e6e15",
+        "references/completions.md": "sha256:e8bcf042bfe2d42a35f64641002067662d5bb23c3df7f7122b29cf49ed413ad9",
+        "references/flags.md": "sha256:fe46534071b49143b4322987b78d7e791fcf12fbb4d0b31fa5c3323e6df4757a",
+        "references/generators.md": "sha256:73cfbec7069ee03e0da19c157753633ceae816a49191c775586b4366c6199b58",
+        "references/testing.md": "sha256:059ca04ad1b772daa41eb4f0446a17e3c65d1b2db54789bbd0d6dabcd8681f50"
+      }
+    },
+    "golang-stretchr-testify": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-stretchr-testify",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:39.724169467+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:e0e681bafd39acc6edb6c9d06c53add7b42e10d93a7f0dd546dde67a23d3f1bf",
+        "evals/evals.json": "sha256:eea26cc911271559fdd0e2f518335a66d38134bac8e69e8e60028699189f912d",
+        "references/mock.md": "sha256:8082a5ace0d7872fc76c51c23aa8205bf18a51b0ca2530ebec21d5dd896f42db"
+      }
+    },
+    "golang-structs-interfaces": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-structs-interfaces",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:40.419852929+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:0bc93e1e86c3cf24571205b6fdd773a23df1b34366e7f639a9530d6984117601",
+        "evals/evals.json": "sha256:34958c0025acf30e85256db718638c03c76dedd3070e56e7c81608c946390219",
+        "references/struct-fields.md": "sha256:fc40bb1979f11cd8f9d20361d524a26a233447fa94b6ec3ccad71a5cebfaec2a",
+        "references/type-assertions.md": "sha256:02860e00115d6b1256c4accedea33b6544746bc6b1429c2a5fc8ed735692b48e"
+      }
+    },
+    "golang-testing": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-testing",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:39.82495327+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:55eea3ed4536df0c95fc1247382d3027d45b1d1af0a94fc9de653debae5df0f2",
+        "evals/evals.json": "sha256:bc083e8d62ff1c23d9cd734f274a5733cfc0d30bb6356e03668dd3c67ff7c92e",
+        "references/benchmarks.md": "sha256:f9de0e2e50cbb8e28684da1f99ff15fa84779150b4a8deefdf97ea3345c871f1",
+        "references/coverage.md": "sha256:b2f7af52412b084cf353ff493941ad43276cae9d197470db2287b5d2c5a1aebf",
+        "references/examples.md": "sha256:40c070f0a83898edbc0c87c034fc2281d9c2b04e0514c94aa1ff07b802b575c5",
+        "references/helpers.md": "sha256:8c71d253a246e66b8249022c96d7e8892f5bfc2156b02a36673c321db2c843f4",
+        "references/http-testing.md": "sha256:39381274d7887651b86bde513085835f52860aa0832eb6f945f79c008f240e0f",
+        "references/integration-testing.md": "sha256:a29e725c58a1c2feaf16470db7eb4f8394aa36a476df92a792ac026c950d0b85",
+        "references/mocking.md": "sha256:65558f907dea483831aea4aca50b1d6f1b64f92803bc2446f6a550a6d6c5c33a"
+      }
+    },
+    "golang-troubleshooting": {
+      "source": "/home/amaury/.local/share/skillshare/skills/golang-troubleshooting",
+      "type": "local",
+      "installed_at": "2026-09-19T20:09:41.320938855+02:00",
+      "file_hashes": {
+        "SKILL.md": "sha256:a94def5ae84dd581536e5fdd64b1c22bd7f9683f3173d638830edb60697aa8e8",
+        "evals/evals.json": "sha256:a15b4ce5f5f0d4d2fe0590ba2207e13e2f23bba4e11d1743bd89ddda87146dde",
+        "references/code-review-flags.md": "sha256:577b683e055c3880fa7233e24f19cddbd4aa65731be72d50211d873e202bfc43",
+        "references/common-go-bugs.md": "sha256:311375f50e79bfc63d48e06565b784fba060609a0bc787f6e106eb1f48fa6fbc",
+        "references/compilation.md": "sha256:b6ecaf7c6f4e2f4635e3c90d02d2cd55fe150c9826f77061a70a03e39ea669ec",
+        "references/concurrency-debug.md": "sha256:7fef337f937d182314200c3f40b38b3954214df190b1b9dccbdd129f22986d2f",
+        "references/diagnostic-tools.md": "sha256:36169dd6972e2e7230d55e8bbf760a6d51f93cc36811d9d80ab94539746d38df",
+        "references/methodology.md": "sha256:2e90eb15812661d06f3c90d5f9c697a3ca292a6667e574a07479626b90c9d48e",
+        "references/performance-debug.md": "sha256:c26e03f1985b156876f31bad0f7541da13d6968b622a24c26bb7565b30305e62",
+        "references/pprof.md": "sha256:039fa03a054737439e69e59d4ebf62c87e711e47c2698941c30bd73890aec5bf",
+        "references/production-debug.md": "sha256:6bbb0e2f3f249bd9a350f6c1f50b48a4d3d93fee9b1de9f2fb4f6ba8bf739f03",
+        "references/testing-debug.md": "sha256:6e499a4f8a96eddb9314ec396e1cb8bf98457085845acb6ab327c49e39f9d34a"
+      }
+    }
+  }
+}

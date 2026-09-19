@@ -1,0 +1,25 @@
+# BEGIN SKILLSHARE MANAGED - DO NOT EDIT
+logs/
+trash/
+backups/
+skills/golang-cli-architecture/
+skills/golang-spf13-cobra/
+skills/golang-stretchr-testify/
+skills/golang-testing/
+skills/golang-project-layout/
+skills/golang-error-handling/
+skills/golang-dependency-management/
+skills/golang-lint/
+skills/golang-continuous-integration/
+skills/golang-design-patterns/
+skills/golang-structs-interfaces/
+skills/golang-code-style/
+skills/golang-naming/
+skills/golang-documentation/
+skills/golang-refactoring/
+skills/golang-modernize/
+skills/golang-safety/
+skills/golang-troubleshooting/
+skills/golang-gopls/
+skills/golang-how-to/
+# END SKILLSHARE MANAGED

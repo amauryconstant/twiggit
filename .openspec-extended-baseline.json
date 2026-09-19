@@ -1,0 +1,27 @@
+{
+  "captured_at": "2026-09-19T19:06:12.923133+00:00",
+  "tool": "opencode",
+  "global_config": {
+    "profile": "custom",
+    "delivery": "both",
+    "workflows": [
+      "propose",
+      "explore",
+      "new",
+      "continue",
+      "apply",
+      "update",
+      "ff",
+      "sync",
+      "archive",
+      "bulk-archive",
+      "verify",
+      "onboard"
+    ],
+    "telemetry": {
+      "noticeSeen": true,
+      "anonymousId": "04f147a1-627e-463e-9bf8-b82675e745bb"
+    }
+  },
+  "project_root": "/home/amaury/Projects/twiggit"
+}

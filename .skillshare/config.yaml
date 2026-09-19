@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/runkids/skillshare/main/schemas/project-config.schema.json
+targets:
+  - name: opencode
+    skills:
+      mode: copy
+skills:
+  - name: golang-cli-architecture
+    source: /home/amaury/.local/share/skillshare/skills/golang-cli-architecture
+  - name: golang-spf13-cobra
+    source: /home/amaury/.local/share/skillshare/skills/golang-spf13-cobra
+  - name: golang-stretchr-testify
+    source: /home/amaury/.local/share/skillshare/skills/golang-stretchr-testify
+  - name: golang-testing
+    source: /home/amaury/.local/share/skillshare/skills/golang-testing
+  - name: golang-project-layout
+    source: /home/amaury/.local/share/skillshare/skills/golang-project-layout
+  - name: golang-error-handling
+    source: /home/amaury/.local/share/skillshare/skills/golang-error-handling
+  - name: golang-dependency-management
+    source: /home/amaury/.local/share/skillshare/skills/golang-dependency-management
+  - name: golang-lint
+    source: /home/amaury/.local/share/skillshare/skills/golang-lint
+  - name: golang-continuous-integration
+    source: /home/amaury/.local/share/skillshare/skills/golang-continuous-integration
+  - name: golang-design-patterns
+    source: /home/amaury/.local/share/skillshare/skills/golang-design-patterns
+  - name: golang-structs-interfaces
+    source: /home/amaury/.local/share/skillshare/skills/golang-structs-interfaces
+  - name: golang-code-style
+    source: /home/amaury/.local/share/skillshare/skills/golang-code-style
+  - name: golang-naming
+    source: /home/amaury/.local/share/skillshare/skills/golang-naming
+  - name: golang-documentation
+    source: /home/amaury/.local/share/skillshare/skills/golang-documentation
+  - name: golang-refactoring
+    source: /home/amaury/.local/share/skillshare/skills/golang-refactoring
+  - name: golang-modernize
+    source: /home/amaury/.local/share/skillshare/skills/golang-modernize
+  - name: golang-safety
+    source: /home/amaury/.local/share/skillshare/skills/golang-safety
+  - name: golang-troubleshooting
+    source: /home/amaury/.local/share/skillshare/skills/golang-troubleshooting
+  - name: golang-gopls
+    source: /home/amaury/.local/share/skillshare/skills/golang-gopls
+  - name: golang-how-to
+    source: /home/amaury/.local/share/skillshare/skills/golang-how-to
+ignore:
+  - .DS_Store
+  - .git/
+  - __pycache__/
+audit:
+  block_threshold: CRITICAL
