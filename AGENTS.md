@@ -194,12 +194,39 @@ graph TB
 | Tests | Written AFTER implementation (per config.yaml) |
 | Progress | `openspec status --change <name> --json` |
 | Artifacts | See `openspec/config.yaml` rules section |
+| Spec categories | `cli-` / `application-` / `domain-` / `infrastructure-` / `testing-` (see below) |
+
+## OpenSpec Spec Organization
+
+Specs live under `openspec/specs/<category>-<name>/spec.md`. The 6 category prefixes map to source-tree layers:
+
+| Prefix | Layer | Owner |
+| ------ | ----- | ----- |
+| `cli-` | `cmd/` | Cobra command specs |
+| `application-` | `internal/application/` | Service interfaces and contracts |
+| `domain-` | `internal/domain/` | Types, errors, validation rules |
+| `infrastructure-` | `internal/infrastructure/` | Git client, resolver, config, hooks, paths, shell-detect, release |
+| `testing-` | `test/` | Test organization and patterns |
+
+**Layout**: one folder per spec, single `spec.md` inside. Use `# Capability:` + `## Purpose` + `## Requirements` headers.
+
+**Purity rules** (enforced by `openspec validate --specs`):
+
+| Rule | Meaning |
+| ---- | ------- |
+| `[no-code-refs]` | No `path:N` or `pkg.Type` references inside spec prose; describe intent, not implementation |
+| `[bare-cross-refs]` | Cross-references to other specs use bare names (`cli-create`), not folder paths |
+| `[purpose-coherence]` | Each `### Requirement:` SHALL/MUST declare a single testable contract |
+
+**Canonical ownership** for each prefix and the full rules live in `openspec/config.yaml`; consult it before adding or renaming specs.
+
+**Dead code**: orphan fields, types, or behaviors that no spec claims are tracked in `openspec/dead-code.md`. Add an entry there when discovering unowned symbols; do not fold them silently into a related spec.
 
 ## Troubleshooting
 
 | Issue | Solution |
 | ----- | -------- |
-| ValidationError wrapping | Return directly, don't wrap with `fmt.Errorf` |
+| ValidationError wrapping | Return unwrapped, not via `fmt.Errorf` |
 | `errors.As()` fails | Check error chain, ensure `Unwrap()` implemented |
 | Context detection wrong | Check CWD, verify `.git` file in worktrees |
 | Mock not matching calls | Verify `On()` args match actual call signature |

@@ -67,6 +67,55 @@ context: |
   - Run mise run check before committing
   - Pre-commit hooks: whitespace, YAML/TOML validation, merge conflict detection
 
+  Spec organization (project-specific):
+  - Layout: openspec/specs/<category>-<spec-name>/spec.md. Specs live one folder deep
+    under openspec/specs/. Files directly at openspec/specs/ are not permitted.
+  - Naming convention: lowercase, hyphen-separated, always prefixed with a category.
+    Pick the shortest unambiguous category; only invent a new prefix if none fit.
+  - Category prefixes (6 active, pick the shortest unambiguous one):
+    - `cli-` — command-line interface layer (alignment: cmd/). Examples: cobra
+      framework setup, exit codes, output formats, shell completion, error
+      formatting, command surface, flag conventions, help examples.
+    - `application-` — service-layer architecture, wiring, configuration
+      (alignment: internal/application/, internal/service/). Examples:
+      dependency injection, service contracts, worktree/project/navigation/shell
+      service behavior.
+    - `domain-` — pure domain types, errors, validation (alignment:
+      internal/domain/). Examples: typed-error taxonomy, context types,
+      config knob types, hook types.
+    - `infrastructure-` — DevOps/CI/CD/release + external integrations
+      (alignment: internal/infrastructure/, .github/, .goreleaser.yml, contrib/,
+      project root). Examples: git client routing, context resolver, config
+      manager, path utilities, hook runner, CI, release management.
+    - `testing-` — test infrastructure (alignment: test/). Examples: e2e
+      suite, helpers, golden files, fixtures, conventions.
+  - Cross-spec references SHALL use bare directory names (e.g., `cli-prune`),
+    never line-anchored paths (e.g., `cli-prune/spec.md:35`).
+
+  Canonical spec ownership (consult before adding content; cross-reference the
+  owner instead of restating):
+  - `domain-typed-errors` owns every `domain.*Error` definition (struct fields,
+    constructor signatures, `Error()`/`Unwrap()`/`MarshalJSON()` contracts,
+    builder methods) and the exit-code mapping table.
+  - `cli-error-formatting` owns cmd-side error-to-exit-code dispatch
+    (`GetExitCodeForError`, formatter registration order). Consumer specs use
+    the symbolic exit-code names.
+  - `infrastructure-context-resolver` owns the context-detection priority
+    chain (worktree > project > outside git) and identifier resolution.
+  - `infrastructure-git-client` owns the GoGit/CLI composite routing decision
+    and the full GoGitClient read-side surface (OpenRepository, ListBranches,
+    BranchExists, GetRepositoryStatus, GetRepositoryInfo, ListRemotes,
+    GetCommitInfo, repository LRU cache).
+  - `application-shell-service` owns the GenerateWrapper + ValidateInstallation
+    service contracts.
+  - `cli-init` owns the init command surface (positional shell arg,
+    `--install`, `--config`, `--force`).
+  - `domain-config-types` owns the full configuration knob surface
+    (ValidationConfig, NavigationConfig, ShellConfig, CompletionConfig,
+    ServiceConfig, GitConfig, ContextDetectionConfig).
+  - `application-worktree-service` owns the WorktreeService orchestration
+    contract and concurrency-safety guarantees for worktree mutations.
+
 rules:
   proposal:
     - Typically include: Why, What Changes, Capabilities, Impact
@@ -82,6 +131,13 @@ rules:
     - Ensure scenarios are concrete with specific inputs and expected outputs
     - Include both positive and negative scenarios
     - Requirements grouped logically with clear purpose statements
+    - Format: `# Capability: <Title>` then `## Purpose` then `## Requirements`
+      with `### Requirement:` and `#### Scenario:` headings.
+    # Purity principles — reader-extractable by future tooling.
+    # Each rule is identified by a [bracketed-key] prefix.
+    - "[bare-cross-refs] Cross-spec references SHALL use bare directory names (e.g., `cli-prune`), never line-anchored paths (e.g., `cli-prune/spec.md:35`)"
+    - "[no-code-refs] Requirements and scenarios SHALL NOT reference implementation files via `path:N` form (e.g., `internal/foo.go:42`)"
+    - "[purpose-coherence] `## Purpose` SHALL match the requirement surface; fix the Purpose (broaden) or fix the Requirement (delete or move)"
 
   design:
     - Include Context (current state, constraints, assumptions)
