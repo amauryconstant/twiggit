@@ -86,7 +86,7 @@ These interfaces define contracts between service layer and infrastructure imple
 - `GetCompletionSuggestionsFromContext(ctx, partial) ([]*domain.ResolutionSuggestion, error)`
 
 ### WorktreeService
-- `CreateWorktree(ctx, *domain.CreateWorktreeRequest) (*domain.WorktreeInfo, error)`
+- `CreateWorktree(ctx, *domain.CreateWorktreeRequest) (*domain.CreateWorktreeResult, error)`
 - `DeleteWorktree(ctx, *domain.DeleteWorktreeRequest) error`
 - `ListWorktrees(ctx, *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error)`
 - `GetWorktreeStatus(ctx, worktreePath) (*domain.WorktreeStatus, error)`
@@ -123,7 +123,7 @@ type CreateWorktreeRequest struct {
 }
 ```
 
-**Result types:** See `internal/domain/AGENTS.md` (WorktreeInfo, PruneWorktreesResult)
+**Result types:** See `internal/domain/AGENTS.md` (CreateWorktreeResult, PruneWorktreesResult, WorktreeStatus)
 
 ## Dependency Injection
 

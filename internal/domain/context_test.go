@@ -130,26 +130,3 @@ func TestResolutionSuggestion_ZeroValues(t *testing.T) {
 	assert.Empty(t, suggestion.ProjectName)
 	assert.Empty(t, suggestion.BranchName)
 }
-
-func TestWithExistingOnly(t *testing.T) {
-	tests := []struct {
-		name     string
-		option   SuggestionOption
-		expected string
-	}{
-		{
-			name:     "WithExistingOnly option",
-			option:   WithExistingOnly(),
-			expected: "WithExistingOnly",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if tt.option == nil {
-				t.Fatal("option should not be nil")
-			}
-			assert.NotNil(t, tt.option, "option should not be nil")
-		})
-	}
-}

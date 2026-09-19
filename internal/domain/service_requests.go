@@ -28,7 +28,6 @@ type ListWorktreesRequest struct {
 type ResolvePathRequest struct {
 	Target  string   // Target identifier to resolve
 	Context *Context // Current context for resolution
-	Search  bool     // Enable search if exact match not found
 }
 
 // PruneWorktreesRequest represents a request to prune merged worktrees

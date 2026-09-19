@@ -91,7 +91,6 @@ func resolveNavigationTarget(ctx context.Context, config *CommandConfig, target 
 	req := &domain.ResolvePathRequest{
 		Target:  target,
 		Context: currentCtx,
-		Search:  false,
 	}
 
 	result, err := config.Services.NavigationService.ResolvePath(ctx, req)

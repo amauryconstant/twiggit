@@ -38,7 +38,6 @@ func configureWorktreeServiceMocks(gitService *mocks.MockGitService, projectServ
 			Path:   "/path/to/worktree",
 			Branch: "feature-branch",
 			Commit: "abc123",
-			IsBare: false,
 		},
 	}
 	gitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/path/to/project/.git").Return(worktrees, nil).Maybe()
@@ -73,7 +72,7 @@ func setupWorktreeService() (application.WorktreeService, *mocks.MockGitService,
 		Path:        "/path/to/project",
 		GitRepoPath: "/path/to/project/.git",
 		Worktrees: []*domain.WorktreeInfo{
-			{Path: "/path/to/worktree", Branch: "feature-branch", Commit: "abc123", IsBare: false},
+			{Path: "/path/to/worktree", Branch: "feature-branch", Commit: "abc123"},
 		},
 		Branches: []*domain.BranchInfo{
 			{Name: "main", IsCurrent: true},

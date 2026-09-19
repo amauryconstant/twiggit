@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"twiggit/internal/domain"
+	"twiggit/internal/infrastructure"
 )
 
 func TestCompletion_GetCompletionTimeout(t *testing.T) {
@@ -132,7 +133,7 @@ func TestCompletion_ActionWorktreeTarget_WithExistingOnly(t *testing.T) {
 		Services: &ServiceContainer{},
 		Config:   &domain.Config{},
 	}
-	action := actionWorktreeTarget(config, domain.WithExistingOnly())
+	action := actionWorktreeTarget(config, infrastructure.WithExistingOnly())
 
 	assert.NotNil(t, action)
 }

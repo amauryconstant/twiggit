@@ -26,9 +26,13 @@ type ResolutionResult struct {
 }
 
 type ResolutionSuggestion struct {
-    Identifier   string
-    DisplayText  string
-    ResourceType PathType
+    Text        string
+    Description string
+    Type        PathType
+    ProjectName string
+    BranchName  string
+    IsCurrent   bool  // Current worktree (sorting priority)
+    IsDirty     bool  // Worktree has uncommitted changes
 }
 ```
 
@@ -40,7 +44,7 @@ type ResolutionSuggestion struct {
 |------|--------|---------|
 | ProjectInfo | Name, Path, GitRepoPath, Worktrees, Branches, Remotes, DefaultBranch, IsBare, LastModified | Full project data |
 | ProjectSummary | Name, Path, GitRepoPath | Lightweight listing |
-| WorktreeInfo | Path, Branch, Commit, IsBare, IsDetached, Modified | Worktree details |
+| WorktreeInfo | Path, Branch, Commit, IsDetached, Modified | Worktree details |
 | Result[T] | Value, Error | Generic Result/Either pattern |
 
 ## Prune Types
@@ -113,11 +117,12 @@ func InferShellTypeFromPath(string) ShellType
 
 ```go
 type SuggestionOption func(*suggestionConfig)
-
-func WithExistingOnly() SuggestionOption  // Filter to materialized worktrees only
 ```
 
-Used by `ContextResolver.GetResolutionSuggestions()` for completion filtering.
+Concrete options (e.g., `WithExistingOnly`) are defined in the
+`infrastructure` package, where the private `suggestionConfig` type
+lives. Used by `ContextResolver.GetResolutionSuggestions()` for
+completion filtering.
 
 ## Hook Types
 

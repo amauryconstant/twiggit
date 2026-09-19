@@ -397,7 +397,6 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.Resolution
 			Type:        domain.PathTypeProject,
 			ProjectName: ctx.ProjectName,
 			BranchName:  branch.Name,
-			Remote:      branch.Remote,
 		})
 	}
 	return suggestions

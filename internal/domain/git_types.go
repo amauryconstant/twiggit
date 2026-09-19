@@ -19,7 +19,6 @@ type WorktreeInfo struct {
 	Path       string // Absolute path to worktree
 	Branch     string // Branch name
 	Commit     string // Commit hash
-	IsBare     bool   // Whether this is a bare worktree
 	IsDetached bool   // Whether worktree is in detached HEAD state
 	Modified   bool   // Whether worktree has uncommitted changes
 }

@@ -83,23 +83,7 @@ type ResolutionSuggestion struct {
 
 	// IsDirty indicates the worktree has uncommitted changes (for visual indicator)
 	IsDirty bool
-
-	// Remote contains remote tracking info (e.g., "origin/branch")
-	Remote string
-
-	// StyleHint provides styling information for display
-	StyleHint string
 }
 
 // SuggestionOption is a functional option for configuring resolution suggestions
 type SuggestionOption func(interface{})
-
-// WithExistingOnly returns an option that filters suggestions to existing worktrees only
-// Defined here for test accessibility - actual implementation in infrastructure layer
-func WithExistingOnly() SuggestionOption {
-	return func(c interface{}) {
-		if cfg, ok := c.(*interface{}); ok {
-			_ = cfg
-		}
-	}
-}
