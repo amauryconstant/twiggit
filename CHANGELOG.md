@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Short flag `-m` for `delete --merged-only`
+- Short flag `-d` for `prune --delete-branches`
+- Preview of affected worktrees before confirmation in `prune --all`
+- Configurable `Git.CLITimeout` and `Shell.HookTimeout` (replace previously hardcoded values)
+
+### Changed
+
+- `create` falls back to `config.Validation.DefaultSourceBranch` when `--source` is not specified
+- `cd` not-found error includes the requested target and project context for easier diagnosis
+- `check` mise task renamed to `verify` and now includes `build` step
+- Release validation consolidated into shared library: `release:validate` replaced by `release:check` which supports initial release setup and dirty `CHANGELOG.md`
+
+### Fixed
+
+- Race condition in `PruneMergedWorktrees` result slice under concurrent pruning
+- Nil `req.Context` panic risk in worktree creation
+- Empty `ResolvedPath` panic risk in delete
+
 ## [0.11.0] - 2026-03-30
 
 
@@ -305,26 +327,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive test coverage (unit, integration, E2E)
 - Docker support and GitLab CI/CD pipeline
 - GitHub mirroring capability
-
-[0.10.1]: https://gitlab.com/amoconst/twiggit/-/compare/v0.10.0...v0.10.1
-[0.10.0]: https://gitlab.com/amoconst/twiggit/-/compare/v0.9.2...v0.10.0
-[0.9.2]: https://gitlab.com/amoconst/twiggit/-/compare/v0.9.1...v0.9.2
-[0.9.1]: https://gitlab.com/amoconst/twiggit/-/compare/v0.9.0...v0.9.1
-[0.9.0]: https://gitlab.com/amoconst/twiggit/-/compare/v0.8.1...v0.9.0
-[0.8.1]: https://gitlab.com/amoconst/twiggit/-/compare/v0.8.0...v0.8.1
-[0.8.0]: https://gitlab.com/amoconst/twiggit/-/compare/v0.7.0...v0.8.0
-[0.7.0]: https://gitlab.com/amoconst/twiggit/-/compare/v0.6.0...v0.7.0
-[0.6.0]: https://gitlab.com/amoconst/twiggit/-/compare/v0.5.6...v0.6.0
-[0.5.6]: https://gitlab.com/amoconst/twiggit/-/compare/v0.5.5...v0.5.6
-[0.5.5]: https://gitlab.com/amoconst/twiggit/-/compare/v0.5.4...v0.5.5
-[0.5.4]: https://gitlab.com/amoconst/twiggit/-/compare/v0.5.3...v0.5.4
-[0.5.3]: https://gitlab.com/amoconst/twiggit/-/compare/v0.5.2...v0.5.3
-[0.5.2]: https://gitlab.com/amoconst/twiggit/-/compare/v0.5.1...v0.5.2
-[0.5.1]: https://gitlab.com/amoconst/twiggit/-/compare/v0.4.0...v0.5.1
-[0.4.0]: https://gitlab.com/amoconst/twiggit/-/compare/v0.3.0...v0.4.0
-[0.3.0]: https://gitlab.com/amoconst/twiggit/-/compare/v0.2.0...v0.3.0
-[0.2.0]: https://gitlab.com/amoconst/twiggit/-/compare/v0.1.13...v0.2.0
-[0.1.13]: https://gitlab.com/amoconst/twiggit/-/compare/v0.1.7...v0.1.13
-[0.1.7]: https://gitlab.com/amoconst/twiggit/-/compare/v0.1.3...v0.1.7
-[0.1.3]: https://gitlab.com/amoconst/twiggit/-/compare/v0.1.0...v0.1.3
-[0.1.0]: https://gitlab.com/amoconst/twiggit/-/tags/v0.1.0

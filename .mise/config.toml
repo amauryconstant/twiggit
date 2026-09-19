@@ -61,12 +61,13 @@ run = "golangci-lint run --fix"
 description = "Format Go code"
 run = "gofmt -w ."
 
-[tasks.check]
-description = "Run all validation checks (quick)"
+[tasks.verify]
+description = "Run all validation checks"
 run = [
     {task="format"},
     {task="lint:fix"},
     {task="test"},
+    {task="build"},
 ]
 
 # ========================

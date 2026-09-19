@@ -41,7 +41,7 @@ graph TB
 | mise run test:golden   | Golden file tests (snapshot testing)          |
 | mise run test:golden:update | Update golden files                      |
 | mise run lint:fix      | Lint + format                                 |
-| mise run check         | All validation                                |
+| mise run verify        | All validation                                |
 | mise run build         | Build binary                                  |
 | mise tasks             | List all tasks                                |
 
@@ -49,7 +49,7 @@ graph TB
 
 | Command                   | Purpose          |
 | ------------------------- | ---------------- |
-| mise run release:validate | Clean tree check |
+| mise run release:check    | Release prerequisites |
 | mise run release:dry-run  | Test GoReleaser  |
 
 **Distribution**: Homebrew via `amoconst/homebrew-tap`, GitLab artifacts with GitHub discoverability pages

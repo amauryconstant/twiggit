@@ -8,8 +8,8 @@ release_lib_validate_environment() {
     return 1
   fi
 
-  if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
-    echo "Error: Working directory has uncommitted changes"
+  if [ -n "$(git status --porcelain | grep -v 'CHANGELOG.md')" ]; then
+    echo "Error: Working directory has uncommitted changes (excluding CHANGELOG.md)"
     return 1
   fi
 
@@ -58,6 +58,10 @@ release_lib_validate_goreleaser() {
 release_lib_validate_commits_since_tag() {
   local latest_tag=$1
 
+  if [ -z "$latest_tag" ]; then
+    return 0
+  fi
+
   if [ -n "$(git log --oneline "$latest_tag"..HEAD 2>/dev/null)" ]; then
     return 0
   else
@@ -74,8 +78,7 @@ release_lib_validate_tag_format() {
   local tag=$1
 
   if [ -z "$tag" ]; then
-    echo "Error: No tags found. Create initial tag with: git tag v0.1.0"
-    return 1
+    return 0
   fi
 
   if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -102,8 +105,29 @@ release_lib_parse_version() {
 
 release_lib_bump_version() {
   local bump_type=$1
+  local tag=$2
+
+  if [ -z "$tag" ]; then
+    case $bump_type in
+      patch)
+        echo "0.0.1"
+        ;;
+      minor)
+        echo "0.1.0"
+        ;;
+      major)
+        echo "1.0.0"
+        ;;
+      *)
+        echo "Error: Invalid bump type '$bump_type'"
+        return 1
+        ;;
+    esac
+    return 0
+  fi
+
   local major minor patch
-  read -r major minor patch <<< "$(release_lib_parse_version "$2")"
+  read -r major minor patch <<< "$(release_lib_parse_version "$tag")"
 
   case $bump_type in
     patch)
@@ -187,7 +211,7 @@ release_lib_check() {
 
   echo "[1/4] Validating environment..."
   release_lib_validate_environment
-  echo "✅ Environment OK (git repo, main branch, clean working directory)"
+  echo "✅ Environment OK (git repo, main branch, clean working directory except CHANGELOG.md)"
   echo ""
 
   echo "[2/4] Validating CHANGELOG.md..."
@@ -208,7 +232,11 @@ release_lib_check() {
   NEW_TAG="v${NEW_VERSION}"
 
   echo "[4/4] Version bump calculation..."
-  echo "✅ Current tag: $LATEST_TAG"
+  if [ -z "$LATEST_TAG" ]; then
+    echo "ℹ️  No existing tags — treating this as the initial release"
+  else
+    echo "✅ Current tag: $LATEST_TAG"
+  fi
   echo "✅ New tag would be: $NEW_TAG"
   echo ""
 

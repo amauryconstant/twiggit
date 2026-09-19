@@ -64,7 +64,7 @@ context: |
 
   Development workflow:
   - Use mise run <task> for all operations
-  - Run mise run check before committing
+  - Run mise run verify before committing
   - Pre-commit hooks: whitespace, YAML/TOML validation, merge conflict detection
 
   Spec organization (project-specific):
@@ -153,6 +153,6 @@ rules:
     - Tasks are small, clear, and independently verifiable
     - Tests written AFTER implementation to anchor code to specs
     - Include specific file paths and function/method names
-    - Add verification steps: mise run check, mise run lint:fix, mise run test
+    - Add verification steps: mise run verify, mise run lint:fix, mise run test
     - Mark completed items with [x]
     - Tasks ordered logically with dependencies clear

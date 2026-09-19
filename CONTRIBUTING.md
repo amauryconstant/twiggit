@@ -42,7 +42,7 @@ Thank you for your interest in contributing to Twiggit! This guide will help you
 
 4. **Verify your setup:**
    ```bash
-   mise run check
+   mise run verify
    ```
 
 ## Project Structure
@@ -141,7 +141,7 @@ pre-commit run --all-files
 
 2. **Make your changes and test:**
    ```bash
-   mise run check    # Run all validation
+   mise run verify    # Run all validation
    ```
 
 3. **Commit your changes:**

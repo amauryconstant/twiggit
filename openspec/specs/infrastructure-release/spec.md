@@ -69,13 +69,18 @@ install.
 ### Requirement: Release validation hooks
 
 Two `mise` tasks SHALL gate releases:
-`mise run release:validate` (clean-tree check) and
-`mise run release:dry-run` (test GoReleaser config without publishing).
+`mise run release:check` (full release prerequisites: environment,
+clean tree, CHANGELOG, GoReleaser config, version bump calculation)
+and `mise run release:dry-run` (test GoReleaser config without publishing).
 
-#### Scenario: Validate before tag
+#### Scenario: Check before tag
 
-- **WHEN** developer runs `mise run release:validate`
-- **THEN** task SHALL fail if the working tree is dirty
+- **WHEN** developer runs `mise run release:check`
+- **THEN** task SHALL run environment, CHANGELOG, GoReleaser, and
+  version bump validations
+- **AND** SHALL fail if the working tree is dirty (CHANGELOG.md excluded)
+- **AND** SHALL fail if not on `main` branch
+- **AND** SHALL preview the tag that would be created
 
 #### Scenario: Dry run before publish
 
@@ -86,7 +91,7 @@ Two `mise` tasks SHALL gate releases:
 ### Requirement: Contributor onboarding
 
 `CONTRIBUTING.md` SHALL cover: `mise install` for toolchain setup,
-`pre-commit install` for hooks, `mise run check` for the full
+`pre-commit install` for hooks, `mise run verify` for the full
 validation suite, and the project's commit conventions.
 
 #### Scenario: New contributor setup
@@ -94,7 +99,7 @@ validation suite, and the project's commit conventions.
 - **WHEN** a new contributor reads `CONTRIBUTING.md`
 - **THEN** they SHALL find: toolchain install via `mise install`,
   pre-commit hook install via `pre-commit install`, and the
-  `mise run check` validation command
+  `mise run verify` validation command
 
 ### Requirement: Test coverage policy
 
