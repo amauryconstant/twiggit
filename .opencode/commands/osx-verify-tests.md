@@ -1,152 +1,68 @@
 ---
-description: Review test coverage for OpenSpec changes to ensure spec requirements have tests
+name: osx-verify-tests
+description: Surface test coverage gaps and orphaned tests for OpenSpec changes. Use after implementation, between /osc-apply-change and /osc-verify-change, to confirm spec scenarios have tests.
 license: MIT
+compatibility: Requires openspec CLI.
+allowed-tools: Bash(openspec:*)
+metadata:
+  author: openspec-extended
+  audience: ad-hoc /osx-verify-tests invocation; PHASE1 end-of-iteration check
+  workflow: post-implementation — between apply and verify
 ---
 
-Review test coverage for OpenSpec changes, ensuring spec requirements have corresponding tests.
+# osx-verify-tests
 
-**IMPORTANT**: This is an AI-guided analysis workflow. It does not use any CLI flags.
+Surface test coverage gaps and orphaned tests for OpenSpec changes.
 
----
+> **IMPORTANT**: This is an AI-guided analysis workflow. It does not use CLI flags.
 
-## Input
+> **Store selection** — see `.opencode/skills/references/store-selection.md`.
 
-Optionally specify `[change-name]` after `/osx-verify-tests`. If omitted, the AI will infer from context or prompt for selection.
+**Input**: Optionally specify `[<change-name>]` after `/osx-verify-tests` (e.g., `/osx-verify-tests add-auth`). `$1` is the change name. If omitted, check if it can be inferred from conversation context; auto-select if only one active change exists; otherwise run `openspec list --json` and prompt via `AskUserQuestion`. When the change is store-backed, carry `--store <id>` on every `openspec …` command.
 
----
+**Invocation matrix**:
 
-## Steps
-
-1. **Select the change**
-
-   If name provided: use it. Otherwise:
-   - Infer from conversation context
-   - Auto-select if only one active change
-   - If ambiguous: run `openspec list --json` and use **AskUserQuestion** to prompt
-
-   Announce: "Reviewing tests for change: <name>" and how to override.
-
-2. **Get project context**
-
-   Check for `openspec/config.yaml`:
-   ```bash
-   cat openspec/config.yaml
-   ```
-   
-   Extract if present:
-   - Testing framework conventions
-   - Test directory patterns
-   - Project-specific rules
-
-   If no config: use sensible defaults based on project structure.
-
-3. **Read specs for the change**
-
-   Find and read spec files:
-   ```bash
-   ls openspec/changes/<name>/specs/
-   ```
-   
-   Parse each spec for:
-   - Requirement names (`### Requirement: ...`)
-   - Scenario names (`#### Scenario: ...`)
-   - Scenario content (GIVEN/WHEN/THEN/AND clauses)
-
-4. **Discover tests**
-
-   Use Glob tool with language-appropriate patterns:
-
-   | Language | Patterns |
-   |----------|----------|
-   | Go | `**/*_test.go` |
-   | Python | `**/test_*.py`, `**/*_test.py` |
-   | JavaScript/TS | `**/*.test.{js,ts,jsx,tsx}` |
-   | Java | `**/*Test.java` |
-   | Ruby | `**/*_spec.rb` |
-
-   Auto-detect language from project if not specified.
-
-5. **Extract semantics from specs and tests**
-
-   **From specs** (GIVEN/WHEN/THEN/AND):
-   - Actions: verbs - submits, validates, returns
-   - Entities: nouns - token, credentials, user
-   - Conditions: valid, empty, null, invalid
-   - Outcomes: SHALL have, must return, succeeds
-
-   **From tests** (language-agnostic):
-   - Test function names
-   - Assertion patterns
-   - Setup/teardown context
-
-6. **Match scenarios to tests**
-
-   Semantic similarity scoring:
-
-   | Score | Description |
-   |-------|-------------|
-   | 100% | Exact name match |
-   | 85-95% | Strong semantic match |
-   | 60-84% | Partial match |
-   | 30-59% | Weak keyword overlap |
-   | 0% | No match |
-
-7. **Analyze gaps**
-
-   Identify:
-   - **Untested scenarios**: No matching tests found
-   - **Partially covered**: Happy path only, edge cases missing
-   - **Orphaned tests**: Tests not matching any scenario
-
-8. **Generate report**
-
-   Ask user for confirmation using **AskUserQuestion** before saving.
-
-   Default output: `openspec/changes/<name>/test-compliance-report.md`
+| Invocation | Effect |
+| --- | --- |
+| `/osx-verify-tests <change-name>` | Analyse test coverage for the change |
+| `/osx-verify-tests` | Infer from context or prompt |
 
 ---
 
-## Output
+**Steps**
 
-```
-## Test Compliance Report: <change-name>
+1. **Select the change** — If a name is provided (as `$1`), use it. Otherwise:
+   - Infer from conversation context if the user mentioned a change
+   - Auto-select if only one active change exists
+   - If ambiguous, run `openspec list --json` and ask the user to select one
 
-### Summary
-- Total requirements: 12
-- Requirements with tests: 9
-- Requirements without tests: 3
-- Overall coverage: 75%
+   Always announce: "Analysing test compliance for: <change-name>" and how to override (e.g., `/osx-verify-tests <other>`).
 
-### Coverage Details
-
-| Requirement | Scenario | Coverage | Tests | Notes |
-|-------------|----------|----------|-------|-------|
-| User Auth | Valid credentials | Partial | TestLoadDocument... | No credential test |
-
-### Gaps Analysis
-
-| Gap Type | Count |
-|----------|-------|
-| Untested scenarios | 3 |
-| Partially covered | 2 |
-| Orphaned tests | 5 |
-
-### Recommendations
-- Add test `TestValidCredentials()` to cover credential validation
-- Document test `TestLoadDocumentIntegration()` as integration utility
-```
+2. **Load the skill body** — read `.opencode/skills/osx-review-test-compliance/SKILL.md` and follow its `**Steps**` section. This command wraps that skill; do not duplicate steps here.
 
 ---
 
-## Guardrails
+**Output**
 
-- Gap-focused: Report what's missing, not just percentages
-- Explain context: Provide "why no match" explanations
-- Project-aware: Use config.yaml for patterns if available
-- Actionable: Suggest specific test additions
-- Reality check: Acknowledge unit tests != scenario tests
-- Confidence transparency: Show scores and explain matching
+Default output path: `openspec/changes/<name>/test-compliance-report.md`. The wrapped skill renders the coverage-by-requirement table, gaps analysis, and recommendations per its `**Output**` section.
 
 ---
 
-See `.opencode/skills/osx-review-test-compliance/SKILL.md` for detailed semantic matching and gap analysis methodology.
+**Guardrails**
+
+- **Gap-focused.** Report what's missing, not just percentages.
+- **Explain context.** Provide "why no match" explanations.
+- **Project-aware.** Use `openspec/config.yaml` for test patterns if available.
+- **Actionable.** Suggest specific test additions.
+- **Reality check.** Acknowledge unit tests ≠ scenario tests.
+- **Confidence transparency.** Show scores and explain matching.
+
+---
+
+## Tips
+
+- Run after `/osc-apply-change` and before `/osc-verify-change` — the verify command expects compliance gaps already addressed.
+- For languages not in the skill's discovery table (Rust, Kotlin, Swift), override via `openspec/config.yaml` `context` rather than inline regex hunting.
+- Re-run after fixes to confirm previously-missing scenarios now have tests; the report does not store incremental state.
+
+See `.opencode/skills/osx-review-test-compliance/SKILL.md` for the full contract, semantic matching methodology, and gap analysis.

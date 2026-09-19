@@ -1,262 +1,202 @@
 ---
 name: osx-review-artifacts
-description: Review OpenSpec artifacts for feasibility, correctness, completeness, and implementation-readiness. Use BEFORE implementation to validate the plan is sound, or during artifact creation to check quality. Part of pre-implementation workflow: review-artifacts → modify-artifacts → apply.
+description: Audit artifacts against schema + dependency graph before implementation. Use between artifact creation (/osc-continue-change, /osc-propose, /osc-ff-change) and /osc-apply-change. Emits a routing report only; never edits.
 license: MIT
 compatibility: Requires openspec CLI.
+allowed-tools: Bash(openspec:*)
+metadata:
+  author: openspec-extended
+  audience: agents running pre-implementation artifact review (PHASE0, ad-hoc /osx-review)
+  workflow: pre-implementation — between artifact creation and /osc-apply-change
 ---
 
-Review OpenSpec artifacts for feasibility, correctness, completeness, and implementation-readiness.
+# osx-review-artifacts
 
-**IMPORTANT: This skill is for reviewing BEFORE implementation begins.** Do not use after apply-change. For post-implementation verification, use `osc-verify-change` (originally `openspec-verify-change`) instead.
+Read-only, schema-driven audit of the planning artifacts in a change. Emits a routing report — never edits artifacts. Reading is allowed on every concrete file listed in `artifactPaths.<id>.existingOutputPaths`.
 
----
+**Store selection:** If the user names a store (a store is a standalone OpenSpec repo registered on this machine) or the work lives in one, run `openspec store list --json` to discover registered store ids, then pass `--store <id>` on the commands that read or write specs and changes (`new change`, `status`, `instructions`, `list`, `show`, `validate`, `archive`, `doctor`, `context`, `schemas`, `view`). Once selected, treat `--store <id>` as sticky for the rest of the workflow. Without a store, commands act on the nearest local `openspec/` root. Full flag matrix in `references/store-selection.md`.
 
-## Input
+> **Schema-agnostic contract** — see `references/schema-agnostic-contract.md`.
 
-Optionally specify a change name. If omitted, the skill will infer from context or prompt for selection.
+Sits in the pre-implementation workflow between artifact creation (`/osc-continue-change`, `/osc-propose`, `/osc-ff-change`) and implementation (`/osc-apply-change`). Use it standalone via `/osx-review <change>` or as part of PHASE0.
 
-**Arguments**: `[change-name] [artifact-type]`
-
-**Examples**:
-- `/osx-review add-auth` - Review all artifacts in "add-auth"
-- `/osx-review add-auth proposal` - Review only proposal.md
-- "Review the design" - Infer change from context
-
----
-
-## Workflow Context
-
-This skill is part of the **pre-implementation** review cycle:
-
-```
-[new-change] → [draft artifacts] → [review-artifacts] → [modify-artifacts] → [apply]
-                                    ↑_______________|
-                                       (iterate until ready)
-```
-
-**After apply**: Use `osc-verify-change` (originally `openspec-verify-change`) to confirm implementation matches specs.
-**After verify passes**: Use `osc-archive-change` (originally `openspec-archive-change`) to finalize.
+**Input**: Optionally specify `[<change-name>]` as `$1` (e.g., `/osx-review add-auth`). PHASE0 dispatches the change name automatically. For ad-hoc invocations: if omitted, check if it can be inferred from conversation context; auto-select if only one active change exists; otherwise run `openspec list --json` and prompt via `AskUserQuestion`. Mark the most-recently modified active change as `(Recommended)`. When the change is store-backed, carry `--store <id>` on every `openspec …` command.
 
 ---
 
-## Steps
+**Steps**
 
-1. **Select the change**
-
-   If a name is provided, use it. Otherwise:
-   - Infer from conversation context
+1. **Select the change** — If a name is provided (as `$1`), use it. Otherwise:
+   - Infer from conversation context if the user mentioned a change
    - Auto-select if only one active change exists
-   - If ambiguous: run `openspec list --json` and use the **AskUserQuestion tool** to let the user select
+   - If ambiguous, run `openspec list --json` to get available changes and ask the user to select one with `AskUserQuestion`. Mark the most-recently modified active change as `(Recommended)`.
 
-   Always announce: "Reviewing change: <name>"
+   Always announce: "Using change: <change-name>" and how to override (e.g., `/osx-review <other>`).
 
-2. **Check change status**
+2. **Load schema state**
 
    ```bash
-   openspec status --change "<name>" --json
+   openspec status --change "<name>" [--store "<id>"] --json
    ```
 
-   Parse the JSON to understand:
-   - `schemaName`: The workflow being used
-   - `artifacts`: Array of artifacts with their status
+   Capture:
 
-3. **Determine review scope**
+   - `schemaName` — the workflow schema id (e.g. `"spec-driven"`).
+   - `planningHome`, `changeRoot` — path context (do not assume repo-local paths).
+   - `artifactPaths.<id>.{outputPath, resolvedOutputPath, existingOutputPaths}`.
+   - `artifacts[]` — array of `{id, status, missingDeps?, requires?}` with status in `{done, ready, blocked}`.
+   - `isComplete`, `applyRequires`, `nextSteps`, `actionContext.allowedEditRoots`.
 
-   If an artifact type is specified, review only that artifact.
-   Otherwise, review all artifacts in the change.
+   > **v1.7.0 contract**: each entry in `artifacts[]` carries a `requires` array of the artifact ids it directly depends on. This is the preferred input for Step 4's dependency graph. Fall back to `instructions --json` `dependencies`/`unlocks` only when `requires` is absent.
 
-4. **Review each artifact**
+   For each artifact with `status == "done"` and non-empty `existingOutputPaths`, queue it for the per-artifact audit (Step 3). Skip `ready` and `blocked` — those are frontier concerns, reported in Step 7.
 
-   For each artifact, check:
+   If `isComplete` is already `true`, the schema is satisfied; the cross-artifact audit (Step 4) is still worth running.
 
-   **Format Validation**:
-   - All required sections present
-   - Correct header levels (especially scenario headers at `####`)
-   - Proper checkbox format in tasks (`- [ ]` / `- [x]`)
+   a. **Build spec inventory (v1.13.0+, additive)**
 
-   **Content Quality**:
-   - Specificity over vagueness
-   - Clear, actionable language
-   - Proper use of SHALL/MUST in specs
+   ```bash
+   openspec list --specs [--store "<id>"] --json
+   # for each spec id in the response:
+   openspec show "<spec-id>" --type spec --json --no-scenarios [--store "<id>"]
+   ```
 
-   **Implementation Readiness**:
-   - Dependencies are available and compatible
-   - Scope is achievable
-   - Tasks are specific enough to know when done
+   Capture:
 
-5. **Check cross-artifact consistency**
+   - The full spec inventory as `{spec_id -> {path, purpose, requirements_count}}`.
+   - The filtered read for each spec keeps the bulk read small enough to enumerate on every capability (the `--no-scenarios` flag).
 
-   Run these alignment checks:
+   > **v1.13.0 contract**: `openspec list --specs` is the first-class spec-inventory command (parallel to `openspec list` for changes). The filtered read `openspec show <id> --type spec --json --no-scenarios` is what generated guidance uses. PHASE0 spec-aware review builds the inventory here and consumes it in Step 4's "Capability-already-exists" check.
 
-   **proposal → specs**:
-   - New Capabilities in proposal = specs/ directory names
-   - Modified Capabilities = existing spec names in openspec/specs/
-   - Consistent kebab-case naming
+   If the inventory can't be built (older core, missing `--specs` flag, CLI failure), skip Step 2b and the new Step 4 check — backwards-compatible with v1.11.0 cores. Do not raise.
 
-    **specs → design**:
-    - All ADDED/MODIFIED requirements addressed in design
-    - REMOVED requirements with migration notes have migration plan
+3. **Per-artifact compliance audit**
 
-   **design → tasks**:
-   - Decisions in design.md have corresponding tasks
-   - Risks in design.md have mitigation tasks
-   - Non-goals NOT in tasks.md
+   For each queued artifact, run:
 
-   **proposal → tasks**:
-   - What Changes items covered by task sections
-   - Impact items considered
+   ```bash
+   openspec instructions "<artifact-id>" --change "<name>" [--store "<id>"] --json
+   ```
 
-6. **Prioritize findings**
+   Read each concrete file in `existingOutputPaths`. Validate against:
 
-   Classify issues by severity:
-   - **Critical**: Blocks implementation, must fix before apply
-   - **Warning**: Should fix, may cause issues during implementation
-   - **Suggestion**: Nice to have, non-blocking improvement
+   - **`template`** — structural conformance: required sections, header levels, required elements per the schema body.
+   - **`instruction`** — schema-defined prose guidance. Sets expectations, not copy-source.
+   - **`rules`** — project-supplied overrides from `openspec/config.yaml`. Surface as additional checks; never copy into artifact content.
+   - **`context`** — also a constraint; never copy into artifact content.
 
-7. **Generate review report**
+   Report each violation with `file_path:line` (approximate line is fine) and a concrete fix suggestion. Categorize each finding as one of:
 
-   Present findings with actionable feedback including line numbers and specific fixes.
+   - **Critical** — the artifact is invalid (missing required section, broken scenario format, content contradicts a hard rule).
+   - **Warning** — the artifact has a fixable defect (wrong header level, missing optional-but-recommended element).
+   - **Suggestion** — a stylistic or clarity improvement.
 
----
+   Use the rule adopted from `openspec-verify-change`: **when uncertain, prefer `Suggestion` over `Warning`, `Warning` over `Critical`**. Implementation-readiness concerns (Step 5) are never `Critical`.
 
-## Artifact Review Criteria
+   If the in-tree `spec-driven` schema's `template` field does not encode a format rule we used to hardcode (H4 scenario headers, `#### Scenario:` shape, etc.), file an upstream issue against the upstream OpenSpec project rather than re-adding a local rubric.
 
-### proposal.md
+4. **Cross-artifact consistency report**
 
-| Section | Required | Common Issues |
-|---------|----------|---------------|
-| ## Why | Yes | Missing entirely, too vague |
-| ## What Changes | Yes | "Improve X" without specifics |
-| ## Capabilities | Yes | Inconsistent naming vs specs |
-| ## Impact | Recommended | Missing migration considerations |
+   Build a graph from each artifact's `requires` array (v1.7.0+, captured in Step 2 from `openspec status --json`). When a `requires` value is missing, fall back to that artifact's `dependencies` + `unlocks` from `openspec instructions --json`. Skip edges whose source artifact has no `existingOutputPaths`.
 
-**Good example**: "Add rate limiting to API endpoints to prevent abuse"
-**Bad example**: "Improve API"
+   For each existing edge **A → B** (A depends on B, both with concrete files):
 
-### specs/
+   - **Entity coherence** — entities introduced in B that A consumes must be present in A; constraints declared in B must be honored by A; no orphan references.
+   - **Severity** — coherence-level findings follow the same calibration rule.
 
-| Element | Format | Common Issues |
-|---------|--------|---------------|
-| Section header | `## ADDED` / `## MODIFIED` / `## REMOVED` | Wrong section names |
-| Requirement | `### Requirement: <name>` | Missing colon |
-| Scenario | `#### Scenario: <name>` | Using `###` instead of `####` |
-| Keywords | SHALL, MUST for mandatory | Using "should" ambiguously |
+   Do **not** hardcode any proposal↔specs↔design↔tasks pairs. The `requires` (or `dependencies` / `unlocks`) graph is fully schema-derived.
 
-**Scenario format**:
-```markdown
-#### Scenario: Valid credentials
-- **GIVEN** a user with valid credentials
-- **WHEN** user submits login form
-- **THEN** a JWT token is returned
-```
+   If an artifact in the edge target has no concrete files (status `ready` or `blocked`), it belongs to Step 7 routing, not here.
 
-### design.md
+   a. **Capability-already-exists (v1.13.0+, additive)**
 
-| Section | Required | Common Issues |
-|---------|----------|---------------|
-| ## Context | Yes | Missing existing system context |
-| ## Decisions | Yes | No rationale for decisions |
-| Alternatives | Under `## Decisions` section | Not considering alternatives |
-| ## Trade-offs | Recommended | Missing or superficial |
+   For each delta `ADDED Requirements` capability path:
 
-**Decision format**:
-```markdown
-### Decision 1: Use JWT for authentication
+   ```bash
+   # Walk the inventory built in Step 2b:
+   for spec_id in spec_inventory.keys(): ...
+   # If the ADDED capability path is already in the inventory, flag it.
+   ```
 
-**Rationale**: Stateless, widely supported, works with microservices.
+   If the spec inventory (Step 2b) has an existing capability at the same path as the delta's `ADDED Requirements` block, emit a `Warning` finding naming the existing spec id and pointing to `/osc-update-change <name>` — the right way to MODIFY/extend an existing capability is `update`, not a fresh `ADDED Requirements` block in a new change. The `Suggestion` ↔ `Warning` ↔ `Critical` calibration rule applies (prefer `Suggestion`).
 
-**Alternatives considered**:
-- Session cookies: Requires shared state
-- API keys: Less secure for user auth
-```
+   Skip Step 4b when the spec inventory is unavailable (older core, CLI failure) — backwards-compatible with v1.11.0 cores. Do not raise.
 
-### tasks.md
+5. **Implementation-readiness** — Stay under `Suggestion` severity. Implementation readiness is human judgment: feasibility, scope, dependency availability, ambiguous requirements. Never `Critical`.
 
-| Element | Format | Common Issues |
-|---------|--------|---------------|
-| Section | `## 1. <name>` | Missing numbers, wrong format |
-| Task | `- [ ] Task description` | Using `*` instead of `-`, missing brackets |
-| Completion | `- [x] Done task` | Wrong checkbox format |
+6. **Classify findings** — Apply the verify calibration rule once more across the whole report. Severity buckets produce distinct routing paths:
+   - `Critical` / `Warning` → blocked; routing required before apply.
+   - `Suggestion` → optional; user may proceed.
 
-**Correct format**:
-```markdown
-## 1. Backend Changes
+7. **Smart routing recommendation** — Produce one routing line per finding category. Pick the single best editor for the aggregate finding set. The route shape depends on whether the audit was dispatched by the orchestrator (`OSX_AUTONOMOUS=1` — the engine handles `/osc-update-change` itself and re-enters PHASE0 to verify) or invoked ad-hoc by a user (`OSX_AUTONOMOUS` unset — the user must run the slash command themselves):
 
-- [ ] Add rate limiting middleware
-- [ ] Update API documentation
-- [ ] Add configuration for rate limits
+   | Finding pattern | In-orchestration route | Ad-hoc route |
+   |---|---|---|
+   | Findings on existing artifacts (single- or multi-artifact) | `auto-fix:osc-update-change` (engine handles) | `/osc-update-change <name>` (user runs) |
+   | Missing artifact (referenced but not created) | `/osc-continue-change <name>` (halt + surface) | `/osc-continue-change <name>` |
+   | All clean, pre-impl (PHASE0) | `advance-to PHASE1` (no slash needed) | `/osc-apply-change <name>` |
+   | Intent-level change detected | `/osc-new-change <name>` (halt + surface) | `/osc-new-change <name>` (per "Update vs. Start Fresh" heuristic) |
+   | Ambiguous finding needing thinking time | `/osc-explore <name>` (halt + surface) | `/osc-explore <name>` |
 
-## 2. Frontend Changes
+   Exactly one routing line, matching this matrix.
 
-- [ ] Add rate limit error handling
-- [ ] Show retry countdown UI
-```
-
-**Note**: AGENTS.md documentation updates should NOT be tracked in tasks.md. They are handled by a separate documentation maintenance workflow.
+   The review skill never invokes the routed command itself. It only emits the route so the engine (in `OSX_AUTONOMOUS=1` context) or the user (ad-hoc) can act.
 
 ---
 
-## Output
+**Output**
 
-**On Issues Found**:
+**Issues found**:
 
-```markdown
+```
 ## Artifact Review: <change-name>
 
-### ✅ Format: Valid
-- All required sections present
-- Header format correct
+**Schema**: <schemaName>
+**Artifacts audited**: <count>
 
-### ⚠️ Issues Found
+### <Severity> findings
+- **<artifact-id>:<file:line>**: <issue>
+  - Fix: <concrete fix>
+  - Route: <auto-fix:osc-update-change | /osc-update-change|/osc-continue-change|/osc-apply-change|/osc-new-change|/osc-explore> <name>
 
-#### Critical (Must Fix Before Implementation)
-- **proposal.md:12**: Missing "Why" section context
-  - Fix: Add 2-3 sentences explaining the business need
+### Routing recommendation
+<single sentence picking ONE of the routes from §Step 7; "auto-fix:..." prefix marks in-orchestration routes the engine handles itself>
 
-- **specs/auth.md:45**: Scenario uses wrong header level (### instead of ####)
-  - Fix: Change to `#### Scenario: Valid credentials`
-
-#### Warnings (Should Fix)
-- **design.md:23**: Decision lacks rationale
-  - Better: Add "Rationale:" explaining why this approach was chosen
-
-#### Suggestions (Nice to Have)
-- **tasks.md:8**: Consider splitting "Implement auth" into smaller tasks
-  - Consider: "Add login endpoint", "Add token validation", "Add refresh flow"
-
-### Consistency Check
-- ❌ proposal Capabilities don't match specs/ structure
-  - Proposal mentions "user-management" but specs/ has "users"
-
-**Next Steps:**
-- Fix critical issues: `/osx-modify <change-name>`
-- Re-review after fixes: `/osx-review <change-name>`
+### Next steps
+- In `OSX_AUTONOMOUS=1` (PHASE0 dispatched): the engine clears routes_pending, invokes the routed slash command, then re-enters PHASE0. No user action.
+- Otherwise (ad-hoc `/osx-review <change>`): address findings via the routed command above, then re-run `/osx-review <name>`.
 ```
 
-**On All Clear**:
+**All checks passed**:
 
-```markdown
+```
 ## Artifact Review: <change-name>
 
-### ✅ All Checks Passed
+### All checks passed
 
-**Format**: All artifacts properly structured
-**Content**: Clear, specific, actionable
-**Consistency**: Cross-artifact alignment verified
-**Readiness**: Ready for implementation
+**Schema compliance**: All artifacts conform to their templates and rules.
+**Cross-artifact consistency**: No drift detected across the dependency graph.
+**Implementation readiness**: <brief judgment>
 
-**Next Steps:**
-- Start implementation: `/osx-apply <change-name>`
+### Next steps
+- In `OSX_AUTONOMOUS=1` (PHASE0 dispatched): engine advances to PHASE1.
+- Otherwise (ad-hoc `/osx-review <change>`): start (or resume) implementation with `/osc-apply-change <name>`.
 ```
 
 ---
 
-## Guardrails
+**Guardrails**
 
-- Review BEFORE implementation, not after
-- Be specific: include file names, line numbers, exact fixes
-- Prioritize by severity: critical → warning → suggestion
-- Check cross-artifact consistency, not just individual files
-- Don't approve changes with critical issues
-- Suggest `/osx-modify` for fixes, don't fix yourself during review
-- For post-implementation verification, use osc-verify-change instead
+- **Read-only.** Emits findings; never edits artifacts.
+- **No code edits.** Surface issues, route the user to `/osc-apply-change`.
+- **No new artifacts.** Missing artifacts are reported; their creation is `/osc-continue-change`'s job.
+- **No hardcoded artifact names.** Schema is the source of truth.
+- **Mode detection via `OSX_AUTONOMOUS` env var.** When set (orchestrator-dispatched PHASE0), the routing table's "in-orchestration" column applies — `auto-fix:osc-update-change` is emitted and the engine reconciles. When unset (ad-hoc `/osx-review <change>`), the "ad-hoc" column applies — slash-command forms are emitted for the user.
+
+---
+
+## Failure modes
+
+- **`openspec status` returns no change** — confirm the change name (and `--store` if applicable); offer `openspec list --json` to help the user.
+- **`openspec instructions` errors mid-audit** — report which artifact failed and stop; do not invent instructions from the schema body.
+- **`isComplete` is false and no `ready` artifact exists** — unusual state; surface as `Suggestion` and ask the user whether they want to archive or start a new change.

@@ -1,119 +1,61 @@
 ---
-description: Review OpenSpec artifacts for quality, completeness, and consistency
+name: osx-review
+description: Schema-driven pre-implementation artifact audit (read-only) plus routing to the right editor. Use when artifacts exist and you want a routing report before implementation.
 license: MIT
+compatibility: Requires openspec CLI.
+allowed-tools: Bash(openspec:*)
+metadata:
+  author: openspec-extended
+  audience: ad-hoc pre-implementation /osx-review invocation
+  workflow: pre-implementation — between artifact creation and apply
 ---
 
-## Tools Available
+# osx-review
 
-| Tool | Type | Usage |
-|------|------|-------|
-| `openspec` | Upstream CLI | `openspec <command> [options]` - npm package |
-| `osx ctx` | Local script | `.opencode/scripts/lib/osx ctx get <change>` - load change context |
+Schema-driven, **read-only** audit of planning artifacts in a change. Emits a routing report; never edits files. Editors (`osc-update-change` or `/osc-update-change`) are invoked separately, typically by the user.
 
-Review OpenSpec artifacts (proposal, design, tasks, specs) for quality and completeness.
+> **Store selection** — see `.opencode/skills/references/store-selection.md`.
 
----
+**Input**: Optionally specify `[<change-name>]` after `/osx-review` (e.g., `/osx-review add-auth`, `/osx-review`). `$1` is the change name. If the change name is omitted, check if it can be inferred from conversation context; auto-select if only one active change exists; otherwise run `openspec list --json` and prompt via `AskUserQuestion`. When the change is store-backed, carry `--store <id>` on every `openspec …` command.
 
-## Input
+**Invocation matrix**:
 
-Optionally specify `[change-name] [artifact-id]` after `/osx-review`. If omitted, the AI will infer from context or prompt for selection.
-
-**Patterns**:
-| Input | Behavior |
-|-------|----------|
-| `/osx-review add-auth proposal` | Review specific artifact in specific change |
-| `/osx-review add-auth` | Review entire change (all artifacts) |
+| Invocation | Effect |
+| --- | --- |
+| `/osx-review <change-name>` | Audit the entire change |
 | `/osx-review` | Infer from context or prompt |
 
 ---
 
-## Steps
+**Steps**
 
-1. **Select the change**
+1. **Select the change** — If a name is provided (as `$1`), use it. Otherwise:
+   - Infer from conversation context if the user mentioned a change
+   - Auto-select if only one active change exists
+   - If ambiguous, run `openspec list --json` and ask the user to select one
 
-   If name provided: use it. Otherwise:
-   - Infer from conversation context
-   - Auto-select if only one active change
-   - If ambiguous: run `openspec list --json` and use **AskUserQuestion** to prompt
+   Always announce: "Using change: <change-name>" and how to override (e.g., `/osx-review <other>`).
 
-   Announce: "Reviewing change: <name>" and how to override.
+2. **Load the skill body** — read `.opencode/skills/osx-review-artifacts/SKILL.md` and follow `**Steps**`. This command wraps that skill; do not duplicate rules here.
 
-2. **Check status to understand schema** (Optional) 
-    ```bash
-    .opencode/scripts/lib/osx ctx get "<name>"
-    ```
-    - Parse JSON for: state (phase, iteration), artifacts with existence info.
-    - Bypass if the call returns nothing or an error.
+3. **Load change context** when needed via `openspec-extended osx ctx get <change>` (per the skill's protocol).
 
-3. **Select artifact to review**
-
-   If artifact ID specified: review that one. Otherwise:
-   - Review all artifacts in schema order
-   - For each artifact, read and validate
-
-4. **Single artifact review**
-
-   For each artifact:
-   - Identify type (proposal/spec/design/tasks)
-   - Read artifact file
-   - Check required sections exist
-   - Validate format (headers, scenario levels, checkbox format)
-   - Review content quality (specificity, clarity)
-   - Report issues with line numbers
-
-5. **Cross-artifact consistency checks**
-
-   When reviewing entire change:
-   - proposal Capabilities match specs/ folder structure
-   - proposal What Changes covered by tasks.md
-   - design.md decisions referenced in tasks
-   - All proposal Capabilities have corresponding specs
-
-6. **Prioritize and report**
-
-   Categories:
-   - **Critical**: Must fix before archive
-   - **Warning**: Should fix
-   - **Suggestion**: Nice to have
+4. **Persist the routing report** once the skill completes its work.
 
 ---
 
-## Output
+**Guardrails**
 
-```
-## Artifact Review: [artifact-name.md]
-
-### Format: Valid
-- All required sections present
-- Header format correct
-
-### Issues Found
-
-#### Critical (Must Fix Before Archive)
-- **Line X**: [Description]
-  - Fix: [Specific action]
-
-#### Warnings (Should Fix)
-- **Line X**: [Description]
-  - Better: [Suggestion]
-
-#### Suggestions (Nice to Have)
-- **Line X**: [Description]
-  - Consider: [Alternative]
-
-### Consistency Check
-- [x]/[ ] [Cross-artifact validation result]
-```
+- **Read-only.** Never edit planning artifacts. The routed editor does the writing.
+- **No code edits.** Findings that imply code changes route to `/osc-apply-change`.
+- **No hardcoded artifact names.** Read ids and paths from `openspec status` and `openspec instructions` JSON.
 
 ---
 
-## Guardrails
+## Tips
 
-- Check schema compliance for format adherence
-- Prioritize issues with clear categories
-- Provide specific, actionable feedback with line numbers
-- For cross-artifact checks, explain dependencies clearly
+- Run after `openspec` reports `isPlanningComplete: true`; reviewing incomplete artifacts wastes the audit on missing files.
+- Re-run after fixes to confirm previously-flagged findings are now clean; the report does not store incremental state.
+- Apply the routed editor (`/osc-update-change` for the typical case) once the routing report chooses.
 
----
-
-See `.opencode/skills/osx-review-artifacts/SKILL.md` for detailed review criteria and common issues catalog.
+See `.opencode/skills/osx-review-artifacts/SKILL.md` for the full contract, output templates, and severity calibration.
