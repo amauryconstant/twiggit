@@ -4,6 +4,8 @@ targets:
     skills:
       mode: copy
 skills:
+  - name: golang-error-handling
+    source: /home/amaury/.local/share/skillshare/skills/golang-error-handling/
   - name: golang-cli-architecture
     source: /home/amaury/.local/share/skillshare/skills/golang-cli-architecture
   - name: golang-spf13-cobra
