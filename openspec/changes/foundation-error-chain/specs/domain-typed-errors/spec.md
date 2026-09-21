@@ -41,6 +41,28 @@ be `Err` (not `Cause`).
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
 
+### Requirement: NotFound detection
+
+Not-found detection SHALL be expressed as `errors.Is(err,
+domain.ErrXNotFound)` against the per-resource sentinel associated
+with each wrapper type (see the Error type taxonomy requirement). The
+substring-based `IsNotFound() bool` method on `GitRepositoryError`,
+`GitWorktreeError`, and `WorktreeServiceError` SHALL be removed. The
+four NotFound sentinels (`ErrGitRepoNotFound`, `ErrWorktreeNotFound`,
+`ErrProjectNotFound`, `ErrResolutionNotFound`) all map to the same
+exit code; per-resource distinction is exposed via the formatter's
+Actionable hints requirement, not via per-resource exit codes.
+
+#### Scenario: NotFound dispatch
+
+- **WHEN** the cmd-side error formatter sees an error whose
+  `errors.Is(err, domain.ErrWorktreeNotFound)` returns true (via
+  `errors.Is` walk through the chain)
+- **THEN** the system SHALL exit with code `ExitCodeError` (1) (per
+  the 3-code canonical exit-code mapping)
+- **AND** the formatter SHALL append the worktree-specific hint per
+  the `cli-error-formatting` Actionable hints requirement
+
 ### Requirement: Cause-chain support
 
 Every domain error that wraps another error SHALL implement `Unwrap()`
@@ -71,19 +93,17 @@ The canonical exit-code mapping SHALL be exactly:
 | Code | Constant | Trigger |
 |---|---|---|
 | 0 | `ExitCodeSuccess` | Clean exit |
-| 1 | `ExitCodeError` | Unclassified error or recovered panic |
-| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax/args) |
-| 3 | `ExitCodeConfig` | `ConfigError` |
-| 4 | `ExitCodeGit` | `GitRepositoryError`, `GitWorktreeError`, `GitCommandError` |
-| 5 | `ExitCodeValidation` | `ValidationError` |
-| 6 | `ExitCodeNotFound` | Any error matching a per-resource NotFound sentinel |
+| 1 | `ExitCodeError` | Unclassified error, runtime failure, or recovered panic |
+| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax/args) typed via `errors.As` against `*cobra.FlagError`, `cobra.ErrSubCommandRequired`, or `*pflag.Error{Code: pflag.ErrRequired}` |
 
-The cmd layer (`cli-error-formatting`) SHALL NOT redefine this table.
-`GetExitCodeForError` SHALL dispatch by `errors.Is` walk against the
-four NotFound sentinels first, then by typed `errors.As` walk, then to
-`ExitCodeError` (1). The dispatch algorithm and hint discriminator
-live in `cli-error-formatting`; this spec is the source of truth for
-the codes and triggers.
+The cmd layer (`cli-error-formatting`) SHALL NOT define additional
+exit-code constants. `GetExitCodeForError` SHALL dispatch first via
+`errors.As` against the typed usage-error sentinels above, returning
+`ExitCodeUsage`; otherwise returning `ExitCodeError` (1) for any
+non-nil error and `ExitCodeSuccess` (0) for nil. Per-resource
+discrimination happens at the formatter hint layer
+(`cli-error-formatting` Actionable hints requirement), not via
+per-resource exit codes.
 
 #### Scenario: Definition holds
 
@@ -153,7 +173,7 @@ substring matching against `Error()`.
 
 ### Requirement: Shell subtypes share a common base
 
-The domain layer SHALL define six shell error subtypes listed in the
+The domain layer SHALL define seven shell error subtypes listed in the
 Error type taxonomy requirement. Each subtype SHALL embed a private
 `shellErrorBase` value carrying `ShellType`, `Context`, and `Err`
 fields, SHALL implement `Unwrap() error` returning the `Err` field,

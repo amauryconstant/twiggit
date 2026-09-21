@@ -11,6 +11,15 @@ roughly thirty tests. These four artifacts — code, spec, doc, and mock —
 are mutually out of sync, and the failure mode (silent misclassification,
 false-pass tests, brittle error copy) is observable to end users.
 
+The proposed fix is anchored on `errors.Is` / `errors.As` walks against a
+deterministic sentinel catalog and a private `asType[T]` generic helper
+that replaces the IIFE pattern. As part of this alignment we also collapse
+the existing seven-code CLI exit-code table (0-6) to a three-code dispatch
+(0/1/2) per the `golang-cli-architecture` skill's exit-code discipline:
+per-resource NotFound categories remain distinguishable through the
+formatter's Actionable hints requirement, not through per-resource exit
+codes. Scripts and tests keyed on codes 3-6 break by design.
+
 ## What Changes
 
 - **`BREAKING`** Introduce `internal/domain/sentinels.go` with twelve sentinel
@@ -24,26 +33,36 @@ false-pass tests, brittle error copy) is observable to end users.
   types with an `Is(target error) bool` method that participates in
   `errors.Is` walks against the new sentinels. Delete the
   `strings.Contains` implementations.
-- **`BREAKING`** Rewrite `internal/domain/shell_errors.go` as six concrete
+- **`BREAKING`** Rewrite `internal/domain/shell_errors.go` as seven concrete
   subtypes (`ShellAlreadyInstalledError`, `ShellNotInstalledError`,
   `ShellInvalidTypeError`, `ShellInferenceError`, `ShellDetectionError`,
   `ShellWrapperError`, `ShellConfigError`) sharing a common base struct, each
-  implementing `Unwrap() error` returning `Cause error` and `Is(target error)
+  implementing `Unwrap() error` returning `Err error` and `Is(target error)
   bool` matching its sentinel. Drop the unused `ErrConfigFileNotWritable`
   constant and the `Code string` field.
 - **`BREAKING`** Rename `Cause error` to `Err error` on all thirteen domain
   error types to align with stdlib convention (e.g., `*os.PathError.Err`,
   `*net.OpError.Err`). Mechanical rename via gopls.
-- Replace substring-based `CategorizeError` in `cmd/error_handler.go` with a
-  sentinel dispatch: `errors.Is(err, Err*NotFound)` collapses to
-  `ExitCodeNotFound`; typed `errors.As` dispatches the remaining error
-  categories. Drop the `strings.Contains(errStr, "invalid")` fallback and
-  replace `IsCobraArgumentError`'s seven-substring list with cobra typed
-  errors (`*cobra.FlagError`, `cobra.ErrSubCommandRequired`,
-  `pflag.ErrorType*`).
+- **`BREAKING`** Reduce CLI exit-code dispatch from seven codes (0-6) to
+  three codes (0/1/2). `GetExitCodeForError` returns `ExitCodeUsage` (2)
+  for typed cobra usage errors, `ExitCodeError` (1) for any other non-nil
+  error, `ExitCodeSuccess` (0) for nil. Per-resource NotFound categories
+  remain distinguishable through the formatter's Actionable hints
+  requirement. Drop the `ExitCodeConfig`, `ExitCodeGit`,
+  `ExitCodeValidation`, `ExitCodeNotFound` constants and their dispatch
+  branches. Drop the substring fallback (`strings.Contains(errStr,
+  "invalid")`) in `CategorizeError`.
+- `BREAKING` Replace `IsCobraArgumentError`'s seven-substring list in
+  `cmd/error_handler.go` with typed cobra/pflag error checks
+  (`*cobra.FlagError`, `cobra.ErrSubCommandRequired`,
+  `*pflag.Error{Code: pflag.ErrRequired}`). Each `cmd/*.go` command
+  declares a `cobra.Args:` validator (`ExactArgs`, `MinimumNArgs`,
+  `MaximumNArgs`, or `MatchAll`) matching its actual arg shape so the
+  substring path is unreachable for syntactic arg-shape failures. Flag-value
+  errors (`pflag.ErrorType*`) continue to be detected via the typed walk.
 - Replace the IIFE `func() *T { ... _ = errors.As(...); return target }()`
   pattern in `cmd/error_formatter.go` with a private `asType[T error](err)
-  (T, bool)` generic helper, register formatters for the six shell subtypes,
+  (T, bool)` generic helper, register formatters for the seven shell subtypes,
   and add a hint table that returns resource-specific hints (e.g., `twiggit
   list --all` for `ErrProjectNotFound`).
 - Add `test/mocks/helpers.go` with a `variadicArgs(first interface{}, opts
@@ -53,6 +72,8 @@ false-pass tests, brittle error copy) is observable to end users.
 - Update `internal/service/AGENTS.md` and `cmd/AGENTS.md` to use the
   `errors.Is(err, domain.ErrX)` idiom and the `asType[T]` helper
   respectively; delete the previous examples that document the substring bug.
+  `cmd/AGENTS.md:58-69` and `AGENTS.md:233-237` drop the rows for exit
+  codes 3-6.
 - Drop the `💡` emoji from `ValidationError.Error()`. Add `func (e
   *ValidationError) Unwrap() error { return nil }` so the type satisfies the
   existing `domain-typed-errors` requirement that all domain errors
@@ -62,8 +83,10 @@ false-pass tests, brittle error copy) is observable to end users.
   stops ignoring the file on every CLI invocation). Delete the empty
   stranded `openspec/changes/spec-restructure-all-categories/` folder.
 - Bump version to **0.13.0** (hard break, no deprecation aliases). End-user
-  CLI surface is unchanged; the breaking surface is the public API of
-  `internal/domain/*Error` types and the mock package.
+  CLI surface changes: exit codes 3-6 collapse to 1; usage-error categories
+  remain at 2; per-resource distinction moves to the formatter hint layer.
+  The other breaking surface is the public API of `internal/domain/*Error`
+  types and the mock package.
 
 ## Capabilities
 
@@ -77,34 +100,21 @@ requirement surface.
 
 - `domain-typed-errors`: the `IsNotFound() bool` substring requirement is
   replaced with a sentinel-walk requirement; the `ShellError` constructor is
-  replaced with six concrete subtypes; the sentinel catalog becomes a
-  first-class requirement under the capability's `## Requirements` section.
+  replaced with seven concrete subtypes; the sentinel catalog becomes a
+  first-class requirement under the capability's `## Requirements` section;
+  the canonical exit-code mapping collapses to three codes (0/1/2).
 - `cli-error-formatting`: the dispatch algorithm in
-  `GetExitCodeForError` is reformulated around sentinel and typed-error
-  matches; a per-resource hint table is added; the IIFE formatter pattern
-  is replaced with the `asType[T]` helper and caller formatters now handle
-  nil safely.
-
-## Impact
-
-| Layer | Files | Lines |
-|---|---|---|
-| `internal/domain/` | `sentinels.go` (new), `errors.go`, `service_errors.go`, `shell_errors.go` | ~350 |
-| `internal/service/` | `shell_service.go` | ~15 |
-| `internal/application/` | unchanged | — |
-| `cmd/` | `error_handler.go`, `error_formatter.go`, `delete.go` | ~180 |
-| `test/mocks/` | `helpers.go` (new), `cmd_mocks.go` | ~25 |
-| Tests (after impl, per project rule) | `domain/errors_test.go`, `domain/service_errors_test.go`, `domain/shell_errors_test.go`, `cmd/error_handler_test.go`, `cmd/error_formatter_test.go` | rewritten |
-| Specs | `openspec/specs/domain-typed-errors/spec.md`, `openspec/specs/cli-error-formatting/spec.md` | rewritten via deltas |
-| AGENTS.md | `internal/service/AGENTS.md`, `cmd/AGENTS.md` | 2 sections |
-| Setup | `openspec/config.yaml` (1-line move), delete empty `spec-restructure-all-categories/` | — |
-
-| Aspect | Effect |
-|---|---|
-| End-user CLI | Unchanged (exit codes for the four NotFound categories still collapse to 6). |
-| Public API of `domain/*` types | Breaks: `IsNotFound()` removed on six types, `Cause` renamed to `Err`, `ShellError` split into six subtypes. |
-| Tests | Existing assertion-on-substring tests must be rewritten (drop `IsNotFound` cases, add sentinel-walk cases). |
-| Version | Bump 0.13.0 (hard break). |
+  `GetExitCodeForError` is reformulated around typed cobra usage errors
+  → `ExitCodeUsage` (2) and a default `ExitCodeError` (1); a per-resource
+  hint table is added; the IIFE formatter pattern is replaced with the
+  `asType[T]` helper and caller formatters now handle nil safely.
+- `cli-main-entry-point`: the "Specific exit code honored" scenario in
+  the Exit code propagation requirement references `ExitCodeValidation (5)`,
+  which is removed under the new 3-code dispatch. The scenario body is
+  updated to assert that the binary propagates the exit code returned by
+  `GetExitCodeForError`, which for `*domain.ValidationError` is now
+  `ExitCodeError` (1), and the requirement body clarifies that the entry
+  point does not override non-zero codes to 1.
 
 ## Non-goals
 
@@ -120,3 +130,29 @@ requirement surface.
 - Generalization of the IsNotFound string-equality check into a generic helper
   across the error taxonomy beyond what `Is(target)` on each concrete type
   already provides.
+- Granular exit codes (3-6). Brought into the change's scope as a Goal;
+  reverse-out of any prior change that reintroduced them.
+- Reverting the public API break via deprecation aliases. The rename and
+  `IsNotFound` removal land hard on the 0.13.0 bump per the project rule
+  (no deprecation aliases in releases).
+
+## Impact
+
+| Layer | Files | Lines |
+|---|---|---|
+| `internal/domain/` | `sentinels.go` (new), `errors.go`, `service_errors.go`, `shell_errors.go` | ~370 |
+| `internal/service/` | `shell_service.go` | ~15 |
+| `internal/application/` | unchanged | — |
+| `cmd/` | `error_handler.go`, `error_formatter.go`, `delete.go` + every `cmd/*.go` Args-validator addition | ~200 |
+| `test/mocks/` | `helpers.go` (new), `cmd_mocks.go` | ~25 |
+| Tests (after impl, per project rule) | `domain/errors_test.go`, `domain/service_errors_test.go`, `domain/shell_errors_test.go`, `cmd/error_handler_test.go`, `cmd/error_formatter_test.go`, `test/e2e/list_test.go` | rewritten |
+| Specs | `openspec/specs/domain-typed-errors/spec.md`, `openspec/specs/cli-error-formatting/spec.md`, `openspec/specs/cli-main-entry-point/spec.md` (delta to be created via `/osc-continue`) | rewritten via deltas |
+| AGENTS.md | `internal/service/AGENTS.md`, `cmd/AGENTS.md`, root `AGENTS.md` (troubleshooting table) | ~3 sections |
+| Setup | `openspec/config.yaml` (1-line move), delete empty `spec-restructure-all-categories/` | — |
+
+| Aspect | Effect |
+|---|---|
+| End-user CLI | Exit codes collapse from 0-6 to 0-2. Non-usage failures exit 1 (was 1, 3, 4, 5, or 6 depending on category). Usage errors exit 2 (unchanged). Per-resource NotFound distinction is preserved in the formatter's hint layer. Scripts and CI pipes keyed on `$? -eq 5` etc. break by design. |
+| Public API of `domain/*` types | Breaks: `IsNotFound()` removed on six types, `Cause` renamed to `Err`, `ShellError` split into seven subtypes, `ExitCodeConfig`/`ExitCodeGit`/`ExitCodeValidation`/`ExitCodeNotFound` constants removed. |
+| Tests | Existing assertion-on-substring tests must be rewritten (drop `IsNotFound` cases, add sentinel-walk cases; collapse per-exit-code assertions to the three-code table). |
+| Version | Bump 0.13.0 (hard break). |

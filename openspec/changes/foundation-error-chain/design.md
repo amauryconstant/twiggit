@@ -61,16 +61,23 @@ findings listed in `REVIEW.md`:
   one source of truth changing forces the others to update.
 - Land the fix in a way that proves itself per slice (vertical-slice
   order) before compounding to the rest of the taxonomy.
-- Keep the end-user CLI surface stable: exit-code 6 still means
-  "resource not found" regardless of which resource.
+- Keep the end-user CLI surface stable: non-usage failures still exit 1,
+  usage errors still exit 2, panic recovery still exits 1.
+- Reduce CLI exit-code dispatch from seven codes to three (0/1/2).
+  Per-resource NotFound distinctions move to sentinel-driven hint
+  discrimination in the formatter (`cli-error-formatting`'s Actionable
+  hints requirement). Aligns with the `golang-cli-architecture` skill's
+  exit-code discipline (sysexits-safe range; consumer-script reality).
 
 **Non-Goals:**
 
 - Layer inversion (`internal/service` ↛ `internal/infrastructure`),
   modernization sweep (`for i := range N`, `strings.CutPrefix`, etc.),
   and dead-config-field removal. Each is a separate follow-up change.
+- Granular exit codes (3-6). Brought into the change's scope as a Goal;
+  reverse-out of any prior change that reintroduced them.
 - A `ShellError` interface in the `domain` package. The package rule
-  permits only types and errors (`internal/domain/AGENTS.md`); six
+  permits only types and errors (`internal/domain/AGENTS.md`); seven
   concrete subtypes without a shared interface stays consistent with
   that rule and avoids polymorphic dispatch where none is needed.
 - Method `Is(target error)` returning `false` for any target other than
@@ -108,34 +115,33 @@ chain that satisfies both `errors.Is(err, ErrXNotFound)` and
   Rejected. Forces callers to choose a constructor before knowing which
   fields they have, and double the number of constructors per type.
 
-### 2. Per-resource NotFound sentinels, collapse to `ExitCodeNotFound`
+### 2. Per-resource NotFound sentinels drive formatter hint discrimination
 
 **Choice.** Four resource-specific sentinels
 (`ErrGitRepoNotFound`, `ErrWorktreeNotFound`, `ErrProjectNotFound`,
-`ErrResolutionNotFound`) all collapse to `ExitCodeNotFound` (6) at
-the cmd boundary. The `cmd/error_formatter.go` hint table discriminates
-between them via `switch errors.Is(err, <sentinel>) { ... }`, returning
-the resource-appropriate hint (e.g., `twiggit list --all` for
+`ErrResolutionNotFound`) all map to `ExitCodeError` (1) at the cmd
+boundary. The `cmd/error_formatter.go` hint table discriminates between
+them via `switch errors.Is(err, <sentinel>) { ... }`, returning the
+resource-appropriate hint (e.g., `twiggit list --all` for
 `ErrProjectNotFound`, `twiggit list` for `ErrWorktreeNotFound`).
 
-**Rationale.** Consumers that script against the CLI keep working
-without change. Operators get better hints without the CLI having to
-grow new exit codes (which would collide with sysexits conventions).
-The dispatch in `cmd/error_handler.go` is a single `switch` over four
-sentinels, not a four-way `if` chain.
+**Rationale.** Granular exit codes (3-6) were removed per the project's
+exit-code discipline. The four NotFound categories remain distinct for
+both programmatic matching (`errors.Is`) and user-facing hint
+discrimination, but they collapse to a single, single-bit
+success/failure signal at the OS level. Operators get better hints
+without growing the exit-code table past `golang-cli-architecture`'s
+3-code contract.
 
 **Alternatives considered:**
 
 - **One generic `ErrNotFound`.** Rejected. Loses hint precision; cmd
   layer cannot choose a resource-specific hint without re-introducing
   typed `errors.As` chains that we'd be trying to delete.
-- **Per-resource exit codes 7 through 10.** Rejected. Breaks the
-  existing `domain-typed-errors` exit-code table at `## Requirements`
-  section, and fall outside the sysexits-safe range (64-78).
 
-### 3. ShellError as six concrete subtypes with shared base struct
+### 3. ShellError as seven concrete subtypes with shared base struct
 
-**Choice.** Six structs
+**Choice.** Seven structs
 (`ShellAlreadyInstalledError`, `ShellNotInstalledError`,
 `ShellInvalidTypeError`, `ShellInferenceError`,
 `ShellDetectionError`, `ShellWrapperError`, `ShellConfigError`)
@@ -155,10 +161,12 @@ left as a future footgun.
 
 **Alternatives considered:**
 
-- **One `ShellError` struct with a `Kind` enum.** Rejected. Brings back
-  the string-equality path that this change deletes
-  (`shellErr.Kind == KindAlreadyInstalled`).
-- **A `domain.ShellError` interface implemented by six subtypes.**
+- **One `ShellError` struct with a `Kind` enum (per `golang-design-patterns`).**
+  Rejected. Brings back the string-equality path that this change deletes
+  (`shellErr.Kind == KindAlreadyInstalled`). The seven subtypes trade
+  ergonomics for type-driven dispatch, which is the whole point of the
+  sentinel + `errors.As` pattern adopted in this change.
+- **A `domain.ShellError` interface implemented by seven subtypes.**
   Rejected. The package rule permits only types and errors in
   `domain/`; adding an interface here forces a follow-up rule
   violation that Change 2 (architecture) would then need to undo.
@@ -238,7 +246,7 @@ test for that one type), validate that `cmd/delete.go:102-104`
 behaves correctly with `errors.Is`, then replicate the pattern
 mechanically for `GitRepositoryError`, `GitWorktreeError`,
 `ProjectServiceError`, `NavigationServiceError`,
-`ResolutionError`, and the six shell subtypes. Service-layer
+`ResolutionError`, and the seven shell subtypes. Service-layer
 (`shell_service.go`), cmd-layer (`error_handler.go`,
 `error_formatter.go`), and mock-layer (`cmd_mocks.go`) changes land
 after the domain layer proves itself.
@@ -270,9 +278,12 @@ types implement `Unwrap() error`.
 `cmd/AGENTS.md` style guidance and the `golang-naming` skill's
 "error strings are fully lowercase — including acronyms") rejects
 emoji in user-facing strings. The formatter already prefixes each
-suggestion with `Hint:` so the emoji added no information. Terminal
-`Unwrap()` is correct: `ValidationError` has no `Cause` field and
-its chain ends at itself.
+suggestion with `Hint:` so the emoji added no information. The
+`golang-naming` skill also requires error strings to carry no
+trailing punctuation; `ValidationError.Error()` SHALL emit the
+message text without a trailing `.` (and without any other terminal
+punctuation). Terminal `Unwrap()` is correct: `ValidationError` has
+no `Cause` field and its chain ends at itself.
 
 **Alternatives considered:**
 
@@ -313,6 +324,12 @@ prevents future confusion.
   propagates the rename across all packages and refuses to leave
   dangling field accesses. Build + `mise run lint` catches anything
   it misses.
+- **Internal scripts and tests key on exit codes 3-6 today.**
+  Mitigation: `cmd/error_handler_test.go:18-98` and
+  `test/e2e/list_test.go:180,199` collapse to assertions on
+  `ExitCodeError` (1) and `ExitCodeUsage` (2). `cmd/AGENTS.md:58-69`
+  and `AGENTS.md:233-237` drop rows for codes 3-6. `mise run verify`
+  (task 8.1) catches any consumer we missed.
 - **`internal/service/AGENTS.md` and `cmd/AGENTS.md` re-drift if
   next change authors repeat patterns without checking the spec.**
   Mitigation: spec catalog at `openspec/specs/domain-typed-errors/spec.md`
@@ -341,8 +358,13 @@ prevents future confusion.
 3. After all vertical slices complete, run the full `mise run test`
    once more. Failing tests at this point identify sentinel-walk
    coverage gaps from per-slice rewrites.
-4. Bump `internal/version/version.go` to `0.13.0`, regenerate
-   `CHANGELOG.md` via `openspec-generate-changelog` after
+4. Bump `internal/version/version.go` to `0.13.0` for the hard-break
+   surface: `Cause`→`Err` field rename on thirteen existing wrapper
+   types, deletion of `IsNotFound() bool` on six types, and `ShellError`
+   split into seven concrete subtypes. The exit-code alignment to
+   3-code dispatch is a consumer-visible policy change but does not
+   add new API surface; scripts keyed on codes 3-6 break by design.
+   Regenerate `CHANGELOG.md` via `openspec-generate-changelog` after
    `openspec-archive-change`.
 5. **Rollback:** every step in this change is a discrete commit;
    `git revert` from the merge commit restores the prior state. The
@@ -354,5 +376,5 @@ prevents future confusion.
 None. Decisions 1 through 9 are settled; any future question
 "should we add a sentinel for X" is captured as a follow-up change
 once we see a caller that needs it. The per-resource NotFound
-granularity is the largest open axis, and the four-sentinel
-collapse-to-exit-6 plan is committed.
+granularity is the largest open axis, and the four-sentinel hint
+discrimination plan is committed.
