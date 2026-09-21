@@ -1,31 +1,52 @@
-# Capability: Main Entry Point
+# cli-main-entry-point Specification
 
 ## Purpose
 
-The `main.go` entry point that constructs the `ServiceContainer`,
-loads configuration, dispatches the cobra command tree, recovers from
-panics, and exits with the code returned by the formatter.
+Binary entry point that loads configuration from defaults, XDG, and
+environment overrides, validates it before dispatch, invokes the cobra
+command tree, and propagates the exit code returned by the cmd-side
+error formatter (`cli-error-formatting`) without remapping non-zero
+values.
 
 ## Requirements
 
-### Requirement: Bootstrap service container
+### Requirement: Exit code propagation
 
-The system SHALL construct the `ServiceContainer` (WorktreeService,
-ProjectService, NavigationService, ContextService, ShellService) at
-startup and pass it through cobra commands.
+The system SHALL exit with the exit code returned by the error formatter
+(see `cli-error-formatting`). It SHALL NOT convert non-zero errors to a
+different non-zero code; the binary SHALL exit with the value returned by
+`GetExitCodeForError` unmodified. Under the 3-code dispatch
+(`cli-error-formatting` Exit code mapping requirement), `*domain.ValidationError`
+maps to `ExitCodeError` (1), cobra usage errors map to `ExitCodeUsage` (2),
+and a clean run maps to `ExitCodeSuccess` (0). The "do not override to 1"
+prohibition still applies: a non-zero code (`ExitCodeUsage` (2)) SHALL NOT
+be converted to `ExitCodeError` (1) at the entry point, and vice versa.
 
-#### Scenario: Container construction
+#### Scenario: Specific exit code honored
 
-- **WHEN** the binary starts
-- **THEN** system SHALL construct all five services via constructor
-  injection (no globals, no `init()`)
-- **AND** SHALL attach them to the root cobra command for child access
+- **WHEN** the error formatter returns `ExitCodeError` (1) for a
+  `domain.ValidationError`
+- **THEN** the binary SHALL exit with code 1, not 0
+
+#### Scenario: Cobra usage error → exit 2
+
+- **WHEN** the error formatter returns `ExitCodeUsage` (2) for a cobra
+  usage error
+- **THEN** the binary SHALL exit with code 2, not 1
+
+#### Scenario: Success → exit 0
+
+- **WHEN** the command returns no error
+- **THEN** the binary SHALL exit with code `ExitCodeSuccess` (0)
 
 ### Requirement: Configuration loading
 
 The system SHALL load configuration from defaults and
 `$HOME/.config/twiggit/config.toml` (XDG), apply environment variable
-overrides (`TWIGGIT_*`), and validate before command dispatch.
+overrides (`TWIGGIT_*`), and validate before command dispatch. Validation
+failures and configuration errors both surface via the error formatter
+and exit with `ExitCodeError` (1) under the 3-code dispatch (see
+`cli-error-formatting` Exit code mapping requirement).
 
 #### Scenario: Load and validate
 
@@ -33,33 +54,4 @@ overrides (`TWIGGIT_*`), and validate before command dispatch.
 - **THEN** system SHALL load the configuration via `ConfigManager.Load()`
 - **AND** SHALL call `Config.Validate()` before dispatch
 - **AND** SHALL surface validation failures via the error formatter
-  (exit code 3 for config errors, 5 for validation errors)
-
-### Requirement: Panic recovery
-
-The system SHALL recover from any panic in the command tree, write
-"Internal error: <panic value>" to stderr, and exit with code 1. With
-`TWIGGIT_DEBUG=1`, the system SHALL additionally print the full stack
-trace. See `cli-error-formatting`.
-
-#### Scenario: Recover from panic
-
-- **WHEN** a panic occurs during command execution
-- **THEN** system SHALL write "Internal error: <panic value>" to stderr
-- **AND** SHALL exit with code 1
-
-#### Scenario: Debug stack
-
-- **WHEN** `TWIGGIT_DEBUG=1` is set and a panic occurs
-- **THEN** system SHALL print the stack trace in addition to the panic value
-
-### Requirement: Exit code propagation
-
-The system SHALL exit with the exit code returned by the error formatter
-(see `cli-error-formatting`). It SHALL NOT convert non-zero errors into
-exit code 1 if a more specific mapping exists.
-
-#### Scenario: Specific exit code honored
-
-- **WHEN** the error formatter returns `ExitCodeValidation` (5)
-- **THEN** the binary SHALL exit with code 5, not 1
+  (exit code `ExitCodeError` (1) per the 3-code canonical mapping)
