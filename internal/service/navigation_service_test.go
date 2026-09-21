@@ -156,7 +156,7 @@ func TestNavigationService_GetNavigationSuggestions(t *testing.T) {
 			contextService := mocks.NewMockContextService()
 
 			// Setup both mock expectations since the service may call either
-			contextService.On("GetCompletionSuggestionsFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string"), []domain.SuggestionOption(nil)).Return([]*domain.ResolutionSuggestion{
+			contextService.On("GetCompletionSuggestionsFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string")).Return([]*domain.ResolutionSuggestion{
 				{
 					Text:        "feature-branch",
 					Description: "Feature branch",
@@ -166,7 +166,7 @@ func TestNavigationService_GetNavigationSuggestions(t *testing.T) {
 				},
 			}, nil).Maybe()
 
-			contextService.On("GetCompletionSuggestions", mock.AnythingOfType("string"), []domain.SuggestionOption(nil)).Return([]*domain.ResolutionSuggestion{
+			contextService.On("GetCompletionSuggestions", mock.AnythingOfType("string")).Return([]*domain.ResolutionSuggestion{
 				{
 					Text:        "test-project",
 					Description: "Test project",

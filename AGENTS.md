@@ -231,10 +231,10 @@ Specs live under `openspec/specs/<category>-<name>/spec.md`. The 6 category pref
 | Context detection wrong | Check CWD, verify `.git` file in worktrees |
 | Mock not matching calls | Verify `On()` args match actual call signature |
 | Exit code 2 (usage) | Check command syntax, required arguments |
-| Exit code 3 (config) | Verify config file exists and is valid |
-| Exit code 4 (git) | Check git operations, repository state |
-| Exit code 5 (validation) | Validate input format and values |
-| Exit code 6 (not-found) | Use `twiggit list` to find resources |
+
+Scripts and CI pipes historically keyed on exit codes 3-6 must update to
+the 3-code contract (0/1/2): all non-usage failures exit 1; per-resource
+NotFound distinction is preserved in the formatter's hint layer.
 
 **Debugging:**
 - Set `TWIGGIT_DEBUG=1` to see internal error details and stack traces

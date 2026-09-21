@@ -28,9 +28,9 @@ Examples:
   twiggit delete feature --force           Delete even with uncommitted changes
   twiggit delete feature --merged-only      Only delete if branch is merged
   twiggit delete feature -C                 Delete and output navigation path`,
-		SilenceUsage:   true,
-		SilenceErrors:  true,
-		Args:           cobra.ExactArgs(1),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Args:          cobra.ExactArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			return executeDelete(c, config, args[0], force, mergedOnly, changeDir)
 		},
@@ -98,12 +98,7 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra
 
 	status, err := config.Services.WorktreeService.GetWorktreeStatus(ctx, worktreePath)
 	if err != nil {
-		var worktreeErr *domain.WorktreeServiceError
-		var gitRepoErr *domain.GitRepositoryError
-		var gitWorktreeErr *domain.GitWorktreeError
-		if errors.As(err, &worktreeErr) && worktreeErr.IsNotFound() ||
-			errors.As(err, &gitRepoErr) && gitRepoErr.IsNotFound() ||
-			errors.As(err, &gitWorktreeErr) && gitWorktreeErr.IsNotFound() {
+		if errors.Is(err, domain.ErrWorktreeNotFound) {
 			if changeDir {
 				navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
 				if navigationTarget != "" {

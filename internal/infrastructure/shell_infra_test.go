@@ -208,7 +208,7 @@ func TestShellInfrastructure_ValidateInstallation(t *testing.T) {
 
 			if tc.expectError {
 				require.Error(t, err)
-				var shellErr *domain.ShellError
+				var shellErr *domain.ShellNotInstalledError
 				require.ErrorAs(t, err, &shellErr)
 			} else {
 				require.NoError(t, err)

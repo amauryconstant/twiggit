@@ -50,8 +50,7 @@ func InferShellTypeFromPath(configPath string) (ShellType, error) {
 		return ShellFish, nil
 
 	default:
-		return "", NewShellErrorWithCause(
-			ErrInferenceFailed,
+		return "", NewShellInferenceError(
 			"",
 			"cannot infer shell type from path: "+configPath,
 			NewValidationError("InferShellTypeFromPath", "shellType", "", "cannot infer shell type").
@@ -64,7 +63,7 @@ func InferShellTypeFromPath(configPath string) (ShellType, error) {
 func DetectShellFromEnv() (ShellType, error) {
 	shellPath := os.Getenv("SHELL")
 	if shellPath == "" {
-		return "", NewShellError(ErrShellDetectionFailed, "", "SHELL environment variable not set")
+		return "", NewShellDetectionError("SHELL environment variable not set", nil)
 	}
 
 	shellName := filepath.Base(shellPath)
@@ -78,9 +77,7 @@ func DetectShellFromEnv() (ShellType, error) {
 	case strings.Contains(lowerName, "fish"):
 		return ShellFish, nil
 	default:
-		return "", NewShellErrorWithCause(
-			ErrShellDetectionFailed,
-			"",
+		return "", NewShellDetectionError(
 			"unsupported shell detected: "+shellName,
 			NewValidationError("DetectShellFromEnv", "shellType", shellName, "unsupported shell type").
 				WithSuggestions([]string{"use --shell to specify shell type (bash, zsh, fish)"}),

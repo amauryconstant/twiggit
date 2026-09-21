@@ -76,7 +76,7 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 
 	// Validate shell type
 	if !domain.IsValidShellType(shellType) {
-		return nil, domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
+		return nil, domain.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
 	}
 
 	// Check existing installation
@@ -101,8 +101,7 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 	// Install wrapper
 	if err := s.integration.InstallWrapper(shellType, wrapper, configFile, req.ForceOverwrite); err != nil {
 		// Check if it's already installed error
-		var shellErr *domain.ShellError
-		if errors.As(err, &shellErr) && shellErr.Code == domain.ErrShellAlreadyInstalled {
+		if errors.Is(err, domain.ErrShellAlreadyInstalled) {
 			return &domain.SetupShellResult{
 				ShellType:  shellType,
 				Installed:  true,
@@ -131,14 +130,13 @@ func (s *shellService) ValidateInstallation(_ context.Context, req *domain.Valid
 
 	// Validate shell type
 	if !domain.IsValidShellType(shellType) {
-		return nil, domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
+		return nil, domain.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
 	}
 
 	// Validate installation
 	err = s.integration.ValidateInstallation(shellType, configFile)
 	if err != nil {
-		var shellErr *domain.ShellError
-		if errors.As(err, &shellErr) && shellErr.Code == domain.ErrShellNotInstalled {
+		if errors.Is(err, domain.ErrShellNotInstalled) {
 			return &domain.ValidateInstallationResult{
 				ShellType:  shellType,
 				Installed:  false,

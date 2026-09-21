@@ -63,7 +63,7 @@ func TestGitWorktreeError_FormatErrorMessage(t *testing.T) {
 
 func TestGitWorktreeError_GetCauseDetails(t *testing.T) {
 	t.Run("nil cause returns empty string", func(t *testing.T) {
-		err := &GitWorktreeError{Cause: nil}
+		err := &GitWorktreeError{Err: nil}
 		details := err.getCauseDetails()
 		assert.Empty(t, details)
 	})
@@ -76,7 +76,7 @@ func TestGitWorktreeError_GetCauseDetails(t *testing.T) {
 			Stderr:   "fatal: Invalid refspec",
 			Message:  "failed",
 		}
-		err := &GitWorktreeError{Cause: gitCmdErr}
+		err := &GitWorktreeError{Err: gitCmdErr}
 		details := err.getCauseDetails()
 
 		assert.Contains(t, details, "git command failed")
@@ -87,7 +87,7 @@ func TestGitWorktreeError_GetCauseDetails(t *testing.T) {
 
 	t.Run("generic error cause returns error message", func(t *testing.T) {
 		genericErr := NewValidationError("request", "field", "value", "validation failed")
-		err := &GitWorktreeError{Cause: genericErr}
+		err := &GitWorktreeError{Err: genericErr}
 		details := err.getCauseDetails()
 
 		assert.Contains(t, details, "validation failed")
@@ -97,25 +97,22 @@ func TestGitWorktreeError_GetCauseDetails(t *testing.T) {
 }
 
 func TestGitCommandError_HasUsefulStderr(t *testing.T) {
-	t.Run("stderr with useful content returns true", func(t *testing.T) {
-		err := &GitCommandError{Stderr: "fatal: Invalid refspec"}
-		assert.True(t, err.hasUsefulStderr())
-	})
-
-	t.Run("empty stderr returns false", func(t *testing.T) {
-		err := &GitCommandError{Stderr: ""}
-		assert.False(t, err.hasUsefulStderr())
-	})
-
-	t.Run("whitespace-only stderr returns false", func(t *testing.T) {
-		err := &GitCommandError{Stderr: "   \n\t  "}
-		assert.False(t, err.hasUsefulStderr())
-	})
-
-	t.Run("stderr with mixed whitespace and content returns true", func(t *testing.T) {
-		err := &GitCommandError{Stderr: "  fatal: error\n"}
-		assert.True(t, err.hasUsefulStderr())
-	})
+	tests := []struct {
+		name     string
+		stderr   string
+		expected bool
+	}{
+		{"stderr with useful content", "fatal: Invalid refspec", true},
+		{"empty stderr", "", false},
+		{"whitespace-only stderr", "   \n\t  ", false},
+		{"stderr with mixed whitespace and content", "  fatal: error\n", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := &GitCommandError{Stderr: tt.stderr}
+			assert.Equal(t, tt.expected, err.hasUsefulStderr())
+		})
+	}
 }
 
 func TestContainsOnlyWhitespace(t *testing.T) {
@@ -124,52 +121,18 @@ func TestContainsOnlyWhitespace(t *testing.T) {
 		input    string
 		expected bool
 	}{
-		{
-			name:     "empty string",
-			input:    "",
-			expected: true,
-		},
-		{
-			name:     "spaces only",
-			input:    "    ",
-			expected: true,
-		},
-		{
-			name:     "tabs only",
-			input:    "\t\t\t",
-			expected: true,
-		},
-		{
-			name:     "newlines only",
-			input:    "\n\n\n",
-			expected: true,
-		},
-		{
-			name:     "mixed whitespace",
-			input:    " \t\n \t ",
-			expected: true,
-		},
-		{
-			name:     "string with content",
-			input:    "hello",
-			expected: false,
-		},
-		{
-			name:     "string with content and whitespace",
-			input:    "  hello world  ",
-			expected: false,
-		},
-		{
-			name:     "string with special characters",
-			input:    "!@#$%",
-			expected: false,
-		},
+		{"empty string", "", true},
+		{"spaces only", "    ", true},
+		{"tabs only", "\t\t\t", true},
+		{"newlines only", "\n\n\n", true},
+		{"mixed whitespace", " \t\n \t ", true},
+		{"string with content", "hello", false},
+		{"string with content and whitespace", "  hello world  ", false},
+		{"string with special characters", "!@#$%", false},
 	}
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := containsOnlyWhitespace(tt.input)
-			assert.Equal(t, tt.expected, result)
+			assert.Equal(t, tt.expected, containsOnlyWhitespace(tt.input))
 		})
 	}
 }
@@ -225,70 +188,90 @@ func TestGitCommandError_FormatErrorMessage(t *testing.T) {
 
 func TestGitWorktreeError_Unwrap(t *testing.T) {
 	t.Run("nil cause returns nil", func(t *testing.T) {
-		err := &GitWorktreeError{Cause: nil}
+		err := &GitWorktreeError{Err: nil}
 		assert.NoError(t, err.Unwrap())
 	})
 
 	t.Run("returns cause error", func(t *testing.T) {
 		cause := NewValidationError("request", "field", "value", "error")
-		err := &GitWorktreeError{Cause: cause}
+		err := &GitWorktreeError{Err: cause}
 		assert.Equal(t, cause, err.Unwrap())
 	})
 }
 
 func TestGitCommandError_Unwrap(t *testing.T) {
 	t.Run("nil cause returns nil", func(t *testing.T) {
-		err := &GitCommandError{Cause: nil}
+		err := &GitCommandError{Err: nil}
 		assert.NoError(t, err.Unwrap())
 	})
 
 	t.Run("returns cause error", func(t *testing.T) {
 		cause := NewValidationError("request", "field", "value", "error")
-		err := &GitCommandError{Cause: cause}
+		err := &GitCommandError{Err: cause}
 		assert.Equal(t, cause, err.Unwrap())
 	})
 }
 
-func TestGitRepositoryError_IsNotFound(t *testing.T) {
+// TestErrSentinels_WalkThroughWraps asserts that each NotFound sentinel
+// is reachable via errors.Is walks through its corresponding wrapper
+// type, and that unrelated sentinels do not match.
+func TestErrSentinels_WalkThroughWraps(t *testing.T) {
 	tests := []struct {
-		name     string
-		message  string
-		expected bool
+		name           string
+		err            error
+		ownSentinel    error
+		otherSentinel  error
+		otherSentinel2 error
 	}{
-		{"not found lowercase", "repository not found", true},
-		{"not found uppercase", "REPOSITORY NOT FOUND", true},
-		{"does not exist lowercase", "repository does not exist", true},
-		{"no such file or directory", "no such file or directory", true},
-		{"No Such File Or Directory mixed", "No Such File Or Directory", true},
-		{"other error", "permission denied", false},
-		{"empty message", "", false},
+		{
+			name:           "GitRepositoryError matches ErrGitRepoNotFound only",
+			err:            NewGitRepositoryError("/p", "msg", nil),
+			ownSentinel:    ErrGitRepoNotFound,
+			otherSentinel:  ErrWorktreeNotFound,
+			otherSentinel2: ErrProjectNotFound,
+		},
+		{
+			name:           "GitWorktreeError matches ErrWorktreeNotFound only",
+			err:            NewGitWorktreeError("/p", "b", "msg", nil),
+			ownSentinel:    ErrWorktreeNotFound,
+			otherSentinel:  ErrGitRepoNotFound,
+			otherSentinel2: ErrProjectNotFound,
+		},
+		{
+			name:           "WorktreeServiceError matches ErrWorktreeNotFound only",
+			err:            NewWorktreeServiceError("/p", "b", "op", "msg", nil),
+			ownSentinel:    ErrWorktreeNotFound,
+			otherSentinel:  ErrProjectNotFound,
+			otherSentinel2: ErrResolutionNotFound,
+		},
+		{
+			name:           "ProjectServiceError matches ErrProjectNotFound only",
+			err:            NewProjectServiceError("name", "/p", "op", "msg", nil),
+			ownSentinel:    ErrProjectNotFound,
+			otherSentinel:  ErrWorktreeNotFound,
+			otherSentinel2: ErrResolutionNotFound,
+		},
+		{
+			name:           "NavigationServiceError matches ErrResolutionNotFound only",
+			err:            NewNavigationServiceError("t", "ctx", "op", "msg", nil),
+			ownSentinel:    ErrResolutionNotFound,
+			otherSentinel:  ErrWorktreeNotFound,
+			otherSentinel2: ErrProjectNotFound,
+		},
+		{
+			name:           "ResolutionError matches ErrResolutionNotFound only",
+			err:            NewResolutionError("t", "ctx", "msg", nil, nil),
+			ownSentinel:    ErrResolutionNotFound,
+			otherSentinel:  ErrWorktreeNotFound,
+			otherSentinel2: ErrProjectNotFound,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := NewGitRepositoryError("/path", tt.message, nil)
-			assert.Equal(t, tt.expected, err.IsNotFound())
-		})
-	}
-}
-
-func TestGitWorktreeError_IsNotFound(t *testing.T) {
-	tests := []struct {
-		name     string
-		message  string
-		expected bool
-	}{
-		{"not found lowercase", "worktree not found", true},
-		{"not found uppercase", "WORKTREE NOT FOUND", true},
-		{"does not exist lowercase", "worktree does not exist", true},
-		{"other error", "permission denied", false},
-		{"empty message", "", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := NewGitWorktreeError("/path", "branch", tt.message, nil)
-			assert.Equal(t, tt.expected, err.IsNotFound())
+			assert.ErrorIs(t, tt.err, tt.ownSentinel, "should match own sentinel")
+			assert.NotErrorIs(t, tt.err, tt.otherSentinel, "should not match unrelated sentinel")
+			assert.NotErrorIs(t, tt.err, tt.otherSentinel2, "should not match unrelated sentinel")
 		})
 	}
 }

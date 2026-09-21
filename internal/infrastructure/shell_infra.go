@@ -23,7 +23,7 @@ func NewShellInfrastructure() application.ShellInfrastructure {
 func (s *shellInfrastructure) GenerateWrapper(shellType domain.ShellType) (string, error) {
 	template := s.getWrapperTemplate(shellType)
 	if template == "" {
-		return "", domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "unsupported shell type")
+		return "", domain.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
 	}
 
 	// Pure function composition for wrapper generation
@@ -38,19 +38,19 @@ func (s *shellInfrastructure) DetectConfigFile(shellType domain.ShellType) (stri
 		var err error
 		home, err = os.UserHomeDir()
 		if err != nil {
-			return "", domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "failed to get home directory", err)
+			return "", domain.NewShellConfigError("", "failed to get home directory", err)
 		}
 	}
 
 	configFiles := s.getConfigFiles(shellType)
 	if len(configFiles) == 0 {
-		return "", domain.NewShellError(domain.ErrInvalidShellType, string(shellType), "no config files available for shell type")
+		return "", domain.NewShellInvalidTypeError(string(shellType), "no config files available for shell type", nil)
 	}
 
 	// Check for existing config files in order of preference
 	absHome, err := filepath.Abs(home)
 	if err != nil {
-		return "", domain.NewShellError(domain.ErrConfigFileNotFound, string(shellType), "failed to resolve home directory")
+		return "", domain.NewShellConfigError("", "failed to resolve home directory", nil)
 	}
 	for _, configFile := range configFiles {
 		configPath := filepath.Join(absHome, configFile)
@@ -73,13 +73,13 @@ func (s *shellInfrastructure) DetectConfigFile(shellType domain.ShellType) (stri
 // InstallWrapper installs the wrapper to the shell config file
 func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
 	if configFile == "" {
-		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "config file path is empty", nil)
+		return domain.NewShellConfigError("", "config file path is empty", nil)
 	}
 
 	// Check if parent directory exists
 	parentDir := filepath.Dir(configFile)
 	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
-		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "parent directory does not exist", err)
+		return domain.NewShellConfigError("", "parent directory does not exist", err)
 	}
 
 	// Check if file exists
@@ -91,7 +91,7 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 	if !fileExists {
 		// Create the file if it doesn't exist
 		if err := os.WriteFile(configFile, []byte(wrapper), 0644); err != nil { // #nosec G306 -- standard perms for shell configs
-			return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to create config file", err)
+			return domain.NewShellWrapperError(string(shellType), "installation", "failed to create config file", err)
 		}
 		return nil
 	}
@@ -99,7 +99,7 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 	// Read existing content
 	content, err := os.ReadFile(configFile) // #nosec G304 -- configFile from DetectConfigFile which validates path
 	if err != nil {
-		return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to read config file", err)
+		return domain.NewShellWrapperError(string(shellType), "installation", "failed to read config file", err)
 	}
 
 	contentStr := string(content)
@@ -107,7 +107,7 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 	// Check if wrapper block exists
 	if s.hasWrapperBlock(contentStr) {
 		if !force {
-			return domain.NewShellError(domain.ErrShellAlreadyInstalled, string(shellType), "wrapper already installed")
+			return domain.NewShellAlreadyInstalledError(string(shellType), "wrapper already installed", nil)
 		}
 		// Remove existing wrapper block
 		contentStr = s.removeWrapperBlock(contentStr)
@@ -116,7 +116,7 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 	// Append wrapper to config file
 	updatedContent := s.appendWrapper(contentStr, wrapper)
 	if err := os.WriteFile(configFile, []byte(updatedContent), 0644); err != nil { // #nosec G306,G703 -- standard perms for shell configs, path from DetectConfigFile
-		return domain.NewShellErrorWithCause(domain.ErrWrapperInstallation, string(shellType), "failed to write wrapper to config file", err)
+		return domain.NewShellWrapperError(string(shellType), "installation", "failed to write wrapper to config file", err)
 	}
 
 	return nil
@@ -125,23 +125,23 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 // ValidateInstallation validates whether the wrapper is installed
 func (s *shellInfrastructure) ValidateInstallation(shellType domain.ShellType, configFile string) error {
 	if configFile == "" {
-		return domain.NewShellErrorWithCause(domain.ErrConfigFileNotFound, string(shellType), "config file path is empty", nil)
+		return domain.NewShellConfigError("", "config file path is empty", nil)
 	}
 
 	// Check if config file exists
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "config file does not exist")
+		return domain.NewShellNotInstalledError(string(shellType), "config file does not exist", nil)
 	}
 
 	// Read config file and check for wrapper
 	content, err := os.ReadFile(configFile) // #nosec G304 -- configFile from DetectConfigFile which validates path
 	if err != nil {
-		return domain.NewShellErrorWithCause(domain.ErrShellNotInstalled, string(shellType), "failed to read config file", err)
+		return domain.NewShellNotInstalledError(string(shellType), "failed to read config file", err)
 	}
 
 	// Check for wrapper block delimiters
 	if !s.hasWrapperBlock(string(content)) {
-		return domain.NewShellError(domain.ErrShellNotInstalled, string(shellType), "wrapper block not found")
+		return domain.NewShellNotInstalledError(string(shellType), "wrapper block not found", nil)
 	}
 
 	return nil

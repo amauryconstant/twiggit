@@ -23,9 +23,9 @@ Examples:
   twiggit cd myproject          # Change to main worktree of myproject
   twiggit cd myproject/feature  # Change to feature branch worktree
   twiggit cd feature            # Change to feature branch (relative to current project)`,
-		SilenceUsage:   true,
-		SilenceErrors:  true,
-		Args:           cobra.MaximumNArgs(1),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Args:          cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := ""
 			if len(args) > 0 {

@@ -56,12 +56,8 @@ See `internal/infrastructure/AGENTS.md` for detection rules and resolution.
 | Code | Constant | Meaning | Use case |
 |------|----------|---------|----------|
 | 0 | ExitCodeSuccess | Success | Normal completion |
-| 1 | ExitCodeError | General error | Unclassified errors, panics |
-| 2 | ExitCodeUsage | Usage error | Invalid command syntax |
-| 3 | ExitCodeConfig | Configuration error | Invalid or missing config |
-| 4 | ExitCodeGit | Git operation error | Git command failures |
-| 5 | ExitCodeValidation | Validation error | Input validation failures |
-| 6 | ExitCodeNotFound | Resource not found | Project/worktree not found |
+| 1 | ExitCodeError | General error | Unclassified errors, runtime failures, panics, NotFound |
+| 2 | ExitCodeUsage | Usage error | Cobra/pflag typed usage error |
 
 **Error formatting:**
 - Messages are user-friendly without internal operation names
@@ -120,15 +116,21 @@ formatter.register(isServiceError, formatServiceError)
 2. Create formatter function:
    ```go
    func formatMyCustomError(err error) string {
-       customErr := func() *domain.MyCustomError {
-           target := &domain.MyCustomError{}
-           _ = errors.As(err, &target)
-           return target
-       }()
+       customErr, ok := asType[*domain.MyCustomError](err)
+       if !ok {
+           return ""
+       }
        return fmt.Sprintf("Error: %s\n", customErr.Error())
    }
    ```
-3. Register in `NewErrorFormatterWithOptions` before generic `formatServiceError`
+   The `asType[T error](err) (T, bool)` helper in `cmd/error_formatter.go`
+   replaces the IIFE pattern. It mirrors Go 1.26's `errors.AsType[T]`.
+3. Register in `NewErrorFormatterWithOptions` in specific-before-generic
+   order. Existing specific matchers (shell subtypes, git errors,
+   navigation/resolution/conflict, worktree/project wrappers) are
+   already registered; new typed formatters slot in just before
+   `isValidationError` so that a chain wrapping a ValidationError in a
+   service wrapper still renders via the outer wrapper's formatter.
 
 ## Command Specifications
 

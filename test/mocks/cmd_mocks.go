@@ -221,7 +221,7 @@ func (m *MockContextService) ResolveIdentifierFromContext(ctx *domain.Context, i
 
 // GetCompletionSuggestions mocks getting completion suggestions
 func (m *MockContextService) GetCompletionSuggestions(partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
-	args := m.Called(partial, opts)
+	args := m.Called(variadicArgs(partial, anySlice(opts)...)...)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -230,11 +230,19 @@ func (m *MockContextService) GetCompletionSuggestions(partial string, opts ...do
 
 // GetCompletionSuggestionsFromContext mocks getting completion suggestions from context
 func (m *MockContextService) GetCompletionSuggestionsFromContext(ctx *domain.Context, partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
-	args := m.Called(ctx, partial, opts)
+	args := m.Called(append([]any{ctx, partial}, anySlice(opts)...)...)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*domain.ResolutionSuggestion), args.Error(1)
+}
+
+func anySlice[T any](s []T) []any {
+	out := make([]any, len(s))
+	for i, v := range s {
+		out[i] = v
+	}
+	return out
 }
 
 // MockShellService is a mock implementation of application.ShellService

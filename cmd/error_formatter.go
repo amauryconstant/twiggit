@@ -8,34 +8,122 @@ import (
 	"twiggit/internal/domain"
 )
 
+// asType extracts a typed error from the chain. Mirrors the semantics of
+// errors.AsType[T] (Go 1.26+); the local helper exists because the project
+// targets go 1.25.5.
+func asType[T error](err error) (T, bool) {
+	var target T
+	if !errors.As(err, &target) {
+		return target, false
+	}
+	return target, true
+}
+
 // matcherFunc is a function that checks if an error matches a specific type
 type matcherFunc func(error) bool
 
 // formatterFunc is a function that formats an error into a user-friendly string
 type formatterFunc func(error) string
 
-// isValidationError checks if error is a ValidationError using errors.As()
 func isValidationError(err error) bool {
 	var target *domain.ValidationError
 	return errors.As(err, &target)
 }
 
-// isWorktreeError checks if error is a WorktreeServiceError using errors.As()
+func isShellAlreadyInstalledError(err error) bool {
+	var target *domain.ShellAlreadyInstalledError
+	return errors.As(err, &target)
+}
+
+func isShellNotInstalledError(err error) bool {
+	var target *domain.ShellNotInstalledError
+	return errors.As(err, &target)
+}
+
+func isShellInvalidTypeError(err error) bool {
+	var target *domain.ShellInvalidTypeError
+	return errors.As(err, &target)
+}
+
+func isShellInferenceError(err error) bool {
+	var target *domain.ShellInferenceError
+	return errors.As(err, &target)
+}
+
+func isShellDetectionError(err error) bool {
+	var target *domain.ShellDetectionError
+	return errors.As(err, &target)
+}
+
+func isShellWrapperError(err error) bool {
+	var target *domain.ShellWrapperError
+	return errors.As(err, &target)
+}
+
+func isShellConfigError(err error) bool {
+	var target *domain.ShellConfigError
+	return errors.As(err, &target)
+}
+
+func isGitRepositoryError(err error) bool {
+	var target *domain.GitRepositoryError
+	return errors.As(err, &target)
+}
+
+func isGitWorktreeError(err error) bool {
+	var target *domain.GitWorktreeError
+	return errors.As(err, &target)
+}
+
+func isGitCommandError(err error) bool {
+	var target *domain.GitCommandError
+	return errors.As(err, &target)
+}
+
+func isNavigationServiceError(err error) bool {
+	var target *domain.NavigationServiceError
+	return errors.As(err, &target)
+}
+
+func isResolutionError(err error) bool {
+	var target *domain.ResolutionError
+	return errors.As(err, &target)
+}
+
+func isConflictError(err error) bool {
+	var target *domain.ConflictError
+	return errors.As(err, &target)
+}
+
 func isWorktreeError(err error) bool {
 	var target *domain.WorktreeServiceError
 	return errors.As(err, &target)
 }
 
-// isProjectError checks if error is a ProjectServiceError using errors.As()
 func isProjectError(err error) bool {
 	var target *domain.ProjectServiceError
 	return errors.As(err, &target)
 }
 
-// isServiceError checks if error is a ServiceError using errors.As()
 func isServiceError(err error) bool {
 	var target *domain.ServiceError
 	return errors.As(err, &target)
+}
+
+// hintFor returns the resource-specific hint for a NotFound sentinel, or
+// an empty string if the error does not match any registered sentinel.
+func hintFor(err error) string {
+	switch {
+	case errors.Is(err, domain.ErrProjectNotFound):
+		return "Use 'twiggit list --all' to see available projects"
+	case errors.Is(err, domain.ErrWorktreeNotFound):
+		return "Use 'twiggit list' to see available worktrees"
+	case errors.Is(err, domain.ErrResolutionNotFound):
+		return "Use 'twiggit list' to see available navigation targets"
+	case errors.Is(err, domain.ErrGitRepoNotFound):
+		return "Verify the repository path"
+	}
+	return ""
 }
 
 // ErrorFormatter is a composable error formatter using explicit strategy pattern
@@ -52,24 +140,49 @@ func NewErrorFormatter() *ErrorFormatter {
 	return NewErrorFormatterWithOptions(false)
 }
 
-// NewErrorFormatterWithOptions creates a new error formatter with options
+// NewErrorFormatterWithOptions creates a new error formatter with options.
+//
+// Registration order is specific-before-generic per the
+// cli-error-formatting spec's Type-matched dispatch requirement: the
+// outermost concrete wrapper in the error chain must win over a
+// terminal type the chain passes through (e.g. a WorktreeServiceError
+// wrapping a ValidationError should render via the worktree
+// formatter, not the validation formatter).
 func NewErrorFormatterWithOptions(quiet bool) *ErrorFormatter {
 	formatter := &ErrorFormatter{
 		quiet: quiet,
 	}
 
-	// Register formatters using explicit strategy pattern
-	// Order matters: more specific matchers should come first
-	formatter.register(isValidationError, formatValidationError)
+	// Shell subtypes (most specific)
+	formatter.register(isShellAlreadyInstalledError, formatShellAlreadyInstalledError)
+	formatter.register(isShellNotInstalledError, formatShellNotInstalledError)
+	formatter.register(isShellInvalidTypeError, formatShellInvalidTypeError)
+	formatter.register(isShellInferenceError, formatShellInferenceError)
+	formatter.register(isShellDetectionError, formatShellDetectionError)
+	formatter.register(isShellWrapperError, formatShellWrapperError)
+	formatter.register(isShellConfigError, formatShellConfigError)
+	// Git errors
+	formatter.register(isGitRepositoryError, formatGitRepositoryError)
+	formatter.register(isGitWorktreeError, formatGitWorktreeError)
+	formatter.register(isGitCommandError, formatGitCommandError)
+	// Navigation/resolution/conflict
+	formatter.register(isNavigationServiceError, formatNavigationServiceError)
+	formatter.register(isResolutionError, formatResolutionError)
+	formatter.register(isConflictError, formatConflictError)
+	// Service wrappers (specific)
 	formatter.register(isWorktreeError, formatWorktreeError)
 	formatter.register(isProjectError, formatProjectError)
+	// Validation (terminal, checked after service wrappers so a
+	// Worktree{Err: Validation} chain renders via the worktree formatter)
+	formatter.register(isValidationError, formatValidationError)
+	// Generic fallback
 	formatter.register(isServiceError, formatServiceError)
 
 	return formatter
 }
 
-// register registers a matcher-formatter pair
-// Matchers are checked in registration order
+// register registers a matcher-formatter pair.
+// Matchers are checked in registration order.
 func (ef *ErrorFormatter) register(matcher matcherFunc, formatter formatterFunc) {
 	ef.matchers = append(ef.matchers, struct {
 		matcher   matcherFunc
@@ -83,9 +196,8 @@ func (ef *ErrorFormatter) withQuietMode(formatter formatterFunc) formatterFunc {
 	return func(err error) string {
 		output := formatter(err)
 		if ef.quiet {
-			// Remove hint lines in quiet mode
 			lines := strings.Split(output, "\n")
-			var filtered []string
+			filtered := make([]string, 0, len(lines))
 			for _, line := range lines {
 				if !strings.HasPrefix(line, "Hint:") {
 					filtered = append(filtered, line)
@@ -99,7 +211,9 @@ func (ef *ErrorFormatter) withQuietMode(formatter formatterFunc) formatterFunc {
 
 // Format formats an error according to its type using explicit strategy pattern
 func (ef *ErrorFormatter) Format(err error) string {
-	// Iterate through matchers in registration order
+	if err == nil {
+		return ""
+	}
 	for _, mf := range ef.matchers {
 		if mf.matcher(err) {
 			return mf.formatter(err)
@@ -108,87 +222,171 @@ func (ef *ErrorFormatter) Format(err error) string {
 	return ef.formatGenericError(err)
 }
 
-// formatValidationError formats ValidationError with emoji indicators and suggestions
 func formatValidationError(err error) string {
-	validationErr := func() *domain.ValidationError {
-		target := &domain.ValidationError{}
-		_ = errors.As(err, &target)
-		return target
-	}()
+	validationErr, ok := asType[*domain.ValidationError](err)
+	if !ok {
+		return ""
+	}
 	var output strings.Builder
-
-	// Error message with plain text indicator
 	output.WriteString(fmt.Sprintf("Error: %s\n", validationErr.Message()))
-
-	// Add suggestions if available (quiet mode is handled by wrapper)
 	for _, suggestion := range validationErr.Suggestions() {
 		output.WriteString(fmt.Sprintf("Hint: %s\n", suggestion))
 	}
-
-	// Add context if available
 	if context := validationErr.Context(); context != "" {
 		output.WriteString(fmt.Sprintf("Context: %s\n", context))
 	}
-
 	return output.String()
 }
 
-// formatWorktreeError formats WorktreeServiceError with actionable hints
-func formatWorktreeError(err error) string {
-	worktreeErr := func() *domain.WorktreeServiceError {
-		target := &domain.WorktreeServiceError{}
-		_ = errors.As(err, &target)
-		return target
-	}()
-	var output strings.Builder
-
-	// The Error() method already provides user-friendly messages
-	output.WriteString(fmt.Sprintf("Error: %s\n", worktreeErr.Error()))
-
-	// Add helpful suggestion based on error type (quiet mode is handled by wrapper)
-	if worktreeErr.IsNotFound() {
-		output.WriteString("Hint: Use 'twiggit list' to see available worktrees\n")
-	} else {
-		output.WriteString("Hint: Check that worktree exists and you have permission\n")
+func formatShellAlreadyInstalledError(err error) string {
+	if _, ok := asType[*domain.ShellAlreadyInstalledError](err); !ok {
+		return ""
 	}
-
-	return output.String()
+	return fmt.Sprintf("Error: %s\n", err.Error())
 }
 
-// formatProjectError formats ProjectServiceError with actionable hints
+func formatShellNotInstalledError(err error) string {
+	if _, ok := asType[*domain.ShellNotInstalledError](err); !ok {
+		return ""
+	}
+	return fmt.Sprintf("Error: %s\n", err.Error())
+}
+
+func formatShellInvalidTypeError(err error) string {
+	if _, ok := asType[*domain.ShellInvalidTypeError](err); !ok {
+		return ""
+	}
+	return fmt.Sprintf("Error: %s\nHint: Supported shells: bash, zsh, fish\n", err.Error())
+}
+
+func formatShellInferenceError(err error) string {
+	if _, ok := asType[*domain.ShellInferenceError](err); !ok {
+		return ""
+	}
+	return fmt.Sprintf("Error: %s\n", err.Error())
+}
+
+func formatShellDetectionError(err error) string {
+	if _, ok := asType[*domain.ShellDetectionError](err); !ok {
+		return ""
+	}
+	return fmt.Sprintf("Error: %s\n", err.Error())
+}
+
+func formatShellWrapperError(err error) string {
+	if _, ok := asType[*domain.ShellWrapperError](err); !ok {
+		return ""
+	}
+	return fmt.Sprintf("Error: %s\nHint: Check the wrapper script and shell config file\n", err.Error())
+}
+
+func formatShellConfigError(err error) string {
+	if _, ok := asType[*domain.ShellConfigError](err); !ok {
+		return ""
+	}
+	return fmt.Sprintf("Error: %s\n", err.Error())
+}
+
+func formatGitRepositoryError(err error) string {
+	gitErr, ok := asType[*domain.GitRepositoryError](err)
+	if !ok {
+		return ""
+	}
+	output := fmt.Sprintf("Error: %s\n", gitErr.Error())
+	if hint := hintFor(err); hint != "" {
+		output += fmt.Sprintf("Hint: %s\n", hint)
+	}
+	return output
+}
+
+func formatGitWorktreeError(err error) string {
+	gitErr, ok := asType[*domain.GitWorktreeError](err)
+	if !ok {
+		return ""
+	}
+	output := fmt.Sprintf("Error: %s\n", gitErr.Error())
+	if hint := hintFor(err); hint != "" {
+		output += fmt.Sprintf("Hint: %s\n", hint)
+	}
+	return output
+}
+
+func formatGitCommandError(err error) string {
+	gitErr, ok := asType[*domain.GitCommandError](err)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("Error: %s\n", gitErr.Error())
+}
+
+func formatNavigationServiceError(err error) string {
+	navErr, ok := asType[*domain.NavigationServiceError](err)
+	if !ok {
+		return ""
+	}
+	output := fmt.Sprintf("Error: %s\n", navErr.Error())
+	if hint := hintFor(err); hint != "" {
+		output += fmt.Sprintf("Hint: %s\n", hint)
+	}
+	return output
+}
+
+func formatResolutionError(err error) string {
+	resErr, ok := asType[*domain.ResolutionError](err)
+	if !ok {
+		return ""
+	}
+	output := fmt.Sprintf("Error: %s\n", resErr.Error())
+	if hint := hintFor(err); hint != "" {
+		output += fmt.Sprintf("Hint: %s\n", hint)
+	}
+	return output
+}
+
+func formatConflictError(err error) string {
+	conflictErr, ok := asType[*domain.ConflictError](err)
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("Error: %s\n", conflictErr.Error())
+}
+
+func formatWorktreeError(err error) string {
+	worktreeErr, ok := asType[*domain.WorktreeServiceError](err)
+	if !ok {
+		return ""
+	}
+	output := fmt.Sprintf("Error: %s\n", worktreeErr.Error())
+	if hint := hintFor(err); hint != "" {
+		output += fmt.Sprintf("Hint: %s\n", hint)
+	}
+	return output
+}
+
 func formatProjectError(err error) string {
-	projectErr := func() *domain.ProjectServiceError {
-		target := &domain.ProjectServiceError{}
-		_ = errors.As(err, &target)
-		return target
-	}()
-	var output strings.Builder
-
-	// The Error() method already provides user-friendly messages
-	output.WriteString(fmt.Sprintf("Error: %s\n", projectErr.Error()))
-
-	// Add helpful suggestion (quiet mode is handled by wrapper)
-	output.WriteString("Hint: Use 'twiggit list --all' to see available projects\n")
-
-	return output.String()
+	projectErr, ok := asType[*domain.ProjectServiceError](err)
+	if !ok {
+		return ""
+	}
+	output := fmt.Sprintf("Error: %s\n", projectErr.Error())
+	if hint := hintFor(err); hint != "" {
+		output += fmt.Sprintf("Hint: %s\n", hint)
+	}
+	return output
 }
 
-// formatServiceError formats ServiceError with actionable hints
 func formatServiceError(err error) string {
-	serviceErr := func() *domain.ServiceError {
-		target := &domain.ServiceError{}
-		_ = errors.As(err, &target)
-		return target
-	}()
-	var output strings.Builder
-
-	// The Error() method now returns just the message without operation names
-	output.WriteString(fmt.Sprintf("Error: %s\n", serviceErr.Error()))
-
-	// Add a generic helpful suggestion (quiet mode is handled by wrapper)
-	output.WriteString("Hint: Check your configuration and try again\n")
-
-	return output.String()
+	serviceErr, ok := asType[*domain.ServiceError](err)
+	if !ok {
+		return ""
+	}
+	output := fmt.Sprintf("Error: %s\n", serviceErr.Error())
+	if hint := hintFor(err); hint != "" {
+		output += fmt.Sprintf("Hint: %s\n", hint)
+	} else {
+		output += "Hint: Check your configuration and try again\n"
+	}
+	return output
 }
 
 // formatGenericError formats any error with basic plain text formatting

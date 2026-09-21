@@ -112,9 +112,8 @@ if strings.Contains(err.Error(), "worktree not found") {
     return nil
 }
 
-// Right: Type-based error detection
-var worktreeErr *domain.WorktreeServiceError
-if errors.As(err, &worktreeErr) && worktreeErr.Message == "worktree not found in any project" {
+// Right: Sentinel-based error detection
+if errors.Is(err, domain.ErrWorktreeNotFound) {
     return nil
 }
 ```

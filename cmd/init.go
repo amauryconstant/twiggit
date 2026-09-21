@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -36,16 +35,16 @@ Examples:
   twiggit init bash                       # Print bash wrapper to stdout
   twiggit init --install                  # Install to auto-detected config file
   twiggit init bash --install -c ~/.bashrc  # Install to specific config file`,
-		SilenceUsage:   true,
-		SilenceErrors:  true,
-		Args:           cobra.MaximumNArgs(1),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Args:          cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flag combinations
 			if configFile != "" && !install {
-				return errors.New("--config requires --install")
+				return fmt.Errorf("%w: --config requires --install", ErrFlagUsage)
 			}
 			if force && !install {
-				return errors.New("--force requires --install")
+				return fmt.Errorf("%w: --force requires --install", ErrFlagUsage)
 			}
 
 			// Parse shell type from positional argument

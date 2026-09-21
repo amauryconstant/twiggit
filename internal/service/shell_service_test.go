@@ -31,8 +31,8 @@ func setupShellService() (application.ShellService, *domain.Config) {
 	shellInfra.On("DetectConfigFile", domain.ShellZsh).Return("/home/user/.zshrc", nil)
 	shellInfra.On("DetectConfigFile", domain.ShellFish).Return("/home/user/.config/fish/config.fish", nil)
 	shellInfra.On("DetectConfigFile", mock.AnythingOfType("domain.ShellType")).Return("", nil).Maybe()
-	shellInfra.On("InstallWrapper", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(domain.NewShellError(domain.ErrWrapperInstallation, "mock", "mock installation failure"))
-	shellInfra.On("ValidateInstallation", mock.Anything, mock.Anything).Return(domain.NewShellError(domain.ErrShellNotInstalled, "mock", "mock validation failure"))
+	shellInfra.On("InstallWrapper", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(domain.NewShellWrapperError("mock", "installation", "mock installation failure", nil))
+	shellInfra.On("ValidateInstallation", mock.Anything, mock.Anything).Return(domain.NewShellNotInstalledError("mock", "mock validation failure", nil))
 	service := NewShellService(shellInfra, config)
 
 	return service, config

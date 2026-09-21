@@ -4,49 +4,50 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"twiggit/internal/domain"
 )
 
-// ExitCode defines the exit codes used by the application
+// ErrFlagUsage is the sentinel for cmd-internal usage errors that arise
+// after flag parsing (e.g. "init --config requires --install"). cmd
+// wrappers can do `fmt.Errorf("%w: <message>", ErrFlagUsage)` to mark an
+// error as a usage failure, dispatching it to ExitCodeUsage via
+// IsCobraUsageError.
+var ErrFlagUsage = errors.New("cmd: flag usage error")
+
+// ExitCode defines the exit codes used by the application.
+//
+// The canonical mapping is:
+//
+//	0 ExitCodeSuccess — clean run
+//	1 ExitCodeError   — any non-usage failure, runtime error, or recovered panic
+//	2 ExitCodeUsage   — cobra/pflag typed usage error
+//
+// Per-resource NotFound categories share ExitCodeError; they are
+// distinguished in the formatter hint layer.
 type ExitCode int
 
 const (
-	// ExitCodeSuccess indicates successful execution
+	// ExitCodeSuccess indicates clean exit.
 	ExitCodeSuccess ExitCode = 0
-	// ExitCodeError indicates a general error occurred
+	// ExitCodeError is the catch-all for non-usage failures.
 	ExitCodeError ExitCode = 1
-	// ExitCodeUsage indicates incorrect command-line usage
+	// ExitCodeUsage indicates a typed cobra/pflag usage error.
 	ExitCodeUsage ExitCode = 2
-	// ExitCodeConfig indicates a configuration error
-	ExitCodeConfig ExitCode = 3
-	// ExitCodeGit indicates a git operation error
-	ExitCodeGit ExitCode = 4
-	// ExitCodeValidation indicates an input validation error
-	ExitCodeValidation ExitCode = 5
-	// ExitCodeNotFound indicates a resource was not found
-	ExitCodeNotFound ExitCode = 6
 )
 
-// ErrorCategory defines categories of errors for consistent handling
+// ErrorCategory groups errors for dispatch in the formatter and exit-code
+// mapping. The three remaining categories map onto the three exit codes.
 type ErrorCategory int
 
 const (
-	// ErrorCategoryCobra represents Cobra argument/flag validation errors
+	// ErrorCategoryCobra marks cobra usage errors.
 	ErrorCategoryCobra ErrorCategory = iota
-	// ErrorCategoryValidation represents input validation errors
-	ErrorCategoryValidation
-	// ErrorCategoryService represents service operation errors
+	// ErrorCategoryService marks service-class runtime errors.
 	ErrorCategoryService
-	// ErrorCategoryGit represents git operation errors
-	ErrorCategoryGit
-	// ErrorCategoryConfig represents configuration errors
-	ErrorCategoryConfig
-	// ErrorCategoryNotFound represents resource not found errors
-	ErrorCategoryNotFound
-	// ErrorCategoryGeneric represents all other errors
+	// ErrorCategoryGeneric marks unclassified errors.
 	ErrorCategoryGeneric
 )
 
@@ -57,140 +58,111 @@ func HandleCLIError(err error) ExitCode {
 
 // HandleCLIErrorWithCommand maps errors to CLI output and returns exit code, respecting quiet mode from command
 func HandleCLIErrorWithCommand(cmd *cobra.Command, err error) ExitCode {
-	// Check if this is a Cobra argument validation error
-	if IsCobraArgumentError(err) {
-		// Print Cobra's argument validation error since we silenced it in the command
+	if IsCobraUsageError(err) {
 		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
 		return ExitCodeUsage
 	}
 
-	// Check for quiet mode (errors always go to stderr - task 3.7)
 	quiet := false
 	if cmd != nil {
 		quiet = isQuiet(cmd)
 	}
 
-	// Format and print error
 	formatter := NewErrorFormatterWithOptions(quiet)
 	formattedError := formatter.Format(err)
 	fmt.Fprint(os.Stderr, formattedError)
 
-	// Return appropriate exit code based on error category
 	return GetExitCodeForError(err)
 }
 
-// GetExitCodeForError maps errors to appropriate exit codes
+// GetExitCodeForError maps errors to the three-code exit contract.
 func GetExitCodeForError(err error) ExitCode {
-	category := CategorizeError(err)
-
-	switch category {
-	case ErrorCategoryCobra:
-		return ExitCodeUsage
-	case ErrorCategoryValidation:
-		return ExitCodeValidation
-	case ErrorCategoryConfig:
-		return ExitCodeConfig
-	case ErrorCategoryGit:
-		return ExitCodeGit
-	case ErrorCategoryNotFound:
-		return ExitCodeNotFound
-	case ErrorCategoryService:
-		return ExitCodeError
-	default:
-		return ExitCodeError
+	if err == nil {
+		return ExitCodeSuccess
 	}
+	if IsCobraUsageError(err) {
+		return ExitCodeUsage
+	}
+	return ExitCodeError
 }
 
 // CategorizeError determines the category of an error for consistent handling
 func CategorizeError(err error) ErrorCategory {
-	// Check for Cobra argument errors first
-	if IsCobraArgumentError(err) {
+	if IsCobraUsageError(err) {
 		return ErrorCategoryCobra
 	}
-
-	// Check for not-found errors (check before general category checks)
-	var worktreeServiceErr *domain.WorktreeServiceError
-	if errors.As(err, &worktreeServiceErr) && worktreeServiceErr.IsNotFound() {
-		return ErrorCategoryNotFound
-	}
-
-	var gitRepoErr *domain.GitRepositoryError
-	if errors.As(err, &gitRepoErr) && gitRepoErr.IsNotFound() {
-		return ErrorCategoryNotFound
-	}
-
-	var gitWorktreeErr *domain.GitWorktreeError
-	if errors.As(err, &gitWorktreeErr) && gitWorktreeErr.IsNotFound() {
-		return ErrorCategoryNotFound
-	}
-
-	// Check for specific domain error types using errors.As for wrapped error support
-	var validationErr *domain.ValidationError
-	if errors.As(err, &validationErr) {
-		return ErrorCategoryValidation
-	}
-
-	if errors.As(err, &worktreeServiceErr) {
+	if errors.Is(err, domain.ErrGitRepoNotFound) ||
+		errors.Is(err, domain.ErrWorktreeNotFound) ||
+		errors.Is(err, domain.ErrProjectNotFound) ||
+		errors.Is(err, domain.ErrResolutionNotFound) {
 		return ErrorCategoryService
 	}
-
-	var projectServiceErr *domain.ProjectServiceError
-	if errors.As(err, &projectServiceErr) {
+	if errors.As(err, new(*domain.ValidationError)) ||
+		errors.As(err, new(*domain.WorktreeServiceError)) ||
+		errors.As(err, new(*domain.ProjectServiceError)) ||
+		errors.As(err, new(*domain.ServiceError)) {
 		return ErrorCategoryService
 	}
-
-	var serviceErr *domain.ServiceError
-	if errors.As(err, &serviceErr) {
-		return ErrorCategoryService
-	}
-
-	if errors.As(err, &gitRepoErr) {
-		return ErrorCategoryGit
-	}
-
-	if errors.As(err, &gitWorktreeErr) {
-		return ErrorCategoryGit
-	}
-
-	var gitCmdErr *domain.GitCommandError
-	if errors.As(err, &gitCmdErr) {
-		return ErrorCategoryGit
-	}
-
-	var configErr *domain.ConfigError
-	if errors.As(err, &configErr) {
-		return ErrorCategoryConfig
-	}
-
-	// Check for validation-related errors by message content
-	errStr := strings.ToLower(err.Error())
-	if strings.Contains(errStr, "invalid") || strings.Contains(errStr, "validation") {
-		return ErrorCategoryValidation
-	}
-
 	return ErrorCategoryGeneric
 }
 
-// IsCobraArgumentError checks if the error is a Cobra argument validation error
-func IsCobraArgumentError(err error) bool {
-	errStr := err.Error()
-
-	// Common Cobra error patterns for argument validation
-	cobraPatterns := []string{
-		"accepts",
-		"requires",
-		"received",
-		"unknown shorthand flag",
-		"unknown flag",
-		"flag needs an argument",
-		"required flag(s)",
+// IsCobraUsageError reports whether err is a typed pflag usage error.
+// Arg-shape failures (cobra.Args validators) are blocked before RunE runs,
+// so the typed walk here covers only flag-value errors emitted by pflag
+// during flag parsing plus the cmd-internal ErrFlagUsage sentinel.
+func IsCobraUsageError(err error) bool {
+	if err == nil {
+		return false
 	}
-
-	for _, pattern := range cobraPatterns {
-		if strings.Contains(errStr, pattern) {
-			return true
-		}
+	if errors.Is(err, ErrFlagUsage) {
+		return true
 	}
-
+	var vre *pflag.ValueRequiredError
+	if errors.As(err, &vre) {
+		return true
+	}
+	var ive *pflag.InvalidValueError
+	if errors.As(err, &ive) {
+		return true
+	}
+	var ise *pflag.InvalidSyntaxError
+	if errors.As(err, &ise) {
+		return true
+	}
 	return false
+}
+
+// IsCobraArgumentError is retained as an alias for callers that still
+// expect the historical name. New code should call IsCobraUsageError.
+func IsCobraArgumentError(err error) bool {
+	return IsCobraUsageError(err)
+}
+
+// flagParseError wraps cobra's flag-parsing errors in a typed error so
+// IsCobraUsageError can match them without falling back to substring
+// matching.
+type flagParseError struct {
+	err error
+}
+
+func (w *flagParseError) Error() string {
+	if w.err == nil {
+		return ""
+	}
+	return w.err.Error()
+}
+
+func (w *flagParseError) Unwrap() error { return w.err }
+
+func (w *flagParseError) Is(target error) bool {
+	return target == ErrFlagUsage
+}
+
+// WrapFlagError wraps a cobra-emitted flag-parsing error in a
+// flagParseError so it dispatches to ExitCodeUsage.
+func WrapFlagError(err error) error {
+	if err == nil {
+		return nil
+	}
+	return &flagParseError{err: err}
 }

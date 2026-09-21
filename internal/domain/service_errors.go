@@ -2,7 +2,6 @@ package domain
 
 import (
 	"fmt"
-	"strings"
 )
 
 // ServiceError represents a general service operation error
@@ -10,7 +9,7 @@ type ServiceError struct {
 	Service   string // Service name (e.g., "WorktreeService", "ProjectService")
 	Operation string // Operation name (e.g., "CreateWorktree", "DiscoverProject")
 	Message   string // Error message
-	Cause     error  // Underlying cause
+	Err       error  // Underlying cause
 }
 
 func (e *ServiceError) Error() string {
@@ -19,16 +18,16 @@ func (e *ServiceError) Error() string {
 }
 
 func (e *ServiceError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
 // NewServiceError creates a new service error
-func NewServiceError(service, operation, message string, cause error) *ServiceError {
+func NewServiceError(service, operation, message string, err error) *ServiceError {
 	return &ServiceError{
 		Service:   service,
 		Operation: operation,
 		Message:   message,
-		Cause:     cause,
+		Err:       err,
 	}
 }
 
@@ -44,17 +43,12 @@ type ValidationError struct {
 
 func (e *ValidationError) Error() string {
 	baseMsg := fmt.Sprintf("validation failed for %s.%s: %s (value: %s)", e.request, e.field, e.message, e.value)
-	if len(e.suggestions) > 0 {
-		var sb strings.Builder
-		sb.WriteString(baseMsg)
-		for _, suggestion := range e.suggestions {
-			sb.WriteString("\n💡 ")
-			sb.WriteString(suggestion)
-		}
-		return sb.String()
-	}
 	return baseMsg
 }
+
+// Unwrap returns nil: ValidationError is a terminal error type with no
+// underlying cause to chain to.
+func (e *ValidationError) Unwrap() error { return nil }
 
 // NewValidationError creates a new validation error
 func NewValidationError(request, field, value, message string) *ValidationError {
@@ -113,7 +107,7 @@ type WorktreeServiceError struct {
 	BranchName   string
 	Operation    string
 	Message      string
-	Cause        error
+	Err          error
 }
 
 func (e *WorktreeServiceError) Error() string {
@@ -125,24 +119,22 @@ func (e *WorktreeServiceError) Error() string {
 }
 
 func (e *WorktreeServiceError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
-// IsNotFound returns true if the error indicates the worktree was not found.
-func (e *WorktreeServiceError) IsNotFound() bool {
-	lowerMsg := strings.ToLower(e.Message)
-	return strings.Contains(lowerMsg, "not found") ||
-		strings.Contains(lowerMsg, "does not exist")
+// Is reports whether the wrapped sentinel matches.
+func (e *WorktreeServiceError) Is(target error) bool {
+	return target == ErrWorktreeNotFound
 }
 
 // NewWorktreeServiceError creates a new worktree service error
-func NewWorktreeServiceError(worktreePath, branchName, operation, message string, cause error) *WorktreeServiceError {
+func NewWorktreeServiceError(worktreePath, branchName, operation, message string, err error) *WorktreeServiceError {
 	return &WorktreeServiceError{
 		WorktreePath: worktreePath,
 		BranchName:   branchName,
 		Operation:    operation,
 		Message:      message,
-		Cause:        cause,
+		Err:          err,
 	}
 }
 
@@ -152,7 +144,7 @@ type ProjectServiceError struct {
 	ProjectPath string
 	Operation   string
 	Message     string
-	Cause       error
+	Err         error
 }
 
 func (e *ProjectServiceError) Error() string {
@@ -164,24 +156,22 @@ func (e *ProjectServiceError) Error() string {
 }
 
 func (e *ProjectServiceError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
-// IsNotFound returns true if the error indicates the project was not found.
-func (e *ProjectServiceError) IsNotFound() bool {
-	lowerMsg := strings.ToLower(e.Message)
-	return strings.Contains(lowerMsg, "not found") ||
-		strings.Contains(lowerMsg, "does not exist")
+// Is reports whether the wrapped sentinel matches.
+func (e *ProjectServiceError) Is(target error) bool {
+	return target == ErrProjectNotFound
 }
 
 // NewProjectServiceError creates a new project service error
-func NewProjectServiceError(projectName, projectPath, operation, message string, cause error) *ProjectServiceError {
+func NewProjectServiceError(projectName, projectPath, operation, message string, err error) *ProjectServiceError {
 	return &ProjectServiceError{
 		ProjectName: projectName,
 		ProjectPath: projectPath,
 		Operation:   operation,
 		Message:     message,
-		Cause:       cause,
+		Err:         err,
 	}
 }
 
@@ -191,7 +181,7 @@ type NavigationServiceError struct {
 	Context   string
 	Operation string
 	Message   string
-	Cause     error
+	Err       error
 }
 
 func (e *NavigationServiceError) Error() string {
@@ -203,24 +193,22 @@ func (e *NavigationServiceError) Error() string {
 }
 
 func (e *NavigationServiceError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
-// IsNotFound returns true if the error indicates the navigation target was not found.
-func (e *NavigationServiceError) IsNotFound() bool {
-	lowerMsg := strings.ToLower(e.Message)
-	return strings.Contains(lowerMsg, "not found") ||
-		strings.Contains(lowerMsg, "does not exist")
+// Is reports whether the wrapped sentinel matches.
+func (e *NavigationServiceError) Is(target error) bool {
+	return target == ErrResolutionNotFound
 }
 
 // NewNavigationServiceError creates a new navigation service error
-func NewNavigationServiceError(target, context, operation, message string, cause error) *NavigationServiceError {
+func NewNavigationServiceError(target, context, operation, message string, err error) *NavigationServiceError {
 	return &NavigationServiceError{
 		Target:    target,
 		Context:   context,
 		Operation: operation,
 		Message:   message,
-		Cause:     cause,
+		Err:       err,
 	}
 }
 
@@ -230,7 +218,7 @@ type ResolutionError struct {
 	Context     string
 	Message     string
 	Suggestions []string // Optional suggestions for resolution
-	Cause       error
+	Err         error
 }
 
 func (e *ResolutionError) Error() string {
@@ -244,24 +232,22 @@ func (e *ResolutionError) Error() string {
 }
 
 func (e *ResolutionError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
-// IsNotFound returns true if the error indicates the resolution target was not found.
-func (e *ResolutionError) IsNotFound() bool {
-	lowerMsg := strings.ToLower(e.Message)
-	return strings.Contains(lowerMsg, "not found") ||
-		strings.Contains(lowerMsg, "does not exist")
+// Is reports whether the wrapped sentinel matches.
+func (e *ResolutionError) Is(target error) bool {
+	return target == ErrResolutionNotFound
 }
 
 // NewResolutionError creates a new resolution error
-func NewResolutionError(target, context, message string, suggestions []string, cause error) *ResolutionError {
+func NewResolutionError(target, context, message string, suggestions []string, err error) *ResolutionError {
 	return &ResolutionError{
 		Target:      target,
 		Context:     context,
 		Message:     message,
 		Suggestions: suggestions,
-		Cause:       cause,
+		Err:         err,
 	}
 }
 
@@ -271,7 +257,7 @@ type ConflictError struct {
 	Identifier string // Resource identifier
 	Operation  string // Operation that conflicted
 	Message    string // Conflict description
-	Cause      error
+	Err        error
 }
 
 func (e *ConflictError) Error() string {
@@ -279,16 +265,16 @@ func (e *ConflictError) Error() string {
 }
 
 func (e *ConflictError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
 // NewConflictError creates a new conflict error
-func NewConflictError(resource, identifier, operation, message string, cause error) *ConflictError {
+func NewConflictError(resource, identifier, operation, message string, err error) *ConflictError {
 	return &ConflictError{
 		Resource:   resource,
 		Identifier: identifier,
 		Operation:  operation,
 		Message:    message,
-		Cause:      cause,
+		Err:        err,
 	}
 }

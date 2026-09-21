@@ -70,7 +70,7 @@ var _ = Describe("prune command", func() {
 	Describe("error handling", func() {
 		It("fails with invalid worktree format", func() {
 			session := ctxHelper.FromOutsideGit("prune", "invalid-format")
-			cli.ShouldFailWithExit(session, 5)
+			cli.ShouldFailWithExit(session, 1)
 		})
 	})
 

@@ -43,6 +43,12 @@ across multiple projects.`,
 		},
 	}
 
+	// Wrap flag-parse errors in a typed wrapper so IsCobraUsageError
+	// can dispatch them to ExitCodeUsage without substring matching.
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		return WrapFlagError(err)
+	})
+
 	// Add persistent verbose flag
 	cmd.PersistentFlags().CountP("verbose", "v", "Increase verbosity (can be used multiple times: -v, -vv)")
 

@@ -9,7 +9,7 @@ import (
 // ContextDetectionError represents context detection errors
 type ContextDetectionError struct {
 	Path    string
-	Cause   error
+	Err     error
 	Message string
 }
 
@@ -18,14 +18,14 @@ func (e *ContextDetectionError) Error() string {
 }
 
 func (e *ContextDetectionError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
 // NewContextDetectionError creates a new context detection error
-func NewContextDetectionError(path, message string, cause error) *ContextDetectionError {
+func NewContextDetectionError(path, message string, err error) *ContextDetectionError {
 	return &ContextDetectionError{
 		Path:    path,
-		Cause:   cause,
+		Err:     err,
 		Message: message,
 	}
 }
@@ -34,7 +34,7 @@ func NewContextDetectionError(path, message string, cause error) *ContextDetecti
 type GitRepositoryError struct {
 	Path    string
 	Message string
-	Cause   error
+	Err     error
 }
 
 func (e *GitRepositoryError) Error() string {
@@ -42,22 +42,19 @@ func (e *GitRepositoryError) Error() string {
 }
 
 func (e *GitRepositoryError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
-// IsNotFound returns true if the error indicates the repository was not found.
-func (e *GitRepositoryError) IsNotFound() bool {
-	lowerMsg := strings.ToLower(e.Message)
-	return strings.Contains(lowerMsg, "not found") ||
-		strings.Contains(lowerMsg, "does not exist") ||
-		strings.Contains(lowerMsg, "no such file or directory")
+// Is reports whether the wrapped sentinel matches.
+func (e *GitRepositoryError) Is(target error) bool {
+	return target == ErrGitRepoNotFound
 }
 
 // NewGitRepositoryError creates a new git repository error
-func NewGitRepositoryError(path, message string, cause error) *GitRepositoryError {
+func NewGitRepositoryError(path, message string, err error) *GitRepositoryError {
 	return &GitRepositoryError{
 		Path:    path,
-		Cause:   cause,
+		Err:     err,
 		Message: message,
 	}
 }
@@ -67,7 +64,7 @@ type GitWorktreeError struct {
 	WorktreePath string
 	BranchName   string
 	Message      string
-	Cause        error
+	Err          error
 }
 
 func (e *GitWorktreeError) Error() string {
@@ -96,38 +93,36 @@ func (e *GitWorktreeError) formatBaseMessage() string {
 
 // getCauseDetails extracts useful information from the cause error
 func (e *GitWorktreeError) getCauseDetails() string {
-	if e.Cause == nil {
+	if e.Err == nil {
 		return ""
 	}
 
 	// If the cause is a GitCommandError, include its details for better debugging
 	gitCmdErr := &GitCommandError{}
-	if errors.As(e.Cause, &gitCmdErr) {
+	if errors.As(e.Err, &gitCmdErr) {
 		return gitCmdErr.Error()
 	}
 
 	// For other error types, just return the error message
-	return e.Cause.Error()
+	return e.Err.Error()
 }
 
 func (e *GitWorktreeError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
-// IsNotFound returns true if the error indicates the worktree was not found.
-func (e *GitWorktreeError) IsNotFound() bool {
-	lowerMsg := strings.ToLower(e.Message)
-	return strings.Contains(lowerMsg, "not found") ||
-		strings.Contains(lowerMsg, "does not exist")
+// Is reports whether the wrapped sentinel matches.
+func (e *GitWorktreeError) Is(target error) bool {
+	return target == ErrWorktreeNotFound
 }
 
 // NewGitWorktreeError creates a new git worktree error
-func NewGitWorktreeError(worktreePath, branchName, message string, cause error) *GitWorktreeError {
+func NewGitWorktreeError(worktreePath, branchName, message string, err error) *GitWorktreeError {
 	return &GitWorktreeError{
 		WorktreePath: worktreePath,
 		BranchName:   branchName,
 		Message:      message,
-		Cause:        cause,
+		Err:          err,
 	}
 }
 
@@ -139,7 +134,7 @@ type GitCommandError struct {
 	Stdout   string
 	Stderr   string
 	Message  string
-	Cause    error
+	Err      error
 }
 
 func (e *GitCommandError) Error() string {
@@ -169,11 +164,11 @@ func containsOnlyWhitespace(s string) bool {
 }
 
 func (e *GitCommandError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
 // NewGitCommandError creates a new git command error
-func NewGitCommandError(command string, args []string, exitCode int, stdout, stderr, message string, cause error) *GitCommandError {
+func NewGitCommandError(command string, args []string, exitCode int, stdout, stderr, message string, err error) *GitCommandError {
 	return &GitCommandError{
 		Command:  command,
 		Args:     args,
@@ -181,7 +176,7 @@ func NewGitCommandError(command string, args []string, exitCode int, stdout, std
 		Stdout:   stdout,
 		Stderr:   stderr,
 		Message:  message,
-		Cause:    cause,
+		Err:      err,
 	}
 }
 
@@ -189,7 +184,7 @@ func NewGitCommandError(command string, args []string, exitCode int, stdout, std
 type ConfigError struct {
 	Path    string
 	Message string
-	Cause   error
+	Err     error
 }
 
 func (e *ConfigError) Error() string {
@@ -197,14 +192,14 @@ func (e *ConfigError) Error() string {
 }
 
 func (e *ConfigError) Unwrap() error {
-	return e.Cause
+	return e.Err
 }
 
 // NewConfigError creates a new config error
-func NewConfigError(path, message string, cause error) *ConfigError {
+func NewConfigError(path, message string, err error) *ConfigError {
 	return &ConfigError{
 		Path:    path,
 		Message: message,
-		Cause:   cause,
+		Err:     err,
 	}
 }

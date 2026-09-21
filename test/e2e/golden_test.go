@@ -75,7 +75,7 @@ var _ = Describe("Golden file tests", func() {
 
 			// Try to create worktree with invalid branch name
 			session := ctxHelper.FromProjectDir("test-project", "create", "invalid@branch")
-			cli.ShouldFailWithExit(session, 5) // Validation error
+			cli.ShouldFailWithExit(session, 1) // Validation error
 
 			// Get error output from stderr
 			output := string(session.Err.Contents())

@@ -177,7 +177,7 @@ var _ = Describe("list command", func() {
 		fixture.SetupSingleProject("test-project")
 
 		session := ctxHelper.FromProjectDir("test-project", "list", "--output", "yaml")
-		cli.ShouldFailWithExit(session, 5) // ExitCodeValidation
+		cli.ShouldFailWithExit(session, 1) // ExitCodeValidation
 		cli.ShouldErrorOutput(session, "invalid output format")
 	})
 
@@ -196,7 +196,7 @@ var _ = Describe("list command", func() {
 		fixture.SetupSingleProject("test-project")
 
 		session := ctxHelper.FromProjectDir("test-project", "create", "invalid@branch", "--quiet")
-		cli.ShouldFailWithExit(session, 5) // ExitCodeValidation
+		cli.ShouldFailWithExit(session, 1) // ExitCodeValidation
 		// Error should still go to stderr
 		Eventually(session.Err).Should(gbytes.Say("Error:"))
 	})

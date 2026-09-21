@@ -1,12 +1,2 @@
 Error: worktree not found for target 'non-existent-worktree' (context: /tmp/fixtures/projects/test-project)
-Usage:
-  twiggit cd <project|project/branch> [flags]
-
-Flags:
-  -h, --help   help for cd
-
-Global Flags:
-  -q, --quiet           Suppress non-essential output
-  -v, --verbose count   Increase verbosity (can be used multiple times: -v, -vv)
-
-Error: worktree not found for target 'non-existent-worktree' (context: /tmp/fixtures/projects/test-project)
+Hint: Use 'twiggit list' to see available navigation targets

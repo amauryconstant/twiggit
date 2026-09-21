@@ -34,9 +34,9 @@ func newCompletionShellCommand(rootCmd *cobra.Command, shell string) *cobra.Comm
 To load completions:
 
 ` + getShellInstructions(shell),
-		SilenceUsage:         true,
-		SilenceErrors:        true,
-		Args:                 cobra.ExactArgs(1),
+		SilenceUsage:          true,
+		SilenceErrors:         true,
+		Args:                  cobra.ExactArgs(1),
 		DisableFlagsInUseLine: true,
 		ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return nil, cobra.ShellCompDirectiveNoFileComp

@@ -38,7 +38,7 @@ func TestValidate(t *testing.T) {
 
 		err := config.Validate()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "projects_directory must be absolute path")
+		assert.True(t, hasSuggestion(err, "projects_directory must be absolute path"))
 	})
 
 	t.Run("invalid worktrees directory", func(t *testing.T) {
@@ -50,7 +50,7 @@ func TestValidate(t *testing.T) {
 
 		err := config.Validate()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "worktrees_directory must be absolute path")
+		assert.True(t, hasSuggestion(err, "worktrees_directory must be absolute path"))
 	})
 
 	t.Run("empty default source branch", func(t *testing.T) {
@@ -62,7 +62,7 @@ func TestValidate(t *testing.T) {
 
 		err := config.Validate()
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "default_source_branch cannot be empty")
+		assert.True(t, hasSuggestion(err, "default_source_branch cannot be empty"))
 	})
 
 	t.Run("multiple validation errors", func(t *testing.T) {
@@ -75,9 +75,9 @@ func TestValidate(t *testing.T) {
 		err := config.Validate()
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "config validation failed")
-		// Should contain all validation errors
-		assert.Contains(t, err.Error(), "projects_directory must be absolute path")
-		assert.Contains(t, err.Error(), "worktrees_directory must be absolute path")
-		assert.Contains(t, err.Error(), "default_source_branch cannot be empty")
+		// Should contain all validation errors as suggestions
+		assert.True(t, hasSuggestion(err, "projects_directory must be absolute path"))
+		assert.True(t, hasSuggestion(err, "worktrees_directory must be absolute path"))
+		assert.True(t, hasSuggestion(err, "default_source_branch cannot be empty"))
 	})
 }

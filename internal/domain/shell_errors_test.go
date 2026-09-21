@@ -2,186 +2,137 @@ package domain
 
 import (
 	"errors"
-	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestShellError_Error_WithContextAndCause(t *testing.T) {
-	cause := errors.New("file not found")
-	err := NewShellErrorWithCause(ErrConfigFileNotFound, "bash", "wrapper installation", cause)
-	msg := err.Error()
-
-	assert.Contains(t, msg, "wrapper installation")
-	assert.Contains(t, msg, "file not found")
-}
-
-func TestShellError_Error_WithContextAndShellType(t *testing.T) {
-	err := NewShellError(ErrInvalidShellType, "invalid", "shell detection")
-	msg := err.Error()
-
-	assert.Contains(t, msg, "shell detection")
-	assert.Contains(t, msg, "invalid")
-}
-
-func TestShellError_Error_OnlyContext(t *testing.T) {
-	err := NewShellError(ErrInferenceFailed, "", "could not infer shell type")
-	msg := err.Error()
-
-	assert.Equal(t, "could not infer shell type", msg)
-}
-
-func TestShellError_Error_OnlyCause(t *testing.T) {
-	cause := errors.New("permission denied")
-	err := NewShellErrorWithCause(ErrConfigFileNotWritable, "", "", cause)
-	msg := err.Error()
-
-	assert.Equal(t, "permission denied", msg)
-}
-
-func TestShellError_Error_OnlyShellType(t *testing.T) {
-	err := NewShellError(ErrInvalidShellType, "fish", "")
-	msg := err.Error()
-
-	assert.Contains(t, msg, ErrInvalidShellType)
-	assert.Contains(t, msg, "fish")
-	assert.Equal(t, ErrInvalidShellType+": fish", msg)
-}
-
-func TestShellError_Error_OnlyCode(t *testing.T) {
-	err := NewShellError(ErrWrapperGeneration, "", "")
-	msg := err.Error()
-
-	assert.Contains(t, msg, ErrWrapperGeneration)
-	assert.Equal(t, fmt.Sprintf("shell error [%s]", ErrWrapperGeneration), msg)
-}
-
-func TestShellError_Unwrap(t *testing.T) {
-	t.Run("with cause returns cause", func(t *testing.T) {
-		cause := errors.New("underlying error")
-		err := NewShellErrorWithCause(ErrConfigFileNotFound, "bash", "context", cause)
-		assert.Equal(t, cause, err.Unwrap())
-	})
-
-	t.Run("without cause returns nil", func(t *testing.T) {
-		err := NewShellError(ErrInvalidShellType, "bash", "context")
-		assert.NoError(t, err.Unwrap())
-	})
-}
-
-func TestShellError_ConstantValues(t *testing.T) {
-	assert.Equal(t, "INVALID_SHELL_TYPE", ErrInvalidShellType)
-	assert.Equal(t, "SHELL_NOT_INSTALLED", ErrShellNotInstalled)
-	assert.Equal(t, "SHELL_ALREADY_INSTALLED", ErrShellAlreadyInstalled)
-	assert.Equal(t, "CONFIG_FILE_NOT_FOUND", ErrConfigFileNotFound)
-	assert.Equal(t, "CONFIG_FILE_NOT_WRITABLE", ErrConfigFileNotWritable)
-	assert.Equal(t, "WRAPPER_GENERATION_FAILED", ErrWrapperGeneration)
-	assert.Equal(t, "WRAPPER_INSTALLATION_FAILED", ErrWrapperInstallation)
-	assert.Equal(t, "INFERENCE_FAILED", ErrInferenceFailed)
-	assert.Equal(t, "SHELL_DETECTION_FAILED", ErrShellDetectionFailed)
-}
-
-func TestShellError_ComplexScenarios(t *testing.T) {
-	t.Run("full error with all fields", func(t *testing.T) {
-		cause := errors.New("disk full")
-		err := NewShellErrorWithCause(ErrWrapperInstallation, "zsh", "installing wrapper", cause)
-		msg := err.Error()
-
-		assert.Contains(t, msg, "installing wrapper")
-		assert.Contains(t, msg, "disk full")
-		assert.Equal(t, "zsh", err.ShellType)
-		assert.Equal(t, ErrWrapperInstallation, err.Code)
-		assert.Equal(t, "installing wrapper", err.Context)
-	})
-
-	t.Run("error with wrapped ShellError", func(t *testing.T) {
-		innerCause := errors.New("permission denied")
-		innerErr := NewShellErrorWithCause(ErrConfigFileNotWritable, "bash", "writing config", innerCause)
-		outerCause := innerErr
-		outerErr := NewShellErrorWithCause(ErrWrapperInstallation, "bash", "wrapper installation", outerCause)
-		msg := outerErr.Error()
-
-		assert.Contains(t, msg, "wrapper installation")
-		assert.Contains(t, msg, "writing config")
-	})
-}
-
-func TestShellError_NewShellError_CreatesWithoutCause(t *testing.T) {
-	err := NewShellError(ErrInvalidShellType, "bash", "shell detection")
-
-	assert.Equal(t, ErrInvalidShellType, err.Code)
-	assert.Equal(t, "bash", err.ShellType)
-	assert.Equal(t, "shell detection", err.Context)
-	assert.NoError(t, err.Cause)
-}
-
-func TestShellError_NewShellErrorWithCause_CreatesWithCause(t *testing.T) {
-	cause := errors.New("test error")
-	err := NewShellErrorWithCause(ErrConfigFileNotFound, "zsh", "file lookup", cause)
-
-	assert.Equal(t, ErrConfigFileNotFound, err.Code)
-	assert.Equal(t, "zsh", err.ShellType)
-	assert.Equal(t, "file lookup", err.Context)
-	assert.Equal(t, cause, err.Cause)
-}
-
-func TestShellError_Error_AllBranches(t *testing.T) {
-	testCases := []struct {
-		name        string
-		err         *ShellError
-		contains    []string
-		notContains []string
-		expected    string
-	}{
-		{
-			name:     "context + cause",
-			err:      NewShellErrorWithCause("CODE", "bash", "context", errors.New("cause msg")),
-			contains: []string{"context", "cause msg"},
-			expected: "context: cause msg",
-		},
-		{
-			name:     "context + shellType (no cause)",
-			err:      NewShellError("CODE", "bash", "context"),
-			contains: []string{"context", "bash"},
-			expected: "context: bash",
-		},
-		{
-			name:     "context only",
-			err:      NewShellError("CODE", "", "context"),
-			contains: []string{"context"},
-			expected: "context",
-		},
-		{
-			name:     "cause only (no context)",
-			err:      NewShellErrorWithCause("CODE", "", "", errors.New("cause msg")),
-			contains: []string{"cause msg"},
-			expected: "cause msg",
-		},
-		{
-			name:     "shellType only (no context)",
-			err:      NewShellError("CODE", "bash", ""),
-			contains: []string{"CODE", "bash"},
-			expected: "CODE: bash",
-		},
-		{
-			name:     "code only",
-			err:      NewShellError("CODE", "", ""),
-			contains: []string{"CODE"},
-			expected: "shell error [CODE]",
-		},
+func TestSentinels_Messages(t *testing.T) {
+	expected := map[error]string{
+		ErrGitRepoNotFound:       "domain: git repository not found",
+		ErrWorktreeNotFound:      "domain: worktree not found",
+		ErrProjectNotFound:       "domain: project not found",
+		ErrResolutionNotFound:    "domain: resolution target not found",
+		ErrShellAlreadyInstalled: "domain: shell wrapper already installed",
+		ErrShellNotInstalled:     "domain: shell wrapper not installed",
+		ErrInvalidShellType:      "domain: invalid shell type",
+		ErrShellInferenceFailed:  "domain: could not infer shell type",
+		ErrShellDetectionFailed:  "domain: shell detection failed",
+		ErrWrapperGeneration:     "domain: wrapper generation failed",
+		ErrWrapperInstallation:   "domain: wrapper installation failed",
+		ErrConfigFileNotFound:    "domain: config file not found",
 	}
+	for sentinel, msg := range expected {
+		assert.Equal(t, msg, sentinel.Error(), "sentinel message mismatch")
+	}
+}
 
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			msg := tc.err.Error()
-			assert.Equal(t, tc.expected, msg)
+func TestShellAlreadyInstalledError_IsAndUnwrap(t *testing.T) {
+	cause := errors.New("disk full")
+	err := NewShellAlreadyInstalledError("bash", "installing wrapper", cause)
+	assert.ErrorIs(t, err, ErrShellAlreadyInstalled)
+	assert.NotErrorIs(t, err, ErrShellNotInstalled)
+	assert.Equal(t, cause, err.Unwrap())
+	msg := err.Error()
+	assert.Contains(t, msg, "shell wrapper already installed")
+	assert.Contains(t, msg, "bash")
+	assert.NotRegexp(t, `\.$`, msg)
+}
 
-			for _, contain := range tc.contains {
-				assert.Contains(t, msg, contain)
-			}
-			for _, notContain := range tc.notContains {
-				assert.NotContains(t, msg, notContain)
+func TestShellNotInstalledError_IsAndUnwrap(t *testing.T) {
+	cause := errors.New("file missing")
+	err := NewShellNotInstalledError("zsh", "missing block", cause)
+	assert.ErrorIs(t, err, ErrShellNotInstalled)
+	assert.NotErrorIs(t, err, ErrShellAlreadyInstalled)
+	assert.Equal(t, cause, err.Unwrap())
+	msg := err.Error()
+	assert.Contains(t, msg, "shell wrapper not installed")
+	assert.Contains(t, msg, "zsh")
+	assert.NotRegexp(t, `\.$`, msg)
+}
+
+func TestShellInvalidTypeError_IsAndUnwrap(t *testing.T) {
+	err := NewShellInvalidTypeError("powershell", "unsupported shell", nil)
+	assert.ErrorIs(t, err, ErrInvalidShellType)
+	assert.NotErrorIs(t, err, ErrShellNotInstalled)
+	require.NoError(t, err.Unwrap())
+	msg := err.Error()
+	assert.Contains(t, msg, "invalid shell type")
+	assert.Contains(t, msg, "powershell")
+	assert.NotRegexp(t, `\.$`, msg)
+}
+
+func TestShellInferenceError_IsAndUnwrap(t *testing.T) {
+	cause := errors.New("path unknown")
+	err := NewShellInferenceError("fish", "from /etc/config", cause)
+	assert.ErrorIs(t, err, ErrShellInferenceFailed)
+	assert.NotErrorIs(t, err, ErrShellDetectionFailed)
+	assert.Equal(t, cause, err.Unwrap())
+	msg := err.Error()
+	assert.Contains(t, msg, "could not infer shell type")
+	assert.Contains(t, msg, "fish")
+	assert.NotRegexp(t, `\.$`, msg)
+}
+
+func TestShellDetectionError_IsAndUnwrap(t *testing.T) {
+	err := NewShellDetectionError("SHELL env unset", nil)
+	assert.ErrorIs(t, err, ErrShellDetectionFailed)
+	assert.NotErrorIs(t, err, ErrShellInferenceFailed)
+	require.NoError(t, err.Unwrap())
+	msg := err.Error()
+	assert.Contains(t, msg, "shell detection failed")
+	assert.Contains(t, msg, "SHELL env unset")
+	assert.NotRegexp(t, `\.$`, msg)
+}
+
+func TestShellWrapperError_GenerationAndInstallation(t *testing.T) {
+	cause := errors.New("template broken")
+	genErr := NewShellWrapperError("bash", "generation", "compose failed", cause)
+	assert.ErrorIs(t, genErr, ErrWrapperGeneration)
+	assert.NotErrorIs(t, genErr, ErrWrapperInstallation)
+	assert.Equal(t, cause, genErr.Unwrap())
+
+	instErr := NewShellWrapperError("zsh", "installation", "write failed", nil)
+	assert.ErrorIs(t, instErr, ErrWrapperInstallation)
+	assert.NotErrorIs(t, instErr, ErrWrapperGeneration)
+	require.NoError(t, instErr.Unwrap())
+
+	unknown := NewShellWrapperError("fish", "other", "", nil)
+	assert.NotErrorIs(t, unknown, ErrWrapperGeneration)
+	assert.NotErrorIs(t, unknown, ErrWrapperInstallation)
+}
+
+func TestShellConfigError_IsAndUnwrap(t *testing.T) {
+	cause := errors.New("permission denied")
+	err := NewShellConfigError("/home/u/.bashrc", "cannot write", cause)
+	assert.ErrorIs(t, err, ErrConfigFileNotFound)
+	assert.NotErrorIs(t, err, ErrShellNotInstalled)
+	assert.Equal(t, cause, err.Unwrap())
+	msg := err.Error()
+	assert.Contains(t, msg, "config file error")
+	assert.Contains(t, msg, "/home/u/.bashrc")
+	assert.NotRegexp(t, `\.$`, msg)
+}
+
+func TestShellErrors_NoEmojiOrSentinelCode(t *testing.T) {
+	cases := map[string]error{
+		"already installed": NewShellAlreadyInstalledError("bash", "ctx", nil),
+		"not installed":     NewShellNotInstalledError("bash", "ctx", nil),
+		"invalid type":      NewShellInvalidTypeError("powershell", "ctx", nil),
+		"inference":         NewShellInferenceError("fish", "ctx", nil),
+		"detection":         NewShellDetectionError("ctx", nil),
+		"wrapper gen":       NewShellWrapperError("bash", "generation", "ctx", nil),
+		"wrapper inst":      NewShellWrapperError("zsh", "installation", "ctx", nil),
+		"config":            NewShellConfigError("/p/.bashrc", "ctx", nil),
+	}
+	for name, err := range cases {
+		t.Run(name, func(t *testing.T) {
+			msg := err.Error()
+			require.NotContains(t, strings.TrimSpace(msg), "💡", "must not contain emoji")
+			for _, code := range []string{"SHELL_", "INVALID_", "CONFIG_", "WRAPPER_", "INFERENCE_"} {
+				assert.NotContains(t, strings.ToUpper(msg), code, "must not expose sentinel code")
 			}
 		})
 	}

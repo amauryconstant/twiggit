@@ -1,17 +1,38 @@
 package domain
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// hasSuggestion reports whether the supplied ValidationError carries the
+// supplied suggestion text. Suggestions are now rendered via the cmd
+// formatter (with a "Hint: " prefix) rather than embedded in Error(),
+// so tests that previously inspected Error() for emoji-prefixed lines
+// now query the Suggestions accessor directly.
+func hasSuggestion(err error, needle string) bool {
+	ve := &ValidationError{}
+	ok := errors.As(err, &ve)
+	if !ok {
+		return false
+	}
+	for _, s := range ve.Suggestions() {
+		if strings.Contains(s, needle) {
+			return true
+		}
+	}
+	return false
+}
 
 func TestValidateBranchName_EmptyBranch(t *testing.T) {
 	result := ValidateBranchName("")
 
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "branch name is required")
-	assert.Contains(t, result.Error.Error(), "💡 Provide a valid branch name")
+	assert.True(t, hasSuggestion(result.Error, "Provide a valid branch name"))
 }
 
 func TestValidateBranchName_InvalidCharacters(t *testing.T) {
@@ -19,7 +40,7 @@ func TestValidateBranchName_InvalidCharacters(t *testing.T) {
 
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "branch name format is invalid")
-	assert.Contains(t, result.Error.Error(), "💡 Use only alphanumeric characters, dots, hyphens, and underscores")
+	assert.True(t, hasSuggestion(result.Error, "Use only alphanumeric characters"))
 }
 
 func TestValidateBranchName_ValidBranch(t *testing.T) {
@@ -41,7 +62,7 @@ func TestValidateProjectName_EmptyProject(t *testing.T) {
 
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "project name is required")
-	assert.Contains(t, result.Error.Error(), "💡 Provide a valid project name")
+	assert.True(t, hasSuggestion(result.Error, "Provide a valid project name"))
 }
 
 func TestValidateProjectName_InvalidCharacters(t *testing.T) {
@@ -49,7 +70,7 @@ func TestValidateProjectName_InvalidCharacters(t *testing.T) {
 
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "project name format is invalid")
-	assert.Contains(t, result.Error.Error(), "💡 Use only alphanumeric characters, hyphens, and underscores")
+	assert.True(t, hasSuggestion(result.Error, "Use only alphanumeric characters"))
 }
 
 func TestValidateProjectName_ValidProject(t *testing.T) {
@@ -85,7 +106,7 @@ func TestValidateShellType_EmptyShell(t *testing.T) {
 
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "shell type is required")
-	assert.Contains(t, result.Error.Error(), "💡 Provide a valid shell type (bash, zsh, fish)")
+	assert.True(t, hasSuggestion(result.Error, "Provide a valid shell type"))
 }
 
 func TestValidateShellType_UnsupportedShell(t *testing.T) {
@@ -93,7 +114,7 @@ func TestValidateShellType_UnsupportedShell(t *testing.T) {
 
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "unsupported shell type")
-	assert.Contains(t, result.Error.Error(), "💡 Supported shells: bash, zsh, fish")
+	assert.True(t, hasSuggestion(result.Error, "Supported shells"))
 }
 
 func TestValidateShellType_ValidShell(t *testing.T) {
@@ -111,7 +132,7 @@ func TestValidateShellType_WhitespaceHandling(t *testing.T) {
 
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "shell type format is invalid")
-	assert.Contains(t, result.Error.Error(), "💡 Shell type should not contain leading or trailing whitespace")
+	assert.True(t, hasSuggestion(result.Error, "leading or trailing whitespace"))
 }
 
 func TestValidationPipeline_ComposeValidations(t *testing.T) {
@@ -120,16 +141,13 @@ func TestValidationPipeline_ComposeValidations(t *testing.T) {
 		ValidateBranchNameFormat,
 	)
 
-	// Test valid input
 	result := pipeline.Validate("valid-branch")
 	assert.True(t, result.IsSuccess())
 
-	// Test invalid input (should fail on first validation)
 	result = pipeline.Validate("")
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "branch name is required")
 
-	// Test invalid format (should fail on second validation)
 	result = pipeline.Validate("invalid@branch")
 	assert.False(t, result.IsSuccess())
 	assert.Contains(t, result.Error.Error(), "branch name format is invalid")
@@ -161,7 +179,7 @@ func TestValidateBranchName_InvalidTrailingChars(t *testing.T) {
 			result := ValidateBranchName(branchName)
 
 			assert.False(t, result.IsSuccess())
-			assert.Contains(t, result.Error.Error(), "cannot end with")
+			assert.True(t, hasSuggestion(result.Error, "cannot end with"))
 		})
 	}
 }
@@ -182,7 +200,6 @@ func TestValidateBranchName_ValidEndingChars(t *testing.T) {
 	for _, branchName := range validCases {
 		t.Run(branchName, func(t *testing.T) {
 			result := ValidateBranchName(branchName)
-
 			assert.True(t, result.IsSuccess())
 			assert.True(t, result.Value)
 		})
@@ -219,9 +236,8 @@ func TestValidateBranchName_ReservedNames(t *testing.T) {
 	for _, tc := range reservedCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result := ValidateBranchName(tc.branchName)
-
 			assert.False(t, result.IsSuccess(), "Reserved branch name %q should fail validation", tc.branchName)
-			assert.Contains(t, result.Error.Error(), "reserved branch name")
+			assert.True(t, hasSuggestion(result.Error, "reserved branch name"))
 		})
 	}
 }
@@ -245,7 +261,6 @@ func TestValidateBranchName_NotReserved(t *testing.T) {
 	for _, branchName := range validCases {
 		t.Run(branchName, func(t *testing.T) {
 			result := ValidateBranchName(branchName)
-
 			assert.True(t, result.IsSuccess(), "Branch name %q should pass validation", branchName)
 			assert.True(t, result.Value)
 		})
@@ -271,7 +286,7 @@ func TestValidateBranchName_InvalidLeadingChars(t *testing.T) {
 			result := ValidateBranchName(branchName)
 
 			assert.False(t, result.IsSuccess(), "Branch name %q should fail validation", branchName)
-			assert.Contains(t, result.Error.Error(), "cannot start with")
+			assert.True(t, hasSuggestion(result.Error, "cannot start with"))
 		})
 	}
 }
@@ -295,7 +310,6 @@ func TestValidateBranchName_ValidLeadingChars(t *testing.T) {
 	for _, branchName := range validCases {
 		t.Run(branchName, func(t *testing.T) {
 			result := ValidateBranchName(branchName)
-
 			assert.True(t, result.IsSuccess(), "Branch name %q should pass validation", branchName)
 			assert.True(t, result.Value)
 		})
