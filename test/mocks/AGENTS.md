@@ -32,6 +32,18 @@ func (s *MyTestSuite) TestCreate() {
 }
 ```
 
+### Variadic args
+
+For methods with `opts ...T` parameters, expand the slice before
+reaching `m.Called` via `variadicArgs` in `helpers.go`. testify's
+`mock.Called` matches on positional arguments; a slice arrives as one
+argument and silently mismatches every expectation.
+
+```go
+// Method: func (m *MockContextService) GetCompletionSuggestions(partial string, opts ...domain.SuggestionOption) (...)
+args := m.Called(variadicArgs(partial, opts)...)
+```
+
 ## Adding New Mock
 
 1. Create `<name>_mock.go` in `test/mocks/`

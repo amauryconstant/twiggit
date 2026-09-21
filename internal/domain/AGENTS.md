@@ -130,7 +130,7 @@ func DetectShellFromEnv() (ShellType, error)  // reads SHELL env
 func InferShellTypeFromPath(string) ShellType
 ```
 
-**Error code:** `ErrShellDetectionFailed = "SHELL_DETECTION_FAILED"` (string constant)
+Detection failures match the `ErrShellDetectionFailed` sentinel via `errors.Is` (see Error Types table).
 
 ## Suggestion Options
 
