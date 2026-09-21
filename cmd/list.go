@@ -27,7 +27,7 @@ Examples:
   twiggit list --output json  Output in JSON format for scripts`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Args:          cobra.NoArgs,
+		Args:          wrapArgsValidator(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Validate output format
 			if output != "" && output != "text" && output != "json" {

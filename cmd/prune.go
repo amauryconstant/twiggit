@@ -40,7 +40,7 @@ Examples:
   twiggit prune --delete-branches     Prune and delete branches`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Args:          cobra.MaximumNArgs(1),
+		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
 		RunE: func(c *cobra.Command, args []string) error {
 			var specificWorktree string
 			if len(args) > 0 {

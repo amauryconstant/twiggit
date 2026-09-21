@@ -30,7 +30,7 @@ Examples:
   twiggit delete feature -C                 Delete and output navigation path`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Args:          cobra.ExactArgs(1),
+		Args:          wrapArgsValidator(cobra.ExactArgs(1)),
 		RunE: func(c *cobra.Command, args []string) error {
 			return executeDelete(c, config, args[0], force, mergedOnly, changeDir)
 		},

@@ -95,7 +95,7 @@ The canonical exit-code mapping SHALL be exactly:
 |---|---|---|
 | 0 | `ExitCodeSuccess` | Clean exit |
 | 1 | `ExitCodeError` | Unclassified error, runtime failure, or recovered panic |
-| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax/args) typed via `errors.As` against `*domain.UsageError` (or `errors.Is(err, domain.ErrUsageFlag)`). The cmd layer's `SetFlagErrorFunc` wraps cobra/pflag flag-parse errors in `*domain.UsageError` so they match this walk. Cobra's own `*cobra.FlagError` and `cobra.ErrSubCommandRequired` are blocked earlier by the `cobra.Args:` validators on each command and do not reach `GetExitCodeForError`. |
+| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax or args) typed via `errors.As` against `*domain.UsageError` (or `errors.Is(err, domain.ErrUsageFlag)`). The cmd layer wraps both classes of cobra error in `*domain.UsageError` before they reach `GetExitCodeForError`: flag-parse errors via `cmd.SetFlagErrorFunc`, and args-validator errors (e.g., `cobra.ExactArgs(n)` mismatches) via the `wrapArgsValidator` helper applied to each command's `Args:` field. Cobra's own `*cobra.FlagError` and `cobra.ErrSubCommandRequired` therefore never reach `GetExitCodeForError` unwrapped. |
 
 The cmd layer (`cli-error-formatting`) SHALL NOT define additional
 exit-code constants. `GetExitCodeForError` SHALL dispatch first via

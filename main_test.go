@@ -51,7 +51,7 @@ worktrees_dir = /tmp/worktrees
 	// Exit code should be non-zero (may be 1 for config error)
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		assert.NotEqual(t, 0, exitErr.ExitCode(), "Exit code should be non-zero for config error")
+		assert.Equal(t, 1, exitErr.ExitCode(), "config error must exit 1 per the 3-code contract")
 	}
 }
 

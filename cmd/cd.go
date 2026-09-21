@@ -25,7 +25,7 @@ Examples:
   twiggit cd feature            # Change to feature branch (relative to current project)`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Args:          cobra.MaximumNArgs(1),
+		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target := ""
 			if len(args) > 0 {

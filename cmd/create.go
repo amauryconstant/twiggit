@@ -27,7 +27,7 @@ Examples:
   twiggit create myproject/feature/my-feature    Create for specific project
   twiggit create feature --source develop       Create from specific source branch
   twiggit create feature -C                     Create and output path for shell`,
-		Args: cobra.ExactArgs(1),
+		Args: wrapArgsValidator(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return executeCreate(cmd, config, args[0], source, cdFlag)
 		},

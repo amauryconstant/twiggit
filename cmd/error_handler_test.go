@@ -4,7 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/domain"
 )
@@ -156,7 +158,65 @@ func TestUsageError_Unwrap(t *testing.T) {
 	assert.ErrorIs(t, err, cause)
 }
 
-func TestIsCobraArgumentError_Alias(t *testing.T) {
+// TestIsCobraArgumentError_AliasParity pins the legacy-alias contract: any future
+// rename of the canonical detector must keep `IsCobraArgumentError` returning the
+// same boolean so external callers do not silently diverge.
+func TestIsCobraArgumentError_AliasParity(t *testing.T) {
 	err := domain.NewUsageError("--foo", nil)
 	assert.Equal(t, IsCobraUsageError(err), IsCobraArgumentError(err))
+}
+
+// TestWrapArgsValidator_WrapsAsUsageError pins the wrap contract used by every
+// command's Args: field. Cobra's Args: validator failures reach Execute()
+// unwrapped; without the helper, IsCobraUsageError returns false and the error
+// dispatches to ExitCodeError (1) instead of ExitCodeUsage (2).
+func TestWrapArgsValidator_WrapsAsUsageError(t *testing.T) {
+	must := require.New(t)
+	is := assert.New(t)
+
+	wrapped := wrapArgsValidator(cobra.ExactArgs(1))
+	cmd := &cobra.Command{Use: "x", Args: wrapped}
+	cmd.SetArgs([]string{})
+
+	err := wrapped(cmd, nil)
+	must.Error(err)
+
+	var ue *domain.UsageError
+	is.ErrorAs(err, &ue, "args-validator failure must wrap into *domain.UsageError")
+	is.True(IsCobraUsageError(err), "IsCobraUsageError must match the wrapped error")
+	is.Equal(ExitCodeUsage, GetExitCodeForError(err), "exit code must be 2")
+}
+
+func TestWrapArgsValidator_NilOnPass(t *testing.T) {
+	is := assert.New(t)
+	wrapped := wrapArgsValidator(cobra.NoArgs)
+	cmd := &cobra.Command{Use: "x", Args: wrapped}
+	is.NoError(wrapped(cmd, nil))
+	is.NoError(wrapped(cmd, []string{}))
+}
+
+func TestHandleCLIErrorWithCommand_ValidationErrorReturnsOne(t *testing.T) {
+	err := domain.NewValidationError("Req", "field", "value", "validation failed")
+	is := assert.New(t)
+	is.Equal(ExitCodeError, HandleCLIErrorWithCommand(nil, err))
+	is.Equal(ExitCodeError, GetExitCodeForError(err))
+}
+
+func TestHandleCLIErrorWithCommand_NotFoundReturnsOne(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{"git repo not found", domain.NewGitRepositoryError("/p", "m", nil)},
+		{"worktree not found", domain.NewGitWorktreeError("/p", "b", "m", nil)},
+		{"project not found", domain.NewProjectServiceError("n", "/p", "o", "m", nil)},
+		{"resolution not found", domain.NewNavigationServiceError("t", "c", "o", "m", nil)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := assert.New(t)
+			is.Equal(ExitCodeError, HandleCLIErrorWithCommand(nil, tt.err))
+			is.Equal(ExitCodeError, GetExitCodeForError(tt.err))
+		})
+	}
 }

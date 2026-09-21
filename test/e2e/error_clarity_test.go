@@ -79,6 +79,12 @@ var _ = Describe("Error Clarity", func() {
 				// Cobra usage errors return exit code 2
 				cli.ShouldFailWithExit(session, 2)
 			})
+
+			It("returns exit code 2 for missing required positional arg", func() {
+				session := ctxHelper.FromProjectDir("usage-test", "create") // cobra.ExactArgs(1)
+				// Args-validator failures are wrapped via SetArgsErrorFunc
+				cli.ShouldFailWithExit(session, 2)
+			})
 		})
 
 		Context("when outside git repository", func() {

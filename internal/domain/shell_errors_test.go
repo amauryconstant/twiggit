@@ -2,6 +2,9 @@ package domain
 
 import (
 	"errors"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"strings"
 	"testing"
 
@@ -135,5 +138,37 @@ func TestShellErrors_NoEmojiOrSentinelCode(t *testing.T) {
 				assert.NotContains(t, strings.ToUpper(msg), code, "must not expose sentinel code")
 			}
 		})
+	}
+}
+
+// TestNoShellErrorInterface guards against reintroduction of a single
+// `ShellError` interface. The domain-typed-errors spec mandates seven concrete
+// subtypes sharing a private `shellErrorBase` struct; an interface would undo
+// the explicit strategy-pattern dispatch in cmd/error_formatter.go and break
+// the Is(target) bool matchers. Static source scan via go/parser — no
+// reflection on runtime symbols required.
+func TestNoShellErrorInterface(t *testing.T) {
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "shell_errors.go", nil, 0)
+	require.NoError(t, err)
+
+	for _, decl := range file.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok || gen.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			if ts.Name.Name != "ShellError" {
+				continue
+			}
+			if _, isIface := ts.Type.(*ast.InterfaceType); isIface {
+				t.Errorf("type ShellError interface must not exist in internal/domain; " +
+					"use the seven concrete subtypes (ShellAlreadyInstalledError, etc.)")
+			}
+		}
 	}
 }

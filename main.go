@@ -28,9 +28,7 @@ func main() {
 	configManager := infrastructure.NewConfigManager()
 	config, err := configManager.Load()
 	if err != nil {
-		// Use functional error handling instead of panic
-		cmd.HandleCLIError(err)
-		os.Exit(1)
+		os.Exit(int(cmd.HandleCLIError(err)))
 	}
 
 	// Initialize infrastructure services in dependency order

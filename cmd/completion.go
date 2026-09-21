@@ -14,7 +14,7 @@ func newCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 		Long:          `Generate the autocompletion script for twiggit for the specified shell. See each sub-command's help for details on how to use the generated script.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Args:          cobra.NoArgs,
+		Args:          wrapArgsValidator(cobra.NoArgs),
 	}
 
 	shells := []string{"bash", "zsh", "fish", "powershell", "elvish", "nushell", "oil", "tcsh", "xonsh", "cmd-clink"}
@@ -36,7 +36,7 @@ To load completions:
 ` + getShellInstructions(shell),
 		SilenceUsage:          true,
 		SilenceErrors:         true,
-		Args:                  cobra.ExactArgs(1),
+		Args:                  wrapArgsValidator(cobra.ExactArgs(1)),
 		DisableFlagsInUseLine: true,
 		ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return nil, cobra.ShellCompDirectiveNoFileComp
