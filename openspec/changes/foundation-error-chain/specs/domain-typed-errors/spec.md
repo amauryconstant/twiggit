@@ -94,16 +94,18 @@ The canonical exit-code mapping SHALL be exactly:
 |---|---|---|
 | 0 | `ExitCodeSuccess` | Clean exit |
 | 1 | `ExitCodeError` | Unclassified error, runtime failure, or recovered panic |
-| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax/args) typed via `errors.As` against `*cobra.FlagError`, `cobra.ErrSubCommandRequired`, or `*pflag.Error{Code: pflag.ErrRequired}` |
+| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax/args) typed via `errors.As` against `*pflag.ValueRequiredError`, `*pflag.InvalidValueError`, `*pflag.InvalidSyntaxError`, or `errors.Is(err, cmd.ErrFlagUsage)`. Cobra's own `*cobra.FlagError` and `cobra.ErrSubCommandRequired` are blocked earlier by the `cobra.Args:` validators on each command and do not reach `GetExitCodeForError`. |
 
 The cmd layer (`cli-error-formatting`) SHALL NOT define additional
 exit-code constants. `GetExitCodeForError` SHALL dispatch first via
-`errors.As` against the typed usage-error sentinels above, returning
-`ExitCodeUsage`; otherwise returning `ExitCodeError` (1) for any
-non-nil error and `ExitCodeSuccess` (0) for nil. Per-resource
-discrimination happens at the formatter hint layer
-(`cli-error-formatting` Actionable hints requirement), not via
-per-resource exit codes.
+`errors.As` / `errors.Is` against the typed usage-error sentinels above,
+returning `ExitCodeUsage`; otherwise returning `ExitCodeError` (1) for
+any non-nil error and `ExitCodeSuccess` (0) for nil. Per-resource
+discrimination happens at the formatter hint layer (`cli-error-formatting`
+Actionable hints requirement), not via per-resource exit codes. The
+cmd-internal `ErrFlagUsage` sentinel marks errors emitted by cmd
+wrappers after flag parsing (e.g., "init --config requires --install")
+so they dispatch to `ExitCodeUsage` through the same typed walk.
 
 #### Scenario: Definition holds
 

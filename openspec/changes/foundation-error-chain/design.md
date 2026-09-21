@@ -358,13 +358,15 @@ prevents future confusion.
 3. After all vertical slices complete, run the full `mise run test`
    once more. Failing tests at this point identify sentinel-walk
    coverage gaps from per-slice rewrites.
-4. Bump `internal/version/version.go` to `0.13.0` for the hard-break
-   surface: `Cause`→`Err` field rename on thirteen existing wrapper
-   types, deletion of `IsNotFound() bool` on six types, and `ShellError`
-   split into seven concrete subtypes. The exit-code alignment to
-   3-code dispatch is a consumer-visible policy change but does not
-   add new API surface; scripts keyed on codes 3-6 break by design.
-   Regenerate `CHANGELOG.md` via `openspec-generate-changelog` after
+4. The version bump that ships the hard-break surface is deferred to the
+   next change that owns a release-pinned tag. The hard-break surface is:
+   `Cause`→`Err` field rename on thirteen existing wrapper types, deletion
+   of `IsNotFound() bool` on six types, and `ShellError` split into seven
+   concrete subtypes. The exit-code alignment to 3-code dispatch is a
+   consumer-visible policy change but does not add new API surface;
+   scripts keyed on codes 3-6 break by design. `internal/version/version.go`
+   stays at the build-time-injected `dev` value for this change. Regenerate
+   `CHANGELOG.md` via `openspec-generate-changelog` after
    `openspec-archive-change`.
 5. **Rollback:** every step in this change is a discrete commit;
    `git revert` from the merge commit restores the prior state. The

@@ -82,10 +82,12 @@ codes. Scripts and tests keyed on codes 3-6 break by design.
   `# Purity principles...` comment out of the list item so the YAML parser
   stops ignoring the file on every CLI invocation). Delete the empty
   stranded `openspec/changes/spec-restructure-all-categories/` folder.
-- Bump version to **0.13.0** (hard break, no deprecation aliases). End-user
-  CLI surface changes: exit codes 3-6 collapse to 1; usage-error categories
-  remain at 2; per-resource distinction moves to the formatter hint layer.
-  The other breaking surface is the public API of `internal/domain/*Error`
+- Bump version deferred to the next change that surfaces a release-pinned
+  tag; this change deliberately keeps `internal/version/version.go` at
+  the build-time-injected `dev` value. End-user CLI surface changes:
+  exit codes 3-6 collapse to 1; usage-error categories remain at 2;
+  per-resource distinction moves to the formatter hint layer. The
+  other breaking surface is the public API of `internal/domain/*Error`
   types and the mock package.
 
 ## Capabilities
@@ -133,8 +135,9 @@ requirement surface.
 - Granular exit codes (3-6). Brought into the change's scope as a Goal;
   reverse-out of any prior change that reintroduced them.
 - Reverting the public API break via deprecation aliases. The rename and
-  `IsNotFound` removal land hard on the 0.13.0 bump per the project rule
-  (no deprecation aliases in releases).
+  `IsNotFound` removal land hard per the project rule (no deprecation
+  aliases in releases); the version tag that ships the break is owned by
+  the next change that surfaces a release-pinned tag.
 
 ## Impact
 
@@ -155,4 +158,4 @@ requirement surface.
 | End-user CLI | Exit codes collapse from 0-6 to 0-2. Non-usage failures exit 1 (was 1, 3, 4, 5, or 6 depending on category). Usage errors exit 2 (unchanged). Per-resource NotFound distinction is preserved in the formatter's hint layer. Scripts and CI pipes keyed on `$? -eq 5` etc. break by design. |
 | Public API of `domain/*` types | Breaks: `IsNotFound()` removed on six types, `Cause` renamed to `Err`, `ShellError` split into seven subtypes, `ExitCodeConfig`/`ExitCodeGit`/`ExitCodeValidation`/`ExitCodeNotFound` constants removed. |
 | Tests | Existing assertion-on-substring tests must be rewritten (drop `IsNotFound` cases, add sentinel-walk cases; collapse per-exit-code assertions to the three-code table). |
-| Version | Bump 0.13.0 (hard break). |
+| Version | Deferred — build-time `dev` until the next release-pinned tag. |

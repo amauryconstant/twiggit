@@ -1,6 +1,6 @@
 # Spec Delta: Error Formatting
 
-## MODIFIED Requirements
+## REMOVED Requirements
 
 ### Requirement: Exit code mapping
 
@@ -12,6 +12,10 @@ The system SHALL map error categories to exit codes via the
 | 0 | `ExitCodeSuccess` | Success |
 | 1 | `ExitCodeError` | General unclassified error, runtime failure, or recovered panic |
 | 2 | `ExitCodeUsage` | Usage error (invalid command syntax) |
+| 3 | `ExitCodeConfig` | Configuration error |
+| 4 | `ExitCodeGit` | Git operation error |
+| 5 | `ExitCodeValidation` | Validation error |
+| 6 | `ExitCodeNotFound` | Not-found error |
 
 The cmd layer SHALL NOT define additional exit-code constants. See
 `domain-typed-errors` for the canonical definitions; per-resource
@@ -23,32 +27,23 @@ SHALL dispatch first via `errors.As` against typed usage-error sentinels
 otherwise returning `ExitCodeError` for any non-nil error and
 `ExitCodeSuccess` for nil.
 
-The scenario bodies reflect the 3-code dispatch (`ExitCodeError` (1) for
-all non-usage errors, `ExitCodeUsage` (2) for typed cobra usage errors).
-The historical seven-code table was collapsed to three codes; per-resource
-distinction lives in the formatter hint layer (see the Actionable hints
-requirement), not in the exit-code value.
-
 #### Scenario: Validation error → exit 5
 
 - **WHEN** a `domain.ValidationError` reaches the formatter
-- **THEN** system SHALL exit with code `ExitCodeError` (1) (formerly
-  `ExitCodeValidation` (5))
+- **THEN** system SHALL exit with code `ExitCodeValidation` (5)
 
 #### Scenario: Git error → exit 4
 
 - **WHEN** a `domain.GitRepositoryError`, `domain.GitWorktreeError`, or
   `domain.GitCommandError` reaches the formatter
-- **THEN** system SHALL exit with code `ExitCodeError` (1) (formerly
-  `ExitCodeGit` (4))
+- **THEN** system SHALL exit with code `ExitCodeGit` (4)
 
 #### Scenario: NotFound → exit 6
 
 - **WHEN** an error matching `domain.ErrGitRepoNotFound`,
   `domain.ErrWorktreeNotFound`, `domain.ErrProjectNotFound`, or
   `domain.ErrResolutionNotFound` via `errors.Is` reaches the formatter
-- **THEN** system SHALL exit with code `ExitCodeError` (1) (formerly
-  `ExitCodeNotFound` (6))
+- **THEN** system SHALL exit with code `ExitCodeNotFound` (6)
 - **AND** the formatter SHALL append the resource-specific hint per
   the Actionable hints requirement
 
@@ -63,6 +58,8 @@ requirement), not in the exit-code value.
   `cobra.ErrSubCommandRequired`, or
   `*pflag.Error{Code: pflag.ErrRequired}` reaches the formatter
 - **THEN** system SHALL exit with code `ExitCodeUsage` (2)
+
+## MODIFIED Requirements
 
 ### Requirement: Type-matched dispatch
 
@@ -130,3 +127,59 @@ For non-NotFound errors the system SHALL retain a generic hint
 - **WHEN** the formatter is configured for quiet mode
 - **THEN** the hint lines SHALL be omitted from the rendered output
 - **AND** quiet-mode behavior SHALL match `cli-quiet-mode`
+
+## ADDED Requirements
+
+### Requirement: Exit code mapping (3-code canonical)
+
+The system SHALL map error categories to exit codes via the
+`GetExitCodeForError` helper. The mapping SHALL be exactly:
+
+| Exit code | Constant | Meaning |
+|---|---|---|
+| 0 | `ExitCodeSuccess` | Success |
+| 1 | `ExitCodeError` | General unclassified error, runtime failure, or recovered panic |
+| 2 | `ExitCodeUsage` | Usage error (invalid command syntax) |
+
+The cmd layer SHALL NOT define additional exit-code constants. See
+`domain-typed-errors` for the canonical definitions; per-resource
+NotFound categories are distinguished in user-facing output by the
+Actionable hints requirement, not by exit code. `GetExitCodeForError`
+SHALL dispatch first via `errors.As` / `errors.Is` against typed
+usage-error sentinels (`*pflag.ValueRequiredError`,
+`*pflag.InvalidValueError`, `*pflag.InvalidSyntaxError`, or
+`errors.Is(err, cmd.ErrFlagUsage)`), returning `ExitCodeUsage`;
+otherwise returning `ExitCodeError` for any non-nil error and
+`ExitCodeSuccess` for nil.
+
+#### Scenario: Validation error → ExitCodeError
+
+- **WHEN** a `domain.ValidationError` reaches the formatter
+- **THEN** system SHALL exit with code `ExitCodeError`
+
+#### Scenario: Git error → ExitCodeError
+
+- **WHEN** a `domain.GitRepositoryError`, `domain.GitWorktreeError`, or
+  `domain.GitCommandError` reaches the formatter
+- **THEN** system SHALL exit with code `ExitCodeError`
+
+#### Scenario: NotFound → ExitCodeError
+
+- **WHEN** an error matching `domain.ErrGitRepoNotFound`,
+  `domain.ErrWorktreeNotFound`, `domain.ErrProjectNotFound`, or
+  `domain.ErrResolutionNotFound` via `errors.Is` reaches the formatter
+- **THEN** system SHALL exit with code `ExitCodeError`
+- **AND** the formatter SHALL append the resource-specific hint per
+  the Actionable hints requirement
+
+#### Scenario: Success → ExitCodeSuccess
+
+- **WHEN** the command returns no error
+- **THEN** system SHALL exit with code `ExitCodeSuccess`
+
+#### Scenario: Cobra usage error → ExitCodeUsage
+
+- **WHEN** an error matching `*pflag.ValueRequiredError`,
+  `*pflag.InvalidValueError`, `*pflag.InvalidSyntaxError`, or
+  matching `cmd.ErrFlagUsage` via `errors.Is` reaches the formatter
+- **THEN** system SHALL exit with code `ExitCodeUsage`
