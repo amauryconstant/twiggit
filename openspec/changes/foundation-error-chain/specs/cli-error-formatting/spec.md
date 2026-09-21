@@ -145,12 +145,10 @@ The cmd layer SHALL NOT define additional exit-code constants. See
 `domain-typed-errors` for the canonical definitions; per-resource
 NotFound categories are distinguished in user-facing output by the
 Actionable hints requirement, not by exit code. `GetExitCodeForError`
-SHALL dispatch first via `errors.As` / `errors.Is` against typed
-usage-error sentinels (`*pflag.ValueRequiredError`,
-`*pflag.InvalidValueError`, `*pflag.InvalidSyntaxError`, or
-`errors.Is(err, cmd.ErrFlagUsage)`), returning `ExitCodeUsage`;
-otherwise returning `ExitCodeError` for any non-nil error and
-`ExitCodeSuccess` for nil.
+SHALL dispatch first via `errors.As(err, &*domain.UsageError{})` (or
+`errors.Is(err, domain.ErrUsageFlag)` against typed usage errors),
+returning `ExitCodeUsage`; otherwise returning `ExitCodeError` for any
+non-nil error and `ExitCodeSuccess` for nil.
 
 #### Scenario: Validation error → ExitCodeError
 
@@ -179,7 +177,6 @@ otherwise returning `ExitCodeError` for any non-nil error and
 
 #### Scenario: Cobra usage error → ExitCodeUsage
 
-- **WHEN** an error matching `*pflag.ValueRequiredError`,
-  `*pflag.InvalidValueError`, `*pflag.InvalidSyntaxError`, or
-  matching `cmd.ErrFlagUsage` via `errors.Is` reaches the formatter
+- **WHEN** an error matching `*domain.UsageError` via `errors.As`
+  (or `domain.ErrUsageFlag` via `errors.Is`) reaches the formatter
 - **THEN** system SHALL exit with code `ExitCodeUsage`

@@ -53,13 +53,18 @@ codes. Scripts and tests keyed on codes 3-6 break by design.
   branches. Drop the substring fallback (`strings.Contains(errStr,
   "invalid")`) in `CategorizeError`.
 - `BREAKING` Replace `IsCobraArgumentError`'s seven-substring list in
-  `cmd/error_handler.go` with typed cobra/pflag error checks
-  (`*cobra.FlagError`, `cobra.ErrSubCommandRequired`,
-  `*pflag.Error{Code: pflag.ErrRequired}`). Each `cmd/*.go` command
+  `cmd/error_handler.go` with a typed walk against `*domain.UsageError`.
+  Cobra/pflag flag-parse errors are wrapped at the cmd boundary
+  (`cmd/root.go`'s `SetFlagErrorFunc` via `domain.UsageWrap`); cmd-side
+  flag-combination failures are constructed directly with
+  `domain.NewUsageError`. The previous shape (typed cobra/pflag concrete
+  types plus `cmd.ErrFlagUsage`) is replaced by a single
+  `errors.As(err, &*domain.UsageError{})` check. Each `cmd/*.go` command
   declares a `cobra.Args:` validator (`ExactArgs`, `MinimumNArgs`,
   `MaximumNArgs`, or `MatchAll`) matching its actual arg shape so the
   substring path is unreachable for syntactic arg-shape failures. Flag-value
-  errors (`pflag.ErrorType*`) continue to be detected via the typed walk.
+  errors are wrapped at the cmd boundary via `domain.UsageWrap` so the
+  dispatch becomes a single `errors.As(err, &*domain.UsageError{})` walk.
 - Replace the IIFE `func() *T { ... _ = errors.As(...); return target }()`
   pattern in `cmd/error_formatter.go` with a private `asType[T error](err)
   (T, bool)` generic helper, register formatters for the seven shell subtypes,
@@ -106,8 +111,9 @@ requirement surface.
   first-class requirement under the capability's `## Requirements` section;
   the canonical exit-code mapping collapses to three codes (0/1/2).
 - `cli-error-formatting`: the dispatch algorithm in
-  `GetExitCodeForError` is reformulated around typed cobra usage errors
-  → `ExitCodeUsage` (2) and a default `ExitCodeError` (1); a per-resource
+  `GetExitCodeForError` is reformulated around the new
+  `*domain.UsageError` type (with `domain.ErrUsageFlag` sentinel) →
+  `ExitCodeUsage` (2) and a default `ExitCodeError` (1); a per-resource
   hint table is added; the IIFE formatter pattern is replaced with the
   `asType[T]` helper and caller formatters now handle nil safely.
 - `cli-main-entry-point`: the "Specific exit code honored" scenario in
@@ -143,7 +149,7 @@ requirement surface.
 
 | Layer | Files | Lines |
 |---|---|---|
-| `internal/domain/` | `sentinels.go` (new), `errors.go`, `service_errors.go`, `shell_errors.go` | ~370 |
+| `internal/domain/` | `sentinels.go` (new), `errors.go`, `service_errors.go`, `shell_errors.go`, `usage_error.go` (new) | ~410 |
 | `internal/service/` | `shell_service.go` | ~15 |
 | `internal/application/` | unchanged | — |
 | `cmd/` | `error_handler.go`, `error_formatter.go`, `delete.go` + every `cmd/*.go` Args-validator addition | ~200 |
@@ -156,6 +162,6 @@ requirement surface.
 | Aspect | Effect |
 |---|---|
 | End-user CLI | Exit codes collapse from 0-6 to 0-2. Non-usage failures exit 1 (was 1, 3, 4, 5, or 6 depending on category). Usage errors exit 2 (unchanged). Per-resource NotFound distinction is preserved in the formatter's hint layer. Scripts and CI pipes keyed on `$? -eq 5` etc. break by design. |
-| Public API of `domain/*` types | Breaks: `IsNotFound()` removed on six types, `Cause` renamed to `Err`, `ShellError` split into seven subtypes, `ExitCodeConfig`/`ExitCodeGit`/`ExitCodeValidation`/`ExitCodeNotFound` constants removed. |
+| Public API of `domain/*` types | Breaks: `IsNotFound()` removed on six types, `Cause` renamed to `Err`, `ShellError` split into seven subtypes, `ExitCodeConfig`/`ExitCodeGit`/`ExitCodeValidation`/`ExitCodeNotFound` constants removed. **Addition:** `domain.UsageError` type with `NewUsageError(message, err)` and `UsageWrap(err)` constructors, plus `domain.ErrUsageFlag` sentinel (new 13th sentinel in the catalog). |
 | Tests | Existing assertion-on-substring tests must be rewritten (drop `IsNotFound` cases, add sentinel-walk cases; collapse per-exit-code assertions to the three-code table). |
 | Version | Deferred — build-time `dev` until the next release-pinned tag. |

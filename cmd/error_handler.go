@@ -6,16 +6,8 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"twiggit/internal/domain"
 )
-
-// ErrFlagUsage is the sentinel for cmd-internal usage errors that arise
-// after flag parsing (e.g. "init --config requires --install"). cmd
-// wrappers can do `fmt.Errorf("%w: <message>", ErrFlagUsage)` to mark an
-// error as a usage failure, dispatching it to ExitCodeUsage via
-// IsCobraUsageError.
-var ErrFlagUsage = errors.New("cmd: flag usage error")
 
 // ExitCode defines the exit codes used by the application.
 //
@@ -23,7 +15,7 @@ var ErrFlagUsage = errors.New("cmd: flag usage error")
 //
 //	0 ExitCodeSuccess — clean run
 //	1 ExitCodeError   — any non-usage failure, runtime error, or recovered panic
-//	2 ExitCodeUsage   — cobra/pflag typed usage error
+//	2 ExitCodeUsage   — typed domain.UsageError
 //
 // Per-resource NotFound categories share ExitCodeError; they are
 // distinguished in the formatter hint layer.
@@ -34,7 +26,7 @@ const (
 	ExitCodeSuccess ExitCode = 0
 	// ExitCodeError is the catch-all for non-usage failures.
 	ExitCodeError ExitCode = 1
-	// ExitCodeUsage indicates a typed cobra/pflag usage error.
+	// ExitCodeUsage indicates a typed UsageError (cobra/pflag wrapped).
 	ExitCodeUsage ExitCode = 2
 )
 
@@ -106,63 +98,20 @@ func CategorizeError(err error) ErrorCategory {
 	return ErrorCategoryGeneric
 }
 
-// IsCobraUsageError reports whether err is a typed pflag usage error.
-// Arg-shape failures (cobra.Args validators) are blocked before RunE runs,
-// so the typed walk here covers only flag-value errors emitted by pflag
-// during flag parsing plus the cmd-internal ErrFlagUsage sentinel.
+// IsCobraUsageError reports whether err is a typed domain UsageError.
+// cmd/root.go's SetFlagErrorFunc wraps cobra/pflag flag-parse errors
+// in *domain.UsageError before they propagate, so this single
+// errors.As match covers all flag-validation paths.
 func IsCobraUsageError(err error) bool {
 	if err == nil {
 		return false
 	}
-	if errors.Is(err, ErrFlagUsage) {
-		return true
-	}
-	var vre *pflag.ValueRequiredError
-	if errors.As(err, &vre) {
-		return true
-	}
-	var ive *pflag.InvalidValueError
-	if errors.As(err, &ive) {
-		return true
-	}
-	var ise *pflag.InvalidSyntaxError
-	if errors.As(err, &ise) {
-		return true
-	}
-	return false
+	var ue *domain.UsageError
+	return errors.As(err, &ue)
 }
 
 // IsCobraArgumentError is retained as an alias for callers that still
 // expect the historical name. New code should call IsCobraUsageError.
 func IsCobraArgumentError(err error) bool {
 	return IsCobraUsageError(err)
-}
-
-// flagParseError wraps cobra's flag-parsing errors in a typed error so
-// IsCobraUsageError can match them without falling back to substring
-// matching.
-type flagParseError struct {
-	err error
-}
-
-func (w *flagParseError) Error() string {
-	if w.err == nil {
-		return ""
-	}
-	return w.err.Error()
-}
-
-func (w *flagParseError) Unwrap() error { return w.err }
-
-func (w *flagParseError) Is(target error) bool {
-	return target == ErrFlagUsage
-}
-
-// WrapFlagError wraps a cobra-emitted flag-parsing error in a
-// flagParseError so it dispatches to ExitCodeUsage.
-func WrapFlagError(err error) error {
-	if err == nil {
-		return nil
-	}
-	return &flagParseError{err: err}
 }

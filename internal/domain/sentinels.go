@@ -22,4 +22,5 @@ var (
 	ErrWrapperGeneration     = errors.New("domain: wrapper generation failed")
 	ErrWrapperInstallation   = errors.New("domain: wrapper installation failed")
 	ErrConfigFileNotFound    = errors.New("domain: config file not found")
+	ErrUsageFlag             = errors.New("domain: usage flag error")
 )

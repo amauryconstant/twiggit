@@ -34,6 +34,7 @@ be `Err` (not `Cause`).
 | `ShellDetectionError` | `NewShellDetectionError(context, err)` | — |
 | `ShellWrapperError` | `NewShellWrapperError(shellType, op, context, err)` | — |
 | `ShellConfigError` | `NewShellConfigError(path, context, err)` | — |
+| `UsageError` | `NewUsageError(message, err)` or `UsageWrap(err)` | `ErrUsageFlag` |
 
 #### Scenario: Definition holds
 
@@ -94,7 +95,7 @@ The canonical exit-code mapping SHALL be exactly:
 |---|---|---|
 | 0 | `ExitCodeSuccess` | Clean exit |
 | 1 | `ExitCodeError` | Unclassified error, runtime failure, or recovered panic |
-| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax/args) typed via `errors.As` against `*pflag.ValueRequiredError`, `*pflag.InvalidValueError`, `*pflag.InvalidSyntaxError`, or `errors.Is(err, cmd.ErrFlagUsage)`. Cobra's own `*cobra.FlagError` and `cobra.ErrSubCommandRequired` are blocked earlier by the `cobra.Args:` validators on each command and do not reach `GetExitCodeForError`. |
+| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax/args) typed via `errors.As` against `*domain.UsageError` (or `errors.Is(err, domain.ErrUsageFlag)`). The cmd layer's `SetFlagErrorFunc` wraps cobra/pflag flag-parse errors in `*domain.UsageError` so they match this walk. Cobra's own `*cobra.FlagError` and `cobra.ErrSubCommandRequired` are blocked earlier by the `cobra.Args:` validators on each command and do not reach `GetExitCodeForError`. |
 
 The cmd layer (`cli-error-formatting`) SHALL NOT define additional
 exit-code constants. `GetExitCodeForError` SHALL dispatch first via
@@ -103,8 +104,8 @@ returning `ExitCodeUsage`; otherwise returning `ExitCodeError` (1) for
 any non-nil error and `ExitCodeSuccess` (0) for nil. Per-resource
 discrimination happens at the formatter hint layer (`cli-error-formatting`
 Actionable hints requirement), not via per-resource exit codes. The
-cmd-internal `ErrFlagUsage` sentinel marks errors emitted by cmd
-wrappers after flag parsing (e.g., "init --config requires --install")
+cmd-internal `UsageError` type marks errors emitted after flag
+parsing (e.g., "init --config requires --install")
 so they dispatch to `ExitCodeUsage` through the same typed walk.
 
 #### Scenario: Definition holds
@@ -137,6 +138,7 @@ via `==` or string equality.
 | `ErrWrapperGeneration` | `"domain: wrapper generation failed"` |
 | `ErrWrapperInstallation` | `"domain: wrapper installation failed"` |
 | `ErrConfigFileNotFound` | `"domain: config file not found"` |
+| `ErrUsageFlag` | `"domain: usage flag error"` |
 
 #### Scenario: Sentinel catalog is exported and stable
 
@@ -171,6 +173,14 @@ substring matching against `Error()`.
 - **THEN** `errors.Is(shellErr, domain.ErrShellAlreadyInstalled)` SHALL
   return true
 - **AND** `errors.Is(shellErr, domain.ErrShellNotInstalled)` SHALL
+  return false
+
+#### Scenario: UsageError matches its sentinel
+
+- **WHEN** a `UsageError` is constructed (with or without an `Err`
+  cause)
+- **THEN** `errors.Is(usageErr, domain.ErrUsageFlag)` SHALL return true
+- **AND** `errors.Is(usageErr, domain.ErrWorktreeNotFound)` SHALL
   return false
 
 ### Requirement: Shell subtypes share a common base

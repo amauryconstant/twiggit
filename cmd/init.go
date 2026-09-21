@@ -41,10 +41,10 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flag combinations
 			if configFile != "" && !install {
-				return fmt.Errorf("%w: --config requires --install", ErrFlagUsage)
+				return domain.NewUsageError("--config requires --install", nil)
 			}
 			if force && !install {
-				return fmt.Errorf("%w: --force requires --install", ErrFlagUsage)
+				return domain.NewUsageError("--force requires --install", nil)
 			}
 
 			// Parse shell type from positional argument

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
 
 	"twiggit/internal/domain"
@@ -87,14 +86,14 @@ func TestGetExitCodeForError_ThreeCodeDispatch(t *testing.T) {
 	}
 }
 
-func TestGetExitCodeForError_CobraUsageError(t *testing.T) {
+func TestGetExitCodeForError_UsageError(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
 	}{
-		{"pflag value required", &pflag.ValueRequiredError{}},
-		{"pflag invalid value", &pflag.InvalidValueError{}},
-		{"pflag invalid syntax", &pflag.InvalidSyntaxError{}},
+		{"usage error with cause", domain.NewUsageError("--config requires --install", errors.New("flag: --config"))},
+		{"usage error no cause", domain.NewUsageError("--force requires --install", nil)},
+		{"wrapped usage error", domain.UsageWrap(errors.New("raw pflag error"))},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -120,8 +119,8 @@ func TestCategorizeError_SentinelNotFoundDispatch(t *testing.T) {
 	}
 }
 
-func TestCategorizeError_CobraUsageError(t *testing.T) {
-	assert.Equal(t, ErrorCategoryCobra, CategorizeError(&pflag.ValueRequiredError{}))
+func TestCategorizeError_UsageError(t *testing.T) {
+	assert.Equal(t, ErrorCategoryCobra, CategorizeError(domain.NewUsageError("--foo", nil)))
 }
 
 func TestCategorizeError_ValidationError(t *testing.T) {
@@ -132,18 +131,32 @@ func TestCategorizeError_Generic(t *testing.T) {
 	assert.Equal(t, ErrorCategoryGeneric, CategorizeError(errors.New("plain")))
 }
 
-func TestIsCobraUsageError_PflagErrors(t *testing.T) {
-	assert.True(t, IsCobraUsageError(&pflag.ValueRequiredError{}))
-	assert.True(t, IsCobraUsageError(&pflag.InvalidValueError{}))
-	assert.True(t, IsCobraUsageError(&pflag.InvalidSyntaxError{}))
+func TestIsCobraUsageError_UsageError(t *testing.T) {
+	assert.True(t, IsCobraUsageError(domain.NewUsageError("--foo", nil)))
+	assert.True(t, IsCobraUsageError(domain.UsageWrap(errors.New("raw"))))
 }
 
-func TestIsCobraUsageError_NonCobraError(t *testing.T) {
+func TestIsCobraUsageError_NonUsageError(t *testing.T) {
 	assert.False(t, IsCobraUsageError(errors.New("plain")))
 	assert.False(t, IsCobraUsageError(domain.NewValidationError("R", "f", "v", "m")))
 	assert.False(t, IsCobraUsageError(nil))
 }
 
+func TestUsageError_SentinelParticipation(t *testing.T) {
+	err := domain.NewUsageError("--foo", nil)
+	assert.ErrorIs(t, err, domain.ErrUsageFlag)
+	assert.NotErrorIs(t, err, domain.ErrWorktreeNotFound)
+}
+
+func TestUsageError_Unwrap(t *testing.T) {
+	cause := errors.New("parser failure")
+	err := domain.NewUsageError("--foo", cause)
+	assert.Equal(t, cause, err.Unwrap())
+	assert.ErrorIs(t, err, domain.ErrUsageFlag)
+	assert.ErrorIs(t, err, cause)
+}
+
 func TestIsCobraArgumentError_Alias(t *testing.T) {
-	assert.Equal(t, IsCobraUsageError(&pflag.ValueRequiredError{}), IsCobraArgumentError(&pflag.ValueRequiredError{}))
+	err := domain.NewUsageError("--foo", nil)
+	assert.Equal(t, IsCobraUsageError(err), IsCobraArgumentError(err))
 }

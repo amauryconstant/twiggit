@@ -83,21 +83,40 @@ func (e *ValidationError) WithContext(string) *ValidationError         // immuta
 
 ## Error Types
 
-| Type | Constructor | IsNotFound() |
-|------|-------------|--------------|
-| ValidationError | `NewValidationError(request, field, value, message)` | - |
-| GitRepositoryError | `NewGitRepositoryError(path, message, cause)` | ✅ |
-| GitWorktreeError | `NewGitWorktreeError(worktreePath, branchName, message, cause)` | ✅ |
-| GitCommandError | `NewGitCommandError(cmd, args, exitCode, stdout, stderr, msg, cause)` | - |
-| ConfigError | `NewConfigError(path, message, cause)` | - |
-| ContextDetectionError | `NewContextDetectionError(path, message, cause)` | - |
-| ServiceError | `NewServiceError(service, operation, message, cause)` | - |
-| WorktreeServiceError | `NewWorktreeServiceError(worktreePath, branchName, op, msg, cause)` | ✅ |
-| ProjectServiceError | `NewProjectServiceError(projectName, projectPath, op, msg, cause)` | - |
-| NavigationServiceError | `NewNavigationServiceError(target, ctx, op, msg, cause)` | - |
-| ShellError | `NewShellError(code, shellType, context)` or `NewShellErrorWithCause(..., cause)` | - |
-| ResolutionError | `NewResolutionError(target, ctx, msg, suggestions, cause)` | - |
-| ConflictError | `NewConflictError(resource, identifier, operation, message, cause)` | - |
+| Type | Constructor | Sentinel / `errors.Is` target |
+|------|-------------|-------------------------------|
+| ValidationError | `NewValidationError(request, field, value, message)` | — (terminal `Unwrap() = nil`) |
+| GitRepositoryError | `NewGitRepositoryError(path, message, err)` | `ErrGitRepoNotFound` |
+| GitWorktreeError | `NewGitWorktreeError(worktreePath, branchName, message, err)` | `ErrWorktreeNotFound` |
+| GitCommandError | `NewGitCommandError(cmd, args, exitCode, stdout, stderr, msg, err)` | — |
+| ConfigError | `NewConfigError(path, message, err)` | — |
+| ContextDetectionError | `NewContextDetectionError(path, message, err)` | — |
+| ServiceError | `NewServiceError(service, operation, message, err)` | — |
+| WorktreeServiceError | `NewWorktreeServiceError(worktreePath, branchName, op, msg, err)` | `ErrWorktreeNotFound` |
+| ProjectServiceError | `NewProjectServiceError(projectName, projectPath, op, msg, err)` | `ErrProjectNotFound` |
+| NavigationServiceError | `NewNavigationServiceError(target, ctx, op, msg, err)` | `ErrResolutionNotFound` |
+| ResolutionError | `NewResolutionError(target, ctx, msg, suggestions, err)` | `ErrResolutionNotFound` |
+| ConflictError | `NewConflictError(resource, identifier, operation, message, err)` | — |
+| ShellAlreadyInstalledError | `NewShellAlreadyInstalledError(shellType, context, err)` | `ErrShellAlreadyInstalled` |
+| ShellNotInstalledError | `NewShellNotInstalledError(shellType, context, err)` | `ErrShellNotInstalled` |
+| ShellInvalidTypeError | `NewShellInvalidTypeError(shellType, context, err)` | `ErrInvalidShellType` |
+| ShellInferenceError | `NewShellInferenceError(shellType, context, err)` | `ErrShellInferenceFailed` |
+| ShellDetectionError | `NewShellDetectionError(context, err)` | `ErrShellDetectionFailed` |
+| ShellWrapperError | `NewShellWrapperError(shellType, op, context, err)` | `ErrWrapperGeneration` / `ErrWrapperInstallation` |
+| ShellConfigError | `NewShellConfigError(path, context, err)` | `ErrConfigFileNotFound` |
+| UsageError | `NewUsageError(message, err)` / `UsageWrap(err)` | `ErrUsageFlag` |
+
+**All wrapper types implement `Unwrap() error` returning the `Err` field.**
+**Wrapper types with a sentinel implement `Is(target error) bool` matching only that sentinel.**
+
+> **Removed:** the substring-based `IsNotFound() bool` methods on
+> `GitRepositoryError`, `GitWorktreeError`, and `WorktreeServiceError` are
+> gone. Identify NotFound conditions via
+> `errors.Is(err, domain.ErrXNotFound)` instead.
+> `ShellError` (single struct with `Code string`) was replaced by the
+> seven concrete shell subtypes listed above; the `code` field is gone.
+> The legacy `cause` parameter is now `err`; all constructors take
+> `err error` as the last argument.
 
 **All error types implement `Unwrap()` for error chain support.**
 
