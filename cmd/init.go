@@ -36,7 +36,9 @@ Examples:
   twiggit init bash                       # Print bash wrapper to stdout
   twiggit init --install                  # Install to auto-detected config file
   twiggit init bash --install -c ~/.bashrc  # Install to specific config file`,
-		Args: cobra.MaximumNArgs(1),
+		SilenceUsage:   true,
+		SilenceErrors:  true,
+		Args:           cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flag combinations
 			if configFile != "" && !install {

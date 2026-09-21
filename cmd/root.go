@@ -33,6 +33,8 @@ func NewRootCommand(config *CommandConfig) *cobra.Command {
 		Long: `twiggit is a pragmatic tool for managing git worktrees with a focus on rebase workflows.
 It provides context-aware operations for creating, listing, navigating, and deleting worktrees
 across multiple projects.`,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			if config == nil || config.Config == nil {
 				return errors.New("cmd: configuration not loaded")

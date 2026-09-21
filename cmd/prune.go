@@ -38,7 +38,9 @@ Examples:
   twiggit prune --all --yes           Prune across all projects without confirmation
   twiggit prune myproject/feature     Prune a specific worktree
   twiggit prune --delete-branches     Prune and delete branches`,
-		Args: cobra.MaximumNArgs(1),
+		SilenceUsage:   true,
+		SilenceErrors:  true,
+		Args:           cobra.MaximumNArgs(1),
 		RunE: func(c *cobra.Command, args []string) error {
 			var specificWorktree string
 			if len(args) > 0 {

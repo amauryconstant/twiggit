@@ -25,7 +25,9 @@ Examples:
   twiggit list              List worktrees for current project
   twiggit list -a           List worktrees from all projects
   twiggit list --output json  Output in JSON format for scripts`,
-		Args: cobra.NoArgs, // Reject any positional arguments
+		SilenceUsage:   true,
+		SilenceErrors:  true,
+		Args:           cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			// Validate output format
 			if output != "" && output != "text" && output != "json" {

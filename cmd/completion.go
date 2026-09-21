@@ -9,10 +9,12 @@ import (
 
 func newCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "completion",
-		Short: "Generate the autocompletion script for the specified shell",
-		Long: `Generate the autocompletion script for twiggit for the specified shell.
-See each sub-command's help for details on how to use the generated script.`,
+		Use:           "completion",
+		Short:         "Generate the autocompletion script for the specified shell",
+		Long:          `Generate the autocompletion script for twiggit for the specified shell. See each sub-command's help for details on how to use the generated script.`,
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Args:          cobra.NoArgs,
 	}
 
 	shells := []string{"bash", "zsh", "fish", "powershell", "elvish", "nushell", "oil", "tcsh", "xonsh", "cmd-clink"}
@@ -32,6 +34,9 @@ func newCompletionShellCommand(rootCmd *cobra.Command, shell string) *cobra.Comm
 To load completions:
 
 ` + getShellInstructions(shell),
+		SilenceUsage:         true,
+		SilenceErrors:        true,
+		Args:                 cobra.ExactArgs(1),
 		DisableFlagsInUseLine: true,
 		ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
 			return nil, cobra.ShellCompDirectiveNoFileComp

@@ -126,6 +126,8 @@ rules:
     - Keep proposals concise and actionable
 
   specs:
+    # Purity principles — reader-extractable by future tooling.
+    # Each rule is identified by a [bracketed-key] prefix.
     - Use SHALL for mandatory requirements (testable)
     - Scenarios use WHEN/THEN/AND format only
     - Ensure scenarios are concrete with specific inputs and expected outputs
@@ -133,8 +135,6 @@ rules:
     - Requirements grouped logically with clear purpose statements
     - Format: `# Capability: <Title>` then `## Purpose` then `## Requirements`
       with `### Requirement:` and `#### Scenario:` headings.
-    # Purity principles — reader-extractable by future tooling.
-    # Each rule is identified by a [bracketed-key] prefix.
     - "[bare-cross-refs] Cross-spec references SHALL use bare directory names (e.g., `cli-prune`), never line-anchored paths (e.g., `cli-prune/spec.md:35`)"
     - "[no-code-refs] Requirements and scenarios SHALL NOT reference implementation files via `path:N` form (e.g., `internal/foo.go:42`)"
     - "[purpose-coherence] `## Purpose` SHALL match the requirement surface; fix the Purpose (broaden) or fix the Requirement (delete or move)"
