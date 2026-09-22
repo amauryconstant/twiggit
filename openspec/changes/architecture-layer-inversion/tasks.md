@@ -107,9 +107,9 @@ order of tasks is implementation order.
 
 ### 5e. Test rewrites (anchor)
 
-- [ ] 5e.1 Rewrite `internal/infrastructure/cli_client_test.go` for the new nil-guard semantics and renamed constructor; REQUIRED fixtures: (a) `ExecuteWithTimeout` returns `(*CommandResult, error)` with non-nil error and nil `*CommandResult` — exercises the nil-guard; (b) successful execution returns populated result; verify by `go test ./internal/infrastructure/cli_client_test.go` passing both cases
-- [ ] 5e.2 Rewrite `internal/infrastructure/gogit_client_test.go` for the new constructor signature (returning `(*GoGitClient, error)`); verify by `go test ./internal/infrastructure/gogit_client_test.go` passing
-- [ ] 5e.3 Verify slice 5e: `go test ./internal/infrastructure/...` passing
+- [x] 5e.1 Rewrite `internal/infrastructure/cli_client_test.go` for the new nil-guard semantics and renamed constructor; REQUIRED fixtures: (a) `ExecuteWithTimeout` returns `(*CommandResult, error)` with non-nil error and nil `*CommandResult` — exercises the nil-guard; (b) successful execution returns populated result; verify by `go test ./internal/infrastructure/cli_client_test.go` passing both cases
+- [x] 5e.2 Rewrite `internal/infrastructure/gogit_client_test.go` for the new constructor signature (returning `(*GoGitClient, error)`); verify by `go test ./internal/infrastructure/gogit_client_test.go` passing
+- [x] 5e.3 Verify slice 5e: `go test ./internal/infrastructure/...` passing
 
 ## 6. main.go rewiring (slice 5)
 

@@ -396,6 +396,81 @@ detached`
 	assert.True(t, worktrees[2].IsDetached)
 }
 
+func TestCLIClient_NilResultGuards(t *testing.T) {
+	t.Run("CreateWorktree", func(t *testing.T) {
+		must := require.New(t)
+		is := assert.New(t)
+		mockExecutor := NewMockCommandExecutor()
+		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"show-ref", "--verify", "--quiet", "refs/heads/feature"}).Return(&CommandResult{ExitCode: 1}, nil)
+		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "add", "-b", "feature", "/path/to/worktree", "main"}).Return(nil, nil)
+		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
+		client := NewCLIClient(mockExecutor)
+		err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
+		must.Error(err)
+		is.Contains(err.Error(), "command executor returned nil result for worktree create")
+	})
+
+	t.Run("DeleteWorktree", func(t *testing.T) {
+		must := require.New(t)
+		is := assert.New(t)
+		mockExecutor := NewMockCommandExecutor()
+		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
+		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
+		client := NewCLIClient(mockExecutor)
+		err := client.DeleteWorktree(context.Background(), "/test/repo", "/path/to/worktree", false)
+		must.Error(err)
+		is.Contains(err.Error(), "command executor returned nil result for worktree delete")
+	})
+
+	t.Run("ListWorktrees", func(t *testing.T) {
+		must := require.New(t)
+		is := assert.New(t)
+		mockExecutor := NewMockCommandExecutor()
+		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
+		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
+		client := NewCLIClient(mockExecutor)
+		_, err := client.ListWorktrees(context.Background(), "/test/repo")
+		must.Error(err)
+		is.Contains(err.Error(), "command executor returned nil result for worktree list")
+	})
+
+	t.Run("PruneWorktrees", func(t *testing.T) {
+		must := require.New(t)
+		is := assert.New(t)
+		mockExecutor := NewMockCommandExecutor()
+		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
+		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
+		client := NewCLIClient(mockExecutor)
+		err := client.PruneWorktrees(context.Background(), "/test/repo")
+		must.Error(err)
+		is.Contains(err.Error(), "command executor returned nil result for worktree prune")
+	})
+
+	t.Run("DeleteBranch", func(t *testing.T) {
+		must := require.New(t)
+		is := assert.New(t)
+		mockExecutor := NewMockCommandExecutor()
+		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
+		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
+		client := NewCLIClient(mockExecutor)
+		err := client.DeleteBranch(context.Background(), "/test/repo", "feature")
+		must.Error(err)
+		is.Contains(err.Error(), "command executor returned nil result for branch delete")
+	})
+
+	t.Run("IsBranchMerged", func(t *testing.T) {
+		must := require.New(t)
+		is := assert.New(t)
+		mockExecutor := NewMockCommandExecutor()
+		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
+		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
+		client := NewCLIClient(mockExecutor)
+		_, err := client.IsBranchMerged(context.Background(), "/test/repo", "feature")
+		must.Error(err)
+		is.Contains(err.Error(), "command executor returned nil result for branch merge check")
+	})
+}
+
 func findWorktree(worktrees []domain.WorktreeInfo, path string) *domain.WorktreeInfo {
 	for _, worktree := range worktrees {
 		if worktree.Path == path {
