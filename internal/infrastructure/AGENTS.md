@@ -79,9 +79,9 @@ type cliClient struct { ... }
 
 ```go
 // Compile-time interface check
-var _ application.ShellInfrastructure = (*ShellInfrastructureImpl)(nil)
+var _ application.ShellInfrastructure = (*ShellInfrastructure)(nil)
 
-type ShellInfrastructureImpl struct { ... }
+type ShellInfrastructure struct { ... }
 ```
 
 | Shell | Config Files (preference order) |
@@ -111,9 +111,9 @@ Slow git operations gracefully degrade to empty suggestions.
 
 ```go
 // Compile-time interface check
-var _ application.HookRunner = (*HookRunnerImpl)(nil)
+var _ application.HookRunner = (*HookRunner)(nil)
 
-type HookRunnerImpl struct { ... }
+type HookRunner struct { ... }
 ```
 
 **Configuration:** `.twiggit.toml` at repository root

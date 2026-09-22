@@ -26,7 +26,7 @@
 
 - [x] 3.1 Delete the `GitClient` interface (4 lines) at `internal/application/interfaces.go`; verify by `go build ./internal/application/...` clean and `git grep -n 'GitClient' internal/application/` returning only the role-interface references (umbrella gone)
 - [x] 3.2 Add `type RepoLocator interface { FindGitRepositories(dir string) ([]domain.GitDir, error) }` to `internal/application/interfaces.go`; verify by `go build ./internal/application/...` clean
-- [ ] 3.3 Add compile-time interface check `var _ application.RepoLocator = (*infrastructure.RepoFinder)(nil)` at the bottom of `internal/infrastructure/repo_finder.go` (created in slice 5d); verify by `go build ./...` clean and the check survives `gopls rename` of the implementation type
+- [x] 3.3 Add compile-time interface check `var _ application.RepoLocator = (*infrastructure.RepoFinder)(nil)` at the bottom of `internal/infrastructure/repo_finder.go` (created in slice 5d); verify by `go build ./...` clean and the check survives `gopls rename` of the implementation type
 
 ## 4. Service layer inversion (slice 3)
 
@@ -54,11 +54,11 @@ order of tasks is implementation order.
 
 ### 5a. Pure renames (structural)
 
-- [ ] 5a.1 Rename `CLIClientImpl` → `CLIClient` and `NewCLIClientImpl` → `NewCLIClient` in `internal/infrastructure/cli_client.go`; update the compile-time check `var _ application.CLIClient = (*CLIClient)(nil)`; verify by `go build ./internal/infrastructure/...` clean
-- [ ] 5a.2 Rename `GoGitClientImpl` → `GoGitClient` and `NewGoGitClientImpl` → `NewGoGitClient` / `NewGoGitClientWithSizeImpl` → `NewGoGitClientWithSize` in `internal/infrastructure/gogit_client.go`; update the compile-time check; verify by `go build ./internal/infrastructure/...` clean
-- [ ] 5a.3 Rename `DefaultCommandExecutor` → `CommandExecutor` and `NewDefaultCommandExecutor` → `NewCommandExecutor` in `internal/infrastructure/command_executor.go`; verify by `gopls rename` zero unresolved references
-- [ ] 5a.4 Rename `ContextDetectorImpl` → `ContextDetector` / `NewContextDetectorImpl` → `NewContextDetector`; rename `ContextResolverImpl` → `ContextResolver` / `NewContextResolverImpl` → `NewContextResolver`; rename `ConfigManagerImpl` → `ConfigManager` / `NewConfigManagerImpl` → `NewConfigManager`; rename `HookRunnerImpl` → `HookRunner` / `NewHookRunnerImpl` → `NewHookRunner`; rename `ShellInfrastructureImpl` → `ShellInfrastructure` / `NewShellInfrastructureImpl` → `NewShellInfrastructure`; update each compile-time check; verify by `grep -rn 'Impl.*= nil' internal/infrastructure/` returning no matches and `go build ./internal/infrastructure/...` clean
-- [ ] 5a.5 Verify slice 5a: `git grep -n 'Impl.*= nil' internal/infrastructure/` returns no matches; `mise run verify` clean
+- [x] 5a.1 Rename `CLIClientImpl` → `CLIClient` and `NewCLIClientImpl` → `NewCLIClient` in `internal/infrastructure/cli_client.go`; update the compile-time check `var _ application.CLIClient = (*CLIClient)(nil)`; verify by `go build ./internal/infrastructure/...` clean
+- [x] 5a.2 Rename `GoGitClientImpl` → `GoGitClient` and `NewGoGitClientImpl` → `NewGoGitClient` / `NewGoGitClientWithSizeImpl` → `NewGoGitClientWithSize` in `internal/infrastructure/gogit_client.go`; update the compile-time check; verify by `go build ./internal/infrastructure/...` clean
+- [x] 5a.3 Rename `DefaultCommandExecutor` → `CommandExecutor` and `NewDefaultCommandExecutor` → `NewCommandExecutor` in `internal/infrastructure/command_executor.go`; verify by `gopls rename` zero unresolved references
+- [x] 5a.4 Rename `ContextDetectorImpl` → `ContextDetector` / `NewContextDetectorImpl` → `NewContextDetector`; rename `ContextResolverImpl` → `ContextResolver` / `NewContextResolverImpl` → `NewContextResolver`; rename `ConfigManagerImpl` → `ConfigManager` / `NewConfigManagerImpl` → `NewConfigManager`; rename `HookRunnerImpl` → `HookRunner` / `NewHookRunnerImpl` → `NewHookRunner`; rename `ShellInfrastructureImpl` → `ShellInfrastructure` / `NewShellInfrastructureImpl` → `NewShellInfrastructure`; update each compile-time check; verify by `grep -rn 'Impl.*= nil' internal/infrastructure/` returning no matches and `go build ./internal/infrastructure/...` clean
+- [x] 5a.5 Verify slice 5a: `git grep -n 'Impl.*= nil' internal/infrastructure/` returns no matches; `mise run verify` clean
 
 ### 5b-i. NewGoGitClient signature change (behavioral)
 
@@ -127,19 +127,19 @@ order of tasks is implementation order.
 
 ## 8. .golangci.yml (slice 7)
 
-- [ ] 8.1 Extend `depguard` rules in `.golangci.yml`: add per-layer allowlists AND explicit `deny:` blocks (per `golang-cli-architecture` recommendation) for `internal/service/**`, `internal/application/**`, `internal/infrastructure/**`, `cmd/**`, `test/mocks/**`. Allowlist:
+- [x] 8.1 Extend `depguard` rules in `.golangci.yml`: add per-layer allowlists AND explicit `deny:` blocks (per `golang-cli-architecture` recommendation) for `internal/service/**`, `internal/application/**`, `internal/infrastructure/**`, `cmd/**`, `test/mocks/**`. Allowlist:
   - `domain` (existing): allow `$gostd`, `internal/domain`
   - `service` (new): allow `$gostd`, `internal/domain`, `internal/application`, `internal/service`; deny `twiggit/internal/infrastructure`, `twiggit/cmd`
   - `application` (new): allow `$gostd`, `internal/domain`, `internal/application`; deny `twiggit/internal/infrastructure`, `twiggit/internal/service`, `twiggit/cmd`
   - `infrastructure` (new): allow `$gostd`, `internal/domain`, `internal/application`, `internal/infrastructure`; deny `twiggit/internal/service`, `twiggit/cmd`
   - `cmd` (new): allow `$gostd`, `internal/domain`, `internal/application`, `internal/service`, `internal/infrastructure`, `internal/version`, `twiggit/cmd`; deny the above-listed reverse-direction imports for clarity in CI failure messages
   - Verify by `mise run lint` failing for any test file that imports a forbidden package (smoke test by adding `import "twiggit/internal/infrastructure"` to a `service/` test, confirming it fails, then removing)
-- [ ] 8.2 Drop `gocognit` from `.golangci.yml` `linters.enable` list; verify by `mise run lint` clean
-- [ ] 8.3 Add `nolintlint` block under `.golangci.yml` `linters.settings` with `require-explanation: true, require-specific: true`; verify by adding a bare `//nolint` to any file and confirming `mise run lint` flags it (smoke test)
-- [ ] 8.4 Add `errcheck.check-type-assertions: true` under `linters.settings.errcheck`; verify by `mise run lint` clean
-- [ ] 8.5 Remove the blanket `text: "Close.*is not checked"` exclusion; for each `Close()` call site that intentionally discards the error, add `//nolint:errcheck // <reason>` on the line above; verify by `mise run lint` clean
-- [ ] 8.6 Remove the four redundant `//nolint:wrapcheck` directives in `command_executor_mock_test.go` (wrapcheck is excluded for `_test.go`); verify by `mise run lint` clean
-- [ ] 8.7 Add `modernize: enable` to `.golangci.yml` `linters.enable` list (requires golangci-lint v2.6.0+, gated by Task 1.4); verify by `mise run lint` clean and `golangci-lint linters` listing `modernize` enabled
+- [x] 8.2 Drop `gocognit` from `.golangci.yml` `linters.enable` list; verify by `mise run lint` clean
+- [x] 8.3 Add `nolintlint` block under `.golangci.yml` `linters.settings` with `require-explanation: true, require-specific: true`; verify by adding a bare `//nolint` to any file and confirming `mise run lint` flags it (smoke test)
+- [x] 8.4 Add `errcheck.check-type-assertions: true` under `linters.settings.errcheck`; verify by `mise run lint` clean
+- [x] 8.5 Remove the blanket `text: "Close.*is not checked"` exclusion; for each `Close()` call site that intentionally discards the error, add `//nolint:errcheck // <reason>` on the line above; verify by `mise run lint` clean
+- [x] 8.6 Remove the four redundant `//nolint:wrapcheck` directives in `command_executor_mock_test.go` (wrapcheck is excluded for `_test.go`); verify by `mise run lint` clean
+- [x] 8.7 Add `modernize: enable` to `.golangci.yml` `linters.enable` list (requires golangci-lint v2.6.0+, gated by Task 1.4); verify by `mise run lint` clean and `golangci-lint linters` listing `modernize` enabled
 
 ## 9. Verification (slice 9)
 
