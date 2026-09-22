@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/domain"
@@ -348,4 +349,39 @@ func TestWithExistingOnly_SkipsMainSuggestion(t *testing.T) {
 	for _, s := range suggestions {
 		assert.NotEqual(t, "main", s.Text, "Should not include 'main' suggestion with WithExistingOnly")
 	}
+}
+
+func TestProjectService_ProductionWiring_UsesFilesystemLocator(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping integration test")
+	}
+
+	tempDir := t.TempDir()
+	projectsDir := filepath.Join(tempDir, "Projects")
+	worktreesDir := filepath.Join(tempDir, "Worktrees")
+
+	projectPath := filepath.Join(projectsDir, "wired-project")
+	require.NoError(t, os.MkdirAll(projectPath, 0755))
+	setupTestGitRepo(t, projectPath)
+
+	mockGitService := mocks.NewMockGitService()
+	mockGitService.MockGoGitClient.On("ValidateRepository", mock.Anything).Return(nil)
+
+	goGitClient, err := infrastructure.NewGoGitClient(true)
+	require.NoError(t, err)
+
+	repoFinder := infrastructure.NewRepoFinder(goGitClient)
+
+	require.NotNil(t, repoFinder, "production wiring must use the filesystem-walking RepoLocator")
+
+	var locator any = repoFinder
+	_, isMockLocator := locator.(*mocks.MockRepoLocator)
+	assert.False(t, isMockLocator, "production wiring must not substitute a mock locator")
+
+	gitDirs, err := repoFinder.FindGitRepositories(projectsDir)
+	require.NoError(t, err)
+	assert.Len(t, gitDirs, 1, "filesystem locator must discover the seeded project")
+	assert.Equal(t, "wired-project", gitDirs[0].Name)
+
+	_ = worktreesDir
 }

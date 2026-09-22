@@ -78,7 +78,7 @@ type ValidationError struct { /* private fields */ }
 func NewValidationError(request, field, value, message string) *ValidationError
 func (e *ValidationError) WithSuggestions([]string) *ValidationError  // immutable
 func (e *ValidationError) WithContext(string) *ValidationError         // immutable
-// Getters: Field(), Value(), Message(), Request(), Suggestions(), Context()
+// Getters: Field(), Value(), Message(), Request(), Suggestions(), Detail()
 ```
 
 ## Error Types

@@ -768,3 +768,90 @@ func TestWorktreeService_PruneMergedWorktrees_CurrentWorktreeSkipped(t *testing.
 	assert.Equal(t, "feature-current", result.CurrentWorktreeSkipped[0].BranchName)
 	assert.Contains(t, result.CurrentWorktreeSkipped[0].SkipReason, "cannot prune current worktree")
 }
+
+func TestWorktreeService_Routing_BranchExistsUsesGoGitOnly(t *testing.T) {
+	config := domain.DefaultConfig()
+	goGit := mocks.NewMockGoGitClient()
+	cli := mocks.NewMockCLIClient()
+	projectService := mocks.NewMockProjectService()
+	testProject := &domain.ProjectInfo{
+		Name:        "test-project",
+		Path:        "/path/to/project",
+		GitRepoPath: "/path/to/project/.git",
+	}
+	configureWorktreeServiceMocks(goGit, cli, projectService, testProject)
+	service := NewWorktreeService(goGit, cli, projectService, config, nil)
+
+	goGit.ExpectedCalls = nil
+	cli.ExpectedCalls = nil
+	goGit.Calls = nil
+	cli.Calls = nil
+
+	projectService.On("ListProjects", mock.Anything).Return([]*domain.ProjectInfo{testProject}, nil).Maybe()
+	projectService.On("ListProjectSummaries", mock.Anything).Return([]*domain.ProjectSummary{{
+		Name: testProject.Name, Path: testProject.Path, GitRepoPath: testProject.GitRepoPath,
+	}}, nil).Maybe()
+	projectService.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*domain.Context")).Return(testProject, nil).Maybe()
+	projectService.On("ValidateProject", mock.Anything, mock.AnythingOfType("string")).Return(nil).Maybe()
+
+	goGit.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil).Once()
+	goGit.On("BranchExists", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(true, nil).Once()
+
+	_, err := service.BranchExists(context.Background(), testProject.Path, "feature-branch")
+	require.NoError(t, err)
+
+	goGit.AssertCalled(t, "BranchExists", mock.Anything, mock.AnythingOfType("string"), "feature-branch")
+	cli.AssertNotCalled(t, "BranchExists", mock.Anything, mock.Anything, mock.Anything)
+	cli.AssertNotCalled(t, "CreateWorktree", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	cli.AssertNotCalled(t, "DeleteWorktree", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	cli.AssertNotCalled(t, "ListWorktrees", mock.Anything, mock.Anything)
+	cli.AssertNotCalled(t, "PruneWorktrees", mock.Anything, mock.Anything)
+	cli.AssertNotCalled(t, "IsBranchMerged", mock.Anything, mock.Anything, mock.Anything)
+	cli.AssertNotCalled(t, "DeleteBranch", mock.Anything, mock.Anything, mock.Anything)
+}
+
+func TestWorktreeService_Routing_CreateWorktreeUsesCLIOnly(t *testing.T) {
+	config := domain.DefaultConfig()
+	goGit := mocks.NewMockGoGitClient()
+	cli := mocks.NewMockCLIClient()
+	projectService := mocks.NewMockProjectService()
+	testProject := &domain.ProjectInfo{
+		Name:        "test-project",
+		Path:        "/path/to/project",
+		GitRepoPath: "/path/to/project/.git",
+	}
+	configureWorktreeServiceMocks(goGit, cli, projectService, testProject)
+	service := NewWorktreeService(goGit, cli, projectService, config, nil)
+
+	goGit.ExpectedCalls = nil
+	cli.ExpectedCalls = nil
+	goGit.Calls = nil
+	cli.Calls = nil
+
+	projectService.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*domain.Context")).Return(testProject, nil).Once()
+	projectService.On("ValidateProject", mock.Anything, testProject.Path).Return(nil).Once()
+	goGit.On("BranchExists", mock.Anything, mock.AnythingOfType("string"), "feature-branch").Return(false, nil).Once()
+	cli.On("CreateWorktree", mock.Anything, testProject.GitRepoPath, "feature-branch", mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(nil).Once()
+
+	req := &domain.CreateWorktreeRequest{
+		ProjectName:  "test-project",
+		BranchName:   "feature-branch",
+		SourceBranch: "main",
+		Context: &domain.Context{
+			Type:        domain.ContextProject,
+			ProjectName: "test-project",
+			Path:        testProject.Path,
+		},
+	}
+
+	_, err := service.CreateWorktree(context.Background(), req)
+	require.NoError(t, err)
+
+	cli.AssertCalled(t, "CreateWorktree", mock.Anything, testProject.GitRepoPath, "feature-branch", mock.AnythingOfType("string"), mock.AnythingOfType("string"))
+	goGit.AssertNotCalled(t, "CreateWorktree", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	goGit.AssertNotCalled(t, "DeleteWorktree", mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+	goGit.AssertNotCalled(t, "ListWorktrees", mock.Anything, mock.Anything)
+	goGit.AssertNotCalled(t, "PruneWorktrees", mock.Anything, mock.Anything)
+	goGit.AssertNotCalled(t, "IsBranchMerged", mock.Anything, mock.Anything, mock.Anything)
+	goGit.AssertNotCalled(t, "DeleteBranch", mock.Anything, mock.Anything, mock.Anything)
+}

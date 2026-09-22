@@ -84,6 +84,7 @@ func TestValidationError_WithSuggestionsThenWithContext(t *testing.T) {
 	assert.Equal(t, "Branch name validation", err.Detail())
 	msg := err.Error()
 	assert.Contains(t, msg, "validation failed")
+	assert.NotContains(t, msg, "💡")
 }
 
 func TestValidationError_Getters(t *testing.T) {

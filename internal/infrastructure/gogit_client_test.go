@@ -2,10 +2,13 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/go-git/go-git/v5"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -152,6 +155,42 @@ func findBranch(branches []domain.BranchInfo, name string) *domain.BranchInfo {
 		}
 	}
 	return nil
+}
+
+func TestNewGoGitClient_CacheAllocatorFailure(t *testing.T) {
+	allocErr := errors.New("simulated cache allocation failure")
+	failingFactory := func(_ int) (*lru.Cache[string, *git.Repository], error) {
+		return nil, allocErr
+	}
+
+	client, err := newGoGitClientWithCacheFactory(25, true, failingFactory)
+	require.Error(t, err)
+	assert.Nil(t, client)
+	assert.ErrorIs(t, err, allocErr)
+}
+
+func TestNewGoGitClientWithSize_CacheAllocatorFailure(t *testing.T) {
+	allocErr := errors.New("simulated cache allocation failure for size")
+	failingFactory := func(_ int) (*lru.Cache[string, *git.Repository], error) {
+		return nil, allocErr
+	}
+
+	client, err := newGoGitClientWithCacheFactory(100, true, failingFactory)
+	require.Error(t, err)
+	assert.Nil(t, client)
+	assert.ErrorIs(t, err, allocErr)
+}
+
+func TestNewGoGitClient_CacheFactoryReceivesRequestedSize(t *testing.T) {
+	var receivedSize int
+	captureFactory := func(size int) (*lru.Cache[string, *git.Repository], error) {
+		receivedSize = size
+		return defaultGoGitCacheFactory(size)
+	}
+
+	_, err := newGoGitClientWithCacheFactory(42, true, captureFactory)
+	require.NoError(t, err)
+	assert.Equal(t, 42, receivedSize)
 }
 
 func setupTestRepo(t *testing.T, tempDir string) string {

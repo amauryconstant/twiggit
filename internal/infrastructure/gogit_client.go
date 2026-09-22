@@ -21,21 +21,24 @@ type goGitClient struct {
 	cacheEnabled bool
 }
 
+const defaultGoGitCacheSize = 25
+
+type goGitCacheFactory func(size int) (*lru.Cache[string, *git.Repository], error)
+
+func defaultGoGitCacheFactory(size int) (*lru.Cache[string, *git.Repository], error) {
+	cache, err := lru.New[string, *git.Repository](size)
+	if err != nil {
+		return nil, fmt.Errorf("create go-git LRU cache: %w", err)
+	}
+	return cache, nil
+}
+
 func NewGoGitClient(cacheEnabled ...bool) (application.GoGitClient, error) {
 	enabled := true
 	if len(cacheEnabled) > 0 {
 		enabled = cacheEnabled[0]
 	}
-
-	cache, err := lru.New[string, *git.Repository](25)
-	if err != nil {
-		return nil, fmt.Errorf("create go-git LRU cache: %w", err)
-	}
-
-	return &goGitClient{
-		cache:        cache,
-		cacheEnabled: enabled,
-	}, nil
+	return newGoGitClientWithCacheFactory(defaultGoGitCacheSize, enabled, defaultGoGitCacheFactory)
 }
 
 func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) (application.GoGitClient, error) {
@@ -43,17 +46,18 @@ func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) (application.Go
 	if len(cacheEnabled) > 0 {
 		enabled = cacheEnabled[0]
 	}
-
 	size := cacheSize
 	if size <= 0 {
-		size = 25
+		size = defaultGoGitCacheSize
 	}
+	return newGoGitClientWithCacheFactory(size, enabled, defaultGoGitCacheFactory)
+}
 
-	cache, err := lru.New[string, *git.Repository](size)
+func newGoGitClientWithCacheFactory(size int, enabled bool, factory goGitCacheFactory) (application.GoGitClient, error) {
+	cache, err := factory(size)
 	if err != nil {
-		return nil, fmt.Errorf("create go-git LRU cache: %w", err)
+		return nil, err
 	}
-
 	return &goGitClient{
 		cache:        cache,
 		cacheEnabled: enabled,

@@ -1,11 +1,14 @@
 package infrastructure
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -287,4 +290,54 @@ func TestContextDetectionError(t *testing.T) {
 
 	assert.Equal(t, "context detection failed for /test/path: test message", err.Error())
 	assert.Equal(t, originalErr, err.Unwrap())
+}
+
+func TestNewContextDetector_CacheAllocatorFailure(t *testing.T) {
+	allocErr := errors.New("simulated cache allocation failure")
+	failingFactory := func(_ int) (*lru.Cache[string, worktreeCacheEntry], error) {
+		return nil, allocErr
+	}
+
+	detector, err := newContextDetectorWithCacheFactory(
+		&domain.Config{WorktreesDirectory: "/tmp/wt"},
+		failingFactory,
+	)
+	require.Error(t, err)
+	assert.Nil(t, detector)
+	assert.ErrorIs(t, err, allocErr)
+}
+
+func TestNewContextDetector_CacheFactoryReceivesRequestedSize(t *testing.T) {
+	var receivedSize int
+	captureFactory := func(size int) (*lru.Cache[string, worktreeCacheEntry], error) {
+		receivedSize = size
+		return defaultContextDetectorCacheFactory(size)
+	}
+
+	detector, err := newContextDetectorWithCacheFactory(
+		&domain.Config{WorktreesDirectory: "/tmp/wt"},
+		captureFactory,
+	)
+	require.NoError(t, err)
+	require.NotNil(t, detector)
+	assert.Equal(t, contextDetectorCacheSize, receivedSize)
+}
+
+func TestNewContextDetector_ParseTTLFallback(t *testing.T) {
+	tests := []struct {
+		name     string
+		ttl      string
+		fallback time.Duration
+		want     time.Duration
+	}{
+		{"empty uses fallback", "", 5 * time.Second, 5 * time.Second},
+		{"valid duration parses", "30s", 5 * time.Second, 30 * time.Second},
+		{"invalid duration falls back", "not-a-duration", 7 * time.Second, 7 * time.Second},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseTTL(tt.ttl, tt.fallback)
+			assert.Equal(t, tt.want, got)
+		})
+	}
 }

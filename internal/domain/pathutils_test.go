@@ -3,6 +3,7 @@ package domain
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -169,4 +170,52 @@ func TestIsPathUnder_NonExistentBase(t *testing.T) {
 	got, err := IsPathUnder(base, target)
 	require.NoError(t, err)
 	is.True(got, "non-existent base must still answer based on lexical prefix")
+}
+
+func TestIsPathUnder_RealSymlinkEscape(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevation on Windows")
+	}
+
+	base := t.TempDir()
+	outsideDir := t.TempDir()
+	linkPath := filepath.Join(base, "link-escapes")
+
+	require.NoError(t, os.Symlink(outsideDir, linkPath))
+
+	got, err := IsPathUnder(base, linkPath)
+	require.NoError(t, err)
+	assert.False(t, got, "symlink resolving outside base must return false")
+}
+
+func TestIsPathUnder_RealSymlinkStaysUnderBase(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevation on Windows")
+	}
+
+	base := t.TempDir()
+	leafDir := filepath.Join(base, "leaf")
+	require.NoError(t, os.MkdirAll(leafDir, 0755))
+	linkPath := filepath.Join(base, "link-stays")
+
+	require.NoError(t, os.Symlink(leafDir, linkPath))
+
+	got, err := IsPathUnder(base, linkPath)
+	require.NoError(t, err)
+	assert.True(t, got, "symlink resolving under base must return true")
+}
+
+func TestNormalizePath_BrokenSymlinkFallback(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevation on Windows")
+	}
+
+	tempDir := t.TempDir()
+	broken := filepath.Join(tempDir, "broken-link")
+	require.NoError(t, os.Symlink(filepath.Join(tempDir, "does-not-exist"), broken))
+
+	got, err := NormalizePath(broken)
+	require.NoError(t, err, "broken symlink must not produce an error")
+	assert.True(t, filepath.IsAbs(got), "fallback path must be absolute")
+	assert.Equal(t, broken, got, "fallback must return the original path verbatim")
 }

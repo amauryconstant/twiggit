@@ -21,6 +21,16 @@ type worktreeCacheEntry struct {
 	expiresAt time.Time
 }
 
+type contextDetectorCacheFactory func(size int) (*lru.Cache[string, worktreeCacheEntry], error)
+
+func defaultContextDetectorCacheFactory(size int) (*lru.Cache[string, worktreeCacheEntry], error) {
+	cache, err := lru.New[string, worktreeCacheEntry](size)
+	if err != nil {
+		return nil, fmt.Errorf("create context detector LRU cache: %w", err)
+	}
+	return cache, nil
+}
+
 type contextDetector struct {
 	config *domain.Config
 	cache  *lru.Cache[string, worktreeCacheEntry]
@@ -29,10 +39,14 @@ type contextDetector struct {
 }
 
 func NewContextDetector(cfg *domain.Config) (application.ContextDetector, error) {
+	return newContextDetectorWithCacheFactory(cfg, defaultContextDetectorCacheFactory)
+}
+
+func newContextDetectorWithCacheFactory(cfg *domain.Config, factory contextDetectorCacheFactory) (application.ContextDetector, error) {
 	ttl := parseTTL(cfg.ContextDetection.CacheTTL, 5*time.Second)
-	cache, err := lru.New[string, worktreeCacheEntry](contextDetectorCacheSize)
+	cache, err := factory(contextDetectorCacheSize)
 	if err != nil {
-		return nil, fmt.Errorf("create context detector LRU cache: %w", err)
+		return nil, err
 	}
 	return &contextDetector{
 		config: cfg,
