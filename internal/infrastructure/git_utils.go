@@ -6,13 +6,12 @@ import (
 	"path/filepath"
 
 	"twiggit/internal/application"
+	"twiggit/internal/domain"
 )
 
-// GitDir represents a directory containing a git repository
-type GitDir struct {
-	Name string
-	Path string
-}
+// GitDir is an alias for domain.GitDir kept for gradual repair
+// until slice 4d deletes git_utils.go.
+type GitDir = domain.GitDir
 
 // FindGitRepositories finds all git repositories in the specified directory
 // Returns a list of directories that contain valid git repositories

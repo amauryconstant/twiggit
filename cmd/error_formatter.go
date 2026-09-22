@@ -232,7 +232,7 @@ func formatValidationError(err error) string {
 	for _, suggestion := range validationErr.Suggestions() {
 		output.WriteString(fmt.Sprintf("Hint: %s\n", suggestion))
 	}
-	if context := validationErr.Context(); context != "" {
+	if context := validationErr.Detail(); context != "" {
 		output.WriteString(fmt.Sprintf("Context: %s\n", context))
 	}
 	return output.String()

@@ -35,7 +35,7 @@ func (vp *ValidationPipeline[T]) Validate(input T) Result[bool] {
 // ValidateBranchNameNotEmpty checks if branch name is not empty or whitespace only
 func ValidateBranchNameNotEmpty(branchName string) Result[bool] {
 	if strings.TrimSpace(branchName) == "" {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "BranchName", branchName, "branch name is required").
 				WithSuggestions([]string{"Provide a valid branch name"}),
 		)
@@ -58,7 +58,7 @@ func ValidateBranchNameReserved(branchName string) Result[bool] {
 	}
 
 	if reservedNames[strings.ToLower(branchName)] {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "BranchName", branchName, "branch name format is invalid").
 				WithSuggestions([]string{"This is a git reserved branch name"}),
 		)
@@ -69,7 +69,7 @@ func ValidateBranchNameReserved(branchName string) Result[bool] {
 // ValidateBranchNameLeadingChars checks if branch name starts with invalid characters
 func ValidateBranchNameLeadingChars(branchName string) Result[bool] {
 	if len(branchName) > 0 && (branchName[0] == '.' || branchName[0] == '-') {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "BranchName", branchName, "branch name format is invalid").
 				WithSuggestions([]string{"Branch names cannot start with . or -"}),
 		)
@@ -81,7 +81,7 @@ func ValidateBranchNameLeadingChars(branchName string) Result[bool] {
 func ValidateBranchNameTrailingChars(branchName string) Result[bool] {
 	trimmed := strings.TrimRight(branchName, ".-_")
 	if len(trimmed) != len(branchName) {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "BranchName", branchName, "branch name format is invalid").
 				WithSuggestions([]string{"Branch names cannot end with ., -, or _"}),
 		)
@@ -94,7 +94,7 @@ func ValidateBranchNameFormat(branchName string) Result[bool] {
 	// Git branch names should follow: no spaces, no @, no #, etc.
 	validPattern := regexp.MustCompile(`^[a-zA-Z0-9._-]+$`)
 	if !validPattern.MatchString(branchName) {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "BranchName", branchName, "branch name format is invalid").
 				WithSuggestions([]string{"Use only alphanumeric characters, dots, hyphens, and underscores"}),
 		)
@@ -105,7 +105,7 @@ func ValidateBranchNameFormat(branchName string) Result[bool] {
 // ValidateBranchNameLength checks if branch name is within reasonable length
 func ValidateBranchNameLength(branchName string) Result[bool] {
 	if len(branchName) > 255 {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "BranchName", branchName, "branch name is too long").
 				WithSuggestions([]string{"Branch names should be 255 characters or less"}),
 		)
@@ -131,7 +131,7 @@ func ValidateBranchName(branchName string) Result[bool] {
 // ValidateProjectNameNotEmpty checks if project name is not empty or whitespace only
 func ValidateProjectNameNotEmpty(projectName string) Result[bool] {
 	if strings.TrimSpace(projectName) == "" {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "ProjectName", projectName, "project name is required").
 				WithSuggestions([]string{"Provide a valid project name"}),
 		)
@@ -144,7 +144,7 @@ func ValidateProjectNameFormat(projectName string) Result[bool] {
 	// Project names should be simpler than branch names
 	validPattern := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 	if !validPattern.MatchString(projectName) {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "ProjectName", projectName, "project name format is invalid").
 				WithSuggestions([]string{"Use only alphanumeric characters, hyphens, and underscores"}),
 		)
@@ -155,7 +155,7 @@ func ValidateProjectNameFormat(projectName string) Result[bool] {
 // ValidateProjectNamePathTraversal checks if project name contains path traversal sequences
 func ValidateProjectNamePathTraversal(projectName string) Result[bool] {
 	if strings.Contains(projectName, "..") {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "ProjectName", projectName, "project name contains invalid path traversal sequence").
 				WithSuggestions([]string{"Remove '..' from project name"}),
 		)
@@ -178,7 +178,7 @@ func ValidateProjectName(projectName string) Result[bool] {
 // ValidateShellTypeNotEmpty checks if shell type is not empty or whitespace only
 func ValidateShellTypeNotEmpty(shellType string) Result[bool] {
 	if strings.TrimSpace(shellType) == "" {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "ShellType", shellType, "shell type is required").
 				WithSuggestions([]string{"Provide a valid shell type (bash, zsh, fish)"}),
 		)
@@ -189,7 +189,7 @@ func ValidateShellTypeNotEmpty(shellType string) Result[bool] {
 // ValidateShellTypeFormat checks if shell type has no leading/trailing whitespace
 func ValidateShellTypeFormat(shellType string) Result[bool] {
 	if strings.TrimSpace(shellType) != shellType {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "ShellType", shellType, "shell type format is invalid").
 				WithSuggestions([]string{"Shell type should not contain leading or trailing whitespace"}),
 		)
@@ -206,7 +206,7 @@ func ValidateShellTypeSupported(shellType string) Result[bool] {
 	}
 
 	if !supportedShells[shellType] {
-		return NewErrorResult[bool](
+		return NewErrResult[bool](
 			NewValidationError("Validation", "ShellType", shellType, "unsupported shell type").
 				WithSuggestions([]string{"Supported shells: bash, zsh, fish"}),
 		)

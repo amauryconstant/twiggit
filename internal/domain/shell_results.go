@@ -5,11 +5,11 @@ type SetupShellResult struct {
 	// ShellType indicates which shell was set up
 	ShellType ShellType
 
-	// Installed indicates whether the wrapper was successfully installed
-	Installed bool
+	// IsInstalled indicates whether the wrapper was successfully installed
+	IsInstalled bool
 
-	// Skipped indicates whether the operation was skipped (already installed)
-	Skipped bool
+	// IsSkipped indicates whether the operation was skipped (already installed)
+	IsSkipped bool
 
 	// ConfigFile indicates which config file was used
 	ConfigFile string
@@ -26,8 +26,8 @@ type ValidateInstallationResult struct {
 	// ShellType indicates which shell was validated
 	ShellType ShellType
 
-	// Installed indicates whether the wrapper is installed
-	Installed bool
+	// IsInstalled indicates whether the wrapper is installed
+	IsInstalled bool
 
 	// ConfigFile indicates which config file contains the wrapper
 	ConfigFile string

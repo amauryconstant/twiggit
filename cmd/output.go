@@ -25,7 +25,7 @@ func (f *TextFormatter) FormatWorktrees(worktrees []*domain.WorktreeInfo) string
 	var result strings.Builder
 	for _, wt := range worktrees {
 		status := ""
-		if wt.Modified {
+		if wt.IsModified {
 			status += " (modified)"
 		}
 		if wt.IsDetached {
@@ -82,7 +82,7 @@ func getStatus(wt *domain.WorktreeInfo) string {
 	if wt.IsDetached {
 		return "detached"
 	}
-	if wt.Modified {
+	if wt.IsModified {
 		return "modified"
 	}
 	return "clean"

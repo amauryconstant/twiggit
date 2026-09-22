@@ -37,19 +37,19 @@ func NewHookRunner(executor CommandExecutor, hookTimeoutSeconds ...int) applicat
 func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (*domain.HookResult, error) {
 	if req.ConfigFilePath == "" {
 		return &domain.HookResult{
-			HookType: req.HookType,
-			Executed: false,
-			Success:  true,
-			Failures: nil,
+			HookType:     req.HookType,
+			HasExecuted:  false,
+			IsSuccessful: true,
+			Failures:     nil,
 		}, nil
 	}
 
 	if _, err := os.Stat(req.ConfigFilePath); os.IsNotExist(err) {
 		return &domain.HookResult{
-			HookType: req.HookType,
-			Executed: false,
-			Success:  true,
-			Failures: nil,
+			HookType:     req.HookType,
+			HasExecuted:  false,
+			IsSuccessful: true,
+			Failures:     nil,
 		}, nil
 	}
 
@@ -57,19 +57,19 @@ func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to parse %s: %v\n", req.ConfigFilePath, err)
 		return &domain.HookResult{
-			HookType: req.HookType,
-			Executed: false,
-			Success:  true,
-			Failures: nil,
+			HookType:     req.HookType,
+			HasExecuted:  false,
+			IsSuccessful: true,
+			Failures:     nil,
 		}, nil
 	}
 
 	if config == nil {
 		return &domain.HookResult{
-			HookType: req.HookType,
-			Executed: false,
-			Success:  true,
-			Failures: nil,
+			HookType:     req.HookType,
+			HasExecuted:  false,
+			IsSuccessful: true,
+			Failures:     nil,
 		}, nil
 	}
 
@@ -79,19 +79,19 @@ func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (
 		definition = config.PostCreate
 	default:
 		return &domain.HookResult{
-			HookType: req.HookType,
-			Executed: false,
-			Success:  true,
-			Failures: nil,
+			HookType:     req.HookType,
+			HasExecuted:  false,
+			IsSuccessful: true,
+			Failures:     nil,
 		}, nil
 	}
 
 	if definition == nil || len(definition.Commands) == 0 {
 		return &domain.HookResult{
-			HookType: req.HookType,
-			Executed: false,
-			Success:  true,
-			Failures: nil,
+			HookType:     req.HookType,
+			HasExecuted:  false,
+			IsSuccessful: true,
+			Failures:     nil,
 		}, nil
 	}
 
@@ -118,10 +118,10 @@ func (r *hookRunner) readHookConfig(path string) (*domain.HookConfig, error) {
 
 func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookRunRequest, commands []string) (*domain.HookResult, error) {
 	result := &domain.HookResult{
-		HookType: req.HookType,
-		Executed: true,
-		Success:  true,
-		Failures: nil,
+		HookType:     req.HookType,
+		HasExecuted:  true,
+		IsSuccessful: true,
+		Failures:     nil,
 	}
 
 	envExports := r.buildEnvExports(req)
@@ -135,7 +135,7 @@ func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookR
 		cmdResult, err := r.executor.ExecuteWithTimeout(ctx, req.WorktreePath, "sh", r.defaultTimeout, "-c", fullCmd)
 
 		if err != nil || cmdResult.ExitCode != 0 {
-			result.Success = false
+			result.IsSuccessful = false
 			exitCode := -1
 			output := ""
 			if cmdResult != nil {

@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"reflect"
 	"time"
 )
 
@@ -10,15 +11,34 @@ type Result[T any] struct {
 	Error error
 }
 
-// NewResult creates a new successful result
+// NewResult creates a new successful result.
+// When T is a slice type, the underlying backing array is cloned to
+// prevent callers from mutating internal state through the returned struct.
 func NewResult[T any](value T) Result[T] {
-	return Result[T]{Value: value, Error: nil}
+	return Result[T]{Value: cloneSlice(value), Error: nil}
 }
 
-// NewErrorResult creates a new error result
-func NewErrorResult[T any](err error) Result[T] {
+// NewErrResult creates a new error result
+func NewErrResult[T any](err error) Result[T] {
 	var zero T
 	return Result[T]{Value: zero, Error: err}
+}
+
+// cloneSlice returns a copy of the slice when value is a slice type;
+// non-slice values pass through untouched. Defensive copy avoids the
+// backing-array-aliasing trap when the caller mutates the slice after
+// the result has been stored.
+func cloneSlice[T any](value T) T {
+	v := reflect.ValueOf(value)
+	if !v.IsValid() || v.Kind() != reflect.Slice {
+		return value
+	}
+	if v.IsNil() {
+		return value
+	}
+	dst := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
+	reflect.Copy(dst, v)
+	return dst.Interface().(T)
 }
 
 // IsSuccess returns true if the result is successful

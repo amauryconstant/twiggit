@@ -71,8 +71,8 @@ func TestValidationError_WithContext_Immutability(t *testing.T) {
 	modified := original.WithContext("Additional context information")
 
 	assert.NotEqual(t, original, modified)
-	assert.Empty(t, original.Context())
-	assert.Equal(t, "Additional context information", modified.Context())
+	assert.Empty(t, original.Detail())
+	assert.Equal(t, "Additional context information", modified.Detail())
 }
 
 func TestValidationError_WithSuggestionsThenWithContext(t *testing.T) {
@@ -81,7 +81,7 @@ func TestValidationError_WithSuggestionsThenWithContext(t *testing.T) {
 		WithContext("Branch name validation")
 
 	assert.Equal(t, []string{"Use kebab-case for branch names"}, err.Suggestions())
-	assert.Equal(t, "Branch name validation", err.Context())
+	assert.Equal(t, "Branch name validation", err.Detail())
 	msg := err.Error()
 	assert.Contains(t, msg, "validation failed")
 }
@@ -96,7 +96,7 @@ func TestValidationError_Getters(t *testing.T) {
 	assert.Equal(t, "invalid format", err.Message())
 	assert.Equal(t, "CreateWorktree", err.Request())
 	assert.Equal(t, []string{"suggestion 1", "suggestion 2"}, err.Suggestions())
-	assert.Equal(t, "test context", err.Context())
+	assert.Equal(t, "test context", err.Detail())
 }
 
 func TestValidationError_Unwrap(t *testing.T) {

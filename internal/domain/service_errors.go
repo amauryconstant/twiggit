@@ -99,7 +99,7 @@ func (e *ValidationError) Suggestions() []string {
 }
 
 // Context returns the context information for the validation error
-func (e *ValidationError) Context() string { return e.context }
+func (e *ValidationError) Detail() string { return e.context }
 
 // WorktreeServiceError represents worktree service specific errors
 type WorktreeServiceError struct {

@@ -39,8 +39,8 @@ func TestPathType_String(t *testing.T) {
 		{"project path", PathTypeProject, "project"},
 		{"worktree path", PathTypeWorktree, "worktree"},
 		{"invalid path", PathTypeInvalid, "invalid"},
-		{"undefined path", PathType(999), "invalid"},
-		{"negative path", PathType(-1), "invalid"},
+		{"undefined path", PathType(999), "unknown"},
+		{"negative path", PathType(-1), "unknown"},
 	}
 
 	for _, tc := range testCases {
@@ -115,7 +115,7 @@ func TestResolutionResult_ZeroValues(t *testing.T) {
 	result := &ResolutionResult{}
 
 	assert.Empty(t, result.ResolvedPath)
-	assert.Equal(t, PathTypeProject, result.Type) // Zero value should be PathTypeProject (iota = 0)
+	assert.Equal(t, PathTypeUnknown, result.Type) // Zero value should be PathTypeUnknown (iota = 0)
 	assert.Empty(t, result.ProjectName)
 	assert.Empty(t, result.BranchName)
 	assert.Empty(t, result.Explanation)
@@ -126,7 +126,7 @@ func TestResolutionSuggestion_ZeroValues(t *testing.T) {
 
 	assert.Empty(t, suggestion.Text)
 	assert.Empty(t, suggestion.Description)
-	assert.Equal(t, PathTypeProject, suggestion.Type) // Zero value should be PathTypeProject (iota = 0)
+	assert.Equal(t, PathTypeUnknown, suggestion.Type) // Zero value should be PathTypeUnknown (iota = 0)
 	assert.Empty(t, suggestion.ProjectName)
 	assert.Empty(t, suggestion.BranchName)
 }

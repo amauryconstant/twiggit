@@ -20,7 +20,7 @@ type WorktreeInfo struct {
 	Branch     string // Branch name
 	Commit     string // Commit hash
 	IsDetached bool   // Whether worktree is in detached HEAD state
-	Modified   bool   // Whether worktree has uncommitted changes
+	IsModified bool   // Whether worktree has uncommitted changes
 }
 
 // RepositoryStatus represents the status of a git repository

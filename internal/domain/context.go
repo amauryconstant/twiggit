@@ -41,8 +41,10 @@ type Context struct {
 type PathType int
 
 const (
+	// PathTypeUnknown represents an uninitialized or unknown path
+	PathTypeUnknown PathType = iota
 	// PathTypeProject represents a project path
-	PathTypeProject PathType = iota
+	PathTypeProject
 	// PathTypeWorktree represents a worktree path
 	PathTypeWorktree
 	// PathTypeInvalid represents an invalid path
@@ -56,8 +58,10 @@ func (p PathType) String() string {
 		return "project"
 	case PathTypeWorktree:
 		return "worktree"
-	default:
+	case PathTypeInvalid:
 		return "invalid"
+	default:
+		return "unknown"
 	}
 }
 

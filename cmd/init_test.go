@@ -177,10 +177,10 @@ func TestInitCmd_InstallMode_CallsSetupShell(t *testing.T) {
 		ForceOverwrite: false,
 		ConfigFile:     "",
 	}).Return(&domain.SetupShellResult{
-		ShellType:  domain.ShellBash,
-		Installed:  true,
-		ConfigFile: "/home/user/.bashrc",
-		Message:    "Shell wrapper installed successfully",
+		ShellType:   domain.ShellBash,
+		IsInstalled: true,
+		ConfigFile:  "/home/user/.bashrc",
+		Message:     "Shell wrapper installed successfully",
 	}, nil)
 
 	config := &CommandConfig{
@@ -210,10 +210,10 @@ func TestInitCmd_InstallMode_WithCustomConfig(t *testing.T) {
 		ForceOverwrite: false,
 		ConfigFile:     "/custom/bashrc",
 	}).Return(&domain.SetupShellResult{
-		ShellType:  domain.ShellBash,
-		Installed:  true,
-		ConfigFile: "/custom/bashrc",
-		Message:    "Shell wrapper installed successfully",
+		ShellType:   domain.ShellBash,
+		IsInstalled: true,
+		ConfigFile:  "/custom/bashrc",
+		Message:     "Shell wrapper installed successfully",
 	}, nil)
 
 	config := &CommandConfig{
@@ -243,10 +243,10 @@ func TestInitCmd_InstallMode_WithForce(t *testing.T) {
 		ForceOverwrite: true,
 		ConfigFile:     "",
 	}).Return(&domain.SetupShellResult{
-		ShellType:  domain.ShellBash,
-		Installed:  true,
-		ConfigFile: "/home/user/.bashrc",
-		Message:    "Shell wrapper installed successfully",
+		ShellType:   domain.ShellBash,
+		IsInstalled: true,
+		ConfigFile:  "/home/user/.bashrc",
+		Message:     "Shell wrapper installed successfully",
 	}, nil)
 
 	config := &CommandConfig{
@@ -268,11 +268,11 @@ func TestInitCmd_InstallMode_WithForce(t *testing.T) {
 func TestDisplayInitResults_Skipped(t *testing.T) {
 	out := &bytes.Buffer{}
 	result := &domain.SetupShellResult{
-		ShellType:  domain.ShellBash,
-		Installed:  true,
-		Skipped:    true,
-		ConfigFile: "/home/user/.bashrc",
-		Message:    "Shell wrapper already installed",
+		ShellType:   domain.ShellBash,
+		IsInstalled: true,
+		IsSkipped:   true,
+		ConfigFile:  "/home/user/.bashrc",
+		Message:     "Shell wrapper already installed",
 	}
 
 	err := displayInitResults(out, result)
@@ -287,10 +287,10 @@ func TestDisplayInitResults_Skipped(t *testing.T) {
 func TestDisplayInitResults_Installed(t *testing.T) {
 	out := &bytes.Buffer{}
 	result := &domain.SetupShellResult{
-		ShellType:  domain.ShellFish,
-		Installed:  true,
-		ConfigFile: "/home/user/.config/fish/config.fish",
-		Message:    "Shell wrapper installed successfully",
+		ShellType:   domain.ShellFish,
+		IsInstalled: true,
+		ConfigFile:  "/home/user/.config/fish/config.fish",
+		Message:     "Shell wrapper installed successfully",
 	}
 
 	err := displayInitResults(out, result)
@@ -306,10 +306,10 @@ func TestDisplayInitResults_Installed(t *testing.T) {
 func TestDisplayInitResults_NotInstalled(t *testing.T) {
 	out := &bytes.Buffer{}
 	result := &domain.SetupShellResult{
-		ShellType:  domain.ShellBash,
-		Installed:  false,
-		ConfigFile: "/home/user/.bashrc",
-		Message:    "Installation failed",
+		ShellType:   domain.ShellBash,
+		IsInstalled: false,
+		ConfigFile:  "/home/user/.bashrc",
+		Message:     "Installation failed",
 	}
 
 	err := displayInitResults(out, result)

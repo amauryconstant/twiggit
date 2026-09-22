@@ -20,10 +20,10 @@ type HookDefinition struct {
 
 // HookResult represents the result of hook execution
 type HookResult struct {
-	HookType HookType
-	Executed bool
-	Success  bool
-	Failures []HookFailure
+	HookType     HookType
+	HasExecuted  bool
+	IsSuccessful bool
+	Failures     []HookFailure
 }
 
 // HookFailure represents details of a failed hook command

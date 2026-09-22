@@ -196,7 +196,7 @@ func TestShellService_ValidateInstallation(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 				assert.NotNil(t, result)
-				assert.False(t, result.Installed)
+				assert.False(t, result.IsInstalled)
 				assert.Equal(t, tc.request.ShellType, result.ShellType)
 			}
 		})

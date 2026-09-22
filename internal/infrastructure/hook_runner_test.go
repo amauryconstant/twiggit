@@ -35,8 +35,8 @@ func TestHookRunner_Run_NoConfigFile_ReturnsNotExecuted(t *testing.T) {
 	result, err := runner.Run(context.Background(), req)
 
 	require.NoError(t, err)
-	assert.False(t, result.Executed)
-	assert.True(t, result.Success)
+	assert.False(t, result.HasExecuted)
+	assert.True(t, result.IsSuccessful)
 	assert.Nil(t, result.Failures)
 }
 
@@ -57,8 +57,8 @@ func TestHookRunner_Run_EmptyConfigFile_ReturnsNotExecuted(t *testing.T) {
 	result, err := runner.Run(context.Background(), req)
 
 	require.NoError(t, err)
-	assert.False(t, result.Executed)
-	assert.True(t, result.Success)
+	assert.False(t, result.HasExecuted)
+	assert.True(t, result.IsSuccessful)
 }
 
 func TestHookRunner_Run_ConfigWithCommands_ExecutesCommands(t *testing.T) {
@@ -89,8 +89,8 @@ commands = ["mise trust", "npm install"]
 	result, err := runner.Run(context.Background(), req)
 
 	require.NoError(t, err)
-	assert.True(t, result.Executed)
-	assert.True(t, result.Success)
+	assert.True(t, result.HasExecuted)
+	assert.True(t, result.IsSuccessful)
 	assert.Empty(t, result.Failures)
 	mockExec.AssertExpectations(t)
 }
@@ -127,8 +127,8 @@ commands = ["mise trust", "npm install", "echo done"]
 	result, err := runner.Run(context.Background(), req)
 
 	require.NoError(t, err)
-	assert.True(t, result.Executed)
-	assert.False(t, result.Success)
+	assert.True(t, result.HasExecuted)
+	assert.False(t, result.IsSuccessful)
 	assert.Len(t, result.Failures, 1)
 	assert.Equal(t, "npm install", result.Failures[0].Command)
 	assert.Equal(t, 1, result.Failures[0].ExitCode)
@@ -154,8 +154,8 @@ commands = ["mise trust"]
 	result, err := runner.Run(context.Background(), req)
 
 	require.NoError(t, err)
-	assert.False(t, result.Executed)
-	assert.True(t, result.Success)
+	assert.False(t, result.HasExecuted)
+	assert.True(t, result.IsSuccessful)
 }
 
 func TestHookRunner_Run_MissingCommandsArray_ReturnsNotExecuted(t *testing.T) {
@@ -177,8 +177,8 @@ func TestHookRunner_Run_MissingCommandsArray_ReturnsNotExecuted(t *testing.T) {
 	result, err := runner.Run(context.Background(), req)
 
 	require.NoError(t, err)
-	assert.False(t, result.Executed)
-	assert.True(t, result.Success)
+	assert.False(t, result.HasExecuted)
+	assert.True(t, result.IsSuccessful)
 }
 
 func TestHookRunner_Run_EmptyCommandsArray_ReturnsNotExecuted(t *testing.T) {
@@ -201,8 +201,8 @@ commands = []
 	result, err := runner.Run(context.Background(), req)
 
 	require.NoError(t, err)
-	assert.False(t, result.Executed)
-	assert.True(t, result.Success)
+	assert.False(t, result.HasExecuted)
+	assert.True(t, result.IsSuccessful)
 }
 
 func TestHookRunner_Run_EnvironmentVariablesSet(t *testing.T) {

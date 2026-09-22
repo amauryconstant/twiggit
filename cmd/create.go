@@ -131,7 +131,7 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 	}
 
 	// Display hook failure warnings
-	if result.HookResult != nil && !result.HookResult.Success {
+	if result.HookResult != nil && !result.HookResult.IsSuccessful {
 		displayHookFailures(cmd.ErrOrStderr(), result.HookResult)
 	}
 

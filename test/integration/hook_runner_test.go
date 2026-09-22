@@ -53,8 +53,8 @@ commands = ["echo hello"]
 	result, err := s.runner.Run(context.Background(), req)
 
 	s.Require().NoError(err)
-	s.True(result.Executed)
-	s.True(result.Success)
+	s.True(result.HasExecuted)
+	s.True(result.IsSuccessful)
 	s.Empty(result.Failures)
 }
 
@@ -80,8 +80,8 @@ commands = [
 	result, err := s.runner.Run(context.Background(), req)
 
 	s.Require().NoError(err)
-	s.True(result.Executed)
-	s.True(result.Success)
+	s.True(result.HasExecuted)
+	s.True(result.IsSuccessful)
 	s.Empty(result.Failures)
 }
 
@@ -107,8 +107,8 @@ commands = [
 	result, err := s.runner.Run(context.Background(), req)
 
 	s.Require().NoError(err)
-	s.True(result.Executed)
-	s.False(result.Success)
+	s.True(result.HasExecuted)
+	s.False(result.IsSuccessful)
 	s.Len(result.Failures, 1)
 	s.Contains(result.Failures[0].Command, "exit 1")
 	s.Equal(1, result.Failures[0].ExitCode)
@@ -136,8 +136,8 @@ commands = ["printenv TWIGGIT_PROJECT_NAME"]
 	result, err := s.runner.Run(context.Background(), req)
 
 	s.Require().NoError(err)
-	s.True(result.Executed)
-	s.True(result.Success, "Command should succeed")
+	s.True(result.HasExecuted)
+	s.True(result.IsSuccessful, "Command should succeed")
 }
 
 func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_CommandExecutesInWorktreeDirectory() {
@@ -159,8 +159,8 @@ commands = ["touch marker.txt"]
 	result, err := s.runner.Run(context.Background(), req)
 
 	s.Require().NoError(err)
-	s.True(result.Executed, "Hooks should have executed")
-	s.True(result.Success, "Command should succeed, failures: %v", result.Failures)
+	s.True(result.HasExecuted, "Hooks should have executed")
+	s.True(result.IsSuccessful, "Command should succeed, failures: %v", result.Failures)
 
 	_, err = os.Stat(testFile)
 	s.Require().NoError(err, "File should have been created in worktree directory")
@@ -176,8 +176,8 @@ func (s *HookRunnerIntegrationSuite) TestRun_NoConfigFile_ReturnsNotExecuted() {
 	result, err := s.runner.Run(context.Background(), req)
 
 	s.Require().NoError(err)
-	s.False(result.Executed)
-	s.True(result.Success)
+	s.False(result.HasExecuted)
+	s.True(result.IsSuccessful)
 }
 
 func (s *HookRunnerIntegrationSuite) TestRun_EmptyHooksSection_ReturnsNotExecuted() {
@@ -198,6 +198,6 @@ key = "value"
 	result, err := s.runner.Run(context.Background(), req)
 
 	s.Require().NoError(err)
-	s.False(result.Executed)
-	s.True(result.Success)
+	s.False(result.HasExecuted)
+	s.True(result.IsSuccessful)
 }

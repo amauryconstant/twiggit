@@ -214,8 +214,8 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		result, err := shellService.SetupShell(nil, request)
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		assert.True(t, result.Installed)
-		assert.False(t, result.Skipped)
+		assert.True(t, result.IsInstalled)
+		assert.False(t, result.IsSkipped)
 
 		content, err := os.ReadFile(configFile)
 		require.NoError(t, err)
@@ -251,8 +251,8 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		result, err := shellService.SetupShell(nil, request)
 		require.NoError(t, err)
 		require.NotNil(t, result)
-		assert.True(t, result.Installed)
-		assert.False(t, result.Skipped)
+		assert.True(t, result.IsInstalled)
+		assert.False(t, result.IsSkipped)
 
 		content, err := os.ReadFile(configFile)
 		require.NoError(t, err)
@@ -293,8 +293,8 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		assert.True(t, result.Installed, "result should indicate installed")
-		assert.True(t, result.Skipped, "result should indicate skipped")
+		assert.True(t, result.IsInstalled, "result should indicate installed")
+		assert.True(t, result.IsSkipped, "result should indicate skipped")
 		assert.Equal(t, "Shell wrapper already installed", result.Message)
 
 		content, err := os.ReadFile(configFile)
@@ -322,8 +322,8 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
-		assert.True(t, result.Installed)
-		assert.False(t, result.Skipped)
+		assert.True(t, result.IsInstalled)
+		assert.False(t, result.IsSkipped)
 		assert.Equal(t, "Shell wrapper installed successfully", result.Message)
 
 		content, err := os.ReadFile(configFile)

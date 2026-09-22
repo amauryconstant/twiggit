@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -272,6 +273,105 @@ func TestErrSentinels_WalkThroughWraps(t *testing.T) {
 			assert.ErrorIs(t, tt.err, tt.ownSentinel, "should match own sentinel")
 			assert.NotErrorIs(t, tt.err, tt.otherSentinel, "should not match unrelated sentinel")
 			assert.NotErrorIs(t, tt.err, tt.otherSentinel2, "should not match unrelated sentinel")
+		})
+	}
+}
+
+// TestErrorsIsChain constructs every per-resource not-found error and
+// asserts the errors.Is chain reaches the matching sentinel. Sourced
+// from the domain-typed-errors spec table.
+func TestErrorsIsChain(t *testing.T) {
+	tests := []struct {
+		name              string
+		err               error
+		ownSentinel       error
+		otherNotFoundA    error
+		otherNotFoundB    error
+	}{
+		{
+			name:           "GitRepositoryError chains to ErrGitRepoNotFound",
+			err:            NewGitRepositoryError("/repo", "not a git repository", nil),
+			ownSentinel:    ErrGitRepoNotFound,
+			otherNotFoundA: ErrWorktreeNotFound,
+			otherNotFoundB: ErrProjectNotFound,
+		},
+		{
+			name:           "GitWorktreeError chains to ErrWorktreeNotFound",
+			err:            NewGitWorktreeError("/wt", "feature", "missing", nil),
+			ownSentinel:    ErrWorktreeNotFound,
+			otherNotFoundA: ErrGitRepoNotFound,
+			otherNotFoundB: ErrProjectNotFound,
+		},
+		{
+			name:           "WorktreeServiceError chains to ErrWorktreeNotFound",
+			err:            NewWorktreeServiceError("/wt", "feature", "ListWorktrees", "missing", nil),
+			ownSentinel:    ErrWorktreeNotFound,
+			otherNotFoundA: ErrProjectNotFound,
+			otherNotFoundB: ErrResolutionNotFound,
+		},
+		{
+			name:           "ProjectServiceError chains to ErrProjectNotFound",
+			err:            NewProjectServiceError("myproj", "/p", "DiscoverProject", "missing", nil),
+			ownSentinel:    ErrProjectNotFound,
+			otherNotFoundA: ErrWorktreeNotFound,
+			otherNotFoundB: ErrResolutionNotFound,
+		},
+		{
+			name:           "NavigationServiceError chains to ErrResolutionNotFound",
+			err:            NewNavigationServiceError("target", "ctx", "Navigate", "missing", nil),
+			ownSentinel:    ErrResolutionNotFound,
+			otherNotFoundA: ErrWorktreeNotFound,
+			otherNotFoundB: ErrProjectNotFound,
+		},
+		{
+			name:           "ResolutionError chains to ErrResolutionNotFound",
+			err:            NewResolutionError("target", "ctx", "missing", nil, nil),
+			ownSentinel:    ErrResolutionNotFound,
+			otherNotFoundA: ErrWorktreeNotFound,
+			otherNotFoundB: ErrProjectNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := assert.New(t)
+			is.True(errors.Is(tt.err, tt.ownSentinel), "errors.Is must reach own sentinel for %s", tt.name)
+			is.False(errors.Is(tt.err, tt.otherNotFoundA), "must not match unrelated sentinel %v", tt.otherNotFoundA)
+			is.False(errors.Is(tt.err, tt.otherNotFoundB), "must not match unrelated sentinel %v", tt.otherNotFoundB)
+		})
+	}
+}
+
+// TestErrorsIsChain_WrappedCause confirms that errors.Is walks through
+// a wrapped cause when one is supplied, in addition to the wrapper's
+// own sentinel match.
+func TestErrorsIsChain_WrappedCause(t *testing.T) {
+	tests := []struct {
+		name        string
+		err         error
+		ownSentinel error
+	}{
+		{
+			name:        "WorktreeServiceError wrapping ErrWorktreeNotFound",
+			err:         NewWorktreeServiceError("/wt", "b", "op", "msg", ErrWorktreeNotFound),
+			ownSentinel: ErrWorktreeNotFound,
+		},
+		{
+			name:        "GitWorktreeError wrapping ErrWorktreeNotFound",
+			err:         NewGitWorktreeError("/wt", "b", "msg", ErrWorktreeNotFound),
+			ownSentinel: ErrWorktreeNotFound,
+		},
+		{
+			name:        "ProjectServiceError wrapping ErrProjectNotFound",
+			err:         NewProjectServiceError("p", "/path", "op", "msg", ErrProjectNotFound),
+			ownSentinel: ErrProjectNotFound,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := assert.New(t)
+			is.True(errors.Is(tt.err, tt.ownSentinel))
 		})
 	}
 }

@@ -83,11 +83,11 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 	if !req.ForceOverwrite {
 		if err := s.integration.ValidateInstallation(shellType, configFile); err == nil {
 			return &domain.SetupShellResult{
-				ShellType:  shellType,
-				Installed:  true,
-				Skipped:    true,
-				ConfigFile: configFile,
-				Message:    "Shell wrapper already installed",
+				ShellType:   shellType,
+				IsInstalled: true,
+				IsSkipped:   true,
+				ConfigFile:  configFile,
+				Message:     "Shell wrapper already installed",
 			}, nil
 		}
 	}
@@ -103,21 +103,21 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 		// Check if it's already installed error
 		if errors.Is(err, domain.ErrShellAlreadyInstalled) {
 			return &domain.SetupShellResult{
-				ShellType:  shellType,
-				Installed:  true,
-				Skipped:    true,
-				ConfigFile: configFile,
-				Message:    "Shell wrapper already installed",
+				ShellType:   shellType,
+				IsInstalled: true,
+				IsSkipped:   true,
+				ConfigFile:  configFile,
+				Message:     "Shell wrapper already installed",
 			}, nil
 		}
 		return nil, fmt.Errorf("failed to install wrapper: %w", err)
 	}
 
 	return &domain.SetupShellResult{
-		ShellType:  shellType,
-		Installed:  true,
-		ConfigFile: configFile,
-		Message:    "Shell wrapper installed successfully",
+		ShellType:   shellType,
+		IsInstalled: true,
+		ConfigFile:  configFile,
+		Message:     "Shell wrapper installed successfully",
 	}, nil
 }
 
@@ -138,20 +138,20 @@ func (s *shellService) ValidateInstallation(_ context.Context, req *domain.Valid
 	if err != nil {
 		if errors.Is(err, domain.ErrShellNotInstalled) {
 			return &domain.ValidateInstallationResult{
-				ShellType:  shellType,
-				Installed:  false,
-				ConfigFile: configFile,
-				Message:    "Shell wrapper not installed",
+				ShellType:   shellType,
+				IsInstalled: false,
+				ConfigFile:  configFile,
+				Message:     "Shell wrapper not installed",
 			}, nil
 		}
 		return nil, fmt.Errorf("failed to validate installation: %w", err)
 	}
 
 	return &domain.ValidateInstallationResult{
-		ShellType:  shellType,
-		Installed:  true,
-		ConfigFile: configFile,
-		Message:    "Shell wrapper is installed",
+		ShellType:   shellType,
+		IsInstalled: true,
+		ConfigFile:  configFile,
+		Message:     "Shell wrapper is installed",
 	}, nil
 }
 

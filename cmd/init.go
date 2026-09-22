@@ -142,14 +142,14 @@ func runInitInstall(cmd *cobra.Command, config *CommandConfig, shellType domain.
 
 // displayInitResults outputs installation results (for install mode only)
 func displayInitResults(out io.Writer, result *domain.SetupShellResult) error {
-	if result.Skipped {
+	if result.IsSkipped {
 		_, _ = fmt.Fprintf(out, "Shell wrapper already installed for %s\n", result.ShellType)
 		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
 		_, _ = fmt.Fprintf(out, "Use --force to reinstall\n")
 		return nil
 	}
 
-	if result.Installed {
+	if result.IsInstalled {
 		_, _ = fmt.Fprintf(out, "Shell wrapper installed for %s\n", result.ShellType)
 		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
 		if _, err := os.Stat(result.ConfigFile); err == nil {

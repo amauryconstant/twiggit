@@ -158,10 +158,10 @@ type HookDefinition struct {
 }
 
 type HookResult struct {
-    HookType HookType
-    Executed bool           // Were commands configured?
-    Success  bool           // All commands succeeded?
-    Failures []HookFailure  // Empty if success
+    HookType     HookType
+    HasExecuted  bool          // Were commands configured?
+    IsSuccessful bool          // All commands succeeded?
+    Failures     []HookFailure // Empty if success
 }
 
 type HookFailure struct {
