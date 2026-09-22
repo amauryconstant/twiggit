@@ -16,7 +16,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"twiggit/internal/infrastructure"
+	"twiggit/internal/git"
 	e2ehelpers "twiggit/test/e2e/helpers"
 	"twiggit/test/helpers"
 )
@@ -32,7 +32,7 @@ type E2ETestFixture struct {
 	tempDir          string
 	configHelper     *e2ehelpers.ConfigHelper
 	gitHelper        *helpers.GitTestHelper
-	gitExecutor      infrastructure.CommandExecutor
+	gitExecutor      git.CommandExecutor
 	projects         map[string]*ProjectInfo
 	testID           *e2ehelpers.TestIDGenerator
 	createdWorktrees []string
@@ -59,7 +59,7 @@ func NewE2ETestFixture() *E2ETestFixture {
 		tempDir:          tempDir,
 		configHelper:     e2ehelpers.NewConfigHelper().WithTempDir(tempDir),
 		gitHelper:        helpers.NewGitTestHelper(&testing.T{}),
-		gitExecutor:      infrastructure.NewCommandExecutor(30 * time.Second),
+		gitExecutor:      git.NewCommandExecutor(30 * time.Second),
 		projects:         make(map[string]*ProjectInfo),
 		testID:           e2ehelpers.NewTestIDGenerator(),
 		createdWorktrees: make([]string, 0),

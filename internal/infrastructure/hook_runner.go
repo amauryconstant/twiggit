@@ -15,17 +15,18 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 )
 
 var _ application.HookRunner = (*hookRunner)(nil)
 
 type hookRunner struct {
-	executor       CommandExecutor
+	executor       git.CommandExecutor
 	defaultTimeout time.Duration
 }
 
 // NewHookRunner creates a new HookRunner for executing post-create hooks
-func NewHookRunner(executor CommandExecutor, hookTimeoutSeconds ...int) application.HookRunner {
+func NewHookRunner(executor git.CommandExecutor, hookTimeoutSeconds ...int) application.HookRunner {
 	defaultTimeout := 30 * time.Second
 	if len(hookTimeoutSeconds) > 0 {
 		defaultTimeout = time.Duration(hookTimeoutSeconds[0]) * time.Second

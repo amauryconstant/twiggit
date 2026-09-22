@@ -14,14 +14,14 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/core"
-	"twiggit/internal/infrastructure"
+	"twiggit/internal/git"
 	"twiggit/internal/service"
 	"twiggit/test/mocks"
 )
 
 type PruneIntegrationTestSuite struct {
 	suite.Suite
-	executor    infrastructure.CommandExecutor
+	executor    git.CommandExecutor
 	cliClient   application.CLIClient
 	goGitClient application.GoGitClient
 }
@@ -30,9 +30,9 @@ func (s *PruneIntegrationTestSuite) SetupSuite() {
 	if testing.Short() {
 		s.T().Skip("Skipping integration tests in short mode")
 	}
-	s.executor = infrastructure.NewCommandExecutor(30 * time.Second)
-	s.cliClient = infrastructure.NewCLIClient(s.executor, 30)
-	goGitClient, err := infrastructure.NewGoGitClient(true)
+	s.executor = git.NewCommandExecutor(30 * time.Second)
+	s.cliClient = git.NewCLIClient(s.executor, 30)
+	goGitClient, err := git.NewClient()
 	s.Require().NoError(err)
 	s.goGitClient = goGitClient
 }

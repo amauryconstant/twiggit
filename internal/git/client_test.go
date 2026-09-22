@@ -1,4 +1,4 @@
-package infrastructure
+package git
 
 import (
 	"context"
@@ -16,7 +16,7 @@ import (
 )
 
 func TestGoGitClient_OpenRepository(t *testing.T) {
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
@@ -30,7 +30,7 @@ func TestGoGitClient_OpenRepository(t *testing.T) {
 }
 
 func TestGoGitClient_ValidateRepository(t *testing.T) {
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
@@ -46,7 +46,7 @@ func TestGoGitClient_ValidateRepository(t *testing.T) {
 }
 
 func TestGoGitClient_ListBranches(t *testing.T) {
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
@@ -65,7 +65,7 @@ func TestGoGitClient_ListBranches(t *testing.T) {
 }
 
 func TestGoGitClient_BranchExists(t *testing.T) {
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
@@ -85,7 +85,7 @@ func TestGoGitClient_BranchExists(t *testing.T) {
 }
 
 func TestGoGitClient_GetRepositoryStatus(t *testing.T) {
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
@@ -101,7 +101,7 @@ func TestGoGitClient_GetRepositoryStatus(t *testing.T) {
 }
 
 func TestGoGitClient_GetRepositoryInfo(t *testing.T) {
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
@@ -119,7 +119,7 @@ func TestGoGitClient_GetRepositoryInfo(t *testing.T) {
 }
 
 func TestGoGitClient_ListRemotes(t *testing.T) {
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
@@ -134,7 +134,7 @@ func TestGoGitClient_ListRemotes(t *testing.T) {
 }
 
 func TestGoGitClient_GetCommitInfo(t *testing.T) {
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
@@ -157,38 +157,38 @@ func findBranch(branches []core.BranchInfo, name string) *core.BranchInfo {
 	return nil
 }
 
-func TestNewGoGitClient_CacheAllocatorFailure(t *testing.T) {
+func TestNewClient_CacheAllocatorFailure(t *testing.T) {
 	allocErr := errors.New("simulated cache allocation failure")
 	failingFactory := func(_ int) (*lru.Cache[string, *git.Repository], error) {
 		return nil, allocErr
 	}
 
-	client, err := newGoGitClientWithCacheFactory(25, true, failingFactory)
+	client, err := newClientWithCacheFactory(25, true, failingFactory)
 	require.Error(t, err)
 	assert.Nil(t, client)
 	assert.ErrorIs(t, err, allocErr)
 }
 
-func TestNewGoGitClientWithSize_CacheAllocatorFailure(t *testing.T) {
+func TestNewClientWithSize_CacheAllocatorFailure(t *testing.T) {
 	allocErr := errors.New("simulated cache allocation failure for size")
 	failingFactory := func(_ int) (*lru.Cache[string, *git.Repository], error) {
 		return nil, allocErr
 	}
 
-	client, err := newGoGitClientWithCacheFactory(100, true, failingFactory)
+	client, err := newClientWithCacheFactory(100, true, failingFactory)
 	require.Error(t, err)
 	assert.Nil(t, client)
 	assert.ErrorIs(t, err, allocErr)
 }
 
-func TestNewGoGitClient_CacheFactoryReceivesRequestedSize(t *testing.T) {
+func TestNewClient_CacheFactoryReceivesRequestedSize(t *testing.T) {
 	var receivedSize int
 	captureFactory := func(size int) (*lru.Cache[string, *git.Repository], error) {
 		receivedSize = size
 		return defaultGoGitCacheFactory(size)
 	}
 
-	_, err := newGoGitClientWithCacheFactory(42, true, captureFactory)
+	_, err := newClientWithCacheFactory(42, true, captureFactory)
 	require.NoError(t, err)
 	assert.Equal(t, 42, receivedSize)
 }
@@ -196,7 +196,7 @@ func TestNewGoGitClient_CacheFactoryReceivesRequestedSize(t *testing.T) {
 func setupTestRepo(t *testing.T, tempDir string) string {
 	t.Helper()
 
-	client, err := NewGoGitClient()
+	client, err := NewClient()
 	require.NoError(t, err)
 	repoPath := filepath.Join(tempDir, "test-repo")
 

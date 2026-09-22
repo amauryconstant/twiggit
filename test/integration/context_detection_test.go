@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
 )
@@ -238,10 +239,10 @@ func TestContextService_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create real git service for integration testing
-	executor := infrastructure.NewCommandExecutor(30 * time.Second)
-	goGitClient, err := infrastructure.NewGoGitClient(true)
+	executor := git.NewCommandExecutor(30 * time.Second)
+	goGitClient, err := git.NewClient()
 	require.NoError(t, err)
-	cliClient := infrastructure.NewCLIClient(executor, 30)
+	cliClient := git.NewCLIClient(executor, 30)
 
 	resolver := infrastructure.NewContextResolver(config, goGitClient, cliClient)
 	contextService := service.NewContextService(detector, resolver)

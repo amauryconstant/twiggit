@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"twiggit/internal/infrastructure"
+	"twiggit/internal/git"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -30,7 +30,7 @@ func TestGitOperations_Integration(t *testing.T) {
 	require.NoError(t, os.MkdirAll(repoPath, 0755))
 
 	// Use command executor to initialize git repo
-	executor := infrastructure.NewCommandExecutor(30 * time.Second)
+	executor := git.NewCommandExecutor(30 * time.Second)
 
 	// Initialize repository
 	_, err := executor.Execute(context.Background(), repoPath, "git", "init")
@@ -55,7 +55,7 @@ func TestGitOperations_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("GoGitClient_BasicOperations", func(t *testing.T) {
-		client, err := infrastructure.NewGoGitClient(true)
+		client, err := git.NewClient()
 		require.NoError(t, err)
 
 		// Test repository validation
@@ -84,7 +84,7 @@ func TestGitOperations_Integration(t *testing.T) {
 	})
 
 	t.Run("CLIClient_WorktreeOperations", func(t *testing.T) {
-		cliClient := infrastructure.NewCLIClient(executor, 30)
+		cliClient := git.NewCLIClient(executor, 30)
 
 		// Create a feature branch first
 		_, err := executor.Execute(context.Background(), repoPath, "git", "checkout", "-b", "feature-test")
@@ -125,9 +125,9 @@ func TestGitOperations_Integration(t *testing.T) {
 	})
 
 	t.Run("GitService_DeterministicRouting", func(t *testing.T) {
-		goGitClient, err := infrastructure.NewGoGitClient(true)
+		goGitClient, err := git.NewClient()
 		require.NoError(t, err)
-		cliClient := infrastructure.NewCLIClient(executor, 30)
+		cliClient := git.NewCLIClient(executor, 30)
 
 		branches, err := goGitClient.ListBranches(context.Background(), repoPath)
 		require.NoError(t, err)
@@ -150,7 +150,7 @@ func TestGitOperations_ErrorHandling(t *testing.T) {
 	tempDir := t.TempDir()
 	nonExistentPath := filepath.Join(tempDir, "non-existent")
 
-	client, err := infrastructure.NewGoGitClient(true)
+	client, err := git.NewClient()
 	require.NoError(t, err)
 
 	// Test validation of non-existent repository

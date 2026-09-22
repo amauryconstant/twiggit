@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 	"twiggit/internal/infrastructure"
 	"twiggit/test/mocks"
 )
@@ -113,7 +114,7 @@ func setupTestGitRepo(t *testing.T, repoPath string) {
 	require.NoError(t, os.MkdirAll(repoPath, 0755))
 
 	// Use command executor to initialize git repo
-	executor := infrastructure.NewCommandExecutor(30 * time.Second)
+	executor := git.NewCommandExecutor(30 * time.Second)
 
 	// Initialize repository
 	_, err := executor.Execute(context.Background(), repoPath, "git", "init")
@@ -367,10 +368,9 @@ func TestProjectService_ProductionWiring_UsesFilesystemLocator(t *testing.T) {
 	mockGitService := mocks.NewMockGitService()
 	mockGitService.MockGoGitClient.On("ValidateRepository", mock.Anything).Return(nil)
 
-	goGitClient, err := infrastructure.NewGoGitClient(true)
+	goGitClient, err := git.NewClient()
 	require.NoError(t, err)
-
-	repoFinder := infrastructure.NewRepoFinder(goGitClient)
+	repoFinder := git.NewRepoFinder(goGitClient)
 
 	require.NotNil(t, repoFinder, "production wiring must use the filesystem-walking RepoLocator")
 

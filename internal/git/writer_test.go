@@ -1,4 +1,4 @@
-package infrastructure
+package git
 
 import (
 	"context"
@@ -378,7 +378,7 @@ worktree /path/to/worktree2
 HEAD cdef3ab
 detached`
 
-	worktrees, err := client.(*cliClient).parseWorktreeList(output)
+	worktrees, err := client.parseWorktreeList(output)
 	require.NoError(t, err)
 	assert.Len(t, worktrees, 3)
 

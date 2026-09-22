@@ -13,11 +13,12 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 )
 
-func setupHookRunnerTest(t *testing.T) (application.HookRunner, *MockCommandExecutor, string) {
+func setupHookRunnerTest(t *testing.T) (application.HookRunner, *git.MockCommandExecutor, string) {
 	t.Helper()
-	mockExec := NewMockCommandExecutor()
+	mockExec := git.NewMockCommandExecutor()
 	runner := NewHookRunner(mockExec)
 	tempDir := t.TempDir()
 	return runner, mockExec, tempDir
@@ -74,7 +75,7 @@ commands = ["mise trust", "npm install"]
 
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
-	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Twice()
+	).Return(&git.CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Twice()
 
 	req := &application.HookRunRequest{
 		HookType:       core.HookPostCreate,
@@ -108,15 +109,15 @@ commands = ["mise trust", "npm install", "echo done"]
 
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
-	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
+	).Return(&git.CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
 
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
-	).Return(&CommandResult{ExitCode: 1, Stdout: "npm error", Stderr: ""}, nil).Once()
+	).Return(&git.CommandResult{ExitCode: 1, Stdout: "npm error", Stderr: ""}, nil).Once()
 
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
-	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
+	).Return(&git.CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
 
 	req := &application.HookRunRequest{
 		HookType:       core.HookPostCreate,
@@ -221,7 +222,7 @@ commands = ["echo test"]
 		mock.Anything, "/worktree/path", "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
 	).Run(func(args mock.Arguments) {
 		capturedArgs = args.Get(4).([]string)
-	}).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil)
+	}).Return(&git.CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil)
 
 	req := &application.HookRunRequest{
 		HookType:       core.HookPostCreate,

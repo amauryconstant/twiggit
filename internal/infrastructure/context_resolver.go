@@ -11,6 +11,7 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 )
 
 // Pure functions extracted from ContextResolver
@@ -171,7 +172,7 @@ type contextResolver struct {
 	config     *core.Config
 	goGit      application.GoGitClient
 	cli        application.CLIClient
-	repoFinder *RepoFinder
+	repoFinder *git.RepoFinder
 }
 
 // NewContextResolver creates a new context resolver
@@ -180,7 +181,7 @@ func NewContextResolver(cfg *core.Config, goGit application.GoGitClient, cli app
 		config:     cfg,
 		goGit:      goGit,
 		cli:        cli,
-		repoFinder: NewRepoFinder(goGit),
+		repoFinder: git.NewRepoFinder(goGit),
 	}
 }
 

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"twiggit/internal/core"
-	"twiggit/internal/infrastructure"
+	"twiggit/internal/git"
 	"twiggit/test/mocks"
 
 	"github.com/stretchr/testify/assert"
@@ -32,7 +32,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	// Initialize git repository
 	require.NoError(t, os.MkdirAll(repoPath, 0755))
 
-	executor := infrastructure.NewCommandExecutor(30 * time.Second)
+	executor := git.NewCommandExecutor(30 * time.Second)
 
 	// Initialize repository
 	_, err := executor.Execute(context.Background(), repoPath, "git", "init")
@@ -57,7 +57,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("BranchOperations_UseGoGit", func(t *testing.T) {
-		goGitClient, err := infrastructure.NewGoGitClient(true)
+		goGitClient, err := git.NewClient()
 		require.NoError(t, err)
 
 		branches, err := goGitClient.ListBranches(context.Background(), repoPath)
@@ -75,7 +75,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	})
 
 	t.Run("WorktreeOperations_UseCLI", func(t *testing.T) {
-		cliClient := infrastructure.NewCLIClient(executor, 30)
+		cliClient := git.NewCLIClient(executor, 30)
 
 		_, err := executor.Execute(context.Background(), repoPath, "git", "checkout", "-b", "feature-test")
 		require.NoError(t, err)
@@ -97,7 +97,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	})
 
 	t.Run("RepositoryOperations_UseGoGit", func(t *testing.T) {
-		goGitClient, err := infrastructure.NewGoGitClient(true)
+		goGitClient, err := git.NewClient()
 		require.NoError(t, err)
 
 		err = goGitClient.ValidateRepository(repoPath)

@@ -1,112 +1,87 @@
-package infrastructure
+package git
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"path/filepath"
 	"strings"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	lru "github.com/hashicorp/golang-lru/v2"
+
 	"twiggit/internal/application"
 	"twiggit/internal/core"
 )
 
-var _ application.GoGitClient = (*goGitClient)(nil)
-
-type goGitClient struct {
+// reader implements the read-side git operations (OpenRepository,
+// ListBranches, BranchExists, GetRepositoryStatus, ListRemotes,
+// GetCommitInfo, GetRepositoryInfo, ValidateRepository). It owns the
+// LRU cache that keeps go-git Repository handles hot.
+//
+// reader is an internal collaborator of Client. It satisfies
+// application.GoGitClient so the legacy services can still consume it
+// directly during the slice 13 refactor.
+type reader struct {
 	cache        *lru.Cache[string, *git.Repository]
 	cacheEnabled bool
 }
 
-const defaultGoGitCacheSize = 25
+// Compile-time assertion: reader satisfies application.GoGitClient.
+// Lives in slice 4; removed in the interface-segregation change.
+var _ application.GoGitClient = (*reader)(nil)
 
+// goGitCacheFactory builds an LRU cache. Indirected so tests can inject
+// failure modes for cache allocator coverage.
 type goGitCacheFactory func(size int) (*lru.Cache[string, *git.Repository], error)
 
 func defaultGoGitCacheFactory(size int) (*lru.Cache[string, *git.Repository], error) {
-	cache, err := lru.New[string, *git.Repository](size)
-	if err != nil {
-		return nil, fmt.Errorf("create go-git LRU cache: %w", err)
-	}
-	return cache, nil
-}
-
-func NewGoGitClient(cacheEnabled ...bool) (application.GoGitClient, error) {
-	enabled := true
-	if len(cacheEnabled) > 0 {
-		enabled = cacheEnabled[0]
-	}
-	return newGoGitClientWithCacheFactory(defaultGoGitCacheSize, enabled, defaultGoGitCacheFactory)
-}
-
-func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) (application.GoGitClient, error) {
-	enabled := true
-	if len(cacheEnabled) > 0 {
-		enabled = cacheEnabled[0]
-	}
-	size := cacheSize
-	if size <= 0 {
-		size = defaultGoGitCacheSize
-	}
-	return newGoGitClientWithCacheFactory(size, enabled, defaultGoGitCacheFactory)
-}
-
-func newGoGitClientWithCacheFactory(size int, enabled bool, factory goGitCacheFactory) (application.GoGitClient, error) {
-	cache, err := factory(size)
-	if err != nil {
-		return nil, err
-	}
-	return &goGitClient{
-		cache:        cache,
-		cacheEnabled: enabled,
-	}, nil
+	return lru.New[string, *git.Repository](size)
 }
 
 // OpenRepository opens git repository (pure function, idempotent)
-func (c *goGitClient) OpenRepository(path string) (*git.Repository, error) {
+func (r *reader) OpenRepository(path string) (*git.Repository, error) {
 	// Normalize path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, core.NewGitRepositoryError(path, "failed to get absolute path", err)
+		return nil, NewRepoError("git.repository", "failed to get absolute path", err)
 	}
 
 	// Check cache first
-	if repo, exists := c.cache.Get(absPath); exists {
+	if repo, exists := r.cache.Get(absPath); exists {
 		return repo, nil
 	}
 
 	// Open repository
 	repo, err := git.PlainOpen(absPath)
 	if err != nil {
-		return nil, core.NewGitRepositoryError(path, "failed to open git repository", err)
+		return nil, NewRepoError("git.repository", "failed to open git repository", err)
 	}
 
 	// Cache the repository
-	c.cache.Add(absPath, repo)
+	r.cache.Add(absPath, repo)
 
 	return repo, nil
 }
 
 // ListBranches lists all branches in repository (idempotent)
-func (c *goGitClient) ListBranches(_ context.Context, repoPath string) ([]core.BranchInfo, error) {
-	repo, err := c.OpenRepository(repoPath)
+func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.BranchInfo, error) {
+	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
 	}
 
 	branches, err := repo.Branches()
 	if err != nil {
-		return nil, core.NewGitRepositoryError(repoPath, "failed to list branches", err)
+		return nil, NewRepoError("git.repository", "failed to list branches", err)
 	}
 
-	var branchInfos []core.BranchInfo
+	branchInfos := make([]core.BranchInfo, 0)
 
 	// Get current branch reference
 	headRef, err := repo.Head()
 	if err != nil {
-		return nil, core.NewGitRepositoryError(repoPath, "failed to get HEAD reference", err)
+		return nil, NewRepoError("git.repository", "failed to get HEAD reference", err)
 	}
 
 	err = branches.ForEach(func(ref *plumbing.Reference) error {
@@ -138,15 +113,15 @@ func (c *goGitClient) ListBranches(_ context.Context, repoPath string) ([]core.B
 	})
 
 	if err != nil {
-		return nil, core.NewGitRepositoryError(repoPath, "failed to iterate branches", err)
+		return nil, NewRepoError("git.repository", "failed to iterate branches", err)
 	}
 
 	return branchInfos, nil
 }
 
 // BranchExists checks if branch exists (idempotent)
-func (c *goGitClient) BranchExists(_ context.Context, repoPath, branchName string) (bool, error) {
-	repo, err := c.OpenRepository(repoPath)
+func (r *reader) BranchExists(_ context.Context, repoPath, branchName string) (bool, error) {
+	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return false, err
 	}
@@ -158,15 +133,15 @@ func (c *goGitClient) BranchExists(_ context.Context, repoPath, branchName strin
 		return false, nil
 	}
 	if err != nil {
-		return false, core.NewGitRepositoryError(repoPath, "failed to check branch "+branchName, err)
+		return false, NewRepoError("git.repository", "failed to check branch "+branchName, err)
 	}
 
 	return true, nil
 }
 
 // GetRepositoryStatus returns repository status (idempotent)
-func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (core.RepositoryStatus, error) {
-	repo, err := c.OpenRepository(repoPath)
+func (r *reader) GetRepositoryStatus(_ context.Context, repoPath string) (core.RepositoryStatus, error) {
+	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return core.RepositoryStatus{}, err
 	}
@@ -174,13 +149,13 @@ func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (c
 	// Get worktree
 	worktree, err := repo.Worktree()
 	if err != nil {
-		return core.RepositoryStatus{}, core.NewGitRepositoryError(repoPath, "failed to get worktree", err)
+		return core.RepositoryStatus{}, NewRepoError("git.repository", "failed to get worktree", err)
 	}
 
 	// Get status
 	status, err := worktree.Status()
 	if err != nil {
-		return core.RepositoryStatus{}, core.NewGitRepositoryError(repoPath, "failed to get repository status", err)
+		return core.RepositoryStatus{}, NewRepoError("git.repository", "failed to get repository status", err)
 	}
 
 	// Workaround for go-git worktree issue:
@@ -237,17 +212,17 @@ func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (c
 }
 
 // ValidateRepository checks if path contains valid git repository (pure function)
-func (c *goGitClient) ValidateRepository(path string) error {
+func (r *reader) ValidateRepository(path string) error {
 	_, err := git.PlainOpen(path)
 	if err != nil {
-		return core.NewGitRepositoryError(path, "not a valid git repository", err)
+		return NewRepoError("git.repository", "not a valid git repository", err)
 	}
 	return nil
 }
 
 // GetRepositoryInfo returns comprehensive repository information
-func (c *goGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*core.GitRepository, error) {
-	_, err := c.OpenRepository(repoPath)
+func (r *reader) GetRepositoryInfo(ctx context.Context, repoPath string) (*core.GitRepository, error) {
+	_, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -259,19 +234,19 @@ func (c *goGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*
 	}
 
 	// Get branches
-	branches, err := c.ListBranches(ctx, repoPath)
+	branches, err := r.ListBranches(ctx, repoPath)
 	if err == nil {
 		info.Branches = branches
 	}
 
 	// Get remotes
-	remotes, err := c.ListRemotes(ctx, repoPath)
+	remotes, err := r.ListRemotes(ctx, repoPath)
 	if err == nil {
 		info.Remotes = remotes
 	}
 
 	// Get status
-	status, err := c.GetRepositoryStatus(ctx, repoPath)
+	status, err := r.GetRepositoryStatus(ctx, repoPath)
 	if err == nil {
 		info.Status = status
 	}
@@ -288,15 +263,15 @@ func (c *goGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*
 }
 
 // ListRemotes lists all remotes in repository
-func (c *goGitClient) ListRemotes(_ context.Context, repoPath string) ([]core.RemoteInfo, error) {
-	repo, err := c.OpenRepository(repoPath)
+func (r *reader) ListRemotes(_ context.Context, repoPath string) ([]core.RemoteInfo, error) {
+	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
 	}
 
 	remotes, err := repo.Remotes()
 	if err != nil {
-		return nil, core.NewGitRepositoryError(repoPath, "failed to list remotes", err)
+		return nil, NewRepoError("git.repository", "failed to list remotes", err)
 	}
 
 	remoteInfos := make([]core.RemoteInfo, 0, len(remotes))
@@ -319,8 +294,8 @@ func (c *goGitClient) ListRemotes(_ context.Context, repoPath string) ([]core.Re
 }
 
 // GetCommitInfo returns information about a specific commit
-func (c *goGitClient) GetCommitInfo(_ context.Context, repoPath, commitHash string) (*core.CommitInfo, error) {
-	repo, err := c.OpenRepository(repoPath)
+func (r *reader) GetCommitInfo(_ context.Context, repoPath, commitHash string) (*core.CommitInfo, error) {
+	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +306,7 @@ func (c *goGitClient) GetCommitInfo(_ context.Context, repoPath, commitHash stri
 	// Get commit object
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
-		return nil, core.NewGitRepositoryError(repoPath, "failed to get commit "+commitHash, err)
+		return nil, NewRepoError("git.repository", "failed to get commit "+commitHash, err)
 	}
 
 	hashStr := commit.Hash.String()

@@ -1,4 +1,4 @@
-package infrastructure
+package git
 
 import (
 	"context"
@@ -69,15 +69,13 @@ func (e *commandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd strin
 	// Check if command failed to start (e.g., command not found)
 	if err != nil {
 		if _, found := extractExitCode(err); !found {
-			return nil, core.NewGitCommandError(cmd, args, -1, result.Stdout, result.Stderr,
-				fmt.Sprintf("failed to execute command: %v", err), err)
+			return nil, NewCommandError("git.command", fmt.Sprintf("failed to execute command: %v", err), err)
 		}
 	}
 
 	// For non-zero exit codes, return the result with an error (original behavior)
 	if result.ExitCode != 0 {
-		return result, core.NewGitCommandError(cmd, args, result.ExitCode, result.Stdout, result.Stderr,
-			"command exited with non-zero status", nil)
+		return result, NewCommandError("git.command", "command exited with non-zero status", nil)
 	}
 
 	return result, nil
@@ -148,3 +146,8 @@ func createCommandResult(_ string, _ []string, output []byte, err error, duratio
 		Duration: duration,
 	}
 }
+
+// _ keeps the core import live even though current implementations don't
+// reference it directly; the demoted constructors stay available for
+// any consumer that still wraps git failures as core.OperationError.
+var _ = (*core.OperationError)(nil)

@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/core"
-	"twiggit/internal/infrastructure"
+	"twiggit/internal/git"
 )
 
 // ConcurrentTestSuite provides concurrent operation testing
@@ -25,7 +25,7 @@ type ConcurrentTestSuite struct {
 	suite.Suite
 	tempDir     string
 	config      *core.Config
-	gitExecutor infrastructure.CommandExecutor
+	gitExecutor git.CommandExecutor
 }
 
 func TestConcurrentSuite(t *testing.T) {
@@ -49,7 +49,7 @@ func (s *ConcurrentTestSuite) SetupTest() {
 	}
 
 	// Initialize infrastructure
-	s.gitExecutor = infrastructure.NewCommandExecutor(30 * time.Second)
+	s.gitExecutor = git.NewCommandExecutor(30 * time.Second)
 }
 
 // createTestProject creates a test project with the given name

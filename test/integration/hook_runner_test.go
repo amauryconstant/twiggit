@@ -13,6 +13,7 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 	"twiggit/internal/infrastructure"
 )
 
@@ -31,7 +32,7 @@ func (s *HookRunnerIntegrationSuite) SetupTest() {
 	s.tempDir = s.T().TempDir()
 	s.configDir = s.T().TempDir()
 
-	executor := infrastructure.NewCommandExecutor(30 * time.Second)
+	executor := git.NewCommandExecutor(30 * time.Second)
 	s.runner = infrastructure.NewHookRunner(executor)
 }
 
