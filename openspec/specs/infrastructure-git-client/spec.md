@@ -31,10 +31,32 @@ The composite client SHALL route operations as follows:
 | `IsBranchMerged` | ❌ | ✅ | go-git limitations |
 | `DeleteBranch` | ❌ | ✅ | Handles worktree-referenced branches |
 
-This routing table is canonical. Callers SHALL NOT reach into a single
-implementation; the composite `GitClient` is the only injection point.
+This routing table is canonical. Callers SHALL select the role
+interface that owns the operation (`GoGitClient` for read paths,
+`CLIClient` for write paths). No composite umbrella interface
+SHALL exist; the two role interfaces are the only injection points.
 
+#### Scenario: Service injects both role interfaces directly
 
+- **WHEN** `WorktreeService`, `ProjectService`, or `NavigationService`
+  is constructed
+- **THEN** its constructor SHALL accept `application.GoGitClient` and
+  `application.CLIClient` as two distinct arguments
+- **AND** callers SHALL NOT depend on any composite `GitClient`
+  interface
+
+#### Scenario: Read operation uses the go-git role
+
+- **WHEN** `service.BranchExists(ctx, projectPath, branchName)` is
+  invoked
+- **THEN** it SHALL dispatch through the `GoGitClient` field
+- **AND** it SHALL NOT call into `CLIClient`
+
+#### Scenario: Worktree mutation uses the CLI role
+
+- **WHEN** `service.CreateWorktree(ctx, req)` is invoked
+- **THEN** it SHALL dispatch through the `CLIClient` field
+- **AND** it SHALL NOT call into `GoGitClient`
 
 #### Scenario: Definition holds
 
@@ -161,12 +183,28 @@ naming the commit hash when the commit does not exist.
 - **AND** the implementation SHALL compile against the contract
 ### Requirement: Cache configuration
 
-`NewGoGitClient()` SHALL create a client with cache enabled (default
-size 25). `NewGoGitClientWithSize(n)` SHALL allow custom sizes;
-`n <= 0` SHALL fall back to 25. `cacheEnabled=false` SHALL bypass the
-cache entirely.
+`NewGoGitClient()` SHALL create a client with cache enabled
+(default size 25). `NewGoGitClientWithSize(n)` SHALL allow custom
+sizes; `n <= 0` SHALL fall back to 25. `cacheEnabled=false` SHALL
+bypass the cache entirely. Both constructors SHALL return a
+non-nil `application.GoGitClient` together with an error; the
+error SHALL be non-nil when the underlying LRU cache cannot be
+allocated. Callers SHALL propagate the construction error rather
+than discard it.
 
+#### Scenario: Successful construction
 
+- **WHEN** `NewGoGitClient()` is called under normal conditions
+- **THEN** it SHALL return `(client, nil)` where `client != nil`
+
+#### Scenario: LRU allocation failure surfaces as error
+
+- **WHEN** `NewGoGitClientWithSize(n)` is called
+- **AND** the LRU cache allocator returns a non-nil error
+- **THEN** the constructor SHALL return `(nil, error)`
+- **AND** callers SHALL propagate the error
+- **AND** the constructor SHALL NOT silently return a client with a
+  nil cache
 
 #### Scenario: Definition holds
 
