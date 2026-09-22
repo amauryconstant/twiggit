@@ -32,7 +32,7 @@ Defines the four `core.Error` subtypes that drive cmd-side error formatting and 
 
 ### Requirement: OperationError carries Op, Message, Cause, Suggestions; wraps via Unwrap
 
-`core.OperationError` SHALL carry `Op string`, `Message string`, `Cause error`, and `Suggestions []string`. It SHALL implement `Unwrap() error` returning the `Cause` field. `Suggestions` carries actionable hints rendered by `output.FormatError` after the user-facing message. The `Op` field identifies the operation and SHALL NOT be shown to the user unless `TWIGGIT_DEBUG=1` is set.
+`core.OperationError` SHALL carry `Op string`, `Message string`, `Cause error`, and `Suggestions []string`. It SHALL implement `Unwrap() error` returning `e.Cause`, satisfying `errors.Is`/`errors.As` walks across the wrapped chain. `Suggestions` carries actionable hints rendered by `output.FormatError` after the user-facing message. The `Op` field identifies the operation and SHALL NOT be shown to the user unless `TWIGGIT_DEBUG=1` is set.
 
 #### Scenario: errors.As walks through OperationError
 - **WHEN** the error chain is `core.NewOperationError("git.open", msg, io.EOF)`
@@ -60,12 +60,20 @@ Defines the four `core.Error` subtypes that drive cmd-side error formatting and 
 
 ### Requirement: I/O-adapter constructors live in internal/git/errors.go
 
-I/O-adapter-specific constructors (`git.NewRepoError`, `git.NewWorktreeError`, `git.NewCommandError`) live in `internal/git/errors.go` and return `*git.ExternalError` whose embedded core type is `*core.OperationError`. The `core` package SHALL NOT export `core.NewGit*Error` constructors; the previous `core.NewGitRepositoryError` form is removed.
+I/O-adapter-specific constructors (`git.NewRepoError`, `git.NewWorktreeError`, `git.NewCommandError`) live in `internal/git/errors.go` and return `*git.ExternalError` whose embedded core type is `*core.OperationError`. Callers SHALL construct I/O-adapter failures via the `git.NewRepoError` / `git.NewWorktreeError` / `git.NewCommandError` constructors; the `core` package exports no `core.NewGit*Error` form.
 
 #### Scenario: git.NewRepoError walks to *core.OperationError
 - **WHEN** the error is `git.NewRepoError(path, msg, io.EOF)`
 - **THEN** `errors.As(err, &*core.OperationError{})` returns `true` and `errors.Is(err, io.EOF)` returns `true` via the chain
 
+#### Scenario: git.NewWorktreeError walks to *core.OperationError
+- **WHEN** the error is `git.NewWorktreeError(name, msg, io.EOF)`
+- **THEN** `errors.As(err, &*core.OperationError{})` returns `true` with `Op` identifying the worktree operation
+
+#### Scenario: git.NewCommandError walks to *core.OperationError
+- **WHEN** the error is `git.NewCommandError(args, msg, exitErr)`
+- **THEN** `errors.As(err, &*core.OperationError{})` returns `true` with `Op` identifying the command and `Cause` set to `exitErr`
+
 #### Scenario: core does not export I/O constructors
 - **WHEN** the `core` package's exported API is enumerated
-- **THEN** it SHALL NOT contain `NewGitRepositoryError`, `NewGitWorktreeError`, or `NewGitCommandError` constructors
+- **THEN** it SHALL NOT contain any `core.NewGit*Error` constructor; callers route I/O failures through `git.NewRepoError`, `git.NewWorktreeError`, or `git.NewCommandError`

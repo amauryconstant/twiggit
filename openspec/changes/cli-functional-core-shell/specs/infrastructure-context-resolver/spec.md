@@ -83,7 +83,7 @@ When `ResolvePathRequest.Search = true` or `core.WithExistingOnly()` is supplied
 
 ### Requirement: Path-traversal rejection
 
-`ResolveIdentifier` SHALL reject identifiers that contain `..` segments or absolute paths, returning a `*core.OperationError` with `Op = "context.resolve"` and a message describing the rejected segment. The previous `domain.ContextDetectionError` is removed.
+`ResolveIdentifier` SHALL reject identifiers that contain `..` segments or absolute paths, returning a `*core.OperationError` with `Op = "context.resolve"` and a message describing the rejected segment. The previous context-detection error type under the `domain` package is removed; all resolver failures now walk to `*core.OperationError`.
 
 #### Scenario: Definition holds
 - **WHEN** the surface described above is exercised

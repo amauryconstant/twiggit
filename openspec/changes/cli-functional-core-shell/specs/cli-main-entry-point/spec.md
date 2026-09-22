@@ -1,5 +1,21 @@
 # Spec Delta
 
+## ADDED Requirements
+
+### Requirement: Thin composition root (main.go ≤ 50 lines)
+
+`main.go` SHALL act as a thin composition root: it wires the cobra root command, the `cmdutil.Factory`, the `iostreams.IOStreams`, the signal-aware `context.Context`, the debug `*slog.Logger` (when `TWIGGIT_DEBUG=1`), and delegates execution to the cmd tree. The file SHALL NOT bind flags, parse configuration eagerly, or contain business logic. The target size is ≤ 50 lines of Go (excluding imports); exceeding this limit is a smell pointing at logic that belongs in `internal/cmdutil`, `internal/iostreams`, or a subcommand file. No additional helper package SHALL be introduced solely to shrink `main.go` — the file's responsibility is composition, not delegation.
+
+#### Scenario: main.go size budget
+- **WHEN** `main.go` is reviewed
+- **THEN** it SHALL contain ≤ 50 lines of Go (excluding the import block)
+- **AND** it SHALL NOT bind cobra flags or read configuration values
+
+#### Scenario: Composition root wires dependencies only
+- **WHEN** the binary starts
+- **THEN** `main.go` constructs the `cmdutil.Factory`, the `IOStreams`, the `*slog.Logger` (gated on `TWIGGIT_DEBUG`), and the `context.Context` (from `signal.NotifyContext`)
+- **AND** every other concern (config loading, output formatting, error dispatch) SHALL live outside `main.go`
+
 ## MODIFIED Requirements
 
 ### Requirement: Exit code propagation

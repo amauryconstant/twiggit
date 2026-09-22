@@ -1,5 +1,27 @@
 # Spec Delta
 
+## ADDED Requirements
+
+### Requirement: Structured debug logger channel
+
+The system SHALL expose a `Logger *slog.Logger` field on the `iostreams.IOStreams` surface, separate from the boolean `Verbose` user-facing channel. The logger SHALL be wired by the composition root only when `TWIGGIT_DEBUG=1` is set; otherwise it SHALL be `nil` (or a discarding logger). When set, the logger SHALL emit `slog.LevelDebug` records to stderr, distinct from the dim-styled `Verbosef` user output. The two channels SHALL NOT interleave: `Verbosef` keeps the dim-style human-readable contract; `Logger.Debug` keeps the structured machine-readable contract.
+
+#### Scenario: Logger nil when TWIGGIT_DEBUG unset
+- **WHEN** `TWIGGIT_DEBUG` is unset or empty
+- **THEN** `ios.Logger` SHALL be `nil` (or a discarding logger)
+- **AND** `Logger.Debug(...)` SHALL be a no-op
+
+#### Scenario: Logger active when TWIGGIT_DEBUG=1
+- **WHEN** `TWIGGIT_DEBUG=1` is exported
+- **THEN** `ios.Logger` SHALL be a non-nil `*slog.Logger`
+- **AND** `Logger.Debug("opening repo", "path", p)` SHALL emit one structured record to stderr
+
+#### Scenario: Logger output stays out of user stream
+- **WHEN** `TWIGGIT_DEBUG=1` and `ios.Verbose == true`
+- **THEN** `ios.Verbosef("cloning %s", src)` SHALL emit the dim-styled human line
+- **AND** `ios.Logger.Debug(...)` SHALL emit the structured record
+- **AND** the two outputs SHALL be distinguishable by content shape (structured key=value vs dim plain text)
+
 ## MODIFIED Requirements
 
 ### Requirement: Two verbosity levels

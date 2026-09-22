@@ -70,7 +70,7 @@ When an expansion target references an undefined env var (e.g. `$UNDEFINED`), th
 
 ### Requirement: TOML parse errors
 
-When the config file exists but is not valid TOML, the system SHALL return a `*core.OperationError` wrapping the koanf parse error with `Op = "config.load"`. The previous `domain.ConfigError` (exit code 3) is removed; parse failures exit 1 via `ExitError` because `*core.OperationError` dispatches via `ExitCodeFor`.
+When the config file exists but is not valid TOML, the system SHALL return a `*core.OperationError` wrapping the koanf parse error with `Op = "config.load"`. The previous config-error type under the `domain` package (exit code 3) is removed; parse failures exit 1 via `ExitError` because `*core.OperationError` dispatches via `ExitCodeFor`.
 
 #### Scenario: Bad TOML
 - **WHEN** config file contains malformed TOML

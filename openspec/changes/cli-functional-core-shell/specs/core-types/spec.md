@@ -20,7 +20,7 @@ Every value object (`core.NewBranchName`, `core.NewProjectName`, `core.NewWorktr
 
 ### Requirement: Pipeline[T] composes Validator[T] with Validate (fail-fast) or ValidateAll (collect-all)
 
-The `core.Pipeline[T]` type SHALL compose zero or more `core.Validator[T]` functions. `Pipeline.Validate(t)` SHALL run each validator in order and return the first error (fail-fast); `Pipeline.ValidateAll(t)` SHALL run all validators and return an error composed via `errors.Join` of every failure. `FormatError` SHALL walk the joined chain via `errors.As` and render each failure as a separate validation hint.
+The `core.Pipeline[T]` type SHALL compose zero or more `core.Validator[T]` functions. `Pipeline.Validate(t)` SHALL run each validator in order and return the first error (fail-fast); `Pipeline.ValidateAll(t)` SHALL run all validators and MUST use `errors.Join(...)` to compose every failure into one error that preserves the full chain. `FormatError` SHALL walk the joined chain via `errors.As` and render each failure as a separate validation hint. `ValidateAll` SHALL NOT aggregate failures into a single `*core.ValidationError` with a `Suggestions` slice; each failure SHALL remain an independent error in the join so `errors.Is` and `errors.As` can inspect them individually.
 
 #### Scenario: Validate stops at first failure
 - **WHEN** a pipeline of two validators runs `pipeline.Validate(input)` and the first fails
@@ -30,6 +30,19 @@ The `core.Pipeline[T]` type SHALL compose zero or more `core.Validator[T]` funct
 - **WHEN** a pipeline of three validators runs `pipeline.ValidateAll(input)` and validators 1 and 3 fail
 - **THEN** `errors.Is(err, validator1Err)` returns `true` and `errors.Is(err, validator3Err)` returns `true` (both preserved in the chain)
 - **AND** `errors.Is(err, validator2Err)` returns `false` (the passing validator is not in the chain)
+
+#### Scenario: ValidateAll wraps each failure independently
+- **WHEN** a pipeline of three validators runs `pipeline.ValidateAll(input)` and validators 1 and 3 fail
+- **THEN** the returned error SHALL be the `errors.Join` composition and SHALL NOT be a single aggregated `*core.ValidationError`
+- **AND** `errors.As(err, &*core.ValidationError{})` SHALL match twice (once per independent failure), confirming each failure is its own error in the chain
+
+#### Scenario: ValidateAll with no failures returns nil
+- **WHEN** a pipeline of three validators runs `pipeline.ValidateAll(input)` and all validators pass
+- **THEN** the returned error SHALL be `nil` (an empty `errors.Join` result is normalized to nil)
+
+#### Scenario: ValidateAll with one failure preserves errors.Is
+- **WHEN** a pipeline of one validator runs `pipeline.ValidateAll(input)` and the validator returns `validatorErr`
+- **THEN** `errors.Is(err, validatorErr)` returns `true` via the join chain
 
 ### Requirement: Core types are immutable post-construction
 

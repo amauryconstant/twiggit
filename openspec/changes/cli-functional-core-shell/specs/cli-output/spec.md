@@ -48,12 +48,12 @@ The `output.Formatter` interface SHALL declare exactly one method: `Write(w io.W
 
 ### Requirement: Default (no --output) falls through to plain
 
-When `--output` is not supplied, the system SHALL use `plain` for every command. Individual commands MAY override the default to `table` when a list view is the explicit purpose; the override is documented in the per-command spec.
+When `--output` is not supplied (including the empty-string case), the system SHALL use `plain` for every command. This spec defines the global default only; per-command overrides (for example the `list` command overriding the default to `table`) are declared in their owning command spec.
 
-#### Scenario: list without --output renders as table
-- **WHEN** the user runs `twiggit list` without `--output`
-- **THEN** the output SHALL be a table (the per-command `list` override to `table`)
+#### Scenario: Empty --output falls back to plain
+- **WHEN** the user runs `twiggit list --output ""` (or omits `--output` entirely) on a command that declares no override
+- **THEN** the system renders the output as `plain` (the global default)
 
-#### Scenario: create without --output renders as plain
+#### Scenario: Global default is plain for non-list commands
 - **WHEN** the user runs `twiggit create feat/foo` without `--output`
 - **THEN** the output SHALL be a plain human-readable success message

@@ -4,7 +4,7 @@
 
 ### Requirement: Read hook config
 
-The system SHALL read `.twiggit.toml` at the repository root and extract `[hooks.post-create].commands`. Missing config file or empty command list SHALL result in a no-op (`HookResult.Executed = false`). The runner lives in `internal/git/hook_runner.go` (migrated from `internal/infrastructure/hook_runner.go`) and returns `*core.HookResult` (renamed from `*domain.HookResult`).
+The system SHALL read `.twiggit.toml` at the repository root and extract `[hooks.post-create].commands`. Missing config file or empty command list SHALL result in a no-op (`HookResult.Executed = false`). The runner lives in `internal/git/hook_runner.go` (migrated from `internal/infrastructure/hook_runner.go`) and returns `*core.HookResult` (the previous hook-result type under the `domain` package is renamed to `core.HookResult`).
 
 #### Scenario: Definition holds
 - **WHEN** the surface described above is exercised
@@ -72,9 +72,14 @@ The runner SHALL satisfy `cmdutil.HookRunner` via `var _ cmdutil.HookRunner = (*
 
 ### Requirement: Service contract
 
-The `Run(ctx, *core.HookRunRequest)` method SHALL execute hooks of the requested `HookType` with the supplied context and return `*core.HookResult`. The cmd-layer display contract lives in `cli-worktree-hooks`; this spec is silent on display. The previous `application.HookRunRequest` and `domain.HookResult` types are removed.
+The `Run(ctx, *core.HookRunRequest) (*core.HookResult, error)` method SHALL execute hooks of the requested `HookType` with the supplied context and return `*core.HookResult` plus a non-nil `error` when any hook command fails (non-zero exit, timeout, or filesystem error reading `.twiggit.toml`). The cmd-layer display contract lives in `cli-worktree-hooks`; this spec is silent on display. The previous hook-run-request type under the `application` package and the previous hook-result type under the `domain` package are removed; both live in the `core` package now.
 
 #### Scenario: Definition holds
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
+#### Scenario: Error return on hook failure
+- **WHEN** at least one hook command exits non-zero
+- **THEN** `Run` SHALL return a non-nil `error`
+- **AND** the `*core.HookResult` SHALL still report `Success = false` and `Failures` per the Failure collection requirement

@@ -4,7 +4,7 @@
 
 ### Requirement: `ShellType` and supported set
 
-`core.ShellType` SHALL be a string type. The system SHALL recognize exactly three values: `bash`, `zsh`, `fish`. Other values SHALL be rejected by `core.IsValidShellType`. The previous `domain.ShellType` and `domain.IsValidShellType` are removed; the package qualifier is `core` for every call site. `core.ShellType` lives in `internal/core/shell_detect.go` (pure derivation; no `os` import for `os.Stat`).
+`core.ShellType` SHALL be a string type. The system SHALL recognize exactly three values: `bash`, `zsh`, `fish`. Other values SHALL be rejected by `core.IsValidShellType`. The previous shell-type definition and its `IsValidShellType` helper under the `domain` package are removed; the package qualifier is `core` for every call site. `core.ShellType` lives in `internal/core/shell_detect.go` (pure derivation; no `os` import for `os.Stat`).
 
 #### Scenario: IsValidShellType accepts the three values
 - **WHEN** the value is `"bash"`, `"zsh"`, or `"fish"`

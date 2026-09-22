@@ -1,5 +1,26 @@
 # Spec Delta
 
+## ADDED Requirements
+
+### Requirement: Signal exit codes bypass ExitCodeFor
+
+Signal cancellation (SIGINT, SIGTERM) SHALL exit with conventional shell exit codes (130 for SIGINT, 143 for SIGTERM) and SHALL bypass `cmdutil.ExitCodeFor`. The detection point is `main.go`: when `ctx.Err() != nil` after `cobra.ExecuteContext(ctx)` returns, the binary maps the cause to 130/143 rather than routing the wrapped `*core.OperationError` through the formatter dispatch. This contract is referenced by `cli-main-entry-point` (signal-context setup); this requirement constrains only the exit-code mapping. The formatter SHALL NOT be invoked for signal-cancelled runs.
+
+#### Scenario: SIGINT exits 130
+- **WHEN** SIGINT is delivered while a command is running and `ctx.Err()` reports cancellation
+- **THEN** `main.go` SHALL call `os.Exit(130)` directly
+- **AND** `cmdutil.ExitCodeFor` SHALL NOT be invoked for the cancelled error
+
+#### Scenario: SIGTERM exits 143
+- **WHEN** SIGTERM is delivered while a command is running and `ctx.Err()` reports cancellation
+- **THEN** `main.go` SHALL call `os.Exit(143)` directly
+- **AND** `cmdutil.ExitCodeFor` SHALL NOT be invoked for the cancelled error
+
+#### Scenario: Non-signal cancellation still routes through ExitCodeFor
+- **WHEN** a command returns `*core.OperationError` wrapping `context.Canceled` without an OS signal
+- **THEN** `cmdutil.ExitCodeFor` SHALL map it to `ExitError` (1)
+- **AND** the SIGINT/SIGTERM branch SHALL NOT trigger
+
 ## MODIFIED Requirements
 
 ### Requirement: Exit code mapping (3-code canonical)

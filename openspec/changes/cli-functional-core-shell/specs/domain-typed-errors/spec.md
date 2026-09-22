@@ -123,7 +123,7 @@ The canonical exit-code mapping SHALL be exactly:
 | 1 | `ExitError` | Unclassified error, runtime failure, or recovered panic |
 | 2 | `ExitUsage` | Cobra usage error (invalid syntax or args) typed via `errors.As` against `*core.UsageError` |
 
-The cmd layer (`cli-error-formatting`) SHALL NOT define additional exit-code constants. `cmdutil.ExitCodeFor` SHALL dispatch first via `errors.As` against `*core.UsageError`, returning `ExitUsage`; otherwise returning `ExitError` (1) for any non-nil error and `ExitOK` (0) for nil. Per-resource discrimination happens at the formatter hint layer (`cli-error-formatting` Actionable hints requirement), not via per-resource exit codes. The previous `domain.ErrUsageFlag` sentinel is removed; the previous `GetExitCodeForError` name is replaced by `cmdutil.ExitCodeFor`.
+The cmd layer (`cli-error-formatting`) SHALL NOT define additional exit-code constants. `cmdutil.ExitCodeFor` SHALL dispatch first via `errors.As` against `*core.UsageError`, returning `ExitUsage`; otherwise returning `ExitError` (1) for any non-nil error and `ExitOK` (0) for nil. Per-resource discrimination happens at the formatter hint layer (`cli-error-formatting` Actionable hints requirement), not via per-resource exit codes. The previous `domain.ErrUsageFlag` sentinel is removed; the previous exit-code dispatch helper is replaced by `cmdutil.ExitCodeFor`.
 
 #### Scenario: Definition holds
 - **WHEN** the surface described above is exercised
