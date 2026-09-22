@@ -32,7 +32,8 @@ func (s *PruneIntegrationTestSuite) SetupSuite() {
 	}
 	s.executor = infrastructure.NewCommandExecutor(30 * time.Second)
 	s.cliClient = infrastructure.NewCLIClient(s.executor, 30)
-	goGitClient := infrastructure.NewGoGitClient(true)
+	goGitClient, err := infrastructure.NewGoGitClient(true)
+	s.Require().NoError(err)
 	s.gitService = infrastructure.NewCompositeGitClient(goGitClient, s.cliClient)
 }
 

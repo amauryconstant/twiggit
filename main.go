@@ -41,7 +41,10 @@ func main() {
 	// Initialize infrastructure services in dependency order
 	cliTimeout := time.Duration(config.Git.CLITimeout) * time.Second
 	commandExecutor := infrastructure.NewCommandExecutor(cliTimeout)
-	goGitClient := infrastructure.NewGoGitClient(true)
+	goGitClient, err := infrastructure.NewGoGitClient(true)
+	if err != nil {
+		os.Exit(int(cmd.HandleCLIError(fmt.Errorf("init go-git client: %w", err))))
+	}
 	cliClient := infrastructure.NewCLIClient(commandExecutor, config.Git.CLITimeout)
 
 	// Create composite GitClient that implements both interfaces

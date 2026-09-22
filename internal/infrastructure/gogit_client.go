@@ -3,6 +3,7 @@ package infrastructure
 import (
 	"context"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -15,33 +16,29 @@ import (
 
 var _ application.GoGitClient = (*goGitClient)(nil)
 
-// goGitClient implements GoGitClient using go-git library
 type goGitClient struct {
 	cache        *lru.Cache[string, *git.Repository]
 	cacheEnabled bool
 }
 
-// NewGoGitClient creates a new GoGitClient implementation
-// cacheEnabled is optional - defaults to true if not provided
-// Uses default cache size of 25 repositories
-func NewGoGitClient(cacheEnabled ...bool) application.GoGitClient {
+func NewGoGitClient(cacheEnabled ...bool) (application.GoGitClient, error) {
 	enabled := true
 	if len(cacheEnabled) > 0 {
 		enabled = cacheEnabled[0]
 	}
 
-	cache, _ := lru.New[string, *git.Repository](25)
+	cache, err := lru.New[string, *git.Repository](25)
+	if err != nil {
+		return nil, fmt.Errorf("create go-git LRU cache: %w", err)
+	}
 
 	return &goGitClient{
 		cache:        cache,
 		cacheEnabled: enabled,
-	}
+	}, nil
 }
 
-// NewGoGitClientWithSize creates a new GoGitClient with custom cache size
-// cacheSize defaults to 25 if <= 0
-// cacheEnabled is optional - defaults to true if not provided
-func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) application.GoGitClient {
+func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) (application.GoGitClient, error) {
 	enabled := true
 	if len(cacheEnabled) > 0 {
 		enabled = cacheEnabled[0]
@@ -52,12 +49,15 @@ func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) application.GoG
 		size = 25
 	}
 
-	cache, _ := lru.New[string, *git.Repository](size)
+	cache, err := lru.New[string, *git.Repository](size)
+	if err != nil {
+		return nil, fmt.Errorf("create go-git LRU cache: %w", err)
+	}
 
 	return &goGitClient{
 		cache:        cache,
 		cacheEnabled: enabled,
-	}
+	}, nil
 }
 
 // OpenRepository opens git repository (pure function, idempotent)

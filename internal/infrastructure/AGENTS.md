@@ -40,8 +40,8 @@ type goGitClient struct { ... }
 
 **Cache:** LRU cache (default 25 repos) prevents memory leak.
 ```go
-NewGoGitClient(cacheEnabled...)           // default size 25
-NewGoGitClientWithSize(cacheSize, ...)    // custom size
+NewGoGitClient(cacheEnabled...) (application.GoGitClient, error)              // default size 25
+NewGoGitClientWithSize(cacheSize int, cacheEnabled...) (application.GoGitClient, error)  // custom size
 ```
 
 ## CLIClient Implementation

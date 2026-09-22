@@ -59,7 +59,8 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	t.Run("BranchOperations_UseGoGit", func(t *testing.T) {
 		// Use real CLI client but verify GoGit is used for branch operations
 		cliClient := infrastructure.NewCLIClient(executor, 30)
-		goGitClient := infrastructure.NewGoGitClient(true)
+		goGitClient, err := infrastructure.NewGoGitClient(true)
+		require.NoError(t, err)
 		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
 		// Test branch listing - should use GoGit only
@@ -80,7 +81,8 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 
 	t.Run("WorktreeOperations_UseCLI", func(t *testing.T) {
 		// Use real GoGit client but verify CLI is used for worktree operations
-		goGitClient := infrastructure.NewGoGitClient(true)
+		goGitClient, err := infrastructure.NewGoGitClient(true)
+		require.NoError(t, err)
 		cliClient := infrastructure.NewCLIClient(executor, 30)
 		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
@@ -111,7 +113,8 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	t.Run("RepositoryOperations_UseGoGit", func(t *testing.T) {
 		// Use real CLI client but verify GoGit is used for repository operations
 		cliClient := infrastructure.NewCLIClient(executor, 30)
-		goGitClient := infrastructure.NewGoGitClient(true)
+		goGitClient, err := infrastructure.NewGoGitClient(true)
+		require.NoError(t, err)
 		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
 		// Test repository validation - should use GoGit only

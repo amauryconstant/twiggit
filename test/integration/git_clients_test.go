@@ -55,7 +55,8 @@ func TestGitOperations_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("GoGitClient_BasicOperations", func(t *testing.T) {
-		client := infrastructure.NewGoGitClient(true)
+		client, err := infrastructure.NewGoGitClient(true)
+		require.NoError(t, err)
 
 		// Test repository validation
 		err := client.ValidateRepository(repoPath)
@@ -124,7 +125,8 @@ func TestGitOperations_Integration(t *testing.T) {
 	})
 
 	t.Run("GitService_DeterministicRouting", func(t *testing.T) {
-		goGitClient := infrastructure.NewGoGitClient(true)
+		goGitClient, err := infrastructure.NewGoGitClient(true)
+		require.NoError(t, err)
 		cliClient := infrastructure.NewCLIClient(executor, 30)
 
 		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
@@ -153,10 +155,11 @@ func TestGitOperations_ErrorHandling(t *testing.T) {
 	tempDir := t.TempDir()
 	nonExistentPath := filepath.Join(tempDir, "non-existent")
 
-	client := infrastructure.NewGoGitClient(true)
+	client, err := infrastructure.NewGoGitClient(true)
+	require.NoError(t, err)
 
 	// Test validation of non-existent repository
-	err := client.ValidateRepository(nonExistentPath)
+	err = client.ValidateRepository(nonExistentPath)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not a valid git repository")
 

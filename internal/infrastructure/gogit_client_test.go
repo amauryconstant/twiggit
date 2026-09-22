@@ -13,7 +13,8 @@ import (
 )
 
 func TestGoGitClient_OpenRepository(t *testing.T) {
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	tempDir := t.TempDir()
 
 	repo, err := client.OpenRepository("/non/existent/path")
@@ -26,10 +27,11 @@ func TestGoGitClient_OpenRepository(t *testing.T) {
 }
 
 func TestGoGitClient_ValidateRepository(t *testing.T) {
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	tempDir := t.TempDir()
 
-	err := client.ValidateRepository("/non/existent/path")
+	err = client.ValidateRepository("/non/existent/path")
 	require.Error(t, err)
 
 	err = client.ValidateRepository(tempDir)
@@ -41,7 +43,8 @@ func TestGoGitClient_ValidateRepository(t *testing.T) {
 }
 
 func TestGoGitClient_ListBranches(t *testing.T) {
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	tempDir := t.TempDir()
 
 	branches, err := client.ListBranches(context.Background(), "/non/existent/path")
@@ -59,7 +62,8 @@ func TestGoGitClient_ListBranches(t *testing.T) {
 }
 
 func TestGoGitClient_BranchExists(t *testing.T) {
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	tempDir := t.TempDir()
 
 	exists, err := client.BranchExists(context.Background(), "/non/existent/path", "main")
@@ -78,7 +82,8 @@ func TestGoGitClient_BranchExists(t *testing.T) {
 }
 
 func TestGoGitClient_GetRepositoryStatus(t *testing.T) {
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	tempDir := t.TempDir()
 
 	status, err := client.GetRepositoryStatus(context.Background(), "/non/existent/path")
@@ -93,7 +98,8 @@ func TestGoGitClient_GetRepositoryStatus(t *testing.T) {
 }
 
 func TestGoGitClient_GetRepositoryInfo(t *testing.T) {
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	tempDir := t.TempDir()
 
 	info, err := client.GetRepositoryInfo(context.Background(), "/non/existent/path")
@@ -110,7 +116,8 @@ func TestGoGitClient_GetRepositoryInfo(t *testing.T) {
 }
 
 func TestGoGitClient_ListRemotes(t *testing.T) {
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	tempDir := t.TempDir()
 
 	remotes, err := client.ListRemotes(context.Background(), "/non/existent/path")
@@ -124,7 +131,8 @@ func TestGoGitClient_ListRemotes(t *testing.T) {
 }
 
 func TestGoGitClient_GetCommitInfo(t *testing.T) {
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	tempDir := t.TempDir()
 
 	commit, err := client.GetCommitInfo(context.Background(), "/non/existent/path", "HEAD")
@@ -149,10 +157,11 @@ func findBranch(branches []domain.BranchInfo, name string) *domain.BranchInfo {
 func setupTestRepo(t *testing.T, tempDir string) string {
 	t.Helper()
 
-	client := NewGoGitClient()
+	client, err := NewGoGitClient()
+	require.NoError(t, err)
 	repoPath := filepath.Join(tempDir, "test-repo")
 
-	err := os.MkdirAll(repoPath, 0755)
+	err = os.MkdirAll(repoPath, 0755)
 	require.NoError(t, err)
 
 	_, err = client.OpenRepository(repoPath)

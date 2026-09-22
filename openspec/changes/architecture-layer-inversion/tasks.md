@@ -62,8 +62,8 @@ order of tasks is implementation order.
 
 ### 5b-i. NewGoGitClient signature change (behavioral)
 
-- [ ] 5b-i.1 Change `NewGoGitClient` and `NewGoGitClientWithSize` return types from `*GoGitClient` to `(*GoGitClient, error)` so the `lru.New` allocation error at lines around the constructor propagates instead of being discarded; verify by `go build ./internal/infrastructure/...` clean (callers updated in slice 6)
-- [ ] 5b-i.2 Update `main.go` and the integration-test wiring to handle the new `error` return from both `NewGoGitClient*` constructors; verify by `go build ./...` clean and `mise run test:integration` passing
+- [x] 5b-i.1 Change `NewGoGitClient` and `NewGoGitClientWithSize` return types from `*GoGitClient` to `(*GoGitClient, error)` so the `lru.New` allocation error at lines around the constructor propagates instead of being discarded; verify by `go build ./internal/infrastructure/...` clean (callers updated in slice 6)
+- [x] 5b-i.2 Update `main.go` and the integration-test wiring to handle the new `error` return from both `NewGoGitClient*` constructors; verify by `go build ./...` clean and `mise run test:integration` passing
 
 ### 5b-ii. NewContextDetector signature change (behavioral)
 
