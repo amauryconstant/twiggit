@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"runtime/debug"
 	"time"
@@ -12,6 +13,12 @@ import (
 )
 
 func main() {
+	slogLevel := slog.LevelInfo
+	if os.Getenv("TWIGGIT_DEBUG") != "" {
+		slogLevel = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slogLevel})))
+
 	// Set up panic recovery for graceful handling of unexpected errors
 	defer func() {
 		if r := recover(); r != nil {

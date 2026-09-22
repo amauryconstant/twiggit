@@ -2,10 +2,10 @@
 
 ## 1. Setup
 
-- [ ] 1.1 Capture pre-change baseline by running `mise run test` and confirming the suite is green before any code edits; also confirm `slog.SetDefault(...)` runs once in `main.go` so service-layer `slog.Error` calls land in the configured handler
-- [ ] 1.2 Confirm this change can land independently of other active changes by inspecting `openspec list --json`; SPECIFICALLY verify `quality-modernization` does not schedule overlapping edits to `.golangci.yml` or `internal/infrastructure/{cli_client,gogit_client,context_detector,context_resolver,config_manager,hook_runner,shell_infra,command_executor}.go`; reject if either change owns a slice before the other lands
-- [ ] 1.3 Verify `github.com/hashicorp/golang-lru/v2` is in `go.mod` (used by slice 4c for `context_detector.go` LRU swap)
-- [ ] 1.4 Verify `golangci-lint v2` is installed and accepts `linters.settings.nolintlint` (slice 7)
+- [x] 1.1 Capture pre-change baseline by running `mise run test` and confirming the suite is green before any code edits; also confirm `slog.SetDefault(...)` runs once in `main.go` so service-layer `slog.Error` calls land in the configured handler
+- [x] 1.2 Confirm this change can land independently of other active changes by inspecting `openspec list --json`; SPECIFICALLY verify `quality-modernization` does not schedule overlapping edits to `.golangci.yml` or `internal/infrastructure/{cli_client,gogit_client,context_detector,context_resolver,config_manager,hook_runner,shell_infra,command_executor}.go`; reject if either change owns a slice before the other lands
+- [x] 1.3 Verify `github.com/hashicorp/golang-lru/v2` is in `go.mod` (used by slice 4c for `context_detector.go` LRU swap)
+- [x] 1.4 Verify `golangci-lint v2` is installed and accepts `linters.settings.nolintlint` (slice 7)
 
 ## 2. Domain layer expansion (slice 1)
 
