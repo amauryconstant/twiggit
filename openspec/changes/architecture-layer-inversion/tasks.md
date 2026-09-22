@@ -100,10 +100,10 @@ order of tasks is implementation order.
 - [x] 5d.1 Delete `internal/infrastructure/pathutils.go` (functions now live in `internal/domain/pathutils.go`); verify by `go build ./...` clean
 - [x] 5d.2 Delete `internal/infrastructure/git_utils.go`; verify by `go build ./...` clean
 - [x] 5d.3 Create `internal/infrastructure/repo_finder.go` with `FindGitRepositories(dir string, goGit application.GoGitClient) ([]domain.GitDir, error)` using the `domain.GitDir` type; add compile-time interface check `var _ application.RepoLocator = (*RepoFinder)(nil)` at the bottom of the file; POLICY: return a freshly allocated `[]domain.GitDir` via `slices.Clone` so callers cannot mutate the implementation's internal slice header; add unit test asserting that mutating the returned slice does not affect a second call; verify by `go build ./internal/infrastructure/...` clean and the new defensive-copy test passing
-- [ ] 5d.4 PAUSED: Delete `internal/infrastructure/git_client.go` (146-line `CompositeGitClient`); grep `infrastructure.NewCompositeGitClient` still returns non-zero callers in `main.go` (1 site) and `test/integration/` (8 sites); per stop condition, paused for user decision on whether caller cleanup belongs to slice 5d or to slice 6/7
+- [x] 5d.4 Delete `internal/infrastructure/git_client.go` (146-line `CompositeGitClient`) and `internal/infrastructure/git_client_test.go` (313-line test dedicated to the deleted type); the latter was required because the verification gate `git grep 'NewCompositeGitClient' internal/ main.go cmd/` would otherwise remain non-zero; remaining `test/integration/` callers (8 sites) are addressed in slice 7
 - [x] 5d.5 Delete `internal/infrastructure/interfaces.go` (9-line placeholder); verify by `go build ./...` clean
 - [x] 5d.6 Collapse the five near-identical no-op result blocks in `hook_runner.go` into a single `noOpResult(req) *domain.HookResult` helper and call it from each branch; verify by `go build ./...` clean and `go test ./internal/infrastructure/...` passing
-- [ ] 5d.7 Verify slice 5d: `git grep -n 'infrastructure\.' internal/service/` returns no matches (sanity check that the layer inversion is complete); `go build ./...` clean
+- [x] 5d.7 Verify slice 5d: `git grep -n 'infrastructure\.' internal/service/` returns no matches (sanity check that the layer inversion is complete); `go build ./...` clean
 
 ### 5e. Test rewrites (anchor)
 
@@ -113,8 +113,8 @@ order of tasks is implementation order.
 
 ## 6. main.go rewiring (slice 5)
 
-- [ ] 6.1 Update `main.go`: drop the `infrastructure.NewCompositeGitClient(...)` call; pass `goGitClient` and `cliClient` directly into `service.NewWorktreeService(...)` and `service.NewProjectService(...)`; construct the repo finder as `repoFinder := infrastructure.NewRepoFinder(goGitClient)` (concrete `*RepoFinder` returned per `golang-naming` "return structs" rule; assign to `application.RepoLocator` at the consumer site); pass both clients into `infrastructure.NewContextResolver(...)`; verify by `go build ./...` clean
-- [ ] 6.2 Update `cmd/root.go` interface references for any renamed infrastructure types (likely none — `cmd/` consumes service interfaces, not infrastructure types); verify by `go build ./...` clean
+- [x] 6.1 Update `main.go`: drop the `infrastructure.NewCompositeGitClient(...)` call; pass `goGitClient` and `cliClient` directly into `service.NewWorktreeService(...)` and `service.NewProjectService(...)`; construct the repo finder as `repoFinder := infrastructure.NewRepoFinder(goGitClient)` (concrete `*RepoFinder` returned per `golang-naming` "return structs" rule; assign to `application.RepoLocator` at the consumer site); pass both clients into `infrastructure.NewContextResolver(...)`; verify by `go build ./...` clean
+- [x] 6.2 `cmd/root.go` required no changes — `cmd/` consumes only `application.*` service interfaces; verified by `go build ./...` clean
 
 ## 7. Test mocks + mechanical rename (slice 6)
 

@@ -12,23 +12,26 @@ Layer: Application services orchestrate domain logic + infrastructure
 
 ```go
 type worktreeService struct {
-    gitService     infrastructure.GitClient
+    goGit         application.GoGitClient
+    cli           application.CLIClient
     projectService application.ProjectService
-    hookRunner     infrastructure.HookRunner
-    config         *domain.Config
+    config        *domain.Config
+    hookRunner    application.HookRunner
 }
 
 func NewWorktreeService(
-    gitService infrastructure.GitClient,
+    goGit application.GoGitClient,
+    cli application.CLIClient,
     projectService application.ProjectService,
-    hookRunner infrastructure.HookRunner,
     config *domain.Config,
+    hookRunner application.HookRunner,
 ) application.WorktreeService {
     return &worktreeService{
-        gitService:     gitService,
+        goGit:         goGit,
+        cli:           cli,
         projectService: projectService,
-        hookRunner:     hookRunner,
-        config:         config,
+        config:        config,
+        hookRunner:    hookRunner,
     }
 }
 
@@ -44,12 +47,12 @@ func (s *worktreeService) CreateWorktree(
     if err != nil {
         return nil, fmt.Errorf("failed to resolve project: %w", err)
     }
-    worktree, err := s.gitService.CreateWorktree(ctx, project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)
+    worktree, err := s.cli.CreateWorktree(ctx, project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)
     if err != nil {
         return nil, domain.NewWorktreeServiceError(worktreePath, req.BranchName, "CreateWorktree", "failed to create worktree", err)
     }
     // Execute post-create hooks
-    hookResult := s.hookRunner.Run(ctx, &infrastructure.HookRunRequest{...})
+    hookResult := s.hookRunner.Run(ctx, &application.HookRunRequest{...})
     return &domain.CreateWorktreeResult{
         Worktree:   &domain.WorktreeInfo{Path: worktreePath, Branch: req.BranchName},
         HookResult: hookResult,
@@ -130,7 +133,7 @@ if errors.Is(err, domain.ErrWorktreeNotFound) {
 
 ### WorktreeService
 - Validate project name, branch name before git operations
-- Use GitClient for worktree operations
+- Use GoGitClient for read-only repo operations, CLIClient for worktree mutation
 - Execute post-create hooks via HookRunner after successful worktree creation
 - Return `CreateWorktreeResult` with worktree info and hook results
 - Methods: `BranchExists`, `IsBranchMerged`, `GetWorktreeByPath` (added for cmd layer isolation)
@@ -139,6 +142,7 @@ if errors.Is(err, domain.ErrWorktreeNotFound) {
 - Discover projects by name or from context
 - Validate project directories contain valid git repos
 - Use ContextDetector for context-aware discovery
+- Delegate git-repo scanning to RepoLocator (injected, not constructed)
 - Method: `ListProjectSummaries` for lightweight listings without expensive git data
 
 ### ContextService
