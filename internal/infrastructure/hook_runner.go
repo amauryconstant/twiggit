@@ -38,52 +38,27 @@ func NewHookRunner(executor CommandExecutor, hookTimeoutSeconds ...int) applicat
 
 func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (*domain.HookResult, error) {
 	if req.ConfigFilePath == "" {
-		return &domain.HookResult{
-			HookType:     req.HookType,
-			HasExecuted:  false,
-			IsSuccessful: true,
-			Failures:     nil,
-		}, nil
+		return noOpResult(req), nil
 	}
 
 	parentDir := filepath.Dir(req.ConfigFilePath)
 	root, rootErr := os.OpenRoot(parentDir)
 	if rootErr != nil {
-		return &domain.HookResult{
-			HookType:     req.HookType,
-			HasExecuted:  false,
-			IsSuccessful: true,
-			Failures:     nil,
-		}, nil
+		return noOpResult(req), nil
 	}
 	defer root.Close()
 	if _, err := root.Stat(filepath.Base(req.ConfigFilePath)); errors.Is(err, os.ErrNotExist) {
-		return &domain.HookResult{
-			HookType:     req.HookType,
-			HasExecuted:  false,
-			IsSuccessful: true,
-			Failures:     nil,
-		}, nil
+		return noOpResult(req), nil
 	}
 
 	config, err := r.readHookConfig(req.ConfigFilePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: failed to parse %s: %v\n", req.ConfigFilePath, err)
-		return &domain.HookResult{
-			HookType:     req.HookType,
-			HasExecuted:  false,
-			IsSuccessful: true,
-			Failures:     nil,
-		}, nil
+		return noOpResult(req), nil
 	}
 
 	if config == nil {
-		return &domain.HookResult{
-			HookType:     req.HookType,
-			HasExecuted:  false,
-			IsSuccessful: true,
-			Failures:     nil,
-		}, nil
+		return noOpResult(req), nil
 	}
 
 	var definition *domain.HookDefinition
@@ -91,24 +66,23 @@ func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (
 	case domain.HookPostCreate:
 		definition = config.PostCreate
 	default:
-		return &domain.HookResult{
-			HookType:     req.HookType,
-			HasExecuted:  false,
-			IsSuccessful: true,
-			Failures:     nil,
-		}, nil
+		return noOpResult(req), nil
 	}
 
 	if definition == nil || len(definition.Commands) == 0 {
-		return &domain.HookResult{
-			HookType:     req.HookType,
-			HasExecuted:  false,
-			IsSuccessful: true,
-			Failures:     nil,
-		}, nil
+		return noOpResult(req), nil
 	}
 
 	return r.executeCommands(ctx, req, definition.Commands)
+}
+
+func noOpResult(req *application.HookRunRequest) *domain.HookResult {
+	return &domain.HookResult{
+		HookType:     req.HookType,
+		HasExecuted:  false,
+		IsSuccessful: true,
+		Failures:     nil,
+	}
 }
 
 func (r *hookRunner) readHookConfig(path string) (*domain.HookConfig, error) {

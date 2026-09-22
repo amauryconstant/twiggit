@@ -18,7 +18,7 @@ import (
 // validatePathUnder validates that a target path is under a base directory
 // Returns an error if validation fails or if path is outside base
 func validatePathUnder(base, target, targetType, baseDesc string) error {
-	if under, err := IsPathUnder(base, target); err != nil {
+	if under, err := domain.IsPathUnder(base, target); err != nil {
 		return domain.NewContextDetectionError(target, "path validation failed", err)
 	} else if !under {
 		return domain.NewContextDetectionError(target,
@@ -168,17 +168,19 @@ func filterSuggestions(suggestions []string, partial string) []string {
 }
 
 type contextResolver struct {
-	config *domain.Config
-	goGit  application.GoGitClient
-	cli    application.CLIClient
+	config     *domain.Config
+	goGit      application.GoGitClient
+	cli        application.CLIClient
+	repoFinder *RepoFinder
 }
 
 // NewContextResolver creates a new context resolver
 func NewContextResolver(cfg *domain.Config, goGit application.GoGitClient, cli application.CLIClient) application.ContextResolver {
 	return &contextResolver{
-		config: cfg,
-		goGit:  goGit,
-		cli:    cli,
+		config:     cfg,
+		goGit:      goGit,
+		cli:        cli,
+		repoFinder: NewRepoFinder(goGit),
 	}
 }
 
@@ -563,7 +565,7 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*do
 func (cr *contextResolver) discoverProjects() ([]domain.ProjectSummary, error) {
 	projectsDir := cr.config.ProjectsDirectory
 
-	gitDirs, err := FindGitRepositories(projectsDir, cr.goGit)
+	gitDirs, err := cr.repoFinder.FindGitRepositories(projectsDir)
 	if err != nil {
 		return nil, domain.NewContextDetectionError(projectsDir, "failed to scan for git repositories", err)
 	}

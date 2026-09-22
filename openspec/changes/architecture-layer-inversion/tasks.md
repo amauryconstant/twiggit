@@ -97,12 +97,12 @@ order of tasks is implementation order.
 
 ### 5d. Refactors (structural)
 
-- [ ] 5d.1 Delete `internal/infrastructure/pathutils.go` (functions now live in `internal/domain/pathutils.go`); verify by `go build ./...` clean
-- [ ] 5d.2 Delete `internal/infrastructure/git_utils.go`; verify by `go build ./...` clean
-- [ ] 5d.3 Create `internal/infrastructure/repo_finder.go` with `FindGitRepositories(dir string, goGit application.GoGitClient) ([]domain.GitDir, error)` using the `domain.GitDir` type; add compile-time interface check `var _ application.RepoLocator = (*RepoFinder)(nil)` at the bottom of the file; POLICY: return a freshly allocated `[]domain.GitDir` via `slices.Clone` so callers cannot mutate the implementation's internal slice header; add unit test asserting that mutating the returned slice does not affect a second call; verify by `go build ./internal/infrastructure/...` clean and the new defensive-copy test passing
-- [ ] 5d.4 Delete `internal/infrastructure/git_client.go` (146-line `CompositeGitClient`); verify by `go build ./...` clean
-- [ ] 5d.5 Delete `internal/infrastructure/interfaces.go` (9-line placeholder); verify by `go build ./...` clean
-- [ ] 5d.6 Collapse the five near-identical no-op result blocks in `hook_runner.go` into a single `noOpResult(req) *domain.HookResult` helper and call it from each branch; verify by `go build ./...` clean and `go test ./internal/infrastructure/...` passing
+- [x] 5d.1 Delete `internal/infrastructure/pathutils.go` (functions now live in `internal/domain/pathutils.go`); verify by `go build ./...` clean
+- [x] 5d.2 Delete `internal/infrastructure/git_utils.go`; verify by `go build ./...` clean
+- [x] 5d.3 Create `internal/infrastructure/repo_finder.go` with `FindGitRepositories(dir string, goGit application.GoGitClient) ([]domain.GitDir, error)` using the `domain.GitDir` type; add compile-time interface check `var _ application.RepoLocator = (*RepoFinder)(nil)` at the bottom of the file; POLICY: return a freshly allocated `[]domain.GitDir` via `slices.Clone` so callers cannot mutate the implementation's internal slice header; add unit test asserting that mutating the returned slice does not affect a second call; verify by `go build ./internal/infrastructure/...` clean and the new defensive-copy test passing
+- [ ] 5d.4 PAUSED: Delete `internal/infrastructure/git_client.go` (146-line `CompositeGitClient`); grep `infrastructure.NewCompositeGitClient` still returns non-zero callers in `main.go` (1 site) and `test/integration/` (8 sites); per stop condition, paused for user decision on whether caller cleanup belongs to slice 5d or to slice 6/7
+- [x] 5d.5 Delete `internal/infrastructure/interfaces.go` (9-line placeholder); verify by `go build ./...` clean
+- [x] 5d.6 Collapse the five near-identical no-op result blocks in `hook_runner.go` into a single `noOpResult(req) *domain.HookResult` helper and call it from each branch; verify by `go build ./...` clean and `go test ./internal/infrastructure/...` passing
 - [ ] 5d.7 Verify slice 5d: `git grep -n 'infrastructure\.' internal/service/` returns no matches (sanity check that the layer inversion is complete); `go build ./...` clean
 
 ### 5e. Test rewrites (anchor)

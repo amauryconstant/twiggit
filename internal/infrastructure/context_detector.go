@@ -66,7 +66,7 @@ func (cd *contextDetector) DetectContext(dir string) (*domain.Context, error) {
 	}
 
 	// Normalize path and resolve symlinks
-	normalizedDir, err := NormalizePath(dir)
+	normalizedDir, err := domain.NormalizePath(dir)
 	if err != nil {
 		return nil, domain.NewContextDetectionError(dir, "failed to normalize directory", err)
 	}
@@ -141,14 +141,14 @@ func (cd *contextDetector) detectWorktreeContext(dir string) *domain.Context {
 }
 
 func (cd *contextDetector) detectProjectContext(dir string) *domain.Context {
-	gitDir := FindGitDirByTraversal(dir)
-	if gitDir != nil {
-		projectName := cd.extractProjectName(*gitDir)
+	gitDir, ok := domain.FindGitDirByTraversal(dir)
+	if ok {
+		projectName := cd.extractProjectName(gitDir)
 
 		return &domain.Context{
 			Type:        domain.ContextProject,
 			ProjectName: projectName,
-			Path:        *gitDir,
+			Path:        gitDir,
 			Explanation: fmt.Sprintf("In project directory '%s'", projectName),
 		}
 	}
