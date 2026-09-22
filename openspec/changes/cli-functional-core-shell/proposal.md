@@ -20,18 +20,18 @@ abstraction, command-pattern (Options + runF), and strict functional-core purity
 
 ### Package migration
 
-- Create `internal/core/` (pure functional core: types, value objects, validation, errors, rules).
-- Create `internal/git/` (git I/O adapter: `client.go`, `reader.go`, `writer.go`, `errors.go`, `repo_finder.go`, `hook_runner.go`, `context_resolver.go`).
-- Create `internal/output/` (formatting: `formatter.go`, `errors.go`, `table.go`, `prompt.go`).
-- Create `internal/iostreams/` (TTY abstraction: `iostreams.go`, `styles.go`).
-- Create `internal/cmdutil/` (composition + exit codes: `factory.go`, `exit.go`, `json_flags.go`).
+- **BREAKING** Create `internal/core/` (pure functional core: types, value objects, validation, errors, rules).
+- **BREAKING** Create `internal/git/` (git I/O adapter: `client.go`, `reader.go`, `writer.go`, `errors.go`, `repo_finder.go`, `hook_runner.go`, `context_resolver.go`).
+- **BREAKING** Create `internal/output/` (formatting: `formatter.go`, `errors.go`, `table.go`).
+- **BREAKING** Create `internal/iostreams/` (TTY abstraction: `iostreams.go`, `styles.go`).
+- **BREAKING** Create `internal/cmdutil/` (composition + exit codes: `factory.go`, `exit.go`, `json_flags.go`).
 - `internal/version/` stays.
-- Move `internal/domain/*` → `internal/core/`. Rename `domain.X` → `core.X` via `gopls rename` (touches every `.go` file).
-- Move `internal/infrastructure/git_utils.go`, `gogit_client.go`, `cli_client.go`, `command_executor.go`, `repo_finder.go`, `hook_runner.go`, `context_resolver.go` → `internal/git/` (split into `client.go`, `reader.go`, `writer.go`, `errors.go`).
-- Move `internal/infrastructure/config_manager.go`, `context_detector.go` → `internal/config/` + `internal/git/` split.
-- Delete `internal/application/`. Service-interface contracts move to `internal/core/` (consumer-side).
-- Delete `internal/service/`. Orchestration moves to `internal/core/` (pure) + `cmd/<command>.go` (I/O).
-- Delete `internal/infrastructure/` skeleton (files migrated above; helper remains if any leftover).
+- **BREAKING** Move `internal/domain/*` → `internal/core/`. Rename `domain.X` → `core.X` via `gopls rename` (touches every `.go` file).
+- **BREAKING** Move `internal/infrastructure/git_utils.go`, `gogit_client.go`, `cli_client.go`, `command_executor.go`, `repo_finder.go`, `hook_runner.go`, `context_resolver.go` → `internal/git/` (split into `client.go`, `reader.go`, `writer.go`, `errors.go`).
+- **BREAKING** Move `internal/infrastructure/config_manager.go`, `context_detector.go` → `internal/config/` + `internal/git/` split.
+- **BREAKING** Delete `internal/application/`. Service-interface contracts deferred to the `interface-segregation` change; `cmd/` consumes concrete types via Factory.
+- **BREAKING** Delete `internal/service/`. Orchestration moves to `internal/core/` (pure) + `cmd/<command>.go` (I/O).
+- **BREAKING** Delete `internal/infrastructure/` skeleton (files migrated above; helper remains if any leftover).
 
 ### Composition pattern
 
@@ -70,24 +70,34 @@ abstraction, command-pattern (Options + runF), and strict functional-core purity
 
 ## Capabilities
 
-### Modified Capabilities
-
-- `cli-factory` — new spec; documents Factory pattern, lazy init contract, sync.Once-cached config.
-- `cli-iostreams` — new spec; documents IOStreams abstraction, TTY detection, stdout/stderr discipline.
-- `cli-output` — new spec; documents `--output` flag, Formatter interface (json/table/plain).
-- `cli-exit-codes` — new spec; documents 0/1/2 exit code contract via `cmdutil.ExitCodeFor`.
-- `core-types` — new spec; documents value-object pattern (`core.NewBranchName` etc.), validation pipeline (`Pipeline[T]`).
-- `core-errors` — new spec; documents `ValidationError`, `NotFoundError`, `OperationError`, `UsageError` hierarchy.
-- `core-paths` — new spec; documents path utilities migrated from `domain/pathutils.go`.
-- `git-client` — modify existing `infrastructure-git-client`; adapt to Tier 2 path references (`internal/git/`); preserve routing table + constructor-error requirements.
-- `git-config` — new spec; documents config loading migrated from `infrastructure-config-manager`.
-- `git-context-resolver` — modify existing `infrastructure-context-resolver`; adapt path references.
-- `git-hook-runner` — modify existing `infrastructure-hook-runner`; adapt path references.
-- `git-shell-detect` — modify existing `infrastructure-shell-detect`; adapt path references.
-
 ### New Capabilities
 
-None. All changes are package migrations of existing capabilities or new specs that document newly-introduced abstractions.
+- `cli-factory` — documents Factory pattern, lazy init contract, `sync.OnceValue`-cached config.
+- `cli-iostreams` — documents IOStreams struct, TTY detection, stdout/stderr discipline, debug-vs-verbose split.
+- `cli-output` — documents `--output` flag, Formatter interface (json/table/plain).
+- `cli-exit-codes` — documents 0/1/2 exit code contract via `cmdutil.ExitCodeFor`.
+- `core-types` — documents value-object pattern (`core.NewBranchName` etc.), validation pipeline (`Pipeline[T]`).
+- `core-errors` — documents `ValidationError`, `NotFoundError`, `OperationError`, `UsageError` hierarchy; I/O-specific constructors live in their adapter packages.
+- `core-paths` — documents path utilities in their new home at `internal/core/`.
+- `git-config` — documents config loading migrated from `infrastructure-config-manager`.
+- `git-client` — documents the composite `git.GitClient` for Tier 2; legacy `infrastructure-git-client` spec retains the two-role-interface design per deferred-migration non-goal.
+- `git-context-resolver` — documents context-detection with `core.NormalizePath` / `core.IsPathUnder`; legacy `infrastructure-context-resolver` spec left intact per deferred-migration non-goal.
+- `git-hook-runner` — documents `internal/git/hook_runner.go`; legacy `infrastructure-hook-runner` spec left intact per deferred-migration non-goal.
+- `git-shell-detect` — documents the core/output split for shell logic; legacy `infrastructure-shell-detect` spec left intact per deferred-migration non-goal.
+
+### Modified Capabilities
+
+- `cli-error-formatting` — exit-code constants renamed `ExitCodeSuccess`/`ExitCodeError`/`ExitCodeUsage` → `ExitOK`/`ExitError`/`ExitUsage`; helper `GetExitCodeForError` → `cmdutil.ExitCodeFor`; per-resource formatter registry collapsed to `FormatError` dispatch on 4 core types; SIGINT → exit 130 / SIGTERM → exit 143 added.
+- `cli-output-formats` — `--output` enum extended with `table`, `plain`, `jsonl`; `Formatter` interface contract added; default empty `--output` = plain.
+- `cli-verbose-output` — boolean `Verbose` replaces the `-v`/`-vv` level distinction; `ios.Verbosef(format, ...)` replaces `logv(cmd, level, ...)`; separate `Logger *slog.Logger` channel added for `TWIGGIT_DEBUG`.
+- `cli-main-entry-point` — main becomes thin composition root; config loading moves to `cmdutil.Factory.Config` lazy field; `GetExitCodeForError` → `cmdutil.ExitCodeFor`; old exit-code constants removed.
+- `domain-typed-errors` — 20-type taxonomy collapsed to 4 core types (`ValidationError`, `NotFoundError`, `OperationError`, `UsageError`); 13 sentinels slimmed to 4 NotFound sentinels; `domain.NewValidationError(request, ...)` → `core.NewValidationError(field, value, message)`; shell/usage-specific sentinels removed.
+- `domain-context-types` — `domain.ContextType` / `PathType` / `ResolutionResult` / `SuggestionOption` → `core.*` rename.
+- `infrastructure-context-resolver` — detection surface scoped to priority chain + path-utils dep; `domain.ContextDetectionError` → `core.OperationError`; full resolver/suggestion coverage retained.
+- `infrastructure-git-client` — "No composite umbrella interface SHALL exist" rule removed; composite `git.GitClient` is the only injection point; role interfaces become internal collaborators; `git.NewGoGitClient()` → `git.NewClient()`.
+- `infrastructure-shell-detect` — `domain.ShellType` → `core.ShellType`; `ShellInfrastructure.ComposeWrapper` → `output.ComposeWrapper` in `internal/output/wrapper.go`; filesystem probing moved to `internal/git/shell_detect.go`.
+- `infrastructure-hook-runner` — `application.HookRunner` interface → `cmdutil.HookRunner` declared in `internal/cmdutil/hook_runner_iface.go`; `domain.HookResult` → `core.HookResult`; `application.HookRunRequest` → `core.HookRunRequest`.
+- `infrastructure-config-manager` — `domain.DefaultConfig()` → `core.DefaultConfig()`; `domain.ConfigError` (exit 3) → `core.OperationError` (exit 1); `NO_COLOR` env handling added.
 
 ## Impact
 
@@ -106,7 +116,7 @@ None. All changes are package migrations of existing capabilities or new specs t
 | `internal/domain/` | deleted (after migration) | -600 |
 | `.golangci.yml` | depguard rewrite (Tier 2) | ~80 |
 | `go.mod` | add `github.com/charmbracelet/lipgloss` | ~1 |
-| Specs | ~12 spec deltas (8 new, 4 modified) | — |
+| Specs | ~23 spec deltas (12 new, 11 modified) | — |
 | Tests | mechanical rename + restructure per package | ~1500 |
 
 | Aspect | Effect |
@@ -119,13 +129,13 @@ None. All changes are package migrations of existing capabilities or new specs t
 
 ## Non-goals
 
-- Interface Segregation Principle refactor — separate change; tracked as `interface-segregation`.
+- Interface Segregation Principle refactor — separate change; tracked as `interface-segregation`. The composite `git.GitClient` stays concrete in this change; the `interface-segregation` change promotes role interfaces to consumer-side interfaces.
 - `moq` generation tooling switch — deferred.
 - Receiver-less methods → free functions — deferred (quality change).
 - `slog` migration across untouched `cmd/` files — deferred.
 - Lint threshold tightening (`funlen`, `gocyclo`) — deferred.
-- Spec migration of legacy prefixes (`domain-*`, `infrastructure-*`, `application-*`) to `core-*`/`git-*`/`cli-*` — deferred; this change introduces new specs with Tier 2 prefixes only.
 - Wholesale modernization of `_ = fmt.Fprint*` sites in `cmd/` — deferred.
+- Wholesale rename of `infrastructure-*` and `application-*` source directories to `git-*`/`cmdutil-*` prefixes — the legacy source dirs are deleted in this change, but the legacy spec paths (`openspec/specs/infrastructure-*`, `openspec/specs/application-*`) keep their directory names so existing cross-refs stay valid. The 11 MODIFIED deltas in this change reconcile the requirement text; the directory names update is a separate follow-up.
 
 ## Out-of-scope follow-ups
 

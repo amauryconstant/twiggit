@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Documents the path-utility helpers migrated from `internal/domain/pathutils.go` (renamed from the original `infrastructure-path-utils` helpers) so the context resolver and project discovery can resolve symlinks and project names deterministically.
+Documents the path-utility helpers in their new home at `internal/core/`, used by the context resolver and project discovery. The legacy `infrastructure-path-utils` spec is left intact per the deferred-migration non-goal in the proposal.
 
 ## ADDED Requirements
 

@@ -1,5 +1,9 @@
 # Design: Tier 2 Foundation
 
+## Principles
+
+Every interactive command is scriptable: flags bypass prompts; prompting is gated on an interactive TTY (and emits `core.UsageError` on missing required input when not interactive).
+
 ## Context
 
 `twiggit` is a single-binary Cobra CLI with 6 commands (`list`, `create`, `delete`, `prune`, `cd`, `init`) plus 2 hidden commands (`_carapace`, `version`). It uses a five-layer DDD-Light architecture: `cmd/` → `internal/application/` (interfaces) → `internal/service/` (orchestration) → `internal/domain/` (pure) and `internal/infrastructure/` (git, config, shell, paths). The `architecture-layer-inversion` change has been planned to land this layout with a depguard-enforced convention.
@@ -41,12 +45,12 @@ This change is the consolidation that lands the skill's recommendation, collapse
 | Old | New | Role |
 |---|---|---|
 | `internal/domain/` | `internal/core/` | Pure types, value objects, errors, validation, rules |
-| `internal/application/` | (deleted; consumer-side interfaces in `internal/core/`) | Interfaces move next to consumers |
+| `internal/application/` | (deleted) | Service interfaces deferred to `interface-segregation` change; `cmd/` consumes concrete types via Factory |
 | `internal/service/` | (deleted; orchestration folded into `internal/core/` pure + `cmd/<command>.go` I/O) | Orchestration becomes `core.OrchestrateX` + `cmd runX` |
 | `internal/infrastructure/` | `internal/git/` + `internal/config/` + `internal/output/` + `internal/iostreams/` + `internal/cmdutil/` | I/O adapters split by concern |
 | `internal/version/` | (kept) | Build-time version injection |
 
-**Rationale:** The Tier 2 layout matches `golang-cli-architecture`'s recommendation. Pure types get a single home (`core`); I/O adapters split by the resource they touch (git, config, output formatting, TTY, composition); command wiring lives at `cmd/`. The `core` package becomes the only one a reader needs to understand to reason about the business rules.
+**Rationale:** The Tier 2 layout matches `golang-cli-architecture`'s recommendation. Pure types get a single home (`core`); I/O adapters split by the resource they touch (git, config, output formatting, TTY, composition); command wiring lives at `cmd/`. The `core` package becomes the only one a reader needs to understand to reason about the business rules. The `application/` interfaces are not reintroduced here; `cmd/` consumes concrete types via Factory lazy fields, and ISP-shaped consumer-side interfaces are introduced by the `interface-segregation` change.
 
 **Alternatives considered:**
 - Keep `domain` package name → rejected; the skill explicitly recommends `core` to signal "functional core, imperative shell."
@@ -97,9 +101,9 @@ This change is the consolidation that lands the skill's recommendation, collapse
 
 ### 6. `output.FormatError` with `errors.As` dispatch
 
-**Choice:** A single `FormatError(w io.Writer, err error, ios IOStreams)` function that walks the error chain via `errors.As` (in order: `*core.ValidationError`, `*core.NotFoundError`, `*core.OperationError`, `*core.UsageError`, fallback `*core.Error`) and renders the matching format with hint text.
+**Choice:** A single `FormatError(w io.Writer, err error, ios *iostreams.IOStreams)` function that walks the error chain via `errors.As` (in order: `*core.ValidationError`, `*core.NotFoundError`, `*core.OperationError`, `*core.UsageError`) and renders the matching branch with hint text. `core.OperationError.Suggestions []string` renders after the user-facing message. `TWIGGIT_DEBUG=1` causes the full wrapped chain to print after the user message.
 
-**Rationale:** The current `cli-error-formatting` spec registers per-error-type formatters explicitly; `FormatError` keeps that explicit-registration rule but moves the registry to `internal/output/` where it belongs (it's a presentation concern, not a domain concern). The dispatch order is identical to `cli-error-formatting`'s.
+**Rationale:** The current `cli-error-formatting` spec registers per-error-type formatters explicitly; `FormatError` keeps that explicit-registration rule but moves the registry to `internal/output/` where it belongs (it's a presentation concern, not a domain concern). The dispatch order is identical to `cli-error-formatting`'s. Per-resource NotFound hints attach via the `NotFoundError` branch.
 
 **Alternatives considered:**
 - Keep formatter registration in `cmd/` → rejected; cmd/ should be wiring only.
@@ -111,16 +115,29 @@ This change is the consolidation that lands the skill's recommendation, collapse
 
 ```go
 type ValidationError struct { Field, Value, Message string; Suggestions []string }
-type NotFoundError   struct { Resource, Identifier string }
-type OperationError  struct { Op string; Err error } // wraps via %w
-type UsageError      struct { Message string; Err error } // wraps via %w
+func (e *ValidationError) Error() string { ... }   // lowercase, no emoji, no trailing punctuation
+func (e *ValidationError) Unwrap() error { return nil }
+
+type NotFoundError   struct { Entity, Name string }
+func (e *NotFoundError) Error() string { ... }
+func (e *NotFoundError) Unwrap() error { return nil }
+func (e *NotFoundError) Is(target error) bool { ... }  // matches one of 4 NotFound sentinels
+
+type OperationError  struct { Op, Message string; Cause error; Suggestions []string }
+func (e *OperationError) Error() string { ... }
+func (e *OperationError) Unwrap() error { return e.Cause }   // chain walks to cause
+
+type UsageError      struct { Message string }   // NO Err field per skill
+func (e *UsageError) Error() string { ... }
+func (e *UsageError) Unwrap() error { return nil }   // typed-nil-safe per golang-safety
 ```
 
-**Rationale:** Collapses the 20-type taxonomy in `domain-typed-errors` to 4 types by category, then carries resource/field/op context as struct fields. The cmd-side formatter still sees per-resource distinction via `NotFoundError.Resource`. The 20-type taxonomy from `domain-typed-errors` is migrated to `core-errors` as constructor helpers (`core.NewGitRepoError(...)` returns `*OperationError` with resource-tagged hints).
+**Rationale:** Collapses the 20-type taxonomy in `domain-typed-errors` to 4 types by category, then carries resource/field/op context as struct fields. The cmd-side formatter sees per-resource distinction via `NotFoundError.Entity`. I/O-adapter-specific constructors live in `internal/git/errors.go` as `*git.ExternalError` whose embedded core type walks to `*core.OperationError`. `UsageError` carries no `Err` field (per `golang-cli-architecture` §05-errors); explicit `Unwrap() error { return nil }` avoids the typed-nil interface trap (`golang-safety`).
 
 **Alternatives considered:**
 - Keep all 20 types → rejected; over-modeled for a CLI.
 - One flat `Error` type with `Kind` enum → rejected; loses `errors.As` typed-walk contract that `cli-error-formatting` relies on.
+- `UsageError.Err` for cobra-wrapped usage errors → rejected; skill says UsageError is terminal. Cobra wrap uses `core.NewUsageError("wrapped: " + cobraErr.Error())` instead.
 
 ### 8. `cmdutil.ExitCodeFor` (0/1/2 contract)
 
@@ -144,7 +161,7 @@ type UsageError      struct { Message string; Err error } // wraps via %w
 
 ### 10. `main.go` composition root
 
-**Choice:** ~50 lines: `func main()` calls `f := cmdutil.NewFactory(ioStreams)`, defers panic recovery that prints to `ioStreams.Stderr` and exits 1, sets up `signal.NotifyContext` for SIGINT/SIGTERM cancellation that propagates into cobra via `cmd.SetContext(ctx)`, then executes `cmd.NewRootCmd(f).Execute()`. Exit code is `cmdutil.ExitCodeFor(err)`.
+**Choice:** ~50 lines: `func main()` calls `f := cmdutil.NewFactory(ioStreams)`, defers panic recovery that prints to `ioStreams.Stderr` and exits 1, sets up `signal.NotifyContext` for SIGINT/SIGTERM cancellation that propagates into cobra via `cmd.SetContext(ctx)`, then executes `cmd.NewRootCmd(f).Execute()`. Exit code is `cmdutil.ExitCodeFor(err)`. The root command SHALL set `SilenceErrors: true` and `SilenceUsage: true` so error formatting and exit-code mapping stay in `main.go`.
 
 **Rationale:** The skill's "thin main" recommendation. All real logic lives in `cmd/` and `core/`; `main.go` is just wiring.
 
@@ -208,6 +225,17 @@ type UsageError      struct { Message string; Err error } // wraps via %w
 - Rewrite all tests → rejected; no behavior change, so existing tests still apply.
 - Defer new unit tests → rejected; breaks the project's "tests written after implementation" rule for the new abstractions.
 
+### 16. HookRunner interface placement (consumer-side, shared)
+
+**Choice:** The `HookRunner` interface is declared in `internal/cmdutil/hook_runner_iface.go` (consumer-side, shared). The implementation in `internal/git/hook_runner.go` satisfies it via `var _ cmdutil.HookRunner = (*git.HookRunnerImpl)(nil)`. Per `golang-cli-architecture` §"Architecture": "Interfaces where consumed — define an interface next to the code that calls it." `cmdutil` is the shared consumer that every `cmd/<command>.go` reaches into; the interface lives there rather than per-command.
+
+**Rationale:** Skill rule says interface next to consumer; in this CLI there is no `application/` package to host it, and per-command interface duplication would explode without the `interface-segregation` change. `cmdutil` is the shared consumer seam (Factory + ExitCodeFor + HookRunner); each cmd/<command>.go consumes `cmdutil.HookRunner` and the implementation lives in the I/O adapter.
+
+**Alternatives considered:**
+- Interface next to implementation (next to `HookRunnerImpl` in `internal/git/hook_runner.go`) → rejected; violates "interfaces where consumed".
+- Per-command interface in each `cmd/<command>.go` file → rejected; duplicates the same interface in 6+ files; deferred to `interface-segregation` for proper ISP decomposition.
+- Move interface to a dedicated `internal/ports/` package → rejected; introduces a new package for one type.
+
 ## Risks / Trade-offs
 
 | Risk | Mitigation |
@@ -216,6 +244,7 @@ type UsageError      struct { Message string; Err error } // wraps via %w
 | lipgloss is a new build-time dependency (security surface, supply chain) | Pin to a specific version at apply time per Q5; depguard restricts it to two packages; review the version's release notes before pinning. |
 | Strict Tier 2 depguard could break the build mid-migration | Phased migration; depguard rules enabled only after every new package compiles; the layer-inversion depguard stays active until the strict rules are ready. |
 | `core-errors` collapses 20 domain-error types to 4 `core.Error` subtypes; existing tests check specific types | Migrate tests alongside source; if a test asserts on a specific `domain.XError` type, replace with the corresponding `core.YError` assertion in the same slice. |
+| 11 MODIFIED-delta spec files (existing capabilities) introduce a wider review surface for the PR | Per-spec commits; CI gate at each slice; the `openspec validate --strict --json` gate runs at the end of the planning phase before `/osc-apply-change`. |
 | IOStreams adds an indirection layer; tests that bypass it (use `fmt.Println` directly) won't see TTY behavior | Lint rule: forbid `os.Stdout`/`os.Stderr` in `cmd/`; `errcheck` + `nolintlint` keeps the rule tight. |
 | Command-pattern (`runF`) change touches every command file | Slice-by-slice migration per command; e2e tests catch behavior drift; CLI surface is identical (verified by `cli-create`, `cli-prune`, etc. existing specs). |
 | `cli-error-formatting` spec contract changes (constants renamed, location moved) | Update `cli-error-formatting` in the same slice as the helper move; exit-code contract (0/1/2) is preserved so scripts are unaffected. |
@@ -244,4 +273,12 @@ Rollback strategy: this is a single PR; rollback is `git revert`. The depguard r
 
 ## Open Questions
 
-None. The locked decisions (Q1-Q5, lipgloss pin deferral, ISP deferral, moq deferral, strict Tier 2 depguard in this change) and the `golang-cli-architecture` skill's Tier 2 recommendation fully determine the approach.
+None. Locked decisions (resolved during the planning phase):
+
+- **Q1** — 20-type collapse to 4 core types approved. Drives `core-errors` shape and `domain-typed-errors` MODIFIED delta.
+- **Q2** — `Formatter` single-method interface (`Write(w io.Writer, data any) error`) approved. Drives `cli-output` shape and `cli-output-formats` MODIFIED delta.
+- **Q3** — `HookRunner` interface lives in `internal/cmdutil/hook_runner_iface.go` (consumer-side, shared) approved. Drives `git-hook-runner` and `infrastructure-hook-runner` MODIFIED deltas.
+- **Q4** — I/O error wrappers live in `internal/git/errors.go` as `git.ExternalError{Tool, Operation, Message, Cause, Kind}` per `golang-cli-architecture` §05-errors. Constructors `git.NewRepoError`, `git.NewWorktreeError`, `git.NewCommandError` return `*git.ExternalError` whose embedded core type walks to `*core.OperationError`.
+- **Q5** — lipgloss version pin deferred to apply time (task 12.6).
+
+The `golang-cli-architecture` skill's Tier 2 recommendation fully determines the approach.

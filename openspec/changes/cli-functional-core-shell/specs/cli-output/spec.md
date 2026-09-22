@@ -2,17 +2,21 @@
 
 ## Purpose
 
-Defines the `--output` flag formatter interface for `json`, `table`, and `plain` rendering so every list-style command shares one formatting seam and one registry.
+Defines the `--output` flag and the `Formatter` interface contract for `json`, `table`, `plain`, and `jsonl` rendering so every list-style command shares one formatting seam. The data-stream contract (stdout vs stderr split) lives in `cli-error-formatting`; the TTY-aware rendering surface lives in `cli-iostreams`.
 
 ## ADDED Requirements
 
-### Requirement: --output accepts json, table, plain values
+### Requirement: --output accepts json, table, plain, jsonl values
 
-The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-style command. The accepted values SHALL be exactly `json`, `table`, and `plain`.
+The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-style command. The accepted values SHALL be exactly `json`, `table`, `plain`, and `jsonl`. The `jsonl` value emits one JSON object per line for streaming consumers; `json` emits a single JSON document. The `table` value renders aligned columns with headers; `plain` emits raw human-readable rendering without table borders.
 
-#### Scenario: --output json emits structured JSON
+#### Scenario: --output json emits a single JSON document
 - **WHEN** the user runs `twiggit list -o json`
 - **THEN** the output is a single JSON document suitable for `jq`
+
+#### Scenario: --output jsonl emits one JSON object per line
+- **WHEN** the user runs `twiggit list -o jsonl | head`
+- **THEN** each line is independently parseable JSON; the pipeline receives newline-delimited records
 
 #### Scenario: --output table emits aligned columns
 - **WHEN** the user runs `twiggit list -o table`
@@ -26,21 +30,29 @@ The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-st
 - **WHEN** the user runs `twiggit list -o xml`
 - **THEN** the system SHALL emit a `core.UsageError` and exit 2
 
-### Requirement: Formatter writes to a writer (not IOStreams)
+### Requirement: Formatter interface is a single Write method
 
-The `output.Formatter` interface SHALL accept an `io.Writer` for every method. Formatters SHALL NOT touch `iostreams.IOStreams` directly so they remain unit-testable without TTY detection.
+The `output.Formatter` interface SHALL declare exactly one method: `Write(w io.Writer, data any) error`. Implementations SHALL NOT touch `iostreams.IOStreams` directly so they remain unit-testable without TTY detection. Implementations: `JSONFormatter`, `JSONLinesFormatter`, `TableFormatter`, `PlainFormatter`.
 
 #### Scenario: Formatter tests use *bytes.Buffer
-- **WHEN** a test invokes `formatter.FormatJSON(&buf, &data)`
+- **WHEN** a test invokes `formatter.Write(&buf, &data)`
 - **THEN** the test reads `buf.String()` to verify the output without configuring IOStreams
 
-### Requirement: Default (no flag) falls through to human-readable rendering
+#### Scenario: TableFormatter accepts structured data
+- **WHEN** a command calls `formatter.Write(w, TableData{Headers: []string{"Name", "Branch"}, Rows: [][]string{{"feat/foo", "main"}, {"feat/bar", "main"}}})`
+- **THEN** `TableFormatter` renders the aligned columns to `w`
 
-When `--output` is not supplied, the system SHALL use `table` for list commands and `plain` for everything else.
+#### Scenario: JSONLinesFormatter emits one object per line
+- **WHEN** a command calls `formatter.Write(w, []core.Worktree{...})`
+- **THEN** `JSONLinesFormatter` writes one JSON object per line with no enclosing array
+
+### Requirement: Default (no --output) falls through to plain
+
+When `--output` is not supplied, the system SHALL use `plain` for every command. Individual commands MAY override the default to `table` when a list view is the explicit purpose; the override is documented in the per-command spec.
 
 #### Scenario: list without --output renders as table
 - **WHEN** the user runs `twiggit list` without `--output`
-- **THEN** the output SHALL be a table (same as `--output table`)
+- **THEN** the output SHALL be a table (the per-command `list` override to `table`)
 
 #### Scenario: create without --output renders as plain
 - **WHEN** the user runs `twiggit create feat/foo` without `--output`

@@ -18,9 +18,9 @@ The `cmdutil.Factory` type SHALL expose one lazy `func() T` field per dependency
 - **WHEN** a command calls `f.Config()` twice during one binary invocation
 - **THEN** the second call SHALL return the same `*core.Config` pointer as the first call
 
-### Requirement: Config is cached via sync.Once
+### Requirement: Config is cached via sync.OnceValue
 
-`Factory.Config` SHALL use `sync.Once` to guarantee the config file is read and parsed exactly once per binary invocation, even when multiple commands access it.
+`Factory.Config` SHALL use `sync.OnceValue(func() (*core.Config, error))` to guarantee the config file is read and parsed exactly once per binary invocation, even when multiple commands access it.
 
 #### Scenario: Config file is read at most once
 - **WHEN** three commands each call `f.Config()` in sequence
