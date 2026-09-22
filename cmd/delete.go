@@ -8,7 +8,7 @@ import (
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 	"twiggit/internal/core"
-	"twiggit/internal/infrastructure"
+	"twiggit/internal/git"
 )
 
 // NewDeleteCommand creates a new delete command
@@ -41,7 +41,7 @@ Examples:
 	cmd.Flags().BoolVarP(&changeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
 
 	carapace.Gen(cmd).PositionalCompletion(
-		actionWorktreeTarget(config, infrastructure.WithExistingOnly()),
+		actionWorktreeTarget(config, git.WithExistingOnly()),
 	)
 
 	return cmd

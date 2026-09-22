@@ -1,9 +1,10 @@
-package infrastructure
+package git
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -11,19 +12,27 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/core"
-	"twiggit/internal/git"
 )
 
 // Pure functions extracted from ContextResolver
 
-// validatePathUnder validates that a target path is under a base directory
-// Returns an error if validation fails or if path is outside base
+// validatePathUnder validates that a target path is under a base directory.
+// It returns a *core.OperationError with Op = "context.resolve" on failure
+// so callers can dispatch uniformly through output.FormatError.
 func validatePathUnder(base, target, targetType, baseDesc string) error {
 	if under, err := core.IsPathUnder(base, target); err != nil {
-		return core.NewContextDetectionError(target, "path validation failed", err)
+		return &core.OperationError{
+			Op:      "context.resolve",
+			Entity:  target,
+			Message: "path validation failed",
+			Cause:   err,
+		}
 	} else if !under {
-		return core.NewContextDetectionError(target,
-			fmt.Sprintf("%s path is outside configured %s directory", targetType, baseDesc), nil)
+		return &core.OperationError{
+			Op:      "context.resolve",
+			Entity:  target,
+			Message: fmt.Sprintf("%s path is outside configured %s directory", targetType, baseDesc),
+		}
 	}
 	return nil
 }
@@ -42,7 +51,7 @@ func parseCrossProjectReference(identifier string) (project, branch string, vali
 	return parts[0], parts[1], true
 }
 
-// fuzzyMatch performs case-insensitive subsequence matching for fuzzy completion
+// fuzzyMatch performs case-insensitive subsequence matching for fuzzy completion.
 // pattern "f1" matches "feature-1", "feat-1", "F1", etc.
 func fuzzyMatch(pattern, text string) bool {
 	pattern = strings.ToLower(pattern)
@@ -68,8 +77,8 @@ func matchesExclusionPatterns(name string, patterns []string) bool {
 	return false
 }
 
-// containsPathTraversal checks if a string contains path traversal sequences
-// Handles literal "..", URL-encoded variants (all cases), and double-encoding
+// containsPathTraversal checks if a string contains path traversal sequences.
+// Handles literal "..", URL-encoded variants (all cases), and double-encoding.
 func containsPathTraversal(s string) bool {
 	if strings.Contains(s, "..") {
 		return true
@@ -104,13 +113,13 @@ func buildWorktreePath(worktreesDir, project, branch string) string {
 // resolveMainIdentifier resolves "main" to the project root path
 func (cr *contextResolver) resolveMainIdentifier(ctx *core.Context) (*core.ResolutionResult, error) {
 	if containsPathTraversal(ctx.ProjectName) {
-		return nil, core.NewResolutionError(
-			"main",
-			ctx.Path,
-			"project name contains path traversal sequences",
-			[]string{"Use a valid project name without '..' or path separators"},
-			nil,
-		)
+		return nil, &core.OperationError{
+			Op:          "context.resolve",
+			Entity:      "main",
+			Field:       ctx.Path,
+			Message:     "project name contains path traversal sequences",
+			Suggestions: []string{"Use a valid project name without '..' or path separators"},
+		}
 	}
 
 	projectPath := filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
@@ -129,13 +138,13 @@ func (cr *contextResolver) resolveMainIdentifier(ctx *core.Context) (*core.Resol
 // resolveWorktreePath resolves a branch identifier to a worktree path
 func (cr *contextResolver) resolveWorktreePath(ctx *core.Context, identifier string) (*core.ResolutionResult, error) {
 	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
-		return nil, core.NewResolutionError(
-			identifier,
-			ctx.Path,
-			"project or branch name contains path traversal sequences",
-			[]string{"Use a valid project or branch name without '..' or path separators"},
-			nil,
-		)
+		return nil, &core.OperationError{
+			Op:          "context.resolve",
+			Entity:      identifier,
+			Field:       ctx.Path,
+			Message:     "project or branch name contains path traversal sequences",
+			Suggestions: []string{"Use a valid project or branch name without '..' or path separators"},
+		}
 	}
 
 	worktreePath := filepath.Join(cr.config.WorktreesDirectory, ctx.ProjectName, identifier)
@@ -172,23 +181,28 @@ type contextResolver struct {
 	config     *core.Config
 	goGit      application.GoGitClient
 	cli        application.CLIClient
-	repoFinder *git.RepoFinder
+	repoFinder *RepoFinder
 }
 
-// NewContextResolver creates a new context resolver
+// NewContextResolver creates a new context resolver.
 func NewContextResolver(cfg *core.Config, goGit application.GoGitClient, cli application.CLIClient) application.ContextResolver {
 	return &contextResolver{
 		config:     cfg,
 		goGit:      goGit,
 		cli:        cli,
-		repoFinder: git.NewRepoFinder(goGit),
+		repoFinder: NewRepoFinder(goGit),
 	}
 }
 
 func (cr *contextResolver) ResolveIdentifier(ctx *core.Context, identifier string) (*core.ResolutionResult, error) {
 	// Handle empty identifier
 	if identifier == "" {
-		return nil, core.NewResolutionError("", "", "empty identifier", nil, nil)
+		return nil, &core.OperationError{
+			Op:      "context.resolve",
+			Entity:  "",
+			Field:   "",
+			Message: "empty identifier",
+		}
 	}
 
 	switch ctx.Type {
@@ -231,13 +245,31 @@ type suggestionConfig struct {
 	existingOnly bool
 }
 
-// WithExistingOnly returns an option that filters suggestions to existing worktrees only
+// WithExistingOnly returns an option that filters suggestions to existing worktrees only.
 func WithExistingOnly() core.SuggestionOption {
-	return func(c interface{}) {
+	return func(c any) {
 		if cfg, ok := c.(*suggestionConfig); ok {
 			cfg.existingOnly = true
 		}
 	}
+}
+
+// worktreeExists reports whether the given worktree path exists on disk.
+// The path enters from git's `worktree list` output (user-influenced), so we
+// bind the stat to the parent directory via os.Root to constrain traversal.
+func worktreeExists(path string) bool {
+	if path == "" {
+		return false
+	}
+	parent := filepath.Dir(path)
+	base := filepath.Base(path)
+	root, err := os.OpenRoot(parent)
+	if err != nil {
+		return false
+	}
+	defer root.Close()
+	_, err = root.Stat(base)
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 func (cr *contextResolver) resolveFromProjectContext(ctx *core.Context, identifier string) (*core.ResolutionResult, error) {
@@ -310,10 +342,8 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*core.Resolution
 			continue
 		}
 
-		if config.existingOnly {
-			if _, err := os.Stat(worktree.Path); errors.Is(err, os.ErrNotExist) {
-				continue
-			}
+		if config.existingOnly && !worktreeExists(worktree.Path) {
+			continue
 		}
 
 		// Check if this is the current worktree
@@ -493,13 +523,12 @@ func (cr *contextResolver) resolveFromOutsideGitContext(_ *core.Context, identif
 
 	// Validate project name doesn't contain path traversal sequences
 	if containsPathTraversal(identifier) {
-		return nil, core.NewResolutionError(
-			identifier,
-			"",
-			"project name contains path traversal sequences",
-			[]string{"Use a valid project name without '..' or path separators"},
-			nil,
-		)
+		return nil, &core.OperationError{
+			Op:          "context.resolve",
+			Entity:      identifier,
+			Message:     "project name contains path traversal sequences",
+			Suggestions: []string{"Use a valid project name without '..' or path separators"},
+		}
 	}
 
 	// Resolve as project name
@@ -561,14 +590,24 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*co
 	return suggestions
 }
 
-// discoverProjects scans the projects directory for git repositories
-// Returns lightweight project summaries for suggestion generation
+// discoverProjects scans the projects directory for git repositories.
+// Returns lightweight project summaries for suggestion generation.
+// Failures are wrapped as *core.OperationError with Op = "context.resolve".
 func (cr *contextResolver) discoverProjects() ([]core.ProjectSummary, error) {
 	projectsDir := cr.config.ProjectsDirectory
 
 	gitDirs, err := cr.repoFinder.FindGitRepositories(projectsDir)
 	if err != nil {
-		return nil, core.NewContextDetectionError(projectsDir, "failed to scan for git repositories", err)
+		slog.Error("discover projects failed",
+			slog.String("op", "context.resolve"),
+			slog.String("dir", projectsDir),
+			slog.Any("err", err))
+		return nil, &core.OperationError{
+			Op:      "context.resolve",
+			Entity:  projectsDir,
+			Message: "failed to scan for git repositories",
+			Cause:   err,
+		}
 	}
 
 	projects := make([]core.ProjectSummary, 0, len(gitDirs))
@@ -586,13 +625,12 @@ func (cr *contextResolver) discoverProjects() ([]core.ProjectSummary, error) {
 func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*core.ResolutionResult, error) {
 	// Check for path traversal before parsing
 	if containsPathTraversal(identifier) {
-		return nil, core.NewResolutionError(
-			identifier,
-			"",
-			"identifier contains path traversal sequences",
-			[]string{"Use format 'project/branch' with valid names"},
-			nil,
-		)
+		return nil, &core.OperationError{
+			Op:          "context.resolve",
+			Entity:      identifier,
+			Message:     "identifier contains path traversal sequences",
+			Suggestions: []string{"Use format 'project/branch' with valid names"},
+		}
 	}
 
 	projectName, branchName, valid := parseCrossProjectReference(identifier)

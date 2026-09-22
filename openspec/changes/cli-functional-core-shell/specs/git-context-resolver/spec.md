@@ -32,7 +32,7 @@ When checking whether `dir` is under `core.Config.ProjectsDirectory` or `core.Co
 
 #### Scenario: Path-utils helpers are imported from internal/core
 - **WHEN** the resolver package's import list is read
-- **THEN** the import SHALL be `twiggit/internal/core` (not `twiggit/internal/infrastructure` or `twiggit/internal/domain`)
+- **THEN** the import SHALL be `twiggit/internal/core` (not `twiggit/internal/git` or `twiggit/internal/domain`)
 
 #### Scenario: Symlink-resolved path comparison
 - **WHEN** `dir = /tmp/sneaky` is a symlink to `/tmp/real` and `/tmp/real` is inside `core.Config.ProjectsDirectory`

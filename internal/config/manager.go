@@ -1,4 +1,4 @@
-package infrastructure
+package config
 
 import (
 	"errors"
@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/knadh/koanf/parsers/toml"
-	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 
 	"twiggit/internal/application"
@@ -102,7 +101,50 @@ func copyConfig(config *core.Config) *core.Config {
 		Navigation:          config.Navigation,
 		Shell:               config.Shell,
 		Completion:          config.Completion,
+		ColorEnabled:        config.ColorEnabled,
 	}
+}
+
+// osRootProvider reads config bytes via os.Root so the load path is
+// constrained to the resolved config directory tree. Falls back to the
+// standard file provider when the root cannot be opened (e.g. relative
+// paths whose parent does not exist as a directory).
+type osRootProvider struct {
+	path string
+	root *os.Root
+	base string
+}
+
+// newOsRootProvider wraps the given file path in an os.Root bound to its
+// parent directory. Subsequent ReadBytes calls go through the bounded
+// root so a tampered XDG_CONFIG_HOME cannot redirect the read outside
+// the resolved subtree.
+func newOsRootProvider(path string) (*osRootProvider, error) {
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	dir := filepath.Dir(absPath)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil, err
+	}
+	return &osRootProvider{
+		path: absPath,
+		root: root,
+		base: filepath.Base(absPath),
+	}, nil
+}
+
+// ReadBytes satisfies koanf.Provider.
+func (p *osRootProvider) ReadBytes() ([]byte, error) {
+	defer p.root.Close()
+	return p.root.ReadFile(p.base)
+}
+
+// Read returns an explicit error; koanf uses ReadBytes when a Parser is supplied.
+func (p *osRootProvider) Read() (map[string]any, error) {
+	return nil, errors.New("osRootProvider: use ReadBytes")
 }
 
 type koanfConfigManager struct {
@@ -110,47 +152,82 @@ type koanfConfigManager struct {
 	config *core.Config
 }
 
-// NewConfigManager creates a new configuration manager
-func NewConfigManager() application.ConfigManager {
+// NewManager creates a new configuration manager backed by koanf.
+func NewManager() application.ConfigManager {
 	return &koanfConfigManager{
 		ko: koanf.New("."),
 	}
 }
 
-// Load loads configuration from defaults and config file
+// Load loads configuration from defaults and config file.
 func (m *koanfConfigManager) Load() (*core.Config, error) {
 	// 1. Load defaults
 	if err := m.loadDefaults(); err != nil {
-		return nil, core.NewConfigError("", "failed to load default configuration", err)
+		return nil, &core.OperationError{
+			Op:      "config.load",
+			Message: "failed to load default configuration",
+			Cause:   err,
+		}
 	}
 
-	// 2. Load config file using pure function for existence check
+	// 2. Load config file using os.Root-bounded reader
 	configPath := m.getConfigFilePath()
-	if configFileExists(configPath) {
-		// Load TOML file
-		if err := m.ko.Load(file.Provider(configPath), toml.Parser()); err != nil {
-			return nil, core.NewConfigError(configPath, "failed to parse config file", err)
+	if configPath != "" && configFileExists(configPath) {
+		provider, err := newOsRootProvider(configPath)
+		if err != nil {
+			return nil, &core.OperationError{
+				Op:      "config.load",
+				Entity:  configPath,
+				Message: "failed to open config directory",
+				Cause:   err,
+			}
+		}
+		if err := m.ko.Load(provider, toml.Parser()); err != nil {
+			return nil, &core.OperationError{
+				Op:      "config.load",
+				Entity:  configPath,
+				Message: "failed to parse config file",
+				Cause:   err,
+			}
 		}
 	}
 
 	// 3. Unmarshal to config object
 	config := &core.Config{}
 	if err := m.ko.Unmarshal("", config); err != nil {
-		return nil, core.NewConfigError(configPath, "failed to unmarshal configuration", err)
+		return nil, &core.OperationError{
+			Op:      "config.load",
+			Entity:  configPath,
+			Message: "failed to unmarshal configuration",
+			Cause:   err,
+		}
 	}
 
 	// 4. Normalize paths (expand environment variables and tilde)
 	normalizeConfigPaths(config)
 
-	// 5. Validate configuration using pure function
-	if err := validateConfig(config); err != nil {
-		return nil, core.NewConfigError(configPath, "validation failed", err)
+	// 5. NO_COLOR handling: presence of NO_COLOR in env disables color output.
+	// Default is true (color on); set false when NO_COLOR is set in env (any value).
+	if _, noColor := os.LookupEnv("NO_COLOR"); noColor {
+		config.ColorEnabled = false
+	} else {
+		config.ColorEnabled = true
 	}
 
-	// 6. Store immutable config
+	// 6. Validate configuration using pure function
+	if err := validateConfig(config); err != nil {
+		return nil, &core.OperationError{
+			Op:      "config.load",
+			Entity:  configPath,
+			Message: "validation failed",
+			Cause:   err,
+		}
+	}
+
+	// 7. Store immutable config
 	m.config = config
 
-	// 7. Return a copy using pure function to maintain immutability
+	// 8. Return a copy using pure function to maintain immutability
 	return copyConfig(config), nil
 }
 

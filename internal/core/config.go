@@ -124,6 +124,10 @@ type Config struct {
 
 	// Completion settings
 	Completion CompletionConfig `toml:"completion" koanf:"completion"`
+
+	// ColorEnabled reports whether ANSI color output is enabled.
+	// It is set by config.Manager from NO_COLOR at load time (default true).
+	ColorEnabled bool `toml:"-" koanf:"-"`
 }
 
 // DefaultConfig returns the default configuration values
@@ -185,6 +189,7 @@ func DefaultConfig() *Config {
 			ExcludeBranches: []string{},
 			ExcludeProjects: []string{},
 		},
+		ColorEnabled: true,
 	}
 }
 

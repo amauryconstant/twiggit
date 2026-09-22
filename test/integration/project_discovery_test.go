@@ -16,7 +16,6 @@ import (
 
 	"twiggit/internal/core"
 	"twiggit/internal/git"
-	"twiggit/internal/infrastructure"
 	"twiggit/test/mocks"
 )
 
@@ -60,7 +59,7 @@ func TestProjectDiscovery_Integration(t *testing.T) {
 	mockGitService.MockGoGitClient.On("ValidateRepository", nonRepoPath).Return(assert.AnError)
 
 	// Create context resolver
-	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
+	resolver := git.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	// Test context detection from outside git
 	ctx := &core.Context{
@@ -142,7 +141,7 @@ func setupTestGitRepo(t *testing.T, repoPath string) {
 func TestContextResolution_WithExistingOnly_Integration(t *testing.T) {
 	tempDir := t.TempDir()
 
-	resolver := infrastructure.NewContextResolver(&core.Config{
+	resolver := git.NewContextResolver(&core.Config{
 		ProjectsDirectory:  tempDir,
 		WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
 	}, nil, nil)
@@ -159,7 +158,7 @@ func TestContextResolution_WithExistingOnly_Integration(t *testing.T) {
 		Path:        projectPath,
 	}
 
-	suggestions, err := resolver.GetResolutionSuggestions(ctx, "", infrastructure.WithExistingOnly())
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "", git.WithExistingOnly())
 	require.NoError(t, err)
 
 	assert.Empty(t, suggestions, "Should return 0 suggestions for empty project")
@@ -197,7 +196,7 @@ func TestWithExistingOnly_ExistingWorktrees(t *testing.T) {
 		{Branch: "feature-2", Path: nonExistingWorktreePath},
 	}, nil)
 
-	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
+	resolver := git.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &core.Context{
 		Type:        core.ContextProject,
@@ -205,7 +204,7 @@ func TestWithExistingOnly_ExistingWorktrees(t *testing.T) {
 		Path:        projectPath,
 	}
 
-	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", infrastructure.WithExistingOnly())
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", git.WithExistingOnly())
 	require.NoError(t, err)
 
 	assert.Len(t, suggestions, 1, "Should only return existing worktrees")
@@ -247,7 +246,7 @@ func TestWithExistingOnly_AllWorktreesExist(t *testing.T) {
 		{Branch: "feature-2", Path: worktree2Path},
 	}, nil)
 
-	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
+	resolver := git.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &core.Context{
 		Type:        core.ContextProject,
@@ -255,7 +254,7 @@ func TestWithExistingOnly_AllWorktreesExist(t *testing.T) {
 		Path:        projectPath,
 	}
 
-	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", infrastructure.WithExistingOnly())
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", git.WithExistingOnly())
 	require.NoError(t, err)
 
 	assert.Len(t, suggestions, 2, "Should return all worktrees when all exist")
@@ -298,7 +297,7 @@ func TestWithExistingOnly_NoWorktreesExist(t *testing.T) {
 		{Branch: "feature-2", Path: nonExisting2},
 	}, nil)
 
-	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
+	resolver := git.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &core.Context{
 		Type:        core.ContextProject,
@@ -306,7 +305,7 @@ func TestWithExistingOnly_NoWorktreesExist(t *testing.T) {
 		Path:        projectPath,
 	}
 
-	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", infrastructure.WithExistingOnly())
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature", git.WithExistingOnly())
 	require.NoError(t, err)
 
 	assert.Empty(t, suggestions, "Should return no suggestions when no worktrees exist")
@@ -336,7 +335,7 @@ func TestWithExistingOnly_SkipsMainSuggestion(t *testing.T) {
 	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]core.BranchInfo{}, nil)
 	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]core.WorktreeInfo{}, nil)
 
-	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
+	resolver := git.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &core.Context{
 		Type:        core.ContextProject,
@@ -344,7 +343,7 @@ func TestWithExistingOnly_SkipsMainSuggestion(t *testing.T) {
 		Path:        projectPath,
 	}
 
-	suggestions, err := resolver.GetResolutionSuggestions(ctx, "main", infrastructure.WithExistingOnly())
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "main", git.WithExistingOnly())
 	require.NoError(t, err)
 
 	for _, s := range suggestions {

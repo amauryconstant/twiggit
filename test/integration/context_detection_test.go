@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
-	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
 )
 
@@ -101,7 +100,7 @@ func TestContextDetector_Integration(t *testing.T) {
 				WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 			}
 
-			detector, err := infrastructure.NewContextDetector(config)
+			detector, err := git.NewContextDetector(config)
 			require.NoError(t, err)
 			testDir := tt.setupFunc(t, config)
 
@@ -163,9 +162,9 @@ func TestContextResolver_Integration(t *testing.T) {
 	require.NoError(t, cmd.Run())
 
 	// Test resolver from project context
-	detector, err := infrastructure.NewContextDetector(config)
+	detector, err := git.NewContextDetector(config)
 	require.NoError(t, err)
-	resolver := infrastructure.NewContextResolver(config, nil, nil)
+	resolver := git.NewContextResolver(config, nil, nil)
 
 	projectCtx, err := detector.DetectContext(mainRepo)
 	require.NoError(t, err)
@@ -235,7 +234,7 @@ func TestContextService_Integration(t *testing.T) {
 	require.NoError(t, cmd.Run())
 
 	// Create context service
-	detector, err := infrastructure.NewContextDetector(config)
+	detector, err := git.NewContextDetector(config)
 	require.NoError(t, err)
 
 	// Create real git service for integration testing
@@ -244,7 +243,7 @@ func TestContextService_Integration(t *testing.T) {
 	require.NoError(t, err)
 	cliClient := git.NewCLIClient(executor, 30)
 
-	resolver := infrastructure.NewContextResolver(config, goGitClient, cliClient)
+	resolver := git.NewContextResolver(config, goGitClient, cliClient)
 	contextService := service.NewContextService(detector, resolver)
 
 	// Change to the repository directory

@@ -1,4 +1,4 @@
-package infrastructure
+package config
 
 import (
 	"os"
@@ -17,7 +17,7 @@ func setupConfigManagerTest(t *testing.T) (application.ConfigManager, string, st
 	originalXDG := os.Getenv("XDG_CONFIG_HOME")
 	tempDir := t.TempDir()
 	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	manager := NewConfigManager()
+	manager := NewManager()
 	t.Cleanup(func() {
 		if originalXDG != "" {
 			os.Setenv("XDG_CONFIG_HOME", originalXDG)
@@ -183,7 +183,7 @@ func TestConfigManager_CopyConfig(t *testing.T) {
 }
 
 func TestConfigManager_LoadDefaultsErrorHandling(t *testing.T) {
-	manager := NewConfigManager()
+	manager := NewManager()
 	config, err := manager.Load()
 
 	require.NoError(t, err, "Load() should succeed with valid default keys")
@@ -374,7 +374,7 @@ backup_dir = "~/backups"
 	configPath := filepath.Join(configDir, "config.toml")
 	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
 
-	manager := NewConfigManager()
+	manager := NewManager()
 	config, err := manager.Load()
 
 	require.NoError(t, err)
@@ -383,4 +383,78 @@ backup_dir = "~/backups"
 	assert.Equal(t, "/custom/projects", config.ProjectsDirectory)
 	assert.Equal(t, "/custom/worktrees", config.WorktreesDirectory)
 	assert.Equal(t, filepath.Join(tempDir, "backups"), config.Shell.Wrapper.BackupDir)
+}
+
+func TestConfigManager_NoColorRespected(t *testing.T) {
+	originalNoColor, hadNoColor := os.LookupEnv("NO_COLOR")
+	t.Cleanup(func() {
+		if hadNoColor {
+			os.Setenv("NO_COLOR", originalNoColor)
+		} else {
+			os.Unsetenv("NO_COLOR")
+		}
+	})
+
+	manager, _, _ := setupConfigManagerTest(t)
+	config, err := manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, config)
+	assert.True(t, config.ColorEnabled, "ColorEnabled should default to true when NO_COLOR is unset")
+
+	os.Setenv("NO_COLOR", "1")
+	config, err = manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, config)
+	assert.False(t, config.ColorEnabled, "ColorEnabled should be false when NO_COLOR is set")
+
+	os.Unsetenv("NO_COLOR")
+	config, err = manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, config)
+	assert.True(t, config.ColorEnabled, "ColorEnabled should return to true when NO_COLOR is unset")
+}
+
+func TestConfigManager_ColorEnabledPropagatesToCopy(t *testing.T) {
+	originalNoColor, hadNoColor := os.LookupEnv("NO_COLOR")
+	t.Cleanup(func() {
+		if hadNoColor {
+			os.Setenv("NO_COLOR", originalNoColor)
+		} else {
+			os.Unsetenv("NO_COLOR")
+		}
+	})
+
+	manager, _, _ := setupConfigManagerTest(t)
+	os.Setenv("NO_COLOR", "1")
+	loaded, err := manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, loaded)
+	require.False(t, loaded.ColorEnabled)
+
+	cached := manager.GetConfig()
+	require.NotNil(t, cached)
+	assert.False(t, cached.ColorEnabled, "GetConfig copy should preserve ColorEnabled=false")
+
+	os.Unsetenv("NO_COLOR")
+	reloaded, err := manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, reloaded)
+	assert.True(t, reloaded.ColorEnabled, "ColorEnabled should reset when NO_COLOR is unset")
+}
+
+func TestConfigManager_LoadWrapsKoanfErrors(t *testing.T) {
+	manager, tempDir, _ := setupConfigManagerTest(t)
+
+	configDir := filepath.Join(tempDir, "twiggit")
+	require.NoError(t, os.MkdirAll(configDir, 0755))
+	configPath := filepath.Join(configDir, "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte("this is not [ valid toml"), 0644))
+
+	_, err := manager.Load()
+	require.Error(t, err)
+
+	var oe *core.OperationError
+	require.ErrorAs(t, err, &oe)
+	assert.Equal(t, "config.load", oe.Op)
+	assert.Equal(t, configPath, oe.Entity)
 }

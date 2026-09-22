@@ -1,8 +1,9 @@
-package infrastructure
+package git
 
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
+
 	"twiggit/internal/application"
 	"twiggit/internal/core"
 )
@@ -38,6 +40,7 @@ type contextDetector struct {
 	ttl    time.Duration
 }
 
+// NewContextDetector creates a new context detector backed by an LRU cache.
 func NewContextDetector(cfg *core.Config) (application.ContextDetector, error) {
 	return newContextDetectorWithCacheFactory(cfg, defaultContextDetectorCacheFactory)
 }
@@ -65,30 +68,55 @@ func parseTTL(ttlStr string, defaultTTL time.Duration) time.Duration {
 	return defaultTTL
 }
 
+// detectOpError wraps a detection failure as *core.OperationError with Op = "context.detect".
+func detectOpError(path, message string, cause error) error {
+	slog.Error("context detect failed",
+		slog.String("op", "context.detect"),
+		slog.String("path", path),
+		slog.Any("err", cause))
+	return &core.OperationError{
+		Op:      "context.detect",
+		Entity:  path,
+		Message: message,
+		Cause:   cause,
+	}
+}
+
 func (cd *contextDetector) DetectContext(dir string) (*core.Context, error) {
 	// Validate input directory
 	if dir == "" {
-		return nil, core.NewContextDetectionError("", "empty directory path", nil)
+		return nil, detectOpError("", "empty directory path", nil)
 	}
 
-	// Check if directory exists
-	if _, err := os.Stat(dir); err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, core.NewContextDetectionError(dir, "directory does not exist", err)
+	// Check if directory exists via os.Root to bound access to the
+	// resolved parent (user-supplied dir cannot traverse outside it).
+	absDir, absErr := filepath.Abs(dir)
+	if absErr != nil {
+		return nil, detectOpError(dir, "failed to resolve absolute path", absErr)
+	}
+	root, rootErr := os.OpenRoot(filepath.Dir(absDir))
+	if rootErr != nil {
+		return nil, detectOpError(dir, "cannot access directory", rootErr)
+	}
+	_, statErr := root.Stat(filepath.Base(absDir))
+	root.Close()
+	if statErr != nil {
+		if errors.Is(statErr, os.ErrNotExist) {
+			return nil, detectOpError(dir, "directory does not exist", statErr)
 		}
-		return nil, core.NewContextDetectionError(dir, "cannot access directory", err)
+		return nil, detectOpError(dir, "cannot access directory", statErr)
 	}
 
 	// Normalize path and resolve symlinks
 	normalizedDir, err := core.NormalizePath(dir)
 	if err != nil {
-		return nil, core.NewContextDetectionError(dir, "failed to normalize directory", err)
+		return nil, detectOpError(dir, "failed to normalize directory", err)
 	}
 
 	// Perform detection
 	ctx := cd.detectContextInternal(normalizedDir)
 	if ctx == nil {
-		return nil, core.NewContextDetectionError(normalizedDir, "failed to detect context for directory", nil)
+		return nil, detectOpError(normalizedDir, "failed to detect context for directory", nil)
 	}
 
 	return ctx, nil
@@ -204,7 +232,7 @@ func (cd *contextDetector) checkValidGitWorktree(dir string) bool {
 		return false
 	}
 
-	content, err := os.ReadFile(gitPath) // #nosec G304 -- gitPath is always .git file in known worktree location
+	content, err := os.ReadFile(gitPath) // #nosec G304 -- gitPath is .git in known worktree location
 	if err != nil {
 		return false
 	}
@@ -213,7 +241,7 @@ func (cd *contextDetector) checkValidGitWorktree(dir string) bool {
 }
 
 func (cd *contextDetector) extractProjectName(dir string) string {
-	// Extract project name from directory path
-	// Use the directory name as project name
+	// Extract project name from directory path.
+	// Use the directory name as project name.
 	return filepath.Base(dir)
 }

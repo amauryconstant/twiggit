@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"twiggit/cmd"
+	"twiggit/internal/config"
 	"twiggit/internal/git"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
@@ -31,7 +32,7 @@ func main() {
 		}
 	}()
 
-	configManager := infrastructure.NewConfigManager()
+	configManager := config.NewManager()
 	config, err := configManager.Load()
 	if err != nil {
 		os.Exit(int(cmd.HandleCLIError(err)))
@@ -45,11 +46,11 @@ func main() {
 	cliClient := goGitClient
 	commandExecutor := git.NewCommandExecutor(cliTimeout)
 
-	contextDetector, err := infrastructure.NewContextDetector(config)
+	contextDetector, err := git.NewContextDetector(config)
 	if err != nil {
 		os.Exit(int(cmd.HandleCLIError(fmt.Errorf("init context detector: %w", err))))
 	}
-	contextResolver := infrastructure.NewContextResolver(config, goGitClient, cliClient)
+	contextResolver := git.NewContextResolver(config, goGitClient, cliClient)
 	repoFinder := git.NewRepoFinder(goGitClient)
 
 	contextService := service.NewContextService(contextDetector, contextResolver)

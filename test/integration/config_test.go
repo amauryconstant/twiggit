@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"twiggit/internal/config"
 	"twiggit/internal/core"
-	"twiggit/internal/infrastructure"
 )
 
 func TestConfigManager_Integration_ConfigFile(t *testing.T) {
 	tempDir := t.TempDir()
-	manager := infrastructure.NewConfigManager()
+	manager := config.NewManager()
 
 	// Create config directory and file
 	configDir := filepath.Join(tempDir, "twiggit")
@@ -47,7 +47,7 @@ default_source_branch = "develop"
 
 func TestConfigManager_Integration_XDGFallback(t *testing.T) {
 	tempDir := t.TempDir()
-	manager := infrastructure.NewConfigManager()
+	manager := config.NewManager()
 
 	// Create config file in .config structure
 	configDir := filepath.Join(tempDir, ".config", "twiggit")
@@ -79,7 +79,7 @@ default_source_branch = "main"
 
 func TestConfigManager_Integration_Validation(t *testing.T) {
 	tempDir := t.TempDir()
-	manager := infrastructure.NewConfigManager()
+	manager := config.NewManager()
 
 	// Create config directory and invalid config file
 	configDir := filepath.Join(tempDir, "twiggit")
@@ -105,7 +105,7 @@ projects_dir = "relative/path"
 
 func TestConfigManager_Integration_MalformedTOML(t *testing.T) {
 	tempDir := t.TempDir()
-	manager := infrastructure.NewConfigManager()
+	manager := config.NewManager()
 
 	// Create config directory and malformed TOML file
 	configDir := filepath.Join(tempDir, "twiggit")
@@ -151,7 +151,7 @@ func TestConfigManager_Integration_NoConfigFile(t *testing.T) {
 	}()
 
 	// Create a fresh manager after setting environment variable
-	manager := infrastructure.NewConfigManager()
+	manager := config.NewManager()
 
 	config, err := manager.Load()
 	require.NoError(t, err)
