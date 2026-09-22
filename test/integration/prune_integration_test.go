@@ -21,9 +21,9 @@ import (
 
 type PruneIntegrationTestSuite struct {
 	suite.Suite
-	executor   infrastructure.CommandExecutor
-	cliClient  application.CLIClient
-	gitService application.GitClient
+	executor    infrastructure.CommandExecutor
+	cliClient   application.CLIClient
+	goGitClient application.GoGitClient
 }
 
 func (s *PruneIntegrationTestSuite) SetupSuite() {
@@ -34,7 +34,7 @@ func (s *PruneIntegrationTestSuite) SetupSuite() {
 	s.cliClient = infrastructure.NewCLIClient(s.executor, 30)
 	goGitClient, err := infrastructure.NewGoGitClient(true)
 	s.Require().NoError(err)
-	s.gitService = infrastructure.NewCompositeGitClient(goGitClient, s.cliClient)
+	s.goGitClient = goGitClient
 }
 
 func TestPruneIntegrationSuite(t *testing.T) {
@@ -78,13 +78,13 @@ func (s *PruneIntegrationTestSuite) createWorktreeService(repoPath string) appli
 		GitRepoPath: projectInfo.GitRepoPath,
 	}}, nil)
 	mockProjectService.On("ValidateProject", context.Background(), repoPath).Return(nil)
-	return service.NewWorktreeService(s.gitService, mockProjectService, config, nil)
+	return service.NewWorktreeService(s.goGitClient, s.cliClient, mockProjectService, config, nil)
 }
 
 func (s *PruneIntegrationTestSuite) TestDeleteBranch_NonExistentBranch() {
 	repoPath := s.setupTestRepo("test-repo")
 
-	err := s.gitService.DeleteBranch(context.Background(), repoPath, "non-existent-branch")
+	err := s.cliClient.DeleteBranch(context.Background(), repoPath, "non-existent-branch")
 	s.Require().Error(err)
 	s.Contains(err.Error(), "not found")
 }
@@ -92,13 +92,13 @@ func (s *PruneIntegrationTestSuite) TestDeleteBranch_NonExistentBranch() {
 func (s *PruneIntegrationTestSuite) TestDeleteBranch_CurrentHEADBranch() {
 	repoPath := s.setupTestRepo("test-repo")
 
-	err := s.gitService.DeleteBranch(context.Background(), repoPath, "main")
+	err := s.cliClient.DeleteBranch(context.Background(), repoPath, "main")
 	s.Require().Error(err)
 	s.Contains(err.Error(), "cannot delete")
 }
 
 func (s *PruneIntegrationTestSuite) TestDeleteBranch_EmptyRepositoryPath() {
-	err := s.gitService.DeleteBranch(context.Background(), "", "some-branch")
+	err := s.cliClient.DeleteBranch(context.Background(), "", "some-branch")
 	s.Require().Error(err)
 	s.Contains(err.Error(), "repository path cannot be empty")
 }
@@ -106,7 +106,7 @@ func (s *PruneIntegrationTestSuite) TestDeleteBranch_EmptyRepositoryPath() {
 func (s *PruneIntegrationTestSuite) TestDeleteBranch_EmptyBranchName() {
 	repoPath := s.setupTestRepo("test-repo")
 
-	err := s.gitService.DeleteBranch(context.Background(), repoPath, "")
+	err := s.cliClient.DeleteBranch(context.Background(), repoPath, "")
 	s.Require().Error(err)
 	s.Contains(err.Error(), "branch name cannot be empty")
 }
@@ -119,7 +119,7 @@ func (s *PruneIntegrationTestSuite) TestDeleteBranch_Success() {
 	_, err = s.executor.Execute(context.Background(), repoPath, "git", "checkout", "main")
 	s.Require().NoError(err)
 
-	err = s.gitService.DeleteBranch(context.Background(), repoPath, "feature-to-delete")
+	err = s.cliClient.DeleteBranch(context.Background(), repoPath, "feature-to-delete")
 	s.Require().NoError(err)
 }
 
@@ -512,7 +512,7 @@ func (s *PruneIntegrationTestSuite) TestNavigationOutput_SingleWorktreePrune() {
 		GitRepoPath: projectInfo.GitRepoPath,
 	}}, nil)
 	mockProjectService.On("ValidateProject", context.Background(), repoPath).Return(nil)
-	worktreeService := service.NewWorktreeService(s.gitService, mockProjectService, config, nil)
+	worktreeService := service.NewWorktreeService(s.goGitClient, s.cliClient, mockProjectService, config, nil)
 
 	req := &domain.PruneWorktreesRequest{
 		SpecificWorktree: "test-repo/feature-nav",

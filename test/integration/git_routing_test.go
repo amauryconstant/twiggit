@@ -57,18 +57,13 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("BranchOperations_UseGoGit", func(t *testing.T) {
-		// Use real CLI client but verify GoGit is used for branch operations
-		cliClient := infrastructure.NewCLIClient(executor, 30)
 		goGitClient, err := infrastructure.NewGoGitClient(true)
 		require.NoError(t, err)
-		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
-		// Test branch listing - should use GoGit only
-		branches, err := gitService.ListBranches(context.Background(), repoPath)
+		branches, err := goGitClient.ListBranches(context.Background(), repoPath)
 		require.NoError(t, err)
 		assert.NotEmpty(t, branches)
 
-		// Verify we got branch data (proving GoGit worked)
 		foundMain := false
 		for _, branch := range branches {
 			if branch.Name == "main" {
@@ -80,49 +75,35 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	})
 
 	t.Run("WorktreeOperations_UseCLI", func(t *testing.T) {
-		// Use real GoGit client but verify CLI is used for worktree operations
-		goGitClient, err := infrastructure.NewGoGitClient(true)
-		require.NoError(t, err)
 		cliClient := infrastructure.NewCLIClient(executor, 30)
-		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
-		// Create a feature branch first
 		_, err := executor.Execute(context.Background(), repoPath, "git", "checkout", "-b", "feature-test")
 		require.NoError(t, err)
 		_, err = executor.Execute(context.Background(), repoPath, "git", "checkout", "main")
-		// Don't fail if we're already on main (git checkout might return non-zero exit code)
 		if err != nil {
-			// Try to get current branch and verify we're on main or feature-test
 			result, checkErr := executor.Execute(context.Background(), repoPath, "git", "branch", "--show-current")
 			if checkErr == nil && strings.TrimSpace(result.Stdout) == "main" {
-				err = nil // We're already on main, so no error
+				err = nil
 			}
 		}
 		require.NoError(t, err)
 
-		// Test worktree listing - should use CLI only
-		worktrees, err := gitService.ListWorktrees(context.Background(), repoPath)
+		worktrees, err := cliClient.ListWorktrees(context.Background(), repoPath)
 		require.NoError(t, err)
 		assert.NotEmpty(t, worktrees)
 
-		// Verify we got worktree data (proving CLI worked)
-		assert.Len(t, worktrees, 1) // Only main worktree exists
+		assert.Len(t, worktrees, 1)
 		assert.Equal(t, "main", worktrees[0].Branch)
 	})
 
 	t.Run("RepositoryOperations_UseGoGit", func(t *testing.T) {
-		// Use real CLI client but verify GoGit is used for repository operations
-		cliClient := infrastructure.NewCLIClient(executor, 30)
 		goGitClient, err := infrastructure.NewGoGitClient(true)
 		require.NoError(t, err)
-		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
-		// Test repository validation - should use GoGit only
-		err := gitService.ValidateRepository(repoPath)
+		err = goGitClient.ValidateRepository(repoPath)
 		require.NoError(t, err)
 
-		// Test repository info - should use GoGit only
-		info, err := gitService.GetRepositoryInfo(context.Background(), repoPath)
+		info, err := goGitClient.GetRepositoryInfo(context.Background(), repoPath)
 		require.NoError(t, err)
 		assert.NotNil(t, info)
 		assert.Equal(t, repoPath, info.Path)
@@ -132,11 +113,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 		mockGoGit := mocks.NewMockGoGitClient()
 		mockGoGit.On("ListBranches", mock.Anything, mock.AnythingOfType("string")).Return([]domain.BranchInfo(nil), assert.AnError)
 
-		cliClient := infrastructure.NewCLIClient(executor, 30)
-
-		gitService := infrastructure.NewCompositeGitClient(mockGoGit, cliClient)
-
-		_, err := gitService.ListBranches(context.Background(), repoPath)
+		_, err := mockGoGit.ListBranches(context.Background(), repoPath)
 		require.Error(t, err)
 
 		assert.ErrorIs(t, err, assert.AnError)

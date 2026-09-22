@@ -149,3 +149,19 @@ func NewMockGitService() *MockGitService {
 		MockCLIClient:   NewMockCLIClient(),
 	}
 }
+
+// MockGitClientBundle is the canonical entry point for tests that need
+// both Go-git and CLI mocks. Pass .MockGoGitClient and .MockCLIClient
+// to service constructors that now require the two role interfaces.
+type MockGitClientBundle struct {
+	MockGoGitClient *MockGoGitClient
+	MockCLIClient   *MockCLIClient
+}
+
+// NewMockGitClientBundle creates a new bundle of git client mocks.
+func NewMockGitClientBundle() *MockGitClientBundle {
+	return &MockGitClientBundle{
+		MockGoGitClient: NewMockGoGitClient(),
+		MockCLIClient:   NewMockCLIClient(),
+	}
+}

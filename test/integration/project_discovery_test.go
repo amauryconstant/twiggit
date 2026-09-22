@@ -58,7 +58,7 @@ func TestProjectDiscovery_Integration(t *testing.T) {
 	mockGitService.MockGoGitClient.On("ValidateRepository", nonRepoPath).Return(assert.AnError)
 
 	// Create context resolver
-	resolver := infrastructure.NewContextResolver(config, mockGitService)
+	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	// Test context detection from outside git
 	ctx := &domain.Context{
@@ -143,7 +143,7 @@ func TestContextResolution_WithExistingOnly_Integration(t *testing.T) {
 	resolver := infrastructure.NewContextResolver(&domain.Config{
 		ProjectsDirectory:  tempDir,
 		WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
-	}, nil)
+	}, nil, nil)
 
 	projectPath := filepath.Join(tempDir, "test-project")
 	require.NoError(t, os.MkdirAll(projectPath, 0755))
@@ -195,7 +195,7 @@ func TestWithExistingOnly_ExistingWorktrees(t *testing.T) {
 		{Branch: "feature-2", Path: nonExistingWorktreePath},
 	}, nil)
 
-	resolver := infrastructure.NewContextResolver(config, mockGitService)
+	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextProject,
@@ -245,7 +245,7 @@ func TestWithExistingOnly_AllWorktreesExist(t *testing.T) {
 		{Branch: "feature-2", Path: worktree2Path},
 	}, nil)
 
-	resolver := infrastructure.NewContextResolver(config, mockGitService)
+	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextProject,
@@ -296,7 +296,7 @@ func TestWithExistingOnly_NoWorktreesExist(t *testing.T) {
 		{Branch: "feature-2", Path: nonExisting2},
 	}, nil)
 
-	resolver := infrastructure.NewContextResolver(config, mockGitService)
+	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextProject,
@@ -334,7 +334,7 @@ func TestWithExistingOnly_SkipsMainSuggestion(t *testing.T) {
 	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
 	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{}, nil)
 
-	resolver := infrastructure.NewContextResolver(config, mockGitService)
+	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextProject,

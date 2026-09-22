@@ -118,12 +118,12 @@ order of tasks is implementation order.
 
 ## 7. Test mocks + mechanical rename (slice 6)
 
-- [ ] 7.1 Rewrite `test/mocks/git_service_mock.go` to expose `MockGitClientBundle` struct with `MockGoGitClient *MockGoGitClient` and `MockCLIClient *MockCLIClient` fields (the two inner mocks retain their existing `*_test.go`-adjacent mock methods); verify by `go build ./test/mocks/...` clean
-- [ ] 7.2 Add `MockRepoLocator` to `test/mocks/` for `application.RepoLocator`; verify by `go build ./test/mocks/...` clean
-- [ ] 7.3 Rename `MockShellInfrastructureImpl` to `MockShellInfrastructure` (drop `Impl`) and any other `*Impl`-suffixed mock types; verify by `grep -rn 'Impl' test/mocks/` returning no `Mock*Impl` matches
-- [ ] 7.4 Mechanical rename across `test/integration/`: replace `infrastructure.NewCLIClientImpl` → `NewCLIClient`, `NewGoGitClientImpl` → `NewGoGitClient`, `NewDefaultCommandExecutor` → `NewCommandExecutor`, `NewContextDetectorImpl` → `NewContextDetector`, `NewContextResolverImpl` → `NewContextResolver`, `NewConfigManagerImpl` → `NewConfigManager`, `NewHookRunnerImpl` → `NewHookRunner`, `NewShellInfrastructureImpl` → `NewShellInfrastructure`; verify by `mise run test:integration` passing (or `go test -tags=integration ./test/integration/...`)
-- [ ] 7.5 Same mechanical rename in `test/concurrent/` and `test/e2e/fixtures/`; verify by `mise run test:race` and `go test -tags=e2e ./test/e2e/...` passing
-- [ ] 7.6 Verify NO mechanical rename is required: confirm `test/integration/`, `test/concurrent/`, `test/e2e/fixtures/` keep calling `domain.New<Xxx>Error(` style constructors unchanged (Decision 19 settles constructor naming: `NewXxxError` is canonical, `NewXxxErr` rejected); verify by `git grep -rn 'domain\.New[A-Z][A-Za-z]*Err(' test/` returning no matches; the test suites above still pass
+- [x] 7.1 Rewrite `test/mocks/git_service_mock.go` to expose `MockGitClientBundle` struct with `MockGoGitClient *MockGoGitClient` and `MockCLIClient *MockCLIClient` fields (the two inner mocks retain their existing `*_test.go`-adjacent mock methods); verify by `go build ./test/mocks/...` clean
+- [x] 7.2 Add `MockRepoLocator` to `test/mocks/` for `application.RepoLocator`; verify by `go build ./test/mocks/...` clean
+- [x] 7.3 Rename `MockShellInfrastructureImpl` to `MockShellInfrastructure` (drop `Impl`) and any other `*Impl`-suffixed mock types; verify by `grep -rn 'Impl' test/mocks/` returning no `Mock*Impl` matches
+- [x] 7.4 Mechanical rename across `test/integration/`: replace `infrastructure.NewCLIClientImpl` → `NewCLIClient`, `NewGoGitClientImpl` → `NewGoGitClient`, `NewDefaultCommandExecutor` → `NewCommandExecutor`, `NewContextDetectorImpl` → `NewContextDetector`, `NewContextResolverImpl` → `NewContextResolver`, `NewConfigManagerImpl` → `NewConfigManager`, `NewHookRunnerImpl` → `NewHookRunner`, `NewShellInfrastructureImpl` → `NewShellInfrastructure`; verify by `mise run test:integration` passing (or `go test -tags=integration ./test/integration/...`)
+- [x] 7.5 Same mechanical rename in `test/concurrent/` and `test/e2e/fixtures/`; verify by `mise run test:race` and `go test -tags=e2e ./test/e2e/...` passing
+- [x] 7.6 Verify NO mechanical rename is required: confirm `test/integration/`, `test/concurrent/`, `test/e2e/fixtures/` keep calling `domain.New<Xxx>Error(` style constructors unchanged (Decision 19 settles constructor naming: `NewXxxError` is canonical, `NewXxxErr` rejected); verify by `git grep -rn 'domain\.New[A-Z][A-Za-z]*Err(' test/` returning no matches; the test suites above still pass
 
 ## 8. .golangci.yml (slice 7)
 

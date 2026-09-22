@@ -129,20 +129,15 @@ func TestGitOperations_Integration(t *testing.T) {
 		require.NoError(t, err)
 		cliClient := infrastructure.NewCLIClient(executor, 30)
 
-		gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
-
-		// Test that branch operations use GoGit
-		branches, err := gitService.ListBranches(context.Background(), repoPath)
+		branches, err := goGitClient.ListBranches(context.Background(), repoPath)
 		require.NoError(t, err)
 		assert.NotEmpty(t, branches)
 
-		// Test that worktree operations use CLI
 		worktreePath := filepath.Join(tempDir, "routing-test")
-		err = gitService.CreateWorktree(context.Background(), repoPath, "feature-test", "main", worktreePath)
+		err = cliClient.CreateWorktree(context.Background(), repoPath, "feature-test", "main", worktreePath)
 		require.NoError(t, err)
 
-		// Cleanup
-		err = gitService.DeleteWorktree(context.Background(), repoPath, worktreePath, false)
+		err = cliClient.DeleteWorktree(context.Background(), repoPath, worktreePath, false)
 		require.NoError(t, err)
 	})
 }

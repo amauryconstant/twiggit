@@ -164,8 +164,7 @@ func TestContextResolver_Integration(t *testing.T) {
 	// Test resolver from project context
 	detector, err := infrastructure.NewContextDetector(config)
 	require.NoError(t, err)
-	gitService := infrastructure.NewCompositeGitClient(nil, nil) // Mock service for integration test
-	resolver := infrastructure.NewContextResolver(config, gitService)
+	resolver := infrastructure.NewContextResolver(config, nil, nil)
 
 	projectCtx, err := detector.DetectContext(mainRepo)
 	require.NoError(t, err)
@@ -243,10 +242,9 @@ func TestContextService_Integration(t *testing.T) {
 	goGitClient, err := infrastructure.NewGoGitClient(true)
 	require.NoError(t, err)
 	cliClient := infrastructure.NewCLIClient(executor, 30)
-	gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
-	resolver := infrastructure.NewContextResolver(config, gitService)
-	contextService := service.NewContextService(detector, resolver, config)
+	resolver := infrastructure.NewContextResolver(config, goGitClient, cliClient)
+	contextService := service.NewContextService(detector, resolver)
 
 	// Change to the repository directory
 	originalWd, err := os.Getwd()

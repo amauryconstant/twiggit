@@ -11,10 +11,13 @@ Test doubles for unit/integration tests using testify/mock.
 | `MockContextService` | `application.ContextService` | `cmd_mocks.go` |
 | `MockNavigationService` | `application.NavigationService` | `cmd_mocks.go` |
 | `MockShellService` | `application.ShellService` | `cmd_mocks.go` |
-| `MockGitClient` | `infrastructure.GitClient` | `git_service_mock.go` |
-| `MockShellInfrastructure` | `infrastructure.ShellInfrastructure` | `shell_infrastructure_mock.go` |
-| `MockContextDetector` | `domain.ContextDetector` | `mock_context_detector.go` |
-| `MockContextResolver` | `domain.ContextResolver` | `mock_context_resolver.go` |
+| `MockGoGitClient` | `application.GoGitClient` | `git_service_mock.go` |
+| `MockCLIClient` | `application.CLIClient` | `git_service_mock.go` |
+| `MockGitClientBundle` | bundle of `MockGoGitClient` + `MockCLIClient` | `git_service_mock.go` |
+| `MockShellInfrastructure` | `application.ShellInfrastructure` | `shell_infrastructure_mock.go` |
+| `MockContextDetector` | `application.ContextDetector` | `mock_context_detector.go` |
+| `MockContextResolver` | `application.ContextResolver` | `mock_context_resolver.go` |
+| `MockRepoLocator` | `application.RepoLocator` | `repo_locator_mock.go` |
 
 ## Usage Pattern
 
