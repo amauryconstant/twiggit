@@ -134,7 +134,7 @@ func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookR
 		fullCmd := envExports + cmd
 		cmdResult, err := r.executor.ExecuteWithTimeout(ctx, req.WorktreePath, "sh", r.defaultTimeout, "-c", fullCmd)
 
-		if err != nil || cmdResult.ExitCode != 0 {
+		if err != nil || cmdResult == nil || cmdResult.ExitCode != 0 {
 			result.IsSuccessful = false
 			exitCode := -1
 			output := ""

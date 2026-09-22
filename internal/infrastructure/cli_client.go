@@ -111,6 +111,9 @@ func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, so
 	if err != nil {
 		return domain.NewGitWorktreeError(worktreePath, branchName, "failed to create worktree", err)
 	}
+	if result == nil {
+		return domain.NewGitWorktreeError(worktreePath, branchName, "command executor returned nil result for worktree create", nil)
+	}
 
 	if result.ExitCode != 0 {
 		return domain.NewGitWorktreeError(worktreePath, branchName,
@@ -147,6 +150,9 @@ func (c *cliClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath s
 	if err != nil {
 		return domain.NewGitWorktreeError(worktreePath, "", "failed to delete worktree", err)
 	}
+	if result == nil {
+		return domain.NewGitWorktreeError(worktreePath, "", "command executor returned nil result for worktree delete", nil)
+	}
 
 	if result.ExitCode != 0 {
 		// Check if worktree was already deleted
@@ -172,6 +178,9 @@ func (c *cliClient) ListWorktrees(ctx context.Context, repoPath string) ([]domai
 	if err != nil {
 		return nil, domain.NewGitWorktreeError("", "", "failed to list worktrees", err)
 	}
+	if result == nil {
+		return nil, domain.NewGitWorktreeError("", "", "command executor returned nil result for worktree list", nil)
+	}
 
 	if result.ExitCode != 0 {
 		return nil, domain.NewGitWorktreeError("", "",
@@ -194,6 +203,9 @@ func (c *cliClient) PruneWorktrees(ctx context.Context, repoPath string) error {
 	if err != nil {
 		return domain.NewGitWorktreeError("", "", "failed to prune worktrees", err)
 	}
+	if result == nil {
+		return domain.NewGitWorktreeError("", "", "command executor returned nil result for worktree prune", nil)
+	}
 
 	if result.ExitCode != 0 {
 		return domain.NewGitWorktreeError("", "",
@@ -215,6 +227,9 @@ func (c *cliClient) DeleteBranch(ctx context.Context, repoPath, branchName strin
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, "branch", "-D", branchName)
 	if err != nil {
 		return domain.NewGitWorktreeError("", branchName, "failed to delete branch", err)
+	}
+	if result == nil {
+		return domain.NewGitWorktreeError("", branchName, "command executor returned nil result for branch delete", nil)
 	}
 
 	if result.ExitCode != 0 {
@@ -242,6 +257,9 @@ func (c *cliClient) IsBranchMerged(ctx context.Context, repoPath, branchName str
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, "branch", "--merged")
 	if err != nil {
 		return false, domain.NewGitWorktreeError("", branchName, "failed to check merged status", err)
+	}
+	if result == nil {
+		return false, domain.NewGitWorktreeError("", branchName, "command executor returned nil result for branch merge check", nil)
 	}
 
 	if result.ExitCode != 0 {
