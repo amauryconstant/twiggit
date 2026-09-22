@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -58,7 +59,7 @@ func (cd *contextDetector) DetectContext(dir string) (*domain.Context, error) {
 
 	// Check if directory exists
 	if _, err := os.Stat(dir); err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return nil, domain.NewContextDetectionError(dir, "directory does not exist", err)
 		}
 		return nil, domain.NewContextDetectionError(dir, "cannot access directory", err)

@@ -22,11 +22,10 @@ func parseWorktreeLine(line string) *domain.WorktreeInfo {
 		return nil
 	}
 
-	if strings.HasPrefix(line, "worktree ") {
-		path := strings.TrimPrefix(line, "worktree ")
+	if path, ok := strings.CutPrefix(line, "worktree "); ok {
 		absPath, err := filepath.Abs(path)
 		if err != nil {
-			absPath = path // Use original path if conversion fails
+			absPath = path
 		}
 		return &domain.WorktreeInfo{
 			Path: absPath,
@@ -120,8 +119,14 @@ func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, so
 			"git worktree add failed: "+result.Stderr, nil)
 	}
 
-	// Check if worktree was actually created
-	if _, err := os.Stat(worktreePath); err != nil {
+	parentDir := filepath.Dir(worktreePath)
+	root, err := os.OpenRoot(parentDir)
+	if err != nil {
+		return domain.NewGitWorktreeError(worktreePath, branchName,
+			"git worktree add succeeded but parent directory not accessible", err)
+	}
+	defer root.Close()
+	if _, err := root.Stat(filepath.Base(worktreePath)); err != nil {
 		return domain.NewGitWorktreeError(worktreePath, branchName,
 			"git worktree add succeeded but worktree directory not found", err)
 	}

@@ -123,9 +123,8 @@ func (c *goGitClient) ListBranches(_ context.Context, repoPath string) ([]domain
 			// Check for remote tracking branch
 			if ref.Name().IsBranch() {
 				remoteTrackingBranch := "refs/remotes/origin/" + branchName
-				if remoteRef, err := repo.Reference(plumbing.ReferenceName(remoteTrackingBranch), false); err == nil {
+				if _, err := repo.Reference(plumbing.ReferenceName(remoteTrackingBranch), false); err == nil {
 					branchInfo.Remote = "origin/" + branchName
-					_ = remoteRef // Avoid unused variable warning
 				}
 			}
 
@@ -331,9 +330,10 @@ func (c *goGitClient) GetCommitInfo(_ context.Context, repoPath, commitHash stri
 		return nil, domain.NewGitRepositoryError(repoPath, "failed to get commit "+commitHash, err)
 	}
 
+	hashStr := commit.Hash.String()
 	commitInfo := &domain.CommitInfo{
-		Hash:      commit.Hash.String(),
-		ShortHash: commit.Hash.String()[:7],
+		Hash:      hashStr,
+		ShortHash: hashStr[:min(7, len(hashStr))],
 		Author:    commit.Author.Name,
 		Email:     commit.Author.Email,
 		Date:      commit.Author.When,

@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -76,15 +77,13 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 		return domain.NewShellConfigError("", "config file path is empty", nil)
 	}
 
-	// Check if parent directory exists
 	parentDir := filepath.Dir(configFile)
-	if _, err := os.Stat(parentDir); os.IsNotExist(err) {
+	if _, err := os.Stat(parentDir); errors.Is(err, os.ErrNotExist) {
 		return domain.NewShellConfigError("", "parent directory does not exist", err)
 	}
 
-	// Check if file exists
 	fileExists := true
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+	if _, err := os.Stat(configFile); errors.Is(err, os.ErrNotExist) {
 		fileExists = false
 	}
 
@@ -128,8 +127,7 @@ func (s *shellInfrastructure) ValidateInstallation(shellType domain.ShellType, c
 		return domain.NewShellConfigError("", "config file path is empty", nil)
 	}
 
-	// Check if config file exists
-	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+	if _, err := os.Stat(configFile); errors.Is(err, os.ErrNotExist) {
 		return domain.NewShellNotInstalledError(string(shellType), "config file does not exist", nil)
 	}
 

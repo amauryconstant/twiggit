@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,7 +18,7 @@ type GitDir = domain.GitDir
 // Returns a list of directories that contain valid git repositories
 func FindGitRepositories(dir string, gitService application.GoGitClient) ([]GitDir, error) {
 	_, err := os.Stat(dir)
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return []GitDir{}, nil
 	}
 	if err != nil {
@@ -104,5 +105,5 @@ func IsMainRepo(path string) bool {
 
 	gitdirPath := filepath.Join(gitPath, "gitdir")
 	_, statErr := os.Stat(gitdirPath)
-	return os.IsNotExist(statErr)
+	return errors.Is(statErr, os.ErrNotExist)
 }

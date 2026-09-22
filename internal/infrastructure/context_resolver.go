@@ -2,6 +2,7 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os"
@@ -305,7 +306,7 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 		}
 
 		if config.existingOnly {
-			if _, err := os.Stat(worktree.Path); os.IsNotExist(err) {
+			if _, err := os.Stat(worktree.Path); errors.Is(err, os.ErrNotExist) {
 				continue
 			}
 		}

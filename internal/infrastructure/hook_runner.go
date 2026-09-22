@@ -2,8 +2,10 @@ package infrastructure
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -44,7 +46,18 @@ func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (
 		}, nil
 	}
 
-	if _, err := os.Stat(req.ConfigFilePath); os.IsNotExist(err) {
+	parentDir := filepath.Dir(req.ConfigFilePath)
+	root, rootErr := os.OpenRoot(parentDir)
+	if rootErr != nil {
+		return &domain.HookResult{
+			HookType:     req.HookType,
+			HasExecuted:  false,
+			IsSuccessful: true,
+			Failures:     nil,
+		}, nil
+	}
+	defer root.Close()
+	if _, err := root.Stat(filepath.Base(req.ConfigFilePath)); errors.Is(err, os.ErrNotExist) {
 		return &domain.HookResult{
 			HookType:     req.HookType,
 			HasExecuted:  false,

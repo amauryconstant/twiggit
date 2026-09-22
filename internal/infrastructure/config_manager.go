@@ -1,6 +1,7 @@
 package infrastructure
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,7 +27,7 @@ func expandConfigPath(path string) string {
 	}
 
 	// Handle tilde expansion first
-	if strings.HasPrefix(path, "~") {
+	if rest, ok := strings.CutPrefix(path, "~"); ok {
 		home, err := os.UserHomeDir()
 		if err != nil {
 			// Fallback to $HOME env var
@@ -36,7 +37,7 @@ func expandConfigPath(path string) string {
 				home = "/tmp"
 			}
 		}
-		return filepath.Join(home, strings.TrimPrefix(path, "~"))
+		return filepath.Join(home, rest)
 	}
 
 	// Handle $VAR and ${VAR} expansion
@@ -74,7 +75,7 @@ func buildDefaultConfig() *domain.Config {
 // configFileExists checks if a file exists at the given path
 func configFileExists(path string) bool {
 	_, err := os.Stat(path)
-	return !os.IsNotExist(err)
+	return !errors.Is(err, os.ErrNotExist)
 }
 
 // validateConfig validates a configuration object

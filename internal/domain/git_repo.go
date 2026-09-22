@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 )
@@ -19,7 +20,7 @@ func IsMainRepo(path string) bool {
 
 	gitdirPath := filepath.Join(gitPath, "gitdir")
 	_, statErr := os.Stat(gitdirPath)
-	return os.IsNotExist(statErr)
+	return errors.Is(statErr, os.ErrNotExist)
 }
 
 func FindMainRepoByTraversal(startPath string) string {

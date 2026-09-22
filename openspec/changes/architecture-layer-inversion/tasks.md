@@ -72,19 +72,19 @@ order of tasks is implementation order.
 
 ### 5c-0. Type nil verification (precondition)
 
-- [ ] 5c-0.1 Verify `command_executor.ExecuteWithTimeout` returns a concrete `*CommandResult` (not interface); refactor to concrete pointer first if interface today; verify by `grep -n 'ExecuteWithTimeout' internal/infrastructure/command_executor.go` showing concrete `*CommandResult` return type and `go build ./internal/infrastructure/...` clean
+- [x] 5c-0.1 Verify `command_executor.ExecuteWithTimeout` returns a concrete `*CommandResult` (not interface); refactor to concrete pointer first if interface today; verify by `grep -n 'ExecuteWithTimeout' internal/infrastructure/command_executor.go` showing concrete `*CommandResult` return type and `go build ./internal/infrastructure/...` clean
 
 ### 5c-i. Nil-guards (behavioral)
 
-- [ ] 5c-i.1 Add `if result == nil { return <error> }` nil-guard before each `result.ExitCode` dereference in `cli_client.go` (6 sites); verify by `go test ./internal/infrastructure/...` passing
-- [ ] 5c-i.2 Add `if cmdResult == nil { return <error> }` nil-guard before `cmdResult.ExitCode` at `hook_runner.go:137`; verify by `go test ./internal/infrastructure/...` passing
+- [x] 5c-i.1 Add `if result == nil { return <error> }` nil-guard before each `result.ExitCode` dereference in `cli_client.go` (6 sites); verify by `go test ./internal/infrastructure/...` passing
+- [x] 5c-i.2 Add `if cmdResult == nil { return <error> }` nil-guard before `cmdResult.ExitCode` at `hook_runner.go:137`; verify by `go test ./internal/infrastructure/...` passing
 
 ### 5c-ii. `errors.Is` migration + bound slice + prefix cut (behavioral)
 
-- [ ] 5c-ii.1 Replace `os.IsNotExist(err)` with `errors.Is(err, os.ErrNotExist)` across ALL files in `internal/` (expanded scope — not just touched files); verify by `grep -rn 'os.IsNotExist' internal/` returning no matches
-- [ ] 5c-ii.2 Replace `strings.HasPrefix(s, prefix) + strings.TrimPrefix(s, prefix)` with `strings.CutPrefix(s, prefix)` at the two flagged sites; verify by `go build ./...` clean
-- [ ] 5c-ii.3 Bound the commit hash slice at `gogit_client.go` with `min(7, len(hashStr))` instead of `hashStr[:7]`; verify by `go test ./internal/infrastructure/...` passing for any short-hash fixture
-- [ ] 5c-ii.4 Delete the `_ = remoteRef` workaround at `gogit_client.go` (drop the bound variable); verify by `grep -n '_ = remoteRef' internal/infrastructure/gogit_client.go` returning no matches
+- [x] 5c-ii.1 Replace `os.IsNotExist(err)` with `errors.Is(err, os.ErrNotExist)` across ALL files in `internal/` (expanded scope — not just touched files); verify by `grep -rn 'os.IsNotExist' internal/` returning no matches
+- [x] 5c-ii.2 Replace `strings.HasPrefix(s, prefix) + strings.TrimPrefix(s, prefix)` with `strings.CutPrefix(s, prefix)` at the two flagged sites; verify by `go build ./...` clean
+- [x] 5c-ii.3 Bound the commit hash slice at `gogit_client.go` with `min(7, len(hashStr))` instead of `hashStr[:7]`; verify by `go test ./internal/infrastructure/...` passing for any short-hash fixture
+- [x] 5c-ii.4 Delete the `_ = remoteRef` workaround at `gogit_client.go` (drop the bound variable); verify by `grep -n '_ = remoteRef' internal/infrastructure/gogit_client.go` returning no matches
 
 ### 5c-iii. LRU cache swap (behavioral)
 
