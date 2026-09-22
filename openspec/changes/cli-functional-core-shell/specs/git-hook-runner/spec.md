@@ -28,7 +28,7 @@ The interface sits with the consumer (cmd/) because each cmd/<command>.go consum
 
 ### Requirement: HookRunner implementation lives in internal/git
 
-The `HookRunnerImpl` implementation SHALL live in `internal/git/hook_runner.go` (migrated from `internal/infrastructure/hook_runner.go`). The runner SHALL use `git.CommandExecutor` from `internal/git/command_executor.go` for `os/exec` invocations. The runner SHALL return a `*core.HookResult` (renamed from `*domain.HookResult`).
+The `HookRunnerImpl` implementation SHALL live in `internal/git/hook_runner.go` (migrated from `internal/git/hook_runner.go`). The runner SHALL use `git.CommandExecutor` from `internal/git/command_executor.go` for `os/exec` invocations. The runner SHALL return a `*core.HookResult` (renamed from `*domain.HookResult`).
 
 #### Scenario: Implementation file path is internal/git
 - **WHEN** the runner implementation source file is located

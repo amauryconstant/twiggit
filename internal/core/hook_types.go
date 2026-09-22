@@ -32,3 +32,16 @@ type HookFailure struct {
 	ExitCode int
 	Output   string
 }
+
+// HookRunRequest carries the context needed to execute hooks. Pure data —
+// the consumer-side interface (cmdutil.HookRunner) takes this type; the
+// implementation lives in internal/git/hook_runner.go.
+type HookRunRequest struct {
+	HookType       HookType
+	WorktreePath   string
+	ProjectName    string
+	BranchName     string
+	SourceBranch   string
+	MainRepoPath   string
+	ConfigFilePath string
+}

@@ -1,0 +1,130 @@
+package cmdutil
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"path/filepath"
+	"sync"
+
+	"twiggit/internal/config"
+	"twiggit/internal/core"
+	"twiggit/internal/git"
+	"twiggit/internal/iostreams"
+	"twiggit/internal/version"
+)
+
+// Factory is the composition seam shared by every cmd/*.go. Each lazy
+// field is a function so callers invoke it at first use rather than
+// constructing every dependency eagerly. The Config field is the
+// canonical sync.OnceValue cache: every other field that depends on
+// config (GitClient, Logger) reaches it through f.Config(), so the
+// config file is parsed exactly once per binary invocation.
+//
+// Construction populates IOStreams, AppVersion, and Executable eagerly
+// (they are cheap and never fail). The expensive fields (Config,
+// GitClient, Logger) are sync.OnceValue / sync.OnceFunc wrappers that
+// run on first call. Init touches each lazy field so initialization
+// failures surface before any command body executes.
+//
+// Customizing for tests: assign new functions to the fields before the
+// first call (or before Init). Once cached, the result is pinned for
+// the Factory's lifetime.
+type Factory struct {
+	// IOStreams is the terminal I/O surface. Populated by NewFactory
+	// from iostreams.System(); tests may swap in iostreams.Test().
+	IOStreams *iostreams.IOStreams
+
+	// AppVersion is the build-time injected version string.
+	AppVersion string
+
+	// Executable is the basename of the running binary (twiggit).
+	Executable string
+
+	// Config returns the loaded config. sync.OnceValue-cached; the
+	// first call reads and parses the config file, every later call
+	// returns the same *core.Config pointer. A load error pins for
+	// the Factory's lifetime (subsequent calls return the same error).
+	Config func() (*core.Config, error)
+
+	// GitClient returns the composite git client. sync.OnceValue-cached;
+	// the closure first reads f.Config() so config load errors surface
+	// here rather than as a confused git-construction failure.
+	GitClient func() (*git.Client, error)
+
+	// Logger returns the slog channel used for TWIGGIT_DEBUG output.
+	// sync.OnceFunc-cached; first call wires a text handler that
+	// discards writes so debug logs do not leak into the user stream.
+	Logger func() *slog.Logger
+}
+
+// NewFactory returns a Factory wired with the system IOStreams, the
+// build-time version, and lazy fields for the three expensive
+// dependencies. Every lazy field is wrapped in sync.OnceValue /
+// sync.OnceFunc so the underlying work runs at most once per Factory.
+//
+// NewFactory never errors: all failures are deferred to the first call
+// to a lazy field (or to Init). Tests that need to short-circuit a
+// failure assign a replacement function before calling the field.
+func NewFactory() *Factory {
+	f := &Factory{
+		IOStreams:  iostreams.System(),
+		AppVersion: version.Version,
+		Executable: executableName(),
+	}
+
+	f.Config = sync.OnceValues(func() (*core.Config, error) {
+		manager := config.NewManager()
+		return manager.Load()
+	})
+
+	f.GitClient = sync.OnceValues(func() (*git.Client, error) {
+		// Touch Config so config load errors surface here too.
+		if _, err := f.Config(); err != nil {
+			return nil, err
+		}
+		return git.NewClient()
+	})
+
+	f.Logger = sync.OnceValue(func() *slog.Logger {
+		return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	})
+
+	return f
+}
+
+// Init touches every lazy field once and returns the joined set of
+// initialization errors. main.go calls Init before Execute so any
+// broken config or git-client construction failure surfaces as a clean
+// exit instead of a half-started command.
+//
+// Per the single-handling rule, Init collects every lazy-field error
+// with errors.Join rather than returning on the first one; callers
+// see the full diagnostic in one pass.
+func (f *Factory) Init() error {
+	var errs []error
+
+	if _, err := f.Config(); err != nil {
+		errs = append(errs, fmt.Errorf("cmdutil: config init: %w", err))
+	}
+	if _, err := f.GitClient(); err != nil {
+		errs = append(errs, fmt.Errorf("cmdutil: git client init: %w", err))
+	}
+	if f.Logger() == nil {
+		errs = append(errs, errors.New("cmdutil: logger init: returned nil"))
+	}
+
+	return errors.Join(errs...)
+}
+
+// executableName returns filepath.Base(os.Args[0]) or "twiggit" when
+// os.Args[0] is empty (some test runners clear it). The fallback
+// guarantees AppVersion callers never see an empty Executable.
+func executableName() string {
+	if len(os.Args) == 0 || os.Args[0] == "" {
+		return "twiggit"
+	}
+	return filepath.Base(os.Args[0])
+}
