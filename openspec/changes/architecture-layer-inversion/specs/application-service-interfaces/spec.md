@@ -16,8 +16,9 @@ deterministic locator without filesystem coupling.
 #### Scenario: WorktreeService construction
 
 - **WHEN** `WorktreeService` is built
-- **THEN** its constructor SHALL take `GitClient`, `ProjectService`,
-  and `*domain.Config` as explicit arguments
+- **THEN** its constructor SHALL take `GoGitClient`, `CLIClient`,
+  `ProjectService`, `*domain.Config`, and `HookRunner` as explicit
+  arguments
 - **AND** SHALL store them as unexported fields
 
 #### Scenario: ProjectService construction

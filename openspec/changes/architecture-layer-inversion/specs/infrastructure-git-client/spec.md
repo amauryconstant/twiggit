@@ -61,10 +61,11 @@ SHALL exist; the two role interfaces are the only injection points.
 `NewGoGitClient()` SHALL create a client with cache enabled
 (default size 25). `NewGoGitClientWithSize(n)` SHALL allow custom
 sizes; `n <= 0` SHALL fall back to 25. `cacheEnabled=false` SHALL
-bypass the cache entirely. Both constructors SHALL return
-`(*GoGitClient, error)`; the error SHALL be non-nil when the
-underlying LRU cache cannot be allocated. Callers SHALL propagate
-the construction error rather than discard it.
+bypass the cache entirely. Both constructors SHALL return a
+non-nil `application.GoGitClient` together with an error; the
+error SHALL be non-nil when the underlying LRU cache cannot be
+allocated. Callers SHALL propagate the construction error rather
+than discard it.
 
 #### Scenario: Successful construction
 
