@@ -24,8 +24,8 @@
 
 ## 3. Application interface split (slice 2)
 
-- [ ] 3.1 Delete the `GitClient` interface (4 lines) at `internal/application/interfaces.go`; verify by `go build ./internal/application/...` clean and `git grep -n 'GitClient' internal/application/` returning only the role-interface references (umbrella gone)
-- [ ] 3.2 Add `type RepoLocator interface { FindGitRepositories(dir string) ([]domain.GitDir, error) }` to `internal/application/interfaces.go`; verify by `go build ./internal/application/...` clean
+- [x] 3.1 Delete the `GitClient` interface (4 lines) at `internal/application/interfaces.go`; verify by `go build ./internal/application/...` clean and `git grep -n 'GitClient' internal/application/` returning only the role-interface references (umbrella gone)
+- [x] 3.2 Add `type RepoLocator interface { FindGitRepositories(dir string) ([]domain.GitDir, error) }` to `internal/application/interfaces.go`; verify by `go build ./internal/application/...` clean
 - [ ] 3.3 Add compile-time interface check `var _ application.RepoLocator = (*infrastructure.RepoFinder)(nil)` at the bottom of `internal/infrastructure/repo_finder.go` (created in slice 5d); verify by `go build ./...` clean and the check survives `gopls rename` of the implementation type
 
 ## 4. Service layer inversion (slice 3)

@@ -25,9 +25,9 @@ These interfaces define contracts between service layer and infrastructure imple
 | `ConfigManager` | Configuration loading | `infrastructure/` |
 | `ContextDetector` | Git context detection | `infrastructure/` |
 | `ContextResolver` | Identifier resolution | `infrastructure/` |
-| `GitClient` | Unified git operations | `infrastructure/` |
 | `GoGitClient` | go-git operations | `infrastructure/` |
 | `CLIClient` | CLI git operations | `infrastructure/` |
+| `RepoLocator` | Git repository discovery | `infrastructure/` |
 | `HookRunner` | Hook execution | `infrastructure/` |
 | `ShellInfrastructure` | Shell integration | `infrastructure/` |
 
@@ -43,7 +43,7 @@ These interfaces define contracts between service layer and infrastructure imple
 - `GetResolutionSuggestions(ctx, partial, opts...) ([]*domain.ResolutionSuggestion, error)`
 
 ### GitClient (Composite)
-- Combines `GoGitClient` + `CLIClient` for unified operations
+- The `GitClient` umbrella interface was removed; the two role interfaces (`GoGitClient`, `CLIClient`) are injected directly into services that need both read and mutation operations
 
 ### GoGitClient
 - `OpenRepository(path) (*git.Repository, error)`
@@ -62,6 +62,9 @@ These interfaces define contracts between service layer and infrastructure imple
 - `PruneWorktrees(ctx, repoPath) error`
 - `IsBranchMerged(ctx, repoPath, branchName) (bool, error)`
 - `DeleteBranch(ctx, repoPath, branchName) error`
+
+### RepoLocator
+- `FindGitRepositories(dir string) ([]domain.GitDir, error)` - Discover git repositories under `dir`
 
 ### HookRunner
 - `Run(ctx, *HookRunRequest) (*domain.HookResult, error)`
@@ -129,9 +132,11 @@ type CreateWorktreeRequest struct {
 
 ```go
 func NewWorktreeService(
-    gitClient application.GitClient,
+    goGit application.GoGitClient,
+    cli application.CLIClient,
     projectService application.ProjectService,
     config *domain.Config,
+    hookRunner application.HookRunner,
 ) application.WorktreeService
 ```
 

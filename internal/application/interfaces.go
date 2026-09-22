@@ -98,10 +98,9 @@ type CLIClient interface {
 	DeleteBranch(ctx context.Context, repoPath, branchName string) error
 }
 
-// GitClient provides unified git operations with deterministic routing
-type GitClient interface {
-	GoGitClient
-	CLIClient
+// RepoLocator discovers git repositories within a directory tree
+type RepoLocator interface {
+	FindGitRepositories(dir string) ([]domain.GitDir, error)
 }
 
 // ShellInfrastructure defines low-level shell infrastructure operations
