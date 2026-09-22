@@ -31,7 +31,7 @@ func (s *HookRunnerIntegrationSuite) SetupTest() {
 	s.tempDir = s.T().TempDir()
 	s.configDir = s.T().TempDir()
 
-	executor := infrastructure.NewDefaultCommandExecutor(30 * time.Second)
+	executor := infrastructure.NewCommandExecutor(30 * time.Second)
 	s.runner = infrastructure.NewHookRunner(executor)
 }
 

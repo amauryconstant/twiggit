@@ -32,7 +32,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	// Initialize git repository
 	require.NoError(t, os.MkdirAll(repoPath, 0755))
 
-	executor := infrastructure.NewDefaultCommandExecutor(30 * time.Second)
+	executor := infrastructure.NewCommandExecutor(30 * time.Second)
 
 	// Initialize repository
 	_, err := executor.Execute(context.Background(), repoPath, "git", "init")

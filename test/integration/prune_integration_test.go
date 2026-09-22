@@ -21,7 +21,7 @@ import (
 
 type PruneIntegrationTestSuite struct {
 	suite.Suite
-	executor   *infrastructure.DefaultCommandExecutor
+	executor   infrastructure.CommandExecutor
 	cliClient  application.CLIClient
 	gitService application.GitClient
 }
@@ -30,7 +30,7 @@ func (s *PruneIntegrationTestSuite) SetupSuite() {
 	if testing.Short() {
 		s.T().Skip("Skipping integration tests in short mode")
 	}
-	s.executor = infrastructure.NewDefaultCommandExecutor(30 * time.Second)
+	s.executor = infrastructure.NewCommandExecutor(30 * time.Second)
 	s.cliClient = infrastructure.NewCLIClient(s.executor, 30)
 	goGitClient := infrastructure.NewGoGitClient(true)
 	s.gitService = infrastructure.NewCompositeGitClient(goGitClient, s.cliClient)

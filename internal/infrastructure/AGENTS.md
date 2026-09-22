@@ -33,9 +33,9 @@ Layer: External integrations (git, config, CLI execution)
 
 ```go
 // Compile-time interface check
-var _ application.GoGitClient = (*GoGitClientImpl)(nil)
+var _ application.GoGitClient = (*goGitClient)(nil)
 
-type GoGitClientImpl struct { ... }
+type goGitClient struct { ... }
 ```
 
 **Cache:** LRU cache (default 25 repos) prevents memory leak.
@@ -48,9 +48,9 @@ NewGoGitClientWithSize(cacheSize, ...)    // custom size
 
 ```go
 // Compile-time interface check
-var _ application.CLIClient = (*CLIClientImpl)(nil)
+var _ application.CLIClient = (*cliClient)(nil)
 
-type CLIClientImpl struct { ... }
+type cliClient struct { ... }
 ```
 
 ## Path Utilities

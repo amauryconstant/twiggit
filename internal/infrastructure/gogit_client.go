@@ -13,10 +13,10 @@ import (
 	"twiggit/internal/domain"
 )
 
-var _ application.GoGitClient = (*GoGitClientImpl)(nil)
+var _ application.GoGitClient = (*goGitClient)(nil)
 
-// GoGitClientImpl implements GoGitClient using go-git library
-type GoGitClientImpl struct {
+// goGitClient implements GoGitClient using go-git library
+type goGitClient struct {
 	cache        *lru.Cache[string, *git.Repository]
 	cacheEnabled bool
 }
@@ -24,7 +24,7 @@ type GoGitClientImpl struct {
 // NewGoGitClient creates a new GoGitClient implementation
 // cacheEnabled is optional - defaults to true if not provided
 // Uses default cache size of 25 repositories
-func NewGoGitClient(cacheEnabled ...bool) *GoGitClientImpl {
+func NewGoGitClient(cacheEnabled ...bool) application.GoGitClient {
 	enabled := true
 	if len(cacheEnabled) > 0 {
 		enabled = cacheEnabled[0]
@@ -32,7 +32,7 @@ func NewGoGitClient(cacheEnabled ...bool) *GoGitClientImpl {
 
 	cache, _ := lru.New[string, *git.Repository](25)
 
-	return &GoGitClientImpl{
+	return &goGitClient{
 		cache:        cache,
 		cacheEnabled: enabled,
 	}
@@ -41,7 +41,7 @@ func NewGoGitClient(cacheEnabled ...bool) *GoGitClientImpl {
 // NewGoGitClientWithSize creates a new GoGitClient with custom cache size
 // cacheSize defaults to 25 if <= 0
 // cacheEnabled is optional - defaults to true if not provided
-func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) *GoGitClientImpl {
+func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) application.GoGitClient {
 	enabled := true
 	if len(cacheEnabled) > 0 {
 		enabled = cacheEnabled[0]
@@ -54,14 +54,14 @@ func NewGoGitClientWithSize(cacheSize int, cacheEnabled ...bool) *GoGitClientImp
 
 	cache, _ := lru.New[string, *git.Repository](size)
 
-	return &GoGitClientImpl{
+	return &goGitClient{
 		cache:        cache,
 		cacheEnabled: enabled,
 	}
 }
 
 // OpenRepository opens git repository (pure function, idempotent)
-func (c *GoGitClientImpl) OpenRepository(path string) (*git.Repository, error) {
+func (c *goGitClient) OpenRepository(path string) (*git.Repository, error) {
 	// Normalize path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
@@ -86,7 +86,7 @@ func (c *GoGitClientImpl) OpenRepository(path string) (*git.Repository, error) {
 }
 
 // ListBranches lists all branches in repository (idempotent)
-func (c *GoGitClientImpl) ListBranches(_ context.Context, repoPath string) ([]domain.BranchInfo, error) {
+func (c *goGitClient) ListBranches(_ context.Context, repoPath string) ([]domain.BranchInfo, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -142,7 +142,7 @@ func (c *GoGitClientImpl) ListBranches(_ context.Context, repoPath string) ([]do
 }
 
 // BranchExists checks if branch exists (idempotent)
-func (c *GoGitClientImpl) BranchExists(_ context.Context, repoPath, branchName string) (bool, error) {
+func (c *goGitClient) BranchExists(_ context.Context, repoPath, branchName string) (bool, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return false, err
@@ -162,7 +162,7 @@ func (c *GoGitClientImpl) BranchExists(_ context.Context, repoPath, branchName s
 }
 
 // GetRepositoryStatus returns repository status (idempotent)
-func (c *GoGitClientImpl) GetRepositoryStatus(_ context.Context, repoPath string) (domain.RepositoryStatus, error) {
+func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (domain.RepositoryStatus, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return domain.RepositoryStatus{}, err
@@ -234,7 +234,7 @@ func (c *GoGitClientImpl) GetRepositoryStatus(_ context.Context, repoPath string
 }
 
 // ValidateRepository checks if path contains valid git repository (pure function)
-func (c *GoGitClientImpl) ValidateRepository(path string) error {
+func (c *goGitClient) ValidateRepository(path string) error {
 	_, err := git.PlainOpen(path)
 	if err != nil {
 		return domain.NewGitRepositoryError(path, "not a valid git repository", err)
@@ -243,7 +243,7 @@ func (c *GoGitClientImpl) ValidateRepository(path string) error {
 }
 
 // GetRepositoryInfo returns comprehensive repository information
-func (c *GoGitClientImpl) GetRepositoryInfo(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
+func (c *goGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
 	_, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -285,7 +285,7 @@ func (c *GoGitClientImpl) GetRepositoryInfo(ctx context.Context, repoPath string
 }
 
 // ListRemotes lists all remotes in repository
-func (c *GoGitClientImpl) ListRemotes(_ context.Context, repoPath string) ([]domain.RemoteInfo, error) {
+func (c *goGitClient) ListRemotes(_ context.Context, repoPath string) ([]domain.RemoteInfo, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -316,7 +316,7 @@ func (c *GoGitClientImpl) ListRemotes(_ context.Context, repoPath string) ([]dom
 }
 
 // GetCommitInfo returns information about a specific commit
-func (c *GoGitClientImpl) GetCommitInfo(_ context.Context, repoPath, commitHash string) (*domain.CommitInfo, error) {
+func (c *goGitClient) GetCommitInfo(_ context.Context, repoPath, commitHash string) (*domain.CommitInfo, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err

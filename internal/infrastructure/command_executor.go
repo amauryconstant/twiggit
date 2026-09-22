@@ -28,25 +28,25 @@ type CommandExecutor interface {
 	ExecuteWithTimeout(ctx context.Context, dir, cmd string, timeout time.Duration, args ...string) (*CommandResult, error)
 }
 
-// DefaultCommandExecutor implements CommandExecutor using os/exec
-type DefaultCommandExecutor struct {
+// commandExecutor implements CommandExecutor using os/exec
+type commandExecutor struct {
 	defaultTimeout time.Duration
 }
 
-// NewDefaultCommandExecutor creates a new DefaultCommandExecutor
-func NewDefaultCommandExecutor(defaultTimeout time.Duration) *DefaultCommandExecutor {
-	return &DefaultCommandExecutor{
+// NewCommandExecutor creates a new CommandExecutor backed by os/exec
+func NewCommandExecutor(defaultTimeout time.Duration) CommandExecutor {
+	return &commandExecutor{
 		defaultTimeout: defaultTimeout,
 	}
 }
 
 // Execute executes a command in the specified directory
-func (e *DefaultCommandExecutor) Execute(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
+func (e *commandExecutor) Execute(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
 	return e.ExecuteWithTimeout(ctx, dir, cmd, e.defaultTimeout, args...)
 }
 
 // ExecuteWithTimeout executes a command with a specific timeout
-func (e *DefaultCommandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd string, timeout time.Duration, args ...string) (*CommandResult, error) {
+func (e *commandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd string, timeout time.Duration, args ...string) (*CommandResult, error) {
 	start := time.Now()
 
 	// Create context with timeout

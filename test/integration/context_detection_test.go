@@ -236,7 +236,7 @@ func TestContextService_Integration(t *testing.T) {
 	detector := infrastructure.NewContextDetector(config)
 
 	// Create real git service for integration testing
-	executor := infrastructure.NewDefaultCommandExecutor(30 * time.Second)
+	executor := infrastructure.NewCommandExecutor(30 * time.Second)
 	goGitClient := infrastructure.NewGoGitClient(true)
 	cliClient := infrastructure.NewCLIClient(executor, 30)
 	gitService := infrastructure.NewCompositeGitClient(goGitClient, cliClient)

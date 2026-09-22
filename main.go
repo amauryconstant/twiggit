@@ -40,7 +40,7 @@ func main() {
 
 	// Initialize infrastructure services in dependency order
 	cliTimeout := time.Duration(config.Git.CLITimeout) * time.Second
-	commandExecutor := infrastructure.NewDefaultCommandExecutor(cliTimeout)
+	commandExecutor := infrastructure.NewCommandExecutor(cliTimeout)
 	goGitClient := infrastructure.NewGoGitClient(true)
 	cliClient := infrastructure.NewCLIClient(commandExecutor, config.Git.CLITimeout)
 

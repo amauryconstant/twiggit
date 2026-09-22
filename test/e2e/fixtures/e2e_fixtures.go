@@ -59,7 +59,7 @@ func NewE2ETestFixture() *E2ETestFixture {
 		tempDir:          tempDir,
 		configHelper:     e2ehelpers.NewConfigHelper().WithTempDir(tempDir),
 		gitHelper:        helpers.NewGitTestHelper(&testing.T{}),
-		gitExecutor:      infrastructure.NewDefaultCommandExecutor(30 * time.Second),
+		gitExecutor:      infrastructure.NewCommandExecutor(30 * time.Second),
 		projects:         make(map[string]*ProjectInfo),
 		testID:           e2ehelpers.NewTestIDGenerator(),
 		createdWorktrees: make([]string, 0),

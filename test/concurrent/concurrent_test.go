@@ -49,7 +49,7 @@ func (s *ConcurrentTestSuite) SetupTest() {
 	}
 
 	// Initialize infrastructure
-	s.gitExecutor = infrastructure.NewDefaultCommandExecutor(30 * time.Second)
+	s.gitExecutor = infrastructure.NewCommandExecutor(30 * time.Second)
 }
 
 // createTestProject creates a test project with the given name

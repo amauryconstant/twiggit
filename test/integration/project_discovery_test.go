@@ -112,7 +112,7 @@ func setupTestGitRepo(t *testing.T, repoPath string) {
 	require.NoError(t, os.MkdirAll(repoPath, 0755))
 
 	// Use command executor to initialize git repo
-	executor := infrastructure.NewDefaultCommandExecutor(30 * time.Second)
+	executor := infrastructure.NewCommandExecutor(30 * time.Second)
 
 	// Initialize repository
 	_, err := executor.Execute(context.Background(), repoPath, "git", "init")

@@ -13,7 +13,7 @@ import (
 	"twiggit/internal/domain"
 )
 
-var _ application.CLIClient = (*CLIClientImpl)(nil)
+var _ application.CLIClient = (*cliClient)(nil)
 
 // parseWorktreeLine parses a single line from git worktree list output
 func parseWorktreeLine(line string) *domain.WorktreeInfo {
@@ -65,27 +65,27 @@ func buildWorktreeRemoveArgs(worktreePath string, force bool) []string {
 	return args
 }
 
-// CLIClientImpl implements CLIClient using git CLI commands
-type CLIClientImpl struct {
+// cliClient implements CLIClient using git CLI commands
+type cliClient struct {
 	executor CommandExecutor
 	timeout  time.Duration
 }
 
 // NewCLIClient creates a new CLIClient implementation
-func NewCLIClient(executor CommandExecutor, timeoutSeconds ...int) *CLIClientImpl {
+func NewCLIClient(executor CommandExecutor, timeoutSeconds ...int) application.CLIClient {
 	defaultTimeout := 30 * time.Second
 	if len(timeoutSeconds) > 0 {
 		defaultTimeout = time.Duration(timeoutSeconds[0]) * time.Second
 	}
 
-	return &CLIClientImpl{
+	return &cliClient{
 		executor: executor,
 		timeout:  defaultTimeout,
 	}
 }
 
 // CreateWorktree creates new worktree using git CLI (idempotent)
-func (c *CLIClientImpl) CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error {
+func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error {
 	// Validate inputs
 	if repoPath == "" {
 		return domain.NewGitWorktreeError(worktreePath, branchName, "repository path cannot be empty", nil)
@@ -127,7 +127,7 @@ func (c *CLIClientImpl) CreateWorktree(ctx context.Context, repoPath, branchName
 }
 
 // DeleteWorktree removes worktree using git CLI (idempotent, no-op if already deleted)
-func (c *CLIClientImpl) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
+func (c *cliClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
 	// Validate inputs
 	if repoPath == "" {
 		return domain.NewGitWorktreeError(worktreePath, "", "repository path cannot be empty", nil)
@@ -161,7 +161,7 @@ func (c *CLIClientImpl) DeleteWorktree(ctx context.Context, repoPath, worktreePa
 }
 
 // ListWorktrees lists all worktrees using git CLI (idempotent)
-func (c *CLIClientImpl) ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
+func (c *cliClient) ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
 	// Validate input
 	if repoPath == "" {
 		return nil, domain.NewGitWorktreeError("", "", "repository path cannot be empty", nil)
@@ -183,7 +183,7 @@ func (c *CLIClientImpl) ListWorktrees(ctx context.Context, repoPath string) ([]d
 }
 
 // PruneWorktrees removes stale worktree references
-func (c *CLIClientImpl) PruneWorktrees(ctx context.Context, repoPath string) error {
+func (c *cliClient) PruneWorktrees(ctx context.Context, repoPath string) error {
 	// Validate input
 	if repoPath == "" {
 		return domain.NewGitWorktreeError("", "", "repository path cannot be empty", nil)
@@ -204,7 +204,7 @@ func (c *CLIClientImpl) PruneWorktrees(ctx context.Context, repoPath string) err
 }
 
 // DeleteBranch deletes a branch using git CLI (handles worktree-referenced branches)
-func (c *CLIClientImpl) DeleteBranch(ctx context.Context, repoPath, branchName string) error {
+func (c *cliClient) DeleteBranch(ctx context.Context, repoPath, branchName string) error {
 	if repoPath == "" {
 		return domain.NewGitWorktreeError("", branchName, "repository path cannot be empty", nil)
 	}
@@ -229,7 +229,7 @@ func (c *CLIClientImpl) DeleteBranch(ctx context.Context, repoPath, branchName s
 }
 
 // IsBranchMerged checks if a branch is merged into the current branch
-func (c *CLIClientImpl) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
+func (c *cliClient) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
 	// Validate input
 	if repoPath == "" {
 		return false, domain.NewGitWorktreeError("", branchName, "repository path cannot be empty", nil)
@@ -266,7 +266,7 @@ func (c *CLIClientImpl) IsBranchMerged(ctx context.Context, repoPath, branchName
 }
 
 // parseWorktreeList parses the output of `git worktree list --porcelain`
-func (c *CLIClientImpl) parseWorktreeList(output string) ([]domain.WorktreeInfo, error) {
+func (c *cliClient) parseWorktreeList(output string) ([]domain.WorktreeInfo, error) {
 	var worktrees []domain.WorktreeInfo
 	var currentWorktree *domain.WorktreeInfo
 
@@ -321,7 +321,7 @@ func (c *CLIClientImpl) parseWorktreeList(output string) ([]domain.WorktreeInfo,
 }
 
 // branchExists checks if a branch exists using git CLI
-func (c *CLIClientImpl) branchExists(ctx context.Context, repoPath, branchName string) (bool, error) {
+func (c *cliClient) branchExists(ctx context.Context, repoPath, branchName string) (bool, error) {
 	// Use git show-ref to check if branch exists
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.timeout, "show-ref", "--verify", "--quiet", "refs/heads/"+branchName)
 	if err != nil {

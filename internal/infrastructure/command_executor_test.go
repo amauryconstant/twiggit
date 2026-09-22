@@ -254,7 +254,7 @@ func TestCreateCommandResult(t *testing.T) {
 
 // TestExecuteWithTimeout_Integration tests refactored method end-to-end
 func TestExecuteWithTimeout_Integration(t *testing.T) {
-	executor := NewDefaultCommandExecutor(5 * time.Second)
+	executor := NewCommandExecutor(5 * time.Second)
 
 	t.Run("successful command", func(t *testing.T) {
 		ctx := context.Background()
