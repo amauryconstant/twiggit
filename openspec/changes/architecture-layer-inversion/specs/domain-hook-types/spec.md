@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: HookResult field names
+### Requirement: `HookResult`
 
 The system SHALL provide a `HookResult` struct with the following
 shape:
@@ -35,3 +35,9 @@ naming rules).
 
 - **WHEN** `result.IsSuccessful` is true
 - **THEN** `result.Failures` SHALL be empty (length 0)
+
+#### Scenario: Definition holds
+
+- **WHEN** the surface described above is exercised
+- **THEN** it SHALL match the documented shape exactly
+- **AND** the implementation SHALL compile against the contract

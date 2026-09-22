@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: ValidationError builder and getter names
+### Requirement: ValidationError terminal chain
 
 `ValidationError` SHALL support immutable builder methods:
 
@@ -29,3 +29,14 @@ type at call sites that pass both).
 - **THEN** `(*ValidationError).Context()` SHALL NOT be defined
 - **AND** any caller that referenced `e.Context()` SHALL fail to
   compile until migrated to `e.Detail()`
+
+#### Scenario: Unwrap returns nil
+
+- **WHEN** `Unwrap()` is called on any `ValidationError` instance
+- **THEN** the result SHALL be `nil`
+
+#### Scenario: Plain text rendering
+
+- **WHEN** `ValidationError.Error()` is called
+- **THEN** the returned string SHALL contain no `💡` character
+- **AND** SHALL contain no trailing punctuation

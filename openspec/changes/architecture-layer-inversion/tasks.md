@@ -21,7 +21,6 @@
 
 - [ ] 3.1 Delete the `GitClient` interface (4 lines) at `internal/application/interfaces.go:101-105`; verify by `go build ./internal/application/...` clean and `git grep -n 'GitClient' internal/application/` returning only the role-interface references
 - [ ] 3.2 Add `type RepoLocator interface { FindGitRepositories(dir string) ([]domain.GitDir, error) }` to `internal/application/interfaces.go`; verify by `go build ./internal/application/...` clean
-- [ ] 3.3 Update `internal/application/AGENTS.md` interface table to remove `GitClient (Composite)` row and add `RepoLocator` row; verify by `grep -F 'GitClient (Composite)' internal/application/AGENTS.md` returning no matches
 
 ## 4. Service layer inversion (slice 3)
 
@@ -77,19 +76,14 @@
 - [ ] 7.4 Mechanical rename across `test/integration/`: replace `infrastructure.NewCLIClientImpl` → `NewCLIClient`, `NewGoGitClientImpl` → `NewGoGitClient`, `NewDefaultCommandExecutor` → `NewCommandExecutor`, `NewContextDetectorImpl` → `NewContextDetector`, `NewContextResolverImpl` → `NewContextResolver`, `NewConfigManagerImpl` → `NewConfigManager`, `NewHookRunnerImpl` → `NewHookRunner`, `NewShellInfrastructureImpl` → `NewShellInfrastructure`; verify by `mise run test:integration` passing (or `go test -tags=integration ./test/integration/...`)
 - [ ] 7.5 Same mechanical rename in `test/concurrent/` and `test/e2e/fixtures/`; verify by `mise run test:race` and `go test -tags=e2e ./test/e2e/...` passing
 
-## 8. AGENTS.md sync + .golangci.yml (slice 7)
+## 8. .golangci.yml (slice 7)
 
-- [ ] 8.1 Rewrite `internal/application/AGENTS.md` interface table to remove `GitClient (Composite)` row and add `RepoLocator` row; verify by `grep -F 'Composite' internal/application/AGENTS.md` returning no matches
-- [ ] 8.2 Rewrite `internal/service/AGENTS.md` examples to use `application.GoGitClient` and `application.CLIClient` as separate constructor params (no composite, no `infrastructure.*` imports); verify by `grep -F 'infrastructure.' internal/service/AGENTS.md` returning no matches
-- [ ] 8.3 Rewrite `internal/infrastructure/AGENTS.md` GitClient routing section to drop `*Impl` from implementation-type names; verify by `grep -F 'Impl' internal/infrastructure/AGENTS.md` returning no matches
-- [ ] 8.4 Update `internal/domain/AGENTS.md` to document the new helpers in `pathutils.go`, `git_repo.go`, `shell_wrapper.go` and the `IsModified`, `IsInstalled`, `IsSkipped`, `HasExecuted`, `IsSuccessful` field renames; verify by `grep -F 'PathTypeUnknown' internal/domain/AGENTS.md` returning a match
-- [ ] 8.5 Update `test/mocks/AGENTS.md` to document `MockGitClientBundle` and `MockRepoLocator`; verify by `grep -F 'MockGitClientBundle' test/mocks/AGENTS.md` returning a match
-- [ ] 8.6 Extend `depguard` rules in `.golangci.yml`: add allowlists for `internal/service/**`, `internal/application/**`, `internal/infrastructure/**`, `cmd/**`, `test/mocks/**` per design decision 13; verify by `mise run lint` failing for any test file that imports a forbidden package (smoke test by adding `import "twiggit/internal/infrastructure"` to a `service/` test, confirming it fails, then removing)
-- [ ] 8.7 Drop `gocognit` from `.golangci.yml` `linters.enable` list; verify by `mise run lint` clean
-- [ ] 8.8 Add `nolintlint` block under `.golangci.yml` `linters.settings` with `require-explanation: true, require-specific: true`; verify by adding a bare `//nolint` to any file and confirming `mise run lint` flags it (smoke test)
-- [ ] 8.9 Add `errcheck.check-type-assertions: true` under `linters.settings.errcheck`; verify by `mise run lint` clean
-- [ ] 8.10 Remove the blanket `text: "Close.*is not checked"` exclusion at `.golangci.yml:129-130`; for each `Close()` call site that intentionally discards the error, add `//nolint:errcheck // <reason>` on the line above (estimate 5-10 sites); verify by `mise run lint` clean
-- [ ] 8.11 Remove the four redundant `//nolint:wrapcheck` directives at `internal/infrastructure/command_executor_mock_test.go:24,26,33,35` (wrapcheck is excluded for `_test.go`); verify by `mise run lint` clean
+- [ ] 8.1 Extend `depguard` rules in `.golangci.yml`: add allowlists for `internal/service/**`, `internal/application/**`, `internal/infrastructure/**`, `cmd/**`, `test/mocks/**` per design decision 13; verify by `mise run lint` failing for any test file that imports a forbidden package (smoke test by adding `import "twiggit/internal/infrastructure"` to a `service/` test, confirming it fails, then removing)
+- [ ] 8.2 Drop `gocognit` from `.golangci.yml` `linters.enable` list; verify by `mise run lint` clean
+- [ ] 8.3 Add `nolintlint` block under `.golangci.yml` `linters.settings` with `require-explanation: true, require-specific: true`; verify by adding a bare `//nolint` to any file and confirming `mise run lint` flags it (smoke test)
+- [ ] 8.4 Add `errcheck.check-type-assertions: true` under `linters.settings.errcheck`; verify by `mise run lint` clean
+- [ ] 8.5 Remove the blanket `text: "Close.*is not checked"` exclusion at `.golangci.yml:129-130`; for each `Close()` call site that intentionally discards the error, add `//nolint:errcheck // <reason>` on the line above (estimate 5-10 sites); verify by `mise run lint` clean
+- [ ] 8.6 Remove the four redundant `//nolint:wrapcheck` directives at `internal/infrastructure/command_executor_mock_test.go:24,26,33,35` (wrapcheck is excluded for `_test.go`); verify by `mise run lint` clean
 
 ## 9. Verification (slice 9)
 

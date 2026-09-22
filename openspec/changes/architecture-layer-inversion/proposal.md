@@ -148,18 +148,6 @@ together.
   per-line `//nolint:errcheck // reason` at the ~5–10 `Close()`
   call sites that intentionally discard the error.
 
-### AGENTS.md sync
-
-Rewrite to current shape:
-- `internal/application/AGENTS.md` — interface table reflects
-  the two-role constructor and the new `RepoLocator`.
-- `internal/service/AGENTS.md` — examples use `domain.*` and
-  `application.*` only.
-- `internal/infrastructure/AGENTS.md` — interface renames +
-  `*Impl` drops documented.
-- `internal/domain/AGENTS.md` — new helpers, renames, PathTypeUnknown.
-- `test/mocks/AGENTS.md` — bundle struct documented.
-
 ## Capabilities
 
 ### New Capabilities
@@ -171,26 +159,16 @@ because the wrapper content is byte-for-byte unchanged).
 
 ### Modified Capabilities
 
-- `application-service-interfaces` — drop `GitClient` umbrella;
-  document role interfaces (`GoGitClient` + `CLIClient`) and the
-  new `RepoLocator`; add DI rule that reverse imports SHALL NOT
-  compile (existing rule, made mechanical).
+- `application-service-interfaces` — add `RepoLocator` interface
 - `application-worktree-management` — drop the "composite"
   wording from requirement 7; drop requirement 2 (per-project
   mutex) since the single `sync.Mutex` field on
   `worktreeService` is dead code and the spec requirement is
   unfulfilled.
-- `application-project-service` — no requirement change. The
-  `RepoLocator` injection is internal to `ProjectService`
-  implementation; the public contract stays the same.
 - `infrastructure-git-client` — drop the "composite GitClient is
   the only injection point" sentence in requirement 1; document
   the role-interface split.
-- `infrastructure-path-utils` — document the move of
-  `ExtractProjectFromWorktreePath`, `NormalizePath`,
-  `IsPathUnder` from `internal/infrastructure/pathutils.go` to
-  `internal/domain/pathutils.go` (the public contracts are
-  unchanged).
+- `infrastructure-path-utils` — remove requirement 4 (path-utility error-wrapping contract); helpers now live in `internal/domain/`
 - `domain-context-types` — add `PathTypeUnknown = iota 0`;
   existing values shift by +1.
 - `domain-hook-types` — `HookResult.Executed` → `HasExecuted`;
@@ -209,7 +187,6 @@ because the wrapper content is byte-for-byte unchanged).
 | `cmd/`, `main.go` | `main.go`, `cmd/root.go` (interface ref) | ~60 |
 | `test/` | `test/mocks/*`, `test/integration/*`, `test/concurrent/*`, `test/e2e/fixtures/*` (mechanical renames) | ~400 |
 | `.golangci.yml` | depguard rules + gocognit drop + nolintlint | ~50 |
-| AGENTS.md | 5 files rewritten | ~500 |
 | Specs | 7 spec deltas via `openspec/specs/<id>/spec.md` | — |
 | Tests (after impl, per project rule) | `internal/domain/*_test.go` (new), `internal/service/*_test.go` (rewritten), `internal/infrastructure/*_test.go` (rewritten) | ~1000 |
 
@@ -225,12 +202,8 @@ because the wrapper content is byte-for-byte unchanged).
 
 ## Non-goals
 
-- Wholesale layer collapse (Tier 2 CLI shape) — separate future
-  change.
-- Interface Segregation Principle refactor (splitting
-  `GoGitClient` / `CLIClient` into 1-method roles) — separate
-  future change; this change keeps the 8-method + 6-method facet
-  shape and only enforces the layer boundary.
+- Wholesale layer collapse to Tier 2 CLI shape — separate change; tracked as `cli-functional-core-shell`.
+- Interface Segregation Principle refactor — separate change; tracked as `interface-segregation`.
 - Receiver-less methods → free functions in `service/` —
   separate refactor.
 - All modernization in `cmd/` (~30 sites for `_, _ = fmt.Fprint*`,

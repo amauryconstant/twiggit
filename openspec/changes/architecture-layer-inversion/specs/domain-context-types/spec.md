@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: PathType enum values
+### Requirement: `PathType` enum
 
 The system SHALL define `PathType` with constants
 `PathTypeUnknown`, `PathTypeProject`, `PathTypeWorktree`,
@@ -33,3 +33,9 @@ invalid. `String()` SHALL return `"unknown"`, `"project"`,
   (`domain.PathTypeProject`, etc.) rather than the underlying integer
   value, because the integer values shift with the addition of
   `PathTypeUnknown = 0`
+
+#### Scenario: Definition holds
+
+- **WHEN** the surface described above is exercised
+- **THEN** it SHALL match the documented shape exactly
+- **AND** the implementation SHALL compile against the contract

@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Operation routing table
+### Requirement: Routing table
 
 The composite client SHALL route operations as follows:
 
@@ -49,6 +49,14 @@ SHALL exist; the two role interfaces are the only injection points.
 - **WHEN** `service.CreateWorktree(ctx, req)` is invoked
 - **THEN** it SHALL dispatch through the `CLIClient` field
 - **AND** it SHALL NOT call into `GoGitClient`
+
+#### Scenario: Definition holds
+
+- **WHEN** the surface described above is exercised
+- **THEN** it SHALL match the documented shape exactly
+- **AND** the implementation SHALL compile against the contract
+
+## ADDED Requirements
 
 ### Requirement: GoGitClient constructor returns error
 

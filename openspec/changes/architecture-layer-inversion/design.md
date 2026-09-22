@@ -510,7 +510,7 @@ overhead the project does not use.
    `HasExecuted`, `IsSuccessful`, `ErrResult`. Domain tests
    rewrite for the renames.
 2. Application interface split: drop `GitClient` umbrella, add
-   `RepoLocator`. `application/AGENTS.md` updates.
+   `RepoLocator`.
 3. Service layer inversion: `worktree_service.go`,
    `project_service.go`, `context_service.go`, `shell_service.go`,
    `shell_service_test.go` rewrite for the new dependencies.
@@ -530,10 +530,9 @@ overhead the project does not use.
    `test/mocks/git_service_mock.go`; rename `*Impl` mocks.
    Mechanical rename across `test/integration/`,
    `test/concurrent/`, `test/e2e/fixtures/`.
-7. AGENTS.md sync + `.golangci.yml`: rewrite 5 AGENTS.md files,
-   extend `depguard`, drop `gocognit`, add `nolintlint`, add
-   `errcheck.check-type-assertions`, drop blanket `Close`
-   exclusion, add per-line nolints.
+7. `.golangci.yml`: extend `depguard`, drop `gocognit`, add
+   `nolintlint`, add `errcheck.check-type-assertions`, drop
+   blanket `Close` exclusion, add per-line nolints.
 8. Spec deltas (this change): the 6 deltas already in
    `specs/`.
 9. Verification: `mise run verify`, `mise run test`,

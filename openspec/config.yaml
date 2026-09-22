@@ -133,7 +133,8 @@ rules:
     - Ensure scenarios are concrete with specific inputs and expected outputs
     - Include both positive and negative scenarios
     - Requirements grouped logically with clear purpose statements
-    - Format: `# Capability: <Title>` then `## Purpose` then `## Requirements`
+    - |
+      Format: `# Capability: <Title>` then `## Purpose` then `## Requirements`
       with `### Requirement:` and `#### Scenario:` headings.
     - "[bare-cross-refs] Cross-spec references SHALL use bare directory names (e.g., `cli-prune`), never line-anchored paths (e.g., `cli-prune/spec.md:35`)"
     - "[no-code-refs] Requirements and scenarios SHALL NOT reference implementation files via `path:N` form (e.g., `internal/foo.go:42`)"

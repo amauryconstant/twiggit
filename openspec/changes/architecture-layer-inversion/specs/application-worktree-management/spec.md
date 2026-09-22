@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: WorktreeService constructor dependencies
+### Requirement: Service receives git client and config via constructor
 
 The `WorktreeService` constructor SHALL accept the
 `application.GoGitClient`, `application.CLIClient`, `application.ProjectService`,
@@ -25,6 +25,12 @@ See `application-service-interfaces`.
   dispatched through the GoGit field
 - **AND** worktree and branch mutation operations SHALL be dispatched
   through the CLI field
+
+#### Scenario: Definition holds
+
+- **WHEN** the surface described above is exercised
+- **THEN** it SHALL match the documented shape exactly
+- **AND** the implementation SHALL compile against the contract
 
 ## REMOVED Requirements
 
