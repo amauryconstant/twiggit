@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 )
 
 // NewInitCmd creates a new init command
@@ -77,7 +78,7 @@ func runInitStdout(cmd *cobra.Command, config *CommandConfig, shellType core.She
 	// Auto-detect shell if not specified
 	if shellType == "" {
 		var err error
-		shellType, err = core.DetectShellFromEnv()
+		shellType, err = git.DetectShellFromEnv()
 		if err != nil {
 			return fmt.Errorf("shell auto-detection failed: %w", err)
 		}
@@ -111,7 +112,7 @@ func runInitInstall(cmd *cobra.Command, config *CommandConfig, shellType core.Sh
 	// Auto-detect shell if not specified
 	if shellType == "" {
 		var err error
-		shellType, err = core.DetectShellFromEnv()
+		shellType, err = git.DetectShellFromEnv()
 		if err != nil {
 			return fmt.Errorf("shell auto-detection failed: %w", err)
 		}

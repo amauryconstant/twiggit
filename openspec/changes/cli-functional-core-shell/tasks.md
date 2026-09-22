@@ -2,89 +2,89 @@
 
 ## 1. Setup
 
-- [ ] 1.1 Confirm `architecture-layer-inversion` is applied or note as a precondition; verify by `openspec list --changes --json` includes it as `applied`.
-- [ ] 1.2 Snapshot current build state; verify by `go build ./...` exits 0 and `go test ./internal/...` passes (read-only snapshot; do not modify tests).
-- [ ] 1.3 Snapshot current depguard rules; verify by reading `.golangci.yml` and confirming the layer-inversion rules are the active ones.
-- [ ] 1.4 Verify the planning artifacts are coherent; run `openspec validate cli-functional-core-shell --strict --json` and confirm zero issues. If issues surface, return to proposal/spec/design for another pass.
+- [x] 1.1 Confirm `architecture-layer-inversion` is applied or note as a precondition; verify by `openspec list --changes --json` includes it as `applied`.
+- [x] 1.2 Snapshot current build state; verify by `go build ./...` exits 0 and `go test ./internal/...` passes (read-only snapshot; do not modify tests).
+- [x] 1.3 Snapshot current depguard rules; verify by reading `.golangci.yml` and confirming the layer-inversion rules are the active ones.
+- [x] 1.4 Verify the planning artifacts are coherent; run `openspec validate cli-functional-core-shell --strict --json` and confirm zero issues. If issues surface, return to proposal/spec/design for another pass.
 
 ## 2. Spec deltas — write 11 MODIFIED Requirements files for existing capabilities
 
-- [ ] 2.1 Write MODIFIED delta for `cli-error-formatting`; rename constants to `ExitOK`/`ExitError`/`ExitUsage`; rename helper to `cmdutil.ExitCodeFor`; collapse formatter registry to 4 core types; add SIGINT/SIGTERM exit codes.
-- [ ] 2.2 Write MODIFIED delta for `cli-output-formats`; add `table`, `plain`, `jsonl` enum values; add single-method `Formatter` interface contract; default empty `--output` = plain.
-- [ ] 2.3 Write MODIFIED delta for `cli-verbose-output`; drop `-v`/`-vv` level distinction; replace `logv(cmd, level, ...)` with `ios.Verbosef(format, ...)`; add separate `Logger *slog.Logger` channel for `TWIGGIT_DEBUG`.
-- [ ] 2.4 Write MODIFIED delta for `cli-main-entry-point`; main becomes thin composition root; config loading moves to Factory lazy field; `ExitCodeFor` replaces `GetExitCodeForError`.
-- [ ] 2.5 Write MODIFIED delta for `domain-typed-errors`; collapse 20 types → 4 core types; slim 13 sentinels → 4 NotFound sentinels; update `core.NewValidationError(field, value, message)` signature; remove builder methods.
-- [ ] 2.6 Write MODIFIED delta for `domain-context-types`; rename `domain.*` → `core.*` for `ContextType`, `PathType`, `ResolutionResult`, `SuggestionOption`.
-- [ ] 2.7 Write MODIFIED delta for `infrastructure-context-resolver`; detection surface scoped; path-utils import → `twiggit/internal/core`; `domain.ContextDetectionError` → `core.OperationError`.
-- [ ] 2.8 Write MODIFIED delta for `infrastructure-git-client`; replace "no composite umbrella interface" rule with composite `git.GitClient` as only injection point; rename `git.NewGoGitClient()` → `git.NewClient()`; split read/write into `internal/git/reader.go` + `writer.go`.
-- [ ] 2.9 Write MODIFIED delta for `infrastructure-shell-detect`; `domain.ShellType` → `core.ShellType`; `ShellInfrastructure.ComposeWrapper` → `output.ComposeWrapper`; split pure derivation (`core/`) from `os.Stat` probing (`internal/git/shell_detect.go`).
-- [ ] 2.10 Write MODIFIED delta for `infrastructure-hook-runner`; move `HookRunner` interface to `internal/cmdutil/hook_runner_iface.go`; `domain.HookResult` → `core.HookResult`; `application.HookRunRequest` → `core.HookRunRequest`.
-- [ ] 2.11 Write MODIFIED delta for `infrastructure-config-manager`; `domain.DefaultConfig()` → `core.DefaultConfig()`; `domain.ConfigError` → `core.OperationError`; add `NO_COLOR` env handling.
-- [ ] 2.12 Verify all 11 MODIFIED deltas; run `openspec validate cli-functional-core-shell --strict --json` and confirm zero issues.
+- [x] 2.1 Write MODIFIED delta for `cli-error-formatting`; rename constants to `ExitOK`/`ExitError`/`ExitUsage`; rename helper to `cmdutil.ExitCodeFor`; collapse formatter registry to 4 core types; add SIGINT/SIGTERM exit codes.
+- [x] 2.2 Write MODIFIED delta for `cli-output-formats`; add `table`, `plain`, `jsonl` enum values; add single-method `Formatter` interface contract; default empty `--output` = plain.
+- [x] 2.3 Write MODIFIED delta for `cli-verbose-output`; drop `-v`/`-vv` level distinction; replace `logv(cmd, level, ...)` with `ios.Verbosef(format, ...)`; add separate `Logger *slog.Logger` channel for `TWIGGIT_DEBUG`.
+- [x] 2.4 Write MODIFIED delta for `cli-main-entry-point`; main becomes thin composition root; config loading moves to Factory lazy field; `ExitCodeFor` replaces `GetExitCodeForError`.
+- [x] 2.5 Write MODIFIED delta for `domain-typed-errors`; collapse 20 types → 4 core types; slim 13 sentinels → 4 NotFound sentinels; update `core.NewValidationError(field, value, message)` signature; remove builder methods.
+- [x] 2.6 Write MODIFIED delta for `domain-context-types`; rename `domain.*` → `core.*` for `ContextType`, `PathType`, `ResolutionResult`, `SuggestionOption`.
+- [x] 2.7 Write MODIFIED delta for `infrastructure-context-resolver`; detection surface scoped; path-utils import → `twiggit/internal/core`; `domain.ContextDetectionError` → `core.OperationError`.
+- [x] 2.8 Write MODIFIED delta for `infrastructure-git-client`; replace "no composite umbrella interface" rule with composite `git.GitClient` as only injection point; rename `git.NewGoGitClient()` → `git.NewClient()`; split read/write into `internal/git/reader.go` + `writer.go`.
+- [x] 2.9 Write MODIFIED delta for `infrastructure-shell-detect`; `domain.ShellType` → `core.ShellType`; `ShellInfrastructure.ComposeWrapper` → `output.ComposeWrapper`; split pure derivation (`core/`) from `os.Stat` probing (`internal/git/shell_detect.go`).
+- [x] 2.10 Write MODIFIED delta for `infrastructure-hook-runner`; move `HookRunner` interface to `internal/cmdutil/hook_runner_iface.go`; `domain.HookResult` → `core.HookResult`; `application.HookRunRequest` → `core.HookRunRequest`.
+- [x] 2.11 Write MODIFIED delta for `infrastructure-config-manager`; `domain.DefaultConfig()` → `core.DefaultConfig()`; `domain.ConfigError` → `core.OperationError`; add `NO_COLOR` env handling.
+- [x] 2.12 Verify all 11 MODIFIED deltas; run `openspec validate cli-functional-core-shell --strict --json` and confirm zero issues.
 
 ## 3. Spec deltas — tighten 10 new-capability spec files to skill
 
-- [ ] 3.1 `core-errors`: add `Suggestions []string` to `OperationError`; mandate `OperationError.Unwrap() error { return e.Cause }`; drop `Err error` from `UsageError`; mandate `UsageError.Unwrap() error { return nil }`; remove `core.NewGit*Error` constructor references (replaced by `git.NewRepoError`/`git.NewWorktreeError`/`git.NewCommandError`).
-- [ ] 3.2 `core-types`: `Pipeline[T].ValidateAll` uses `errors.Join` to preserve the full error chain (replace the previous aggregated `*core.ValidationError.Suggestions` approach).
-- [ ] 3.3 `cli-iostreams`: add `colorEnabled` field + `IsInteractive()` method (stdout AND stdin TTY); `NO_COLOR` scenario; `Quiet bool` field for `--quiet`; explicit trailing newline in `Verbosef`; `Logger` constructor wires `slog.LevelDebug` when `TWIGGIT_DEBUG` set, else `slog.LevelWarn`.
-- [ ] 3.4 `cli-output`: collapse `Formatter` to single `Write(w io.Writer, data any) error`; add `jsonl` enum value with `JSONLinesFormatter`; default empty `--output` = plain; remove the global "list commands use table" rule (per-command override documented in `cli-output-formats` MODIFIED).
-- [ ] 3.5 `cli-exit-codes`: introduce `type ExitCode int`; constants typed `ExitCode`; document SIGINT → 130 and SIGTERM → 143 via `signal.NotifyContext` + `ctx.Err()` bypass of `ExitCodeFor`.
-- [ ] 3.6 `git-client`: replace ✅/❌ emoji with `Yes`/`No` markdown; rename `git.NewGoGitClient()` → `git.NewClient()` with functional-options API (`git.WithCacheSize(n)`, `git.WithCacheDisabled()`); add "no stutter at call sites" scenario.
-- [ ] 3.7 `git-context-resolver`: replace the tautological "Priority chain matches the documented shape" scenario with concrete WHEN/THEN (worktree CWD → ContextWorktree; project CWD → ContextProject; outside git → ContextOutsideGit).
-- [ ] 3.8 `git-hook-runner`: update to declare interface in `internal/cmdutil/hook_runner_iface.go` (see §13.5); add `*core.HookRunRequest` requirement; add `*core.HookResult` requirement.
-- [ ] 3.9 `git-shell-detect`: split pure derivation (`internal/core/shell_detect.go`) from `os.Stat` probing (`internal/git/shell_detect.go`); add `core.ShellType`/`core.IsValidShellType` requirement; add `*core.OperationError` wrapping for stat failures.
-- [ ] 3.10 `cli-factory` and `core-paths`: unchanged from the initial write; verify they still match `golang-cli-architecture` examples (read-only check).
-- [ ] 3.11 Verify all 10 tightened new specs; run `openspec validate cli-functional-core-shell --strict --json` and confirm zero issues.
+- [x] 3.1 `core-errors`: add `Suggestions []string` to `OperationError`; mandate `OperationError.Unwrap() error { return e.Cause }`; drop `Err error` from `UsageError`; mandate `UsageError.Unwrap() error { return nil }`; remove `core.NewGit*Error` constructor references (replaced by `git.NewRepoError`/`git.NewWorktreeError`/`git.NewCommandError`).
+- [x] 3.2 `core-types`: `Pipeline[T].ValidateAll` uses `errors.Join` to preserve the full error chain (replace the previous aggregated `*core.ValidationError.Suggestions` approach).
+- [x] 3.3 `cli-iostreams`: add `colorEnabled` field + `IsInteractive()` method (stdout AND stdin TTY); `NO_COLOR` scenario; `Quiet bool` field for `--quiet`; explicit trailing newline in `Verbosef`; `Logger` constructor wires `slog.LevelDebug` when `TWIGGIT_DEBUG` set, else `slog.LevelWarn`.
+- [x] 3.4 `cli-output`: collapse `Formatter` to single `Write(w io.Writer, data any) error`; add `jsonl` enum value with `JSONLinesFormatter`; default empty `--output` = plain; remove the global "list commands use table" rule (per-command override documented in `cli-output-formats` MODIFIED).
+- [x] 3.5 `cli-exit-codes`: introduce `type ExitCode int`; constants typed `ExitCode`; document SIGINT → 130 and SIGTERM → 143 via `signal.NotifyContext` + `ctx.Err()` bypass of `ExitCodeFor`.
+- [x] 3.6 `git-client`: replace ✅/❌ emoji with `Yes`/`No` markdown; rename `git.NewGoGitClient()` → `git.NewClient()` with functional-options API (`git.WithCacheSize(n)`, `git.WithCacheDisabled()`); add "no stutter at call sites" scenario.
+- [x] 3.7 `git-context-resolver`: replace the tautological "Priority chain matches the documented shape" scenario with concrete WHEN/THEN (worktree CWD → ContextWorktree; project CWD → ContextProject; outside git → ContextOutsideGit).
+- [x] 3.8 `git-hook-runner`: update to declare interface in `internal/cmdutil/hook_runner_iface.go` (see §13.5); add `*core.HookRunRequest` requirement; add `*core.HookResult` requirement.
+- [x] 3.9 `git-shell-detect`: split pure derivation (`internal/core/shell_detect.go`) from `os.Stat` probing (`internal/git/shell_detect.go`); add `core.ShellType`/`core.IsValidShellType` requirement; add `*core.OperationError` wrapping for stat failures.
+- [x] 3.10 `cli-factory` and `core-paths`: unchanged from the initial write; verify they still match `golang-cli-architecture` examples (read-only check).
+- [x] 3.11 Verify all 10 tightened new specs; run `openspec validate cli-functional-core-shell --strict --json` and confirm zero issues.
 
 ## 4. New package skeletons
 
-- [ ] 4.1 Create `internal/core/doc.go` with package declaration only; verify by `go build ./internal/core/` clean.
-- [ ] 4.2 Create `internal/git/doc.go` with package declaration only; verify by `go build ./internal/git/` clean.
-- [ ] 4.3 Create `internal/output/doc.go` with package declaration only; verify by `go build ./internal/output/` clean.
-- [ ] 4.4 Create `internal/iostreams/doc.go` with package declaration only; verify by `go build ./internal/iostreams/` clean.
-- [ ] 4.5 Create `internal/cmdutil/doc.go` with package declaration only; verify by `go build ./internal/cmdutil/` clean.
-- [ ] 4.6 Create `internal/config/doc.go` with package declaration only; verify by `go build ./internal/config/` clean.
+- [x] 4.1 Create `internal/core/doc.go` with package declaration only; verify by `go build ./internal/core/` clean.
+- [x] 4.2 Create `internal/git/doc.go` with package declaration only; verify by `go build ./internal/git/` clean.
+- [x] 4.3 Create `internal/output/doc.go` with package declaration only; verify by `go build ./internal/output/` clean.
+- [x] 4.4 Create `internal/iostreams/doc.go` with package declaration only; verify by `go build ./internal/iostreams/` clean.
+- [x] 4.5 Create `internal/cmdutil/doc.go` with package declaration only; verify by `go build ./internal/cmdutil/` clean.
+- [x] 4.6 Create `internal/config/doc.go` with package declaration only; verify by `go build ./internal/config/` clean.
 
 ## 5. Pure core migration (domain → core)
 
-- [ ] 5.1 Move every `.go` file from `internal/domain/` to `internal/core/` via `git mv`; verify by `ls internal/core/` listing matches `ls internal/domain/` (minus the `doc.go` from 4.1).
-- [ ] 5.2 Rename `domain.X` → `core.X` for every exported symbol via `gopls rename` (see `golang-gopls` skill); verify by `go build ./...` clean and `go test ./internal/core/...` passes.
-- [ ] 5.3 Update every import site across `internal/service/`, `internal/application/`, `internal/infrastructure/`, `cmd/`, `test/` from `twiggit/internal/domain` → `twiggit/internal/core`; verify by `go build ./...` clean.
-- [ ] 5.4 Rename internal type aliases (`domain.Worktree` → `core.Worktree`, etc.) atomically; verify by `go test ./...` passes.
-- [ ] 5.5 Replace `domain.NewValidationError` calls with `core.NewValidationError`; verify by `go test ./internal/...` passes.
-- [ ] 5.6 Apply `os.IsNotExist` → `errors.Is(err, os.ErrNotExist)` modernization across `internal/core/`; verify by `rg 'os\.IsNotExist' internal/core/` returns no matches.
-- [ ] 5.7 Apply `strings.HasPrefix + TrimPrefix` → `strings.CutPrefix` modernization across `internal/core/`; verify by `rg 'HasPrefix.*TrimPrefix' internal/core/` returns no matches.
-- [ ] 5.8 Apply linear-scan → `slices.Contains`/`slices.Clone` modernization across `internal/core/`; verify by `rg 'for _, .* := range .* { if .* == .* {' internal/core/` returns no matches.
-- [ ] 5.9 Delete `internal/domain/` directory; verify by `ls internal/domain/` reports no such file or directory.
-- [ ] 5.10 Verify `OperationError.Suggestions []string` field exists in the migration; verify `UsageError` has no `Err` field; verify `UsageError.Unwrap() error { return nil }` and `OperationError.Unwrap() error { return e.Cause }` are present.
+- [x] 5.1 Move every `.go` file from `internal/domain/` to `internal/core/` via `git mv`; verify by `ls internal/core/` listing matches `ls internal/domain/` (minus the `doc.go` from 4.1).
+- [x] 5.2 Rename `domain.X` → `core.X` for every exported symbol via `gopls rename` (see `golang-gopls` skill); verify by `go build ./...` clean and `go test ./internal/core/...` passes.
+- [x] 5.3 Update every import site across `internal/service/`, `internal/application/`, `internal/infrastructure/`, `cmd/`, `test/` from `twiggit/internal/domain` → `twiggit/internal/core`; verify by `go build ./...` clean.
+- [x] 5.4 Rename internal type aliases (`domain.Worktree` → `core.Worktree`, etc.) atomically; verify by `go test ./...` passes.
+- [x] 5.5 Replace `domain.NewValidationError` calls with `core.NewValidationError`; verify by `go test ./internal/...` passes.
+- [x] 5.6 Apply `os.IsNotExist` → `errors.Is(err, os.ErrNotExist)` modernization across `internal/core/`; verify by `rg 'os\.IsNotExist' internal/core/` returns no matches.
+- [x] 5.7 Apply `strings.HasPrefix + TrimPrefix` → `strings.CutPrefix` modernization across `internal/core/`; verify by `rg 'HasPrefix.*TrimPrefix' internal/core/` returns no matches.
+- [x] 5.8 Apply linear-scan → `slices.Contains`/`slices.Clone` modernization across `internal/core/`; verify by `rg 'for _, .* := range .* { if .* == .* {' internal/core/` returns no matches.
+- [x] 5.9 Delete `internal/domain/` directory; verify by `ls internal/domain/` reports no such file or directory.
+- [x] 5.10 Verify `OperationError.Suggestions []string` field exists in the migration; verify `UsageError` has no `Err` field; verify `UsageError.Unwrap() error { return nil }` and `OperationError.Unwrap() error { return e.Cause }` are present.
 
 ## 6. Git adapter migration
 
-- [ ] 6.1 Move `internal/infrastructure/gogit_client.go` to `internal/git/client.go`; verify by `go build ./internal/git/` clean.
-- [ ] 6.2 Split read-side operations into `internal/git/reader.go` (`OpenRepository`, `ListBranches`, `BranchExists`, `GetRepositoryStatus`, `ListRemotes`, `GetCommitInfo`, `GetRepositoryInfo`, `ValidateRepository`); verify by `go test ./internal/git/...` passes.
-- [ ] 6.3 Move `internal/infrastructure/cli_client.go` to `internal/git/writer.go` (worktree/branch mutations); verify by `go test ./internal/git/...` passes.
-- [ ] 6.4 Move `internal/infrastructure/command_executor.go` to `internal/git/command_executor.go`; verify by `go test ./internal/git/...` passes.
-- [ ] 6.5 Move `internal/infrastructure/repo_finder.go` to `internal/git/repo_finder.go`; verify by `go test ./internal/git/...` passes.
-- [ ] 6.6 Update `domain.*` → `core.*` references across all `internal/git/` files; verify by `go build ./internal/git/` clean.
-- [ ] 6.7 Create `internal/git/errors.go` with `git.ExternalError{Tool, Operation, Message, Cause, Kind}` and constructors `git.NewRepoError`, `git.NewWorktreeError`, `git.NewCommandError`; verify by `go test ./internal/git/...` passes.
-- [ ] 6.8 Replace `git.NewGoGitClient()` callsites with `git.NewClient()` via `gopls rename`; verify by `go build ./...` clean.
-- [ ] 6.9 Apply modernization sweep (`errors.Is`, `slices.Contains`, `CutPrefix`) across `internal/git/`; verify by `rg 'os\.IsNotExist' internal/git/` returns no matches.
-- [ ] 6.10 Update test mocks to import `internal/git/` instead of `internal/infrastructure/`; verify by `go test ./test/mocks/... ./test/integration/...` passes.
+- [x] 6.1 Move `internal/infrastructure/gogit_client.go` to `internal/git/client.go`; verify by `go build ./internal/git/` clean.
+- [x] 6.2 Split read-side operations into `internal/git/reader.go` (`OpenRepository`, `ListBranches`, `BranchExists`, `GetRepositoryStatus`, `ListRemotes`, `GetCommitInfo`, `GetRepositoryInfo`, `ValidateRepository`); verify by `go test ./internal/git/...` passes.
+- [x] 6.3 Move `internal/infrastructure/cli_client.go` to `internal/git/writer.go` (worktree/branch mutations); verify by `go test ./internal/git/...` passes.
+- [x] 6.4 Move `internal/infrastructure/command_executor.go` to `internal/git/command_executor.go`; verify by `go test ./internal/git/...` passes.
+- [x] 6.5 Move `internal/infrastructure/repo_finder.go` to `internal/git/repo_finder.go`; verify by `go test ./internal/git/...` passes.
+- [x] 6.6 Update `domain.*` → `core.*` references across all `internal/git/` files; verify by `go build ./internal/git/` clean.
+- [x] 6.7 Create `internal/git/errors.go` with `git.ExternalError{Tool, Operation, Message, Cause, Kind}` and constructors `git.NewRepoError`, `git.NewWorktreeError`, `git.NewCommandError`; verify by `go test ./internal/git/...` passes.
+- [x] 6.8 Replace `git.NewGoGitClient()` callsites with `git.NewClient()` via `gopls rename`; verify by `go build ./...` clean.
+- [x] 6.9 Apply modernization sweep (`errors.Is`, `slices.Contains`, `CutPrefix`) across `internal/git/`; verify by `rg 'os\.IsNotExist' internal/git/` returns no matches.
+- [x] 6.10 Update test mocks to import `internal/git/` instead of `internal/infrastructure/`; verify by `go test ./test/mocks/... ./test/integration/...` passes.
 
 ## 7. Config + context + shell-detect migration
 
-- [ ] 7.1 Move `internal/infrastructure/config_manager.go` to `internal/config/manager.go`; verify by `go build ./internal/config/` clean.
-- [ ] 7.2 Update `domain.*` → `core.*` references in `internal/config/`; verify by `go test ./internal/config/...` passes.
-- [ ] 7.3 Move `internal/infrastructure/context_resolver.go` to `internal/git/context_resolver.go`; verify by `go test ./internal/git/...` passes.
-- [ ] 7.4 Move `internal/infrastructure/context_detector.go` to `internal/git/context_detector.go`; verify by `go test ./internal/git/...` passes.
-- [ ] 7.5 Update `git-context-resolver` and `git-shell-detect` spec delta path references; verify by `openspec validate cli-functional-core-shell --strict --json` zero issues.
-- [ ] 7.6 Apply modernization sweep across `internal/config/` and the migrated context files; verify by `rg 'os\.IsNotExist' internal/config/ internal/git/context_*.go` returns no matches.
+- [x] 7.1 Move `internal/infrastructure/config_manager.go` to `internal/config/manager.go`; verify by `go build ./internal/config/` clean.
+- [x] 7.2 Update `domain.*` → `core.*` references in `internal/config/`; verify by `go test ./internal/config/...` passes.
+- [x] 7.3 Move `internal/infrastructure/context_resolver.go` to `internal/git/context_resolver.go`; verify by `go test ./internal/git/...` passes.
+- [x] 7.4 Move `internal/infrastructure/context_detector.go` to `internal/git/context_detector.go`; verify by `go test ./internal/git/...` passes.
+- [x] 7.5 Update `git-context-resolver` and `git-shell-detect` spec delta path references; verify by `openspec validate cli-functional-core-shell --strict --json` zero issues.
+- [x] 7.6 Apply modernization sweep across `internal/config/` and the migrated context files; verify by `rg 'os\.IsNotExist' internal/config/ internal/git/context_*.go` returns no matches.
 
 ## 8. Shell-detect split (pure derivation vs file probing)
 
-- [ ] 8.1 Create `internal/core/shell_detect.go` with `core.ShellType`, `core.IsValidShellType`, `core.DetectShellFromEnv`, `core.InferShellTypeFromPath` (no `os` import for `os.Stat`); verify by `go test ./internal/core/...` passes.
-- [ ] 8.2 Create `internal/git/shell_detect.go` with the `os.Stat`-based config-file probing; wrap stat failures as `*core.OperationError` with `Op = "shell.probe"`; verify by `go test ./internal/git/...` passes.
-- [ ] 8.3 Verify `internal/core/shell_detect.go` does not import `"os"` for filesystem access; verify by `rg '"os"' internal/core/shell_detect.go` returns no matches.
+- [x] 8.1 Create `internal/core/shell_detect.go` with `core.ShellType`, `core.IsValidShellType`, `core.DetectShellFromEnv`, `core.InferShellTypeFromPath` (no `os` import for `os.Stat`); verify by `go test ./internal/core/...` passes.
+- [x] 8.2 Create `internal/git/shell_detect.go` with the `os.Stat`-based config-file probing; wrap stat failures as `*core.OperationError` with `Op = "shell.probe"`; verify by `go test ./internal/git/...` passes.
+- [x] 8.3 Verify `internal/core/shell_detect.go` does not import `"os"` for filesystem access; verify by `rg '"os"' internal/core/shell_detect.go` returns no matches.
 
 ## 9. Hook runner migration
 

@@ -1,84 +1,86 @@
-package core
+package git
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"twiggit/internal/core"
 )
 
 func TestInferShellTypeFromPath(t *testing.T) {
 	testCases := []struct {
 		name          string
 		configPath    string
-		expectedShell ShellType
+		expectedShell core.ShellType
 		expectError   bool
 		errorContains string
 	}{
 		{
 			name:          "infer bash from .bashrc",
 			configPath:    "/home/user/.bashrc",
-			expectedShell: ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 		{
 			name:          "infer bash from .bash_profile",
 			configPath:    "/home/user/.bash_profile",
-			expectedShell: ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 		{
 			name:          "infer bash from .profile",
 			configPath:    "/home/user/.profile",
-			expectedShell: ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 		{
 			name:          "infer bash from custom.bash",
 			configPath:    "/home/user/custom.bash",
-			expectedShell: ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 		{
 			name:          "infer bash from my-bash-config",
 			configPath:    "/home/user/my-bash-config",
-			expectedShell: ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 		{
 			name:          "infer zsh from .zshrc",
 			configPath:    "/home/user/.zshrc",
-			expectedShell: ShellZsh,
+			expectedShell: core.ShellZsh,
 			expectError:   false,
 		},
 		{
 			name:          "infer zsh from .zprofile",
 			configPath:    "/home/user/.zprofile",
-			expectedShell: ShellZsh,
+			expectedShell: core.ShellZsh,
 			expectError:   false,
 		},
 		{
 			name:          "infer zsh from custom.zsh",
 			configPath:    "/home/user/custom.zsh",
-			expectedShell: ShellZsh,
+			expectedShell: core.ShellZsh,
 			expectError:   false,
 		},
 		{
 			name:          "infer fish from config.fish",
 			configPath:    "/home/user/.config/fish/config.fish",
-			expectedShell: ShellFish,
+			expectedShell: core.ShellFish,
 			expectError:   false,
 		},
 		{
 			name:          "infer fish from .fishrc",
 			configPath:    "/home/user/.fishrc",
-			expectedShell: ShellFish,
+			expectedShell: core.ShellFish,
 			expectError:   false,
 		},
 		{
 			name:          "infer fish from path containing fish",
 			configPath:    "/home/user/fish/config",
-			expectedShell: ShellFish,
+			expectedShell: core.ShellFish,
 			expectError:   false,
 		},
 		{
@@ -103,7 +105,7 @@ func TestInferShellTypeFromPath(t *testing.T) {
 
 			if tc.expectError {
 				require.Error(t, err)
-				assert.Equal(t, ShellType(""), shellType)
+				assert.Equal(t, core.ShellType(""), shellType)
 				if tc.errorContains != "" {
 					assert.Contains(t, err.Error(), tc.errorContains)
 				}
@@ -120,7 +122,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 		name          string
 		setEnv        func(t *testing.T)
 		unsetEnv      func()
-		expectedShell ShellType
+		expectedShell core.ShellType
 		expectError   bool
 		errorMsg      string
 	}{
@@ -131,7 +133,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 				t.Setenv("SHELL", "/bin/bash")
 			},
 			unsetEnv:      func() {},
-			expectedShell: ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 		{
@@ -141,7 +143,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 				t.Setenv("SHELL", "/usr/local/bin/bash")
 			},
 			unsetEnv:      func() {},
-			expectedShell: ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 		{
@@ -151,7 +153,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 				t.Setenv("SHELL", "/bin/zsh")
 			},
 			unsetEnv:      func() {},
-			expectedShell: ShellZsh,
+			expectedShell: core.ShellZsh,
 			expectError:   false,
 		},
 		{
@@ -161,7 +163,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 				t.Setenv("SHELL", "/usr/bin/zsh")
 			},
 			unsetEnv:      func() {},
-			expectedShell: ShellZsh,
+			expectedShell: core.ShellZsh,
 			expectError:   false,
 		},
 		{
@@ -171,7 +173,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 				t.Setenv("SHELL", "/usr/local/bin/fish")
 			},
 			unsetEnv:      func() {},
-			expectedShell: ShellFish,
+			expectedShell: core.ShellFish,
 			expectError:   false,
 		},
 		{
@@ -181,7 +183,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 				t.Setenv("SHELL", "/bin/fish")
 			},
 			unsetEnv:      func() {},
-			expectedShell: ShellFish,
+			expectedShell: core.ShellFish,
 			expectError:   false,
 		},
 		{
@@ -224,7 +226,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 				t.Setenv("SHELL", "/usr/local/BASH/Bin/bash")
 			},
 			unsetEnv:      func() {},
-			expectedShell: ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 	}
@@ -238,7 +240,7 @@ func TestDetectShellFromEnv(t *testing.T) {
 
 			if tc.expectError {
 				require.Error(t, err)
-				assert.Equal(t, ShellType(""), shellType)
+				assert.Equal(t, core.ShellType(""), shellType)
 				if tc.errorMsg != "" {
 					assert.Contains(t, err.Error(), tc.errorMsg)
 				}

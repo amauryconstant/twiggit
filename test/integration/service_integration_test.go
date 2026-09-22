@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
 )
@@ -49,7 +50,7 @@ func TestShellIntegration_Inference(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			shellType, err := core.InferShellTypeFromPath(tc.configPath)
+			shellType, err := git.InferShellTypeFromPath(tc.configPath)
 
 			if tc.expectError {
 				require.Error(t, err)

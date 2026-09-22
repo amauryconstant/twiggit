@@ -7,6 +7,7 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 )
 
 var _ application.ShellService = (*shellService)(nil)
@@ -44,7 +45,7 @@ func (s *shellService) detectShellAndConfig(shellType core.ShellType, configFile
 	// Auto-detect shell and config file when both are empty
 	if shellType == "" && configFile == "" {
 		var err error
-		shellType, err = core.DetectShellFromEnv()
+		shellType, err = git.DetectShellFromEnv()
 		if err != nil {
 			return "", "", fmt.Errorf("shell auto-detection failed: %w", err)
 		}
@@ -58,7 +59,7 @@ func (s *shellService) detectShellAndConfig(shellType core.ShellType, configFile
 
 	// Infer shell type from config file if not specified
 	if shellType == "" && configFile != "" {
-		inferredType, err := core.InferShellTypeFromPath(configFile)
+		inferredType, err := git.InferShellTypeFromPath(configFile)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to infer shell type: %w", err)
 		}
