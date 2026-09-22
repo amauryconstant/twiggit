@@ -128,7 +128,7 @@ func TestContextResolver_ResolveIdentifier(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := setupContextResolverTest(t)
-			resolver := NewContextResolver(config, nil)
+			resolver := NewContextResolver(config, nil, nil)
 			result, err := resolver.ResolveIdentifier(tt.context, tt.identifier)
 
 			if tt.expectError {
@@ -194,7 +194,7 @@ func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := setupContextResolverTest(t)
-			resolver := NewContextResolver(config, nil)
+			resolver := NewContextResolver(config, nil, nil)
 			suggestions, err := resolver.GetResolutionSuggestions(tt.context, tt.partial)
 
 			require.NoError(t, err)
@@ -213,7 +213,7 @@ func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
 
 func TestContextResolver_WorktreeContextResolution(t *testing.T) {
 	config := setupContextResolverTest(t)
-	resolver := NewContextResolver(config, nil)
+	resolver := NewContextResolver(config, nil, nil)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextWorktree,
@@ -234,7 +234,7 @@ func TestContextResolver_WorktreeContextResolution(t *testing.T) {
 
 func TestContextResolver_CrossProjectReference(t *testing.T) {
 	config := setupContextResolverTest(t)
-	resolver := NewContextResolver(config, nil)
+	resolver := NewContextResolver(config, nil, nil)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextProject,
@@ -694,7 +694,7 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			config := setupContextResolverTest(t)
-			resolver := NewContextResolver(config, nil)
+			resolver := NewContextResolver(config, nil, nil)
 			result, err := resolver.ResolveIdentifier(tt.context, tt.identifier)
 
 			if tt.expectError {
@@ -735,7 +735,7 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 			Path:        "/home/user/Projects/test-project",
 		}
 
-		resolver := NewContextResolver(config, nil)
+		resolver := NewContextResolver(config, nil, nil)
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "main")
 
 		require.NoError(t, err)
@@ -760,7 +760,7 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, "/home/user/Projects/test-project").
 			Return([]domain.BranchInfo{}, nil)
 
-		resolver := NewContextResolver(config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature-1")
 
 		require.NoError(t, err)
@@ -783,7 +783,7 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, "/home/user/Projects/test-project").
 			Return([]domain.BranchInfo{{Name: "develop"}}, nil)
 
-		resolver := NewContextResolver(config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "develop")
 
 		require.NoError(t, err)
@@ -808,7 +808,7 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 		mockGitService := mocks.NewMockGitService()
 		mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
 
-		resolver := NewContextResolver(config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 		ctx := &domain.Context{
 			Type: domain.ContextOutsideGit,
@@ -935,7 +935,7 @@ func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
 			Return([]domain.BranchInfo{}, nil)
 
-		resolver := NewContextResolver(config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 		ctx := &domain.Context{
 			Type:        domain.ContextProject,
@@ -984,7 +984,7 @@ func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
 			Return([]domain.BranchInfo{}, nil)
 
-		resolver := NewContextResolver(config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 		ctx := &domain.Context{
 			Type:        domain.ContextProject,
@@ -1038,7 +1038,7 @@ func TestContextResolver_ProjectSuggestionsFromWorktreeContext(t *testing.T) {
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
 			Return([]domain.BranchInfo{}, nil)
 
-		resolver := NewContextResolver(config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 		ctx := &domain.Context{
 			Type:        domain.ContextWorktree,
@@ -1087,7 +1087,7 @@ func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
 				{Name: "renovate/docker-456"},
 			}, nil)
 
-		resolver := NewContextResolver(config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 		ctx := &domain.Context{
 			Type:        domain.ContextProject,
@@ -1135,7 +1135,7 @@ func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
 			mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
 		}
 
-		resolver := NewContextResolver(config, mockGitService)
+		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 		ctx := &domain.Context{
 			Type: domain.ContextOutsideGit,
@@ -1180,7 +1180,7 @@ func TestContextResolver_FuzzyMatchingEnabled(t *testing.T) {
 			{Name: "main"},
 		}, nil)
 
-	resolver := NewContextResolver(config, mockGitService)
+	resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextProject,
@@ -1219,7 +1219,7 @@ func TestContextResolver_WorktreeStatusFields(t *testing.T) {
 	mockGitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, worktreePath).
 		Return(domain.RepositoryStatus{IsClean: false}, nil)
 
-	resolver := NewContextResolver(config, mockGitService)
+	resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	ctx := &domain.Context{
 		Type:        domain.ContextWorktree,

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/knadh/koanf/parsers/toml"
@@ -88,6 +89,8 @@ func validateConfig(config *domain.Config) error {
 
 // copyConfig creates a deep copy of a configuration object
 func copyConfig(config *domain.Config) *domain.Config {
+	validation := config.Validation
+	validation.ProtectedBranches = slices.Clone(config.Validation.ProtectedBranches)
 	return &domain.Config{
 		ProjectsDirectory:   config.ProjectsDirectory,
 		WorktreesDirectory:  config.WorktreesDirectory,
@@ -95,7 +98,7 @@ func copyConfig(config *domain.Config) *domain.Config {
 		ContextDetection:    config.ContextDetection,
 		Git:                 config.Git,
 		Services:            config.Services,
-		Validation:          config.Validation,
+		Validation:          validation,
 		Navigation:          config.Navigation,
 		Shell:               config.Shell,
 		Completion:          config.Completion,

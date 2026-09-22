@@ -54,7 +54,7 @@ func main() {
 	if err != nil {
 		os.Exit(int(cmd.HandleCLIError(fmt.Errorf("init context detector: %w", err))))
 	}
-	contextResolver := infrastructure.NewContextResolver(config, gitClient)
+	contextResolver := infrastructure.NewContextResolver(config, goGitClient, cliClient)
 
 	// Initialize application services (contextService first as others depend on it)
 	contextService := service.NewContextService(contextDetector, contextResolver, config)

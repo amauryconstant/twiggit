@@ -168,15 +168,17 @@ func filterSuggestions(suggestions []string, partial string) []string {
 }
 
 type contextResolver struct {
-	config     *domain.Config
-	gitService application.GitClient
+	config *domain.Config
+	goGit  application.GoGitClient
+	cli    application.CLIClient
 }
 
 // NewContextResolver creates a new context resolver
-func NewContextResolver(cfg *domain.Config, gitService application.GitClient) application.ContextResolver {
+func NewContextResolver(cfg *domain.Config, goGit application.GoGitClient, cli application.CLIClient) application.ContextResolver {
 	return &contextResolver{
-		config:     cfg,
-		gitService: gitService,
+		config: cfg,
+		goGit:  goGit,
+		cli:    cli,
 	}
 }
 
@@ -254,8 +256,8 @@ func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, par
 	suggestions = cr.addMainSuggestion(suggestions, ctx, partial, config)
 
 	// Add worktree and branch suggestions if git service is available
-	if cr.gitService != nil && ctx.Path != "" {
-		worktrees, err := cr.gitService.ListWorktrees(context.Background(), ctx.Path)
+	if cr.cli != nil && ctx.Path != "" {
+		worktrees, err := cr.cli.ListWorktrees(context.Background(), ctx.Path)
 		if err == nil {
 			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees, config)
 			suggestions = cr.addBranchSuggestions(suggestions, ctx, partial, worktrees, config)
@@ -316,8 +318,8 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 
 		// Check dirty status for current worktree only (performance optimization)
 		var isDirty bool
-		if isCurrent && cr.gitService != nil {
-			if status, err := cr.gitService.GetRepositoryStatus(context.Background(), worktree.Path); err == nil {
+		if isCurrent && cr.goGit != nil {
+			if status, err := cr.goGit.GetRepositoryStatus(context.Background(), worktree.Path); err == nil {
 				isDirty = !status.IsClean
 			}
 		}
@@ -351,7 +353,7 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.Resolution
 		listPath = ctx.Path
 	}
 
-	branches, err := cr.gitService.ListBranches(context.Background(), listPath)
+	branches, err := cr.goGit.ListBranches(context.Background(), listPath)
 	if err != nil {
 		// Silent degradation is acceptable for suggestions - errors shouldn't prevent
 		// operation from proceeding, just reduce in helpfulness of completions
@@ -458,7 +460,7 @@ func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, ident
 func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, partial string, config *suggestionConfig) []*domain.ResolutionSuggestion {
 	suggestions := cr.addMainSuggestion(nil, ctx, partial, config)
 
-	if cr.gitService != nil && ctx.Path != "" {
+	if cr.cli != nil && ctx.Path != "" {
 		// When in worktree context, ListWorktrees should be called on project path, not worktree path
 		// Construct project path from project name and projects directory
 		var listPath string
@@ -468,7 +470,7 @@ func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, pa
 			listPath = ctx.Path
 		}
 
-		if worktrees, err := cr.gitService.ListWorktrees(context.Background(), listPath); err == nil {
+		if worktrees, err := cr.cli.ListWorktrees(context.Background(), listPath); err == nil {
 			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees, config)
 			suggestions = cr.addBranchSuggestions(suggestions, ctx, partial, worktrees, config)
 		}
@@ -556,28 +558,22 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*do
 	return suggestions
 }
 
-// ProjectRef represents a lightweight project reference for internal use
-// This is distinct from domain.ProjectInfo which contains comprehensive project details
-type ProjectRef struct {
-	Name string
-	Path string
-}
-
 // discoverProjects scans the projects directory for git repositories
-// Returns lightweight project references for suggestion generation
-func (cr *contextResolver) discoverProjects() ([]ProjectRef, error) {
+// Returns lightweight project summaries for suggestion generation
+func (cr *contextResolver) discoverProjects() ([]domain.ProjectSummary, error) {
 	projectsDir := cr.config.ProjectsDirectory
 
-	gitDirs, err := FindGitRepositories(projectsDir, cr.gitService)
+	gitDirs, err := FindGitRepositories(projectsDir, cr.goGit)
 	if err != nil {
 		return nil, domain.NewContextDetectionError(projectsDir, "failed to scan for git repositories", err)
 	}
 
-	projects := make([]ProjectRef, 0, len(gitDirs))
+	projects := make([]domain.ProjectSummary, 0, len(gitDirs))
 	for _, gitDir := range gitDirs {
-		projects = append(projects, ProjectRef{
-			Name: gitDir.Name,
-			Path: gitDir.Path,
+		projects = append(projects, domain.ProjectSummary{
+			Name:        gitDir.Name,
+			Path:        gitDir.Path,
+			GitRepoPath: gitDir.Path,
 		})
 	}
 

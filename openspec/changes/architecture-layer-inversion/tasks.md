@@ -92,8 +92,8 @@ order of tasks is implementation order.
 
 ### 5c-iv. Resolver + config refactor (behavioral)
 
-- [ ] 5c-iv.1 Update `internal/infrastructure/context_resolver.go` to accept `goGit application.GoGitClient` + `cli application.CLIClient` (replacing the composite) and replace local `ProjectRef` struct with `domain.ProjectSummary`; verify by `go build ./...` clean
-- [ ] 5c-iv.2 Update `internal/infrastructure/config_manager.go` `ProtectedBranches` deep-copy to use `slices.Clone`; verify by `go build ./...` clean
+- [x] 5c-iv.1 Update `internal/infrastructure/context_resolver.go` to accept `goGit application.GoGitClient` + `cli application.CLIClient` (replacing the composite) and replace local `ProjectRef` struct with `domain.ProjectSummary`; verify by `go build ./...` clean
+- [x] 5c-iv.2 Update `internal/infrastructure/config_manager.go` `ProtectedBranches` deep-copy to use `slices.Clone`; verify by `go build ./...` clean
 
 ### 5d. Refactors (structural)
 
