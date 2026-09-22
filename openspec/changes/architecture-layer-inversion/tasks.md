@@ -67,8 +67,8 @@ order of tasks is implementation order.
 
 ### 5b-ii. NewContextDetector signature change (behavioral)
 
-- [ ] 5b-ii.1 Change `NewContextDetector` return type from `*ContextDetector` to `(*ContextDetector, error)` so the `lru.New` allocation error in `context_detector.go` propagates; verify by `go build ./internal/infrastructure/...` clean
-- [ ] 5b-ii.2 Update `main.go` and the integration-test wiring to handle the new `error` return from `NewContextDetector`; verify by `go build ./...` clean and `mise run test:integration` passing
+- [x] 5b-ii.1 Change `NewContextDetector` return type from `*ContextDetector` to `(*ContextDetector, error)` so the `lru.New` allocation error in `context_detector.go` propagates; verify by `go build ./internal/infrastructure/...` clean
+- [x] 5b-ii.2 Update `main.go` and the integration-test wiring to handle the new `error` return from `NewContextDetector`; verify by `go build ./...` clean and `mise run test:integration` passing
 
 ### 5c-0. Type nil verification (precondition)
 
@@ -88,7 +88,7 @@ order of tasks is implementation order.
 
 ### 5c-iii. LRU cache swap (behavioral)
 
-- [ ] 5c-iii.1 Replace the unbounded `map[string]cached` field at `internal/infrastructure/context_detector.go` with `lru.Cache[string, cached]` (size 256); verify by `go test ./internal/infrastructure/...` passing
+- [x] 5c-iii.1 Replace the unbounded `map[string]cached` field at `internal/infrastructure/context_detector.go` with `lru.Cache[string, cached]` (size 256); verify by `go test ./internal/infrastructure/...` passing
 
 ### 5c-iv. Resolver + config refactor (behavioral)
 

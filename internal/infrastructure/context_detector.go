@@ -8,9 +8,12 @@ import (
 	"sync"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru/v2"
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
 )
+
+const contextDetectorCacheSize = 256
 
 type worktreeCacheEntry struct {
 	valid     bool
@@ -19,19 +22,22 @@ type worktreeCacheEntry struct {
 
 type contextDetector struct {
 	config *domain.Config
-	cache  map[string]worktreeCacheEntry
+	cache  *lru.Cache[string, worktreeCacheEntry]
 	mu     sync.RWMutex
 	ttl    time.Duration
 }
 
-// NewContextDetector creates a new context detector
-func NewContextDetector(cfg *domain.Config) application.ContextDetector {
+func NewContextDetector(cfg *domain.Config) (application.ContextDetector, error) {
 	ttl := parseTTL(cfg.ContextDetection.CacheTTL, 5*time.Second)
+	cache, err := lru.New[string, worktreeCacheEntry](contextDetectorCacheSize)
+	if err != nil {
+		return nil, fmt.Errorf("create context detector LRU cache: %w", err)
+	}
 	return &contextDetector{
 		config: cfg,
-		cache:  make(map[string]worktreeCacheEntry),
+		cache:  cache,
 		ttl:    ttl,
-	}
+	}, nil
 }
 
 func parseTTL(ttlStr string, defaultTTL time.Duration) time.Duration {
@@ -153,7 +159,7 @@ func (cd *contextDetector) isValidGitWorktree(dir string) bool {
 	now := time.Now()
 
 	cd.mu.RLock()
-	if entry, ok := cd.cache[dir]; ok && entry.expiresAt.After(now) {
+	if entry, ok := cd.cache.Get(dir); ok && entry.expiresAt.After(now) {
 		cd.mu.RUnlock()
 		return entry.valid
 	}
@@ -162,10 +168,10 @@ func (cd *contextDetector) isValidGitWorktree(dir string) bool {
 	valid := cd.checkValidGitWorktree(dir)
 
 	cd.mu.Lock()
-	cd.cache[dir] = worktreeCacheEntry{
+	cd.cache.Add(dir, worktreeCacheEntry{
 		valid:     valid,
 		expiresAt: now.Add(cd.ttl),
-	}
+	})
 	cd.mu.Unlock()
 
 	return valid

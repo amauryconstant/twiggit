@@ -100,7 +100,8 @@ func TestContextDetector_Integration(t *testing.T) {
 				WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 			}
 
-			detector := infrastructure.NewContextDetector(config)
+			detector, err := infrastructure.NewContextDetector(config)
+			require.NoError(t, err)
 			testDir := tt.setupFunc(t, config)
 
 			ctx, err := detector.DetectContext(testDir)
@@ -161,7 +162,8 @@ func TestContextResolver_Integration(t *testing.T) {
 	require.NoError(t, cmd.Run())
 
 	// Test resolver from project context
-	detector := infrastructure.NewContextDetector(config)
+	detector, err := infrastructure.NewContextDetector(config)
+	require.NoError(t, err)
 	gitService := infrastructure.NewCompositeGitClient(nil, nil) // Mock service for integration test
 	resolver := infrastructure.NewContextResolver(config, gitService)
 
@@ -233,7 +235,8 @@ func TestContextService_Integration(t *testing.T) {
 	require.NoError(t, cmd.Run())
 
 	// Create context service
-	detector := infrastructure.NewContextDetector(config)
+	detector, err := infrastructure.NewContextDetector(config)
+	require.NoError(t, err)
 
 	// Create real git service for integration testing
 	executor := infrastructure.NewCommandExecutor(30 * time.Second)

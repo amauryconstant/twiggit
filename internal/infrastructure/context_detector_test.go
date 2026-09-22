@@ -131,7 +131,8 @@ func TestContextDetector_DetectContext(t *testing.T) {
 				}
 			}
 
-			detector := NewContextDetector(config)
+			detector, err := NewContextDetector(config)
+			require.NoError(t, err)
 			ctx, err := detector.DetectContext(dir)
 
 			if tc.expectError {
@@ -163,7 +164,8 @@ func TestContextDetector_WorktreePriority(t *testing.T) {
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
 
-	detector := NewContextDetector(config)
+	detector, err := NewContextDetector(config)
+	require.NoError(t, err)
 	ctx, err := detector.DetectContext(worktreeDir)
 
 	require.NoError(t, err)
@@ -185,7 +187,8 @@ func TestContextDetector_ProjectTraversal(t *testing.T) {
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
 
-	detector := NewContextDetector(config)
+	detector, err := NewContextDetector(config)
+	require.NoError(t, err)
 	ctx, err := detector.DetectContext(nestedDir)
 
 	require.NoError(t, err)
@@ -207,7 +210,8 @@ func TestContextDetector_InvalidWorktree(t *testing.T) {
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
 
-	detector := NewContextDetector(config)
+	detector, err := NewContextDetector(config)
+	require.NoError(t, err)
 	ctx, err := detector.DetectContext(worktreeDir)
 
 	require.NoError(t, err)
@@ -236,7 +240,8 @@ func testWindowsPaths(t *testing.T) {
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
 
-	detector := NewContextDetector(config)
+	detector, err := NewContextDetector(config)
+	require.NoError(t, err)
 	require.NotNil(t, detector)
 
 	projectDir := filepath.Join(config.ProjectsDirectory, "test-project")
@@ -258,7 +263,8 @@ func testUnixPaths(t *testing.T) {
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
 
-	detector := NewContextDetector(config)
+	detector, err := NewContextDetector(config)
+	require.NoError(t, err)
 	require.NotNil(t, detector)
 
 	projectDir := filepath.Join(config.ProjectsDirectory, "test-project")

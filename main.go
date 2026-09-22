@@ -50,7 +50,10 @@ func main() {
 	// Create composite GitClient that implements both interfaces
 	gitClient := infrastructure.NewCompositeGitClient(goGitClient, cliClient)
 
-	contextDetector := infrastructure.NewContextDetector(config)
+	contextDetector, err := infrastructure.NewContextDetector(config)
+	if err != nil {
+		os.Exit(int(cmd.HandleCLIError(fmt.Errorf("init context detector: %w", err))))
+	}
 	contextResolver := infrastructure.NewContextResolver(config, gitClient)
 
 	// Initialize application services (contextService first as others depend on it)
