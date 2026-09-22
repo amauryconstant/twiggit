@@ -211,7 +211,7 @@ func (s *PruneIntegrationTestSuite) TestPruneMergedWorktrees_FullLifecycle() {
 	s.Equal("feature-merged", result.DeletedWorktrees[0].BranchName)
 
 	_, err = os.Stat(worktreePath)
-	s.True(os.IsNotExist(err), "worktree should be deleted after prune")
+	s.ErrorIs(err, os.ErrNotExist, "worktree should be deleted after prune")
 }
 
 func (s *PruneIntegrationTestSuite) TestPruneMergedWorktrees_WithDeleteBranches() {
@@ -248,7 +248,7 @@ func (s *PruneIntegrationTestSuite) TestPruneMergedWorktrees_WithDeleteBranches(
 	s.True(result.DeletedWorktrees[0].BranchDeleted)
 
 	_, err = os.Stat(worktreePath)
-	s.True(os.IsNotExist(err), "worktree should be deleted")
+	s.ErrorIs(err, os.ErrNotExist, "worktree should be deleted")
 
 	output, err := s.executor.Execute(context.Background(), repoPath, "git", "branch", "--list", "feature-with-branch")
 	s.Require().NoError(err)
@@ -432,7 +432,7 @@ func (s *PruneIntegrationTestSuite) TestUncommittedChanges_ForceBypasses() {
 	s.Equal(1, result.TotalDeleted, "should delete worktree with --force")
 
 	_, err = os.Stat(worktreePath)
-	s.True(os.IsNotExist(err), "worktree should be deleted")
+	s.ErrorIs(err, os.ErrNotExist, "worktree should be deleted")
 }
 
 func (s *PruneIntegrationTestSuite) TestCurrentWorktree_Skipped() {

@@ -4,6 +4,7 @@
 package helpers
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -42,7 +43,7 @@ func NewTwiggitCLI() *TwiggitCLI {
 
 	binaryPath := filepath.Join(cwd, "bin", "twiggit-e2e")
 
-	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
+	if _, err := os.Stat(binaryPath); errors.Is(err, os.ErrNotExist) {
 		GinkgoT().Logf("Binary not found at %s, attempting to build...", binaryPath)
 		BuildBinary()
 	}

@@ -143,10 +143,10 @@ order of tasks is implementation order.
 
 ## 9. Verification (slice 9)
 
-- [ ] 9.1 Run `mise run verify` and confirm lint + format + race + golden all pass; report any failures
-- [ ] 9.2 Run `mise run test` and confirm the full suite is green; report any failing tests
-- [ ] 9.3 Run `openspec validate architecture-layer-inversion --json` and confirm `valid: true, issues: []`
-- [ ] 9.4 Run `git grep -n 'os.IsNotExist' internal/` returning no matches (sanity check for modernization completeness)
-- [ ] 9.5 Run `git grep -n 'Impl.*= nil' internal/infrastructure/` returning no matches (sanity check for naming sweep completeness)
-- [ ] 9.6 Run `git grep -n 'infrastructure\.' internal/service/` returning no matches (sanity check that the layer inversion is complete)
-- [ ] 9.7 Run `git grep -n 'New[A-Z][A-Za-z]*Error('` returning no matches across `internal/`, `cmd/`, `test/` (sanity check for slice 1 Err-rename completeness)
+- [x] 9.1 Run `mise run verify` and confirm lint + format + race + golden all pass; report any failures
+- [x] 9.2 Run `mise run test` and confirm the full suite is green; report any failing tests
+- [x] 9.3 Run `openspec validate architecture-layer-inversion --json` and confirm `valid: true, issues: []`
+- [x] 9.4 Run `git grep -n 'os.IsNotExist' internal/` returning no matches (sanity check for modernization completeness)
+- [x] 9.5 Run `git grep -n 'Impl.*= nil' internal/infrastructure/` returning no matches (sanity check for naming sweep completeness)
+- [x] 9.6 Run `git grep -n 'infrastructure\.' internal/service/` returning no matches (sanity check that the layer inversion is complete)
+- [x] 9.7 Run `git grep -rn 'New[A-Z][A-Za-z]*Err(' internal/ cmd/ test/ | wc -l` returning 0 (sanity check: Decision 19 keeps `NewXxxError` style; `NewXxxErr` abbrev forbidden per golang-naming `Error`-suffix rule)

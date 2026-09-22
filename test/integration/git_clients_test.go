@@ -121,7 +121,7 @@ func TestGitOperations_Integration(t *testing.T) {
 
 		// Verify worktree directory is removed (or at least worktree is pruned)
 		_, err = os.Stat(worktreePath)
-		assert.True(t, os.IsNotExist(err))
+		assert.ErrorIs(t, err, os.ErrNotExist)
 	})
 
 	t.Run("GitService_DeterministicRouting", func(t *testing.T) {

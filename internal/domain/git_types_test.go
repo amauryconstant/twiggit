@@ -58,7 +58,7 @@ func TestWorktreeInfo_UsedInGitRepositoryList(t *testing.T) {
 	require := require.New(t)
 
 	repo := GitRepository{
-		Path:   "/repos/example",
+		Path: "/repos/example",
 		Worktrees: []WorktreeInfo{
 			{Path: "/repos/example/main", Branch: "main", Commit: "abc1234", IsModified: false},
 			{Path: "/repos/example/feat", Branch: "feature/x", Commit: "def5678", IsModified: true},

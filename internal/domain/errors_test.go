@@ -281,11 +281,11 @@ func TestErrSentinels_WalkThroughWraps(t *testing.T) {
 // from the domain-typed-errors spec table.
 func TestErrorsIsChain(t *testing.T) {
 	tests := []struct {
-		name              string
-		err               error
-		ownSentinel       error
-		otherNotFoundA    error
-		otherNotFoundB    error
+		name           string
+		err            error
+		ownSentinel    error
+		otherNotFoundA error
+		otherNotFoundB error
 	}{
 		{
 			name:           "GitRepositoryError chains to ErrGitRepoNotFound",

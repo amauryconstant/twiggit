@@ -6,6 +6,7 @@
 package e2e
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -65,7 +66,7 @@ var _ = Describe("Infrastructure Verification", func() {
 
 		for _, wt := range createdWorktrees {
 			_, err := os.Stat(wt)
-			Expect(os.IsNotExist(err)).To(BeTrue(), "Worktree %s should be removed", wt)
+			Expect(errors.Is(err, os.ErrNotExist)).To(BeTrue(), "Worktree %s should be removed", wt)
 		}
 	})
 

@@ -18,11 +18,11 @@ import (
 var _ application.WorktreeService = (*worktreeService)(nil)
 
 type worktreeService struct {
-	goGit         application.GoGitClient
-	cli           application.CLIClient
+	goGit          application.GoGitClient
+	cli            application.CLIClient
 	projectService application.ProjectService
-	config        *domain.Config
-	hookRunner    application.HookRunner
+	config         *domain.Config
+	hookRunner     application.HookRunner
 }
 
 func NewWorktreeService(
@@ -33,11 +33,11 @@ func NewWorktreeService(
 	hookRunner application.HookRunner,
 ) application.WorktreeService {
 	return &worktreeService{
-		goGit:         goGit,
-		cli:           cli,
+		goGit:          goGit,
+		cli:            cli,
 		projectService: projectService,
-		config:        config,
-		hookRunner:    hookRunner,
+		config:         config,
+		hookRunner:     hookRunner,
 	}
 }
 
