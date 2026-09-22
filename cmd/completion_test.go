@@ -6,14 +6,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 )
 
 func TestCompletion_GetCompletionTimeout(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   *domain.Config
+		config   *core.Config
 		expected time.Duration
 	}{
 		{
@@ -23,34 +23,34 @@ func TestCompletion_GetCompletionTimeout(t *testing.T) {
 		},
 		{
 			name:     "empty timeout returns default",
-			config:   &domain.Config{},
+			config:   &core.Config{},
 			expected: 500 * time.Millisecond,
 		},
 		{
 			name: "valid timeout from config",
-			config: &domain.Config{
-				Completion: domain.CompletionConfig{Timeout: "1s"},
+			config: &core.Config{
+				Completion: core.CompletionConfig{Timeout: "1s"},
 			},
 			expected: time.Second,
 		},
 		{
 			name: "invalid timeout returns default",
-			config: &domain.Config{
-				Completion: domain.CompletionConfig{Timeout: "invalid"},
+			config: &core.Config{
+				Completion: core.CompletionConfig{Timeout: "invalid"},
 			},
 			expected: 500 * time.Millisecond,
 		},
 		{
 			name: "custom timeout 250ms",
-			config: &domain.Config{
-				Completion: domain.CompletionConfig{Timeout: "250ms"},
+			config: &core.Config{
+				Completion: core.CompletionConfig{Timeout: "250ms"},
 			},
 			expected: 250 * time.Millisecond,
 		},
 		{
 			name: "custom timeout 2s",
-			config: &domain.Config{
-				Completion: domain.CompletionConfig{Timeout: "2s"},
+			config: &core.Config{
+				Completion: core.CompletionConfig{Timeout: "2s"},
 			},
 			expected: 2 * time.Second,
 		},
@@ -65,7 +65,7 @@ func TestCompletion_GetCompletionTimeout(t *testing.T) {
 }
 
 func TestCompletion_SuggestionsToCarapaceAction_EmptySuggestions(t *testing.T) {
-	action := suggestionsToCarapaceAction([]*domain.ResolutionSuggestion{}, "main")
+	action := suggestionsToCarapaceAction([]*core.ResolutionSuggestion{}, "main")
 
 	assert.NotNil(t, action)
 }
@@ -77,7 +77,7 @@ func TestCompletion_SuggestionsToCarapaceAction_NilSuggestions(t *testing.T) {
 }
 
 func TestCompletion_SuggestionsToCarapaceAction_WithSuggestions(t *testing.T) {
-	suggestions := []*domain.ResolutionSuggestion{
+	suggestions := []*core.ResolutionSuggestion{
 		{Text: "main", Description: "Project root directory"},
 		{Text: "feature-1", Description: "Worktree for branch feature-1"},
 		{Text: "develop", Description: "Branch develop (create worktree)"},
@@ -89,8 +89,8 @@ func TestCompletion_SuggestionsToCarapaceAction_WithSuggestions(t *testing.T) {
 }
 
 func TestCompletion_SuggestionsToCarapaceAction_SingleSuggestion(t *testing.T) {
-	suggestions := []*domain.ResolutionSuggestion{
-		{Text: "main", Description: "Project root directory", Type: domain.PathTypeProject, ProjectName: "test-project"},
+	suggestions := []*core.ResolutionSuggestion{
+		{Text: "main", Description: "Project root directory", Type: core.PathTypeProject, ProjectName: "test-project"},
 	}
 
 	action := suggestionsToCarapaceAction(suggestions, "main")
@@ -101,7 +101,7 @@ func TestCompletion_SuggestionsToCarapaceAction_SingleSuggestion(t *testing.T) {
 func TestCompletion_ActionWorktreeTarget_ReturnsAction(t *testing.T) {
 	config := &CommandConfig{
 		Services: &ServiceContainer{},
-		Config:   &domain.Config{},
+		Config:   &core.Config{},
 	}
 	action := actionWorktreeTarget(config)
 
@@ -111,7 +111,7 @@ func TestCompletion_ActionWorktreeTarget_ReturnsAction(t *testing.T) {
 func TestCompletion_ActionBranches_ReturnsAction(t *testing.T) {
 	config := &CommandConfig{
 		Services: &ServiceContainer{},
-		Config:   &domain.Config{},
+		Config:   &core.Config{},
 	}
 	action := actionBranches(config)
 
@@ -121,7 +121,7 @@ func TestCompletion_ActionBranches_ReturnsAction(t *testing.T) {
 func TestCompletion_ActionBranchesForProject_ReturnsAction(t *testing.T) {
 	config := &CommandConfig{
 		Services: &ServiceContainer{},
-		Config:   &domain.Config{},
+		Config:   &core.Config{},
 	}
 	action := actionBranchesForProject("myproject", config)
 
@@ -131,7 +131,7 @@ func TestCompletion_ActionBranchesForProject_ReturnsAction(t *testing.T) {
 func TestCompletion_ActionWorktreeTarget_WithExistingOnly(t *testing.T) {
 	config := &CommandConfig{
 		Services: &ServiceContainer{},
-		Config:   &domain.Config{},
+		Config:   &core.Config{},
 	}
 	action := actionWorktreeTarget(config, infrastructure.WithExistingOnly())
 

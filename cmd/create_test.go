@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
@@ -34,14 +34,14 @@ func TestCreateCommand_Execute(t *testing.T) {
 			args:  []string{"test-project/feature-branch"},
 			flags: map[string]string{"source": "main"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockPS *mocks.MockProjectService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
-				mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*domain.Context")).Return(&domain.ProjectInfo{
+				mockCS.On("GetCurrentContext").Return(&core.Context{Type: core.ContextOutsideGit}, nil)
+				mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*core.Context")).Return(&core.ProjectInfo{
 					Name:        "test-project",
 					GitRepoPath: "/home/user/Projects/test-project",
 				}, nil)
 				mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
-					Worktree: &domain.WorktreeInfo{
+				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*core.CreateWorktreeRequest")).Return(&core.CreateWorktreeResult{
+					Worktree: &core.WorktreeInfo{
 						Path:   "/home/user/Worktrees/test-project/feature-branch",
 						Branch: "feature-branch",
 					},
@@ -56,17 +56,17 @@ func TestCreateCommand_Execute(t *testing.T) {
 			name: "infer project from context",
 			args: []string{"feature-branch"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockPS *mocks.MockProjectService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{
-					Type:        domain.ContextProject,
+				mockCS.On("GetCurrentContext").Return(&core.Context{
+					Type:        core.ContextProject,
 					ProjectName: "current-project",
 				}, nil)
-				mockPS.On("DiscoverProject", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("*domain.Context")).Return(&domain.ProjectInfo{
+				mockPS.On("DiscoverProject", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("*core.Context")).Return(&core.ProjectInfo{
 					Name:        "current-project",
 					GitRepoPath: "/home/user/Projects/current-project",
 				}, nil)
 				mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
-					Worktree: &domain.WorktreeInfo{},
+				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*core.CreateWorktreeRequest")).Return(&core.CreateWorktreeResult{
+					Worktree: &core.WorktreeInfo{},
 				}, nil)
 			},
 			expectError: false,
@@ -76,14 +76,14 @@ func TestCreateCommand_Execute(t *testing.T) {
 			args:  []string{"test-project/feature-branch"},
 			flags: map[string]string{"cd": "true"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockPS *mocks.MockProjectService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
-				mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*domain.Context")).Return(&domain.ProjectInfo{
+				mockCS.On("GetCurrentContext").Return(&core.Context{Type: core.ContextOutsideGit}, nil)
+				mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*core.Context")).Return(&core.ProjectInfo{
 					Name:        "test-project",
 					GitRepoPath: "/home/user/Projects/test-project",
 				}, nil)
 				mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
-					Worktree: &domain.WorktreeInfo{
+				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*core.CreateWorktreeRequest")).Return(&core.CreateWorktreeResult{
+					Worktree: &core.WorktreeInfo{
 						Path:   "/home/user/Worktrees/test-project/feature-branch",
 						Branch: "feature-branch",
 					},
@@ -100,14 +100,14 @@ func TestCreateCommand_Execute(t *testing.T) {
 			args:  []string{"test-project/feature-branch"},
 			flags: map[string]string{"source": "main"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockPS *mocks.MockProjectService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
-				mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*domain.Context")).Return(&domain.ProjectInfo{
+				mockCS.On("GetCurrentContext").Return(&core.Context{Type: core.ContextOutsideGit}, nil)
+				mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*core.Context")).Return(&core.ProjectInfo{
 					Name:        "test-project",
 					GitRepoPath: "/home/user/Projects/test-project",
 				}, nil)
 				mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
-					Worktree: &domain.WorktreeInfo{
+				mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*core.CreateWorktreeRequest")).Return(&core.CreateWorktreeResult{
+					Worktree: &core.WorktreeInfo{
 						Path:   "/home/user/Worktrees/test-project/feature-branch",
 						Branch: "feature-branch",
 					},

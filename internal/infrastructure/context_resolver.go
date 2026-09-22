@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // Pure functions extracted from ContextResolver
@@ -18,10 +18,10 @@ import (
 // validatePathUnder validates that a target path is under a base directory
 // Returns an error if validation fails or if path is outside base
 func validatePathUnder(base, target, targetType, baseDesc string) error {
-	if under, err := domain.IsPathUnder(base, target); err != nil {
-		return domain.NewContextDetectionError(target, "path validation failed", err)
+	if under, err := core.IsPathUnder(base, target); err != nil {
+		return core.NewContextDetectionError(target, "path validation failed", err)
 	} else if !under {
-		return domain.NewContextDetectionError(target,
+		return core.NewContextDetectionError(target,
 			fmt.Sprintf("%s path is outside configured %s directory", targetType, baseDesc), nil)
 	}
 	return nil
@@ -101,9 +101,9 @@ func buildWorktreePath(worktreesDir, project, branch string) string {
 }
 
 // resolveMainIdentifier resolves "main" to the project root path
-func (cr *contextResolver) resolveMainIdentifier(ctx *domain.Context) (*domain.ResolutionResult, error) {
+func (cr *contextResolver) resolveMainIdentifier(ctx *core.Context) (*core.ResolutionResult, error) {
 	if containsPathTraversal(ctx.ProjectName) {
-		return nil, domain.NewResolutionError(
+		return nil, core.NewResolutionError(
 			"main",
 			ctx.Path,
 			"project name contains path traversal sequences",
@@ -117,18 +117,18 @@ func (cr *contextResolver) resolveMainIdentifier(ctx *domain.Context) (*domain.R
 		return nil, err
 	}
 
-	return &domain.ResolutionResult{
+	return &core.ResolutionResult{
 		ResolvedPath: projectPath,
-		Type:         domain.PathTypeProject,
+		Type:         core.PathTypeProject,
 		ProjectName:  ctx.ProjectName,
 		Explanation:  fmt.Sprintf("Resolved 'main' to project root '%s'", ctx.ProjectName),
 	}, nil
 }
 
 // resolveWorktreePath resolves a branch identifier to a worktree path
-func (cr *contextResolver) resolveWorktreePath(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+func (cr *contextResolver) resolveWorktreePath(ctx *core.Context, identifier string) (*core.ResolutionResult, error) {
 	if containsPathTraversal(ctx.ProjectName) || containsPathTraversal(identifier) {
-		return nil, domain.NewResolutionError(
+		return nil, core.NewResolutionError(
 			identifier,
 			ctx.Path,
 			"project or branch name contains path traversal sequences",
@@ -142,9 +142,9 @@ func (cr *contextResolver) resolveWorktreePath(ctx *domain.Context, identifier s
 		return nil, err
 	}
 
-	return &domain.ResolutionResult{
+	return &core.ResolutionResult{
 		ResolvedPath: worktreePath,
-		Type:         domain.PathTypeWorktree,
+		Type:         core.PathTypeWorktree,
 		ProjectName:  ctx.ProjectName,
 		BranchName:   identifier,
 		Explanation:  fmt.Sprintf("Resolved '%s' to worktree of project '%s'", identifier, ctx.ProjectName),
@@ -168,14 +168,14 @@ func filterSuggestions(suggestions []string, partial string) []string {
 }
 
 type contextResolver struct {
-	config     *domain.Config
+	config     *core.Config
 	goGit      application.GoGitClient
 	cli        application.CLIClient
 	repoFinder *RepoFinder
 }
 
 // NewContextResolver creates a new context resolver
-func NewContextResolver(cfg *domain.Config, goGit application.GoGitClient, cli application.CLIClient) application.ContextResolver {
+func NewContextResolver(cfg *core.Config, goGit application.GoGitClient, cli application.CLIClient) application.ContextResolver {
 	return &contextResolver{
 		config:     cfg,
 		goGit:      goGit,
@@ -184,41 +184,41 @@ func NewContextResolver(cfg *domain.Config, goGit application.GoGitClient, cli a
 	}
 }
 
-func (cr *contextResolver) ResolveIdentifier(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+func (cr *contextResolver) ResolveIdentifier(ctx *core.Context, identifier string) (*core.ResolutionResult, error) {
 	// Handle empty identifier
 	if identifier == "" {
-		return nil, domain.NewResolutionError("", "", "empty identifier", nil, nil)
+		return nil, core.NewResolutionError("", "", "empty identifier", nil, nil)
 	}
 
 	switch ctx.Type {
-	case domain.ContextProject:
+	case core.ContextProject:
 		return cr.resolveFromProjectContext(ctx, identifier)
-	case domain.ContextWorktree:
+	case core.ContextWorktree:
 		return cr.resolveFromWorktreeContext(ctx, identifier)
-	case domain.ContextOutsideGit:
+	case core.ContextOutsideGit:
 		return cr.resolveFromOutsideGitContext(ctx, identifier)
 	default:
-		return &domain.ResolutionResult{
-			Type:        domain.PathTypeInvalid,
+		return &core.ResolutionResult{
+			Type:        core.PathTypeInvalid,
 			Explanation: fmt.Sprintf("Cannot resolve identifier '%s' from unknown context", identifier),
 		}, nil
 	}
 }
 
-func (cr *contextResolver) GetResolutionSuggestions(ctx *domain.Context, partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
+func (cr *contextResolver) GetResolutionSuggestions(ctx *core.Context, partial string, opts ...core.SuggestionOption) ([]*core.ResolutionSuggestion, error) {
 	config := &suggestionConfig{}
 	for _, opt := range opts {
 		opt(config)
 	}
 
-	var suggestions []*domain.ResolutionSuggestion
+	var suggestions []*core.ResolutionSuggestion
 
 	switch ctx.Type {
-	case domain.ContextProject:
+	case core.ContextProject:
 		suggestions = append(suggestions, cr.getProjectContextSuggestions(ctx, partial, config)...)
-	case domain.ContextWorktree:
+	case core.ContextWorktree:
 		suggestions = append(suggestions, cr.getWorktreeContextSuggestions(ctx, partial, config)...)
-	case domain.ContextOutsideGit:
+	case core.ContextOutsideGit:
 		suggestions = append(suggestions, cr.getOutsideGitContextSuggestions(partial)...)
 	}
 
@@ -231,7 +231,7 @@ type suggestionConfig struct {
 }
 
 // WithExistingOnly returns an option that filters suggestions to existing worktrees only
-func WithExistingOnly() domain.SuggestionOption {
+func WithExistingOnly() core.SuggestionOption {
 	return func(c interface{}) {
 		if cfg, ok := c.(*suggestionConfig); ok {
 			cfg.existingOnly = true
@@ -239,7 +239,7 @@ func WithExistingOnly() domain.SuggestionOption {
 	}
 }
 
-func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+func (cr *contextResolver) resolveFromProjectContext(ctx *core.Context, identifier string) (*core.ResolutionResult, error) {
 	if identifier == "main" {
 		return cr.resolveMainIdentifier(ctx)
 	}
@@ -251,8 +251,8 @@ func (cr *contextResolver) resolveFromProjectContext(ctx *domain.Context, identi
 	return cr.resolveWorktreePath(ctx, identifier)
 }
 
-func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, partial string, config *suggestionConfig) []*domain.ResolutionSuggestion {
-	var suggestions []*domain.ResolutionSuggestion
+func (cr *contextResolver) getProjectContextSuggestions(ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
+	var suggestions []*core.ResolutionSuggestion
 
 	// Add main suggestion
 	suggestions = cr.addMainSuggestion(suggestions, ctx, partial, config)
@@ -273,17 +273,17 @@ func (cr *contextResolver) getProjectContextSuggestions(ctx *domain.Context, par
 }
 
 // addMainSuggestion adds the "main" project root suggestion
-func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, config *suggestionConfig) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addMainSuggestion(suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
 	// Skip main suggestion when existingOnly is true (main is not a worktree)
 	if config.existingOnly {
 		return suggestions
 	}
 
 	if strings.HasPrefix("main", partial) {
-		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+		suggestions = append(suggestions, &core.ResolutionSuggestion{
 			Text:        "main",
 			Description: "Project root directory",
-			Type:        domain.PathTypeProject,
+			Type:        core.PathTypeProject,
 			ProjectName: ctx.ProjectName,
 		})
 	}
@@ -291,7 +291,7 @@ func (cr *contextResolver) addMainSuggestion(suggestions []*domain.ResolutionSug
 }
 
 // addWorktreeSuggestions adds suggestions for existing worktrees
-func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, worktrees []domain.WorktreeInfo, config *suggestionConfig) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addWorktreeSuggestions(suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, worktrees []core.WorktreeInfo, config *suggestionConfig) []*core.ResolutionSuggestion {
 	for _, worktree := range worktrees {
 		// Apply fuzzy matching if enabled
 		if cr.config.Navigation.FuzzyMatching {
@@ -316,7 +316,7 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 		}
 
 		// Check if this is the current worktree
-		isCurrent := ctx.Type == domain.ContextWorktree && ctx.BranchName == worktree.Branch
+		isCurrent := ctx.Type == core.ContextWorktree && ctx.BranchName == worktree.Branch
 
 		// Check dirty status for current worktree only (performance optimization)
 		var isDirty bool
@@ -332,10 +332,10 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 			description = "⚠ " + description
 		}
 
-		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+		suggestions = append(suggestions, &core.ResolutionSuggestion{
 			Text:        worktree.Branch,
 			Description: description,
-			Type:        domain.PathTypeWorktree,
+			Type:        core.PathTypeWorktree,
 			ProjectName: ctx.ProjectName,
 			BranchName:  worktree.Branch,
 			IsCurrent:   isCurrent,
@@ -346,10 +346,10 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*domain.Resoluti
 }
 
 // addBranchSuggestions adds suggestions for branches without worktrees
-func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, existingWorktrees []domain.WorktreeInfo, _ *suggestionConfig) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addBranchSuggestions(suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, existingWorktrees []core.WorktreeInfo, _ *suggestionConfig) []*core.ResolutionSuggestion {
 	// When in worktree context, ListBranches should be called on project path, not worktree path
 	var listPath string
-	if ctx.Type == domain.ContextWorktree {
+	if ctx.Type == core.ContextWorktree {
 		listPath = filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
 	} else {
 		listPath = ctx.Path
@@ -396,10 +396,10 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.Resolution
 			description = fmt.Sprintf("Branch • %s (create worktree)", branch.Remote)
 		}
 
-		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+		suggestions = append(suggestions, &core.ResolutionSuggestion{
 			Text:        branch.Name,
 			Description: description,
-			Type:        domain.PathTypeProject,
+			Type:        core.PathTypeProject,
 			ProjectName: ctx.ProjectName,
 			BranchName:  branch.Name,
 		})
@@ -408,7 +408,7 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*domain.Resolution
 }
 
 // addProjectSuggestions adds suggestions for other projects (for cross-project navigation)
-func (cr *contextResolver) addProjectSuggestions(suggestions []*domain.ResolutionSuggestion, ctx *domain.Context, partial string, excludeCurrentProject bool) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) addProjectSuggestions(suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, excludeCurrentProject bool) []*core.ResolutionSuggestion {
 	projects, err := cr.discoverProjects()
 	if err != nil {
 		// Graceful degradation - return existing suggestions on error
@@ -437,17 +437,17 @@ func (cr *contextResolver) addProjectSuggestions(suggestions []*domain.Resolutio
 			continue
 		}
 
-		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+		suggestions = append(suggestions, &core.ResolutionSuggestion{
 			Text:        project.Name,
 			Description: "Project directory",
-			Type:        domain.PathTypeProject,
+			Type:        core.PathTypeProject,
 			ProjectName: project.Name,
 		})
 	}
 	return suggestions
 }
 
-func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+func (cr *contextResolver) resolveFromWorktreeContext(ctx *core.Context, identifier string) (*core.ResolutionResult, error) {
 	if identifier == "main" {
 		return cr.resolveMainIdentifier(ctx)
 	}
@@ -459,14 +459,14 @@ func (cr *contextResolver) resolveFromWorktreeContext(ctx *domain.Context, ident
 	return cr.resolveWorktreePath(ctx, identifier)
 }
 
-func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, partial string, config *suggestionConfig) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) getWorktreeContextSuggestions(ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
 	suggestions := cr.addMainSuggestion(nil, ctx, partial, config)
 
 	if cr.cli != nil && ctx.Path != "" {
 		// When in worktree context, ListWorktrees should be called on project path, not worktree path
 		// Construct project path from project name and projects directory
 		var listPath string
-		if ctx.Type == domain.ContextWorktree {
+		if ctx.Type == core.ContextWorktree {
 			listPath = filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
 		} else {
 			listPath = ctx.Path
@@ -484,7 +484,7 @@ func (cr *contextResolver) getWorktreeContextSuggestions(ctx *domain.Context, pa
 	return suggestions
 }
 
-func (cr *contextResolver) resolveFromOutsideGitContext(_ *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+func (cr *contextResolver) resolveFromOutsideGitContext(_ *core.Context, identifier string) (*core.ResolutionResult, error) {
 	// Check if identifier contains "/" (project/branch format)
 	if strings.Contains(identifier, "/") {
 		return cr.resolveCrossProjectReference(identifier)
@@ -492,7 +492,7 @@ func (cr *contextResolver) resolveFromOutsideGitContext(_ *domain.Context, ident
 
 	// Validate project name doesn't contain path traversal sequences
 	if containsPathTraversal(identifier) {
-		return nil, domain.NewResolutionError(
+		return nil, core.NewResolutionError(
 			identifier,
 			"",
 			"project name contains path traversal sequences",
@@ -509,29 +509,29 @@ func (cr *contextResolver) resolveFromOutsideGitContext(_ *domain.Context, ident
 		return nil, err
 	}
 
-	return &domain.ResolutionResult{
+	return &core.ResolutionResult{
 		ResolvedPath: projectPath,
-		Type:         domain.PathTypeProject,
+		Type:         core.PathTypeProject,
 		ProjectName:  identifier,
 		Explanation:  fmt.Sprintf("Resolved '%s' to project directory", identifier),
 	}, nil
 }
 
-func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*domain.ResolutionSuggestion {
+func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*core.ResolutionSuggestion {
 	// Check if projects directory is configured and accessible
 	if cr.config.ProjectsDirectory == "" {
-		return []*domain.ResolutionSuggestion{}
+		return []*core.ResolutionSuggestion{}
 	}
 
 	// Discover projects in the configured directory
 	projects, err := cr.discoverProjects()
 	if err != nil {
 		// Graceful degradation - return empty suggestions on error
-		return []*domain.ResolutionSuggestion{}
+		return []*core.ResolutionSuggestion{}
 	}
 
 	// Filter projects by partial match and create suggestions
-	var suggestions []*domain.ResolutionSuggestion
+	var suggestions []*core.ResolutionSuggestion
 	for _, project := range projects {
 		// Apply fuzzy matching if enabled
 		if cr.config.Navigation.FuzzyMatching {
@@ -549,10 +549,10 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*do
 			continue
 		}
 
-		suggestions = append(suggestions, &domain.ResolutionSuggestion{
+		suggestions = append(suggestions, &core.ResolutionSuggestion{
 			Text:        project.Name,
 			Description: "Project directory",
-			Type:        domain.PathTypeProject,
+			Type:        core.PathTypeProject,
 			ProjectName: project.Name,
 		})
 	}
@@ -562,17 +562,17 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*do
 
 // discoverProjects scans the projects directory for git repositories
 // Returns lightweight project summaries for suggestion generation
-func (cr *contextResolver) discoverProjects() ([]domain.ProjectSummary, error) {
+func (cr *contextResolver) discoverProjects() ([]core.ProjectSummary, error) {
 	projectsDir := cr.config.ProjectsDirectory
 
 	gitDirs, err := cr.repoFinder.FindGitRepositories(projectsDir)
 	if err != nil {
-		return nil, domain.NewContextDetectionError(projectsDir, "failed to scan for git repositories", err)
+		return nil, core.NewContextDetectionError(projectsDir, "failed to scan for git repositories", err)
 	}
 
-	projects := make([]domain.ProjectSummary, 0, len(gitDirs))
+	projects := make([]core.ProjectSummary, 0, len(gitDirs))
 	for _, gitDir := range gitDirs {
-		projects = append(projects, domain.ProjectSummary{
+		projects = append(projects, core.ProjectSummary{
 			Name:        gitDir.Name,
 			Path:        gitDir.Path,
 			GitRepoPath: gitDir.Path,
@@ -582,10 +582,10 @@ func (cr *contextResolver) discoverProjects() ([]domain.ProjectSummary, error) {
 	return projects, nil
 }
 
-func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*domain.ResolutionResult, error) {
+func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*core.ResolutionResult, error) {
 	// Check for path traversal before parsing
 	if containsPathTraversal(identifier) {
-		return nil, domain.NewResolutionError(
+		return nil, core.NewResolutionError(
 			identifier,
 			"",
 			"identifier contains path traversal sequences",
@@ -596,8 +596,8 @@ func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*dom
 
 	projectName, branchName, valid := parseCrossProjectReference(identifier)
 	if !valid {
-		return &domain.ResolutionResult{
-			Type:        domain.PathTypeInvalid,
+		return &core.ResolutionResult{
+			Type:        core.PathTypeInvalid,
 			Explanation: fmt.Sprintf("Invalid cross-project reference format: '%s'. Expected: project/branch", identifier),
 		}, nil
 	}
@@ -610,9 +610,9 @@ func (cr *contextResolver) resolveCrossProjectReference(identifier string) (*dom
 		return nil, err
 	}
 
-	return &domain.ResolutionResult{
+	return &core.ResolutionResult{
 		ResolvedPath: worktreePath,
-		Type:         domain.PathTypeWorktree,
+		Type:         core.PathTypeWorktree,
 		ProjectName:  projectName,
 		BranchName:   branchName,
 		Explanation:  fmt.Sprintf("Resolved '%s' to worktree of project '%s'", identifier, projectName),

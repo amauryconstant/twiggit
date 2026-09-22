@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
@@ -31,11 +31,11 @@ func TestCDCommand_Execute(t *testing.T) {
 			name: "cd to worktree with branch name",
 			args: []string{"feature-branch"},
 			setupMocks: func(mockNS *mocks.MockNavigationService, mockCS *mocks.MockContextService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{
-					Type:        domain.ContextProject,
+				mockCS.On("GetCurrentContext").Return(&core.Context{
+					Type:        core.ContextProject,
 					ProjectName: "test-project",
 				}, nil)
-				mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*domain.ResolvePathRequest")).Return(&domain.ResolutionResult{
+				mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*core.ResolvePathRequest")).Return(&core.ResolutionResult{
 					ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
 				}, nil)
 				mockNS.On("ValidatePath", mock.Anything, mock.AnythingOfType("string")).Return(nil)
@@ -47,12 +47,12 @@ func TestCDCommand_Execute(t *testing.T) {
 			name: "cd to default worktree",
 			args: []string{},
 			setupMocks: func(mockNS *mocks.MockNavigationService, mockCS *mocks.MockContextService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{
-					Type:        domain.ContextWorktree,
+				mockCS.On("GetCurrentContext").Return(&core.Context{
+					Type:        core.ContextWorktree,
 					ProjectName: "test-project",
 					BranchName:  "main",
 				}, nil)
-				mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*domain.ResolvePathRequest")).Return(&domain.ResolutionResult{
+				mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*core.ResolvePathRequest")).Return(&core.ResolutionResult{
 					ResolvedPath: "/home/user/Worktrees/test-project/main",
 				}, nil)
 				mockNS.On("ValidatePath", mock.Anything, mock.AnythingOfType("string")).Return(nil)
@@ -64,7 +64,7 @@ func TestCDCommand_Execute(t *testing.T) {
 			name: "no target and no default",
 			args: []string{},
 			setupMocks: func(mockNS *mocks.MockNavigationService, mockCS *mocks.MockContextService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
+				mockCS.On("GetCurrentContext").Return(&core.Context{Type: core.ContextOutsideGit}, nil)
 			},
 			expectError:  true,
 			errorMessage: "no target specified and no default worktree in context",

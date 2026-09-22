@@ -13,7 +13,7 @@ import (
 	"github.com/knadh/koanf/v2"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 var _ application.ConfigManager = (*koanfConfigManager)(nil)
@@ -46,7 +46,7 @@ func expandConfigPath(path string) string {
 }
 
 // normalizeConfigPaths expands environment variables and tilde in all path fields of the config.
-func normalizeConfigPaths(config *domain.Config) {
+func normalizeConfigPaths(config *core.Config) {
 	config.ProjectsDirectory = expandConfigPath(config.ProjectsDirectory)
 	config.WorktreesDirectory = expandConfigPath(config.WorktreesDirectory)
 	config.Shell.Wrapper.BackupDir = expandConfigPath(config.Shell.Wrapper.BackupDir)
@@ -69,8 +69,8 @@ func resolveConfigPath(xdgConfigHome, homeDir string) string {
 }
 
 // buildDefaultConfig creates a new default configuration
-func buildDefaultConfig() *domain.Config {
-	return domain.DefaultConfig()
+func buildDefaultConfig() *core.Config {
+	return core.DefaultConfig()
 }
 
 // configFileExists checks if a file exists at the given path
@@ -80,7 +80,7 @@ func configFileExists(path string) bool {
 }
 
 // validateConfig validates a configuration object
-func validateConfig(config *domain.Config) error {
+func validateConfig(config *core.Config) error {
 	if err := config.Validate(); err != nil {
 		return fmt.Errorf("config validation failed: %w", err)
 	}
@@ -88,10 +88,10 @@ func validateConfig(config *domain.Config) error {
 }
 
 // copyConfig creates a deep copy of a configuration object
-func copyConfig(config *domain.Config) *domain.Config {
+func copyConfig(config *core.Config) *core.Config {
 	validation := config.Validation
 	validation.ProtectedBranches = slices.Clone(config.Validation.ProtectedBranches)
-	return &domain.Config{
+	return &core.Config{
 		ProjectsDirectory:   config.ProjectsDirectory,
 		WorktreesDirectory:  config.WorktreesDirectory,
 		DefaultSourceBranch: config.DefaultSourceBranch,
@@ -107,7 +107,7 @@ func copyConfig(config *domain.Config) *domain.Config {
 
 type koanfConfigManager struct {
 	ko     *koanf.Koanf
-	config *domain.Config
+	config *core.Config
 }
 
 // NewConfigManager creates a new configuration manager
@@ -118,10 +118,10 @@ func NewConfigManager() application.ConfigManager {
 }
 
 // Load loads configuration from defaults and config file
-func (m *koanfConfigManager) Load() (*domain.Config, error) {
+func (m *koanfConfigManager) Load() (*core.Config, error) {
 	// 1. Load defaults
 	if err := m.loadDefaults(); err != nil {
-		return nil, domain.NewConfigError("", "failed to load default configuration", err)
+		return nil, core.NewConfigError("", "failed to load default configuration", err)
 	}
 
 	// 2. Load config file using pure function for existence check
@@ -129,14 +129,14 @@ func (m *koanfConfigManager) Load() (*domain.Config, error) {
 	if configFileExists(configPath) {
 		// Load TOML file
 		if err := m.ko.Load(file.Provider(configPath), toml.Parser()); err != nil {
-			return nil, domain.NewConfigError(configPath, "failed to parse config file", err)
+			return nil, core.NewConfigError(configPath, "failed to parse config file", err)
 		}
 	}
 
 	// 3. Unmarshal to config object
-	config := &domain.Config{}
+	config := &core.Config{}
 	if err := m.ko.Unmarshal("", config); err != nil {
-		return nil, domain.NewConfigError(configPath, "failed to unmarshal configuration", err)
+		return nil, core.NewConfigError(configPath, "failed to unmarshal configuration", err)
 	}
 
 	// 4. Normalize paths (expand environment variables and tilde)
@@ -144,7 +144,7 @@ func (m *koanfConfigManager) Load() (*domain.Config, error) {
 
 	// 5. Validate configuration using pure function
 	if err := validateConfig(config); err != nil {
-		return nil, domain.NewConfigError(configPath, "validation failed", err)
+		return nil, core.NewConfigError(configPath, "validation failed", err)
 	}
 
 	// 6. Store immutable config
@@ -155,7 +155,7 @@ func (m *koanfConfigManager) Load() (*domain.Config, error) {
 }
 
 // GetConfig returns the loaded configuration (immutable copy)
-func (m *koanfConfigManager) GetConfig() *domain.Config {
+func (m *koanfConfigManager) GetConfig() *core.Config {
 	if m.config == nil {
 		return nil
 	}

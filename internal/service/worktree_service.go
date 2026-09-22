@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 var _ application.WorktreeService = (*worktreeService)(nil)
@@ -21,7 +21,7 @@ type worktreeService struct {
 	goGit          application.GoGitClient
 	cli            application.CLIClient
 	projectService application.ProjectService
-	config         *domain.Config
+	config         *core.Config
 	hookRunner     application.HookRunner
 }
 
@@ -29,7 +29,7 @@ func NewWorktreeService(
 	goGit application.GoGitClient,
 	cli application.CLIClient,
 	projectService application.ProjectService,
-	config *domain.Config,
+	config *core.Config,
 	hookRunner application.HookRunner,
 ) application.WorktreeService {
 	return &worktreeService{
@@ -41,7 +41,7 @@ func NewWorktreeService(
 	}
 }
 
-func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.CreateWorktreeRequest) (*domain.CreateWorktreeResult, error) {
+func (s *worktreeService) CreateWorktree(ctx context.Context, req *core.CreateWorktreeRequest) (*core.CreateWorktreeResult, error) {
 	if err := s.validateCreateRequest(req); err != nil {
 		return nil, err
 	}
@@ -54,7 +54,7 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 	worktreePath := s.calculateWorktreePath(project.Name, req.BranchName)
 
 	if _, err := os.Stat(worktreePath); err == nil {
-		return nil, domain.NewConflictError("worktree", req.BranchName, "CreateWorktree", "worktree already exists at "+worktreePath, nil)
+		return nil, core.NewConflictError("worktree", req.BranchName, "CreateWorktree", "worktree already exists at "+worktreePath, nil)
 	}
 
 	parentDir := filepath.Dir(worktreePath)
@@ -64,18 +64,18 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 
 	err = s.cli.CreateWorktree(ctx, project.GitRepoPath, req.BranchName, req.SourceBranch, worktreePath)
 	if err != nil {
-		return nil, domain.NewWorktreeServiceError(worktreePath, req.BranchName, "CreateWorktree", "failed to create worktree", err)
+		return nil, core.NewWorktreeServiceError(worktreePath, req.BranchName, "CreateWorktree", "failed to create worktree", err)
 	}
 
-	worktreeInfo := &domain.WorktreeInfo{
+	worktreeInfo := &core.WorktreeInfo{
 		Path:   worktreePath,
 		Branch: req.BranchName,
 	}
 
-	var hookResult *domain.HookResult
+	var hookResult *core.HookResult
 	if s.hookRunner != nil {
 		hookReq := &application.HookRunRequest{
-			HookType:       domain.HookPostCreate,
+			HookType:       core.HookPostCreate,
 			WorktreePath:   worktreePath,
 			ProjectName:    project.Name,
 			BranchName:     req.BranchName,
@@ -93,36 +93,36 @@ func (s *worktreeService) CreateWorktree(ctx context.Context, req *domain.Create
 		}
 	}
 
-	return &domain.CreateWorktreeResult{
+	return &core.CreateWorktreeResult{
 		Worktree:   worktreeInfo,
 		HookResult: hookResult,
 	}, nil
 }
 
-func (s *worktreeService) DeleteWorktree(ctx context.Context, req *domain.DeleteWorktreeRequest) error {
+func (s *worktreeService) DeleteWorktree(ctx context.Context, req *core.DeleteWorktreeRequest) error {
 	if err := s.validateDeleteRequest(req); err != nil {
 		return err
 	}
 
 	project, err := s.findProjectByWorktree(ctx, req.WorktreePath)
 	if err != nil {
-		var worktreeErr *domain.WorktreeServiceError
-		if errors.As(err, &worktreeErr) && worktreeErr.Message == "worktree not found in any project" {
+		var worktreeErr *core.ValidationError
+		if errors.As(err, &worktreeErr) && worktreeErr.Op == "worktree.service" && worktreeErr.Message == "worktree not found in any project" {
 			return nil
 		}
-		return domain.NewWorktreeServiceError(req.WorktreePath, "", "DeleteWorktree", "failed to find project for worktree", err)
+		return core.NewWorktreeServiceError(req.WorktreePath, "", "DeleteWorktree", "failed to find project for worktree", err)
 	}
 
 	err = s.cli.DeleteWorktree(ctx, project.GitRepoPath, req.WorktreePath, req.Force)
 	if err != nil {
-		return domain.NewWorktreeServiceError(req.WorktreePath, "", "DeleteWorktree", "failed to delete worktree", err)
+		return core.NewWorktreeServiceError(req.WorktreePath, "", "DeleteWorktree", "failed to delete worktree", err)
 	}
 
 	return nil
 }
 
-func (s *worktreeService) ListWorktrees(ctx context.Context, req *domain.ListWorktreesRequest) ([]*domain.WorktreeInfo, error) {
-	var projects []*domain.ProjectInfo
+func (s *worktreeService) ListWorktrees(ctx context.Context, req *core.ListWorktreesRequest) ([]*core.WorktreeInfo, error) {
+	var projects []*core.ProjectInfo
 	var err error
 
 	if req.ListAllProjects {
@@ -130,12 +130,12 @@ func (s *worktreeService) ListWorktrees(ctx context.Context, req *domain.ListWor
 		if err != nil {
 			return nil, fmt.Errorf("failed to list all projects: %w", err)
 		}
-	} else if req.Context != nil && (req.Context.Type == domain.ContextProject || req.Context.Type == domain.ContextWorktree) {
+	} else if req.Context != nil && (req.Context.Type == core.ContextProject || req.Context.Type == core.ContextWorktree) {
 		project, err := s.projectService.GetProjectInfo(ctx, req.Context.Path)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get project info from context: %w", err)
 		}
-		projects = []*domain.ProjectInfo{project}
+		projects = []*core.ProjectInfo{project}
 	} else {
 		projectName := req.ProjectName
 		if projectName == "" && req.Context != nil {
@@ -143,25 +143,25 @@ func (s *worktreeService) ListWorktrees(ctx context.Context, req *domain.ListWor
 		}
 
 		if projectName == "" {
-			return nil, domain.NewValidationError("ListWorktreesRequest", "projectName", "", "project name required when not provided in context")
+			return nil, core.NewOpValidationError("ListWorktreesRequest", "projectName", "", "project name required when not provided in context")
 		}
 
 		project, err := s.projectService.DiscoverProject(ctx, projectName, req.Context)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve project: %w", err)
 		}
-		projects = []*domain.ProjectInfo{project}
+		projects = []*core.ProjectInfo{project}
 	}
 
-	var allWorktrees []*domain.WorktreeInfo
+	var allWorktrees []*core.WorktreeInfo
 	for _, project := range projects {
 		worktrees, err := s.cli.ListWorktrees(ctx, project.GitRepoPath)
 		if err != nil {
-			return nil, domain.NewWorktreeServiceError(project.GitRepoPath, "", "ListWorktrees", "failed to list worktrees", err)
+			return nil, core.NewWorktreeServiceError(project.GitRepoPath, "", "ListWorktrees", "failed to list worktrees", err)
 		}
 
 		if !req.IncludeMain {
-			var filtered []domain.WorktreeInfo
+			var filtered []core.WorktreeInfo
 			for _, wt := range worktrees {
 				if wt.Path != project.GitRepoPath {
 					filtered = append(filtered, wt)
@@ -178,15 +178,15 @@ func (s *worktreeService) ListWorktrees(ctx context.Context, req *domain.ListWor
 	return allWorktrees, nil
 }
 
-func (s *worktreeService) listAllProjects(ctx context.Context) ([]*domain.ProjectInfo, error) {
+func (s *worktreeService) listAllProjects(ctx context.Context) ([]*core.ProjectInfo, error) {
 	summaries, err := s.projectService.ListProjectSummaries(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list projects: %w", err)
 	}
 
-	result := make([]*domain.ProjectInfo, len(summaries))
+	result := make([]*core.ProjectInfo, len(summaries))
 	for i, summary := range summaries {
-		result[i] = &domain.ProjectInfo{
+		result[i] = &core.ProjectInfo{
 			Name:        summary.Name,
 			Path:        summary.Path,
 			GitRepoPath: summary.GitRepoPath,
@@ -196,9 +196,9 @@ func (s *worktreeService) listAllProjects(ctx context.Context) ([]*domain.Projec
 	return result, nil
 }
 
-func (s *worktreeService) GetWorktreeStatus(ctx context.Context, worktreePath string) (*domain.WorktreeStatus, error) {
+func (s *worktreeService) GetWorktreeStatus(ctx context.Context, worktreePath string) (*core.WorktreeStatus, error) {
 	if worktreePath == "" {
-		return nil, domain.NewValidationError("GetWorktreeStatus", "worktreePath", "", "worktree path cannot be empty")
+		return nil, core.NewOpValidationError("GetWorktreeStatus", "worktreePath", "", "worktree path cannot be empty")
 	}
 
 	err := s.ValidateWorktree(ctx, worktreePath)
@@ -208,20 +208,20 @@ func (s *worktreeService) GetWorktreeStatus(ctx context.Context, worktreePath st
 
 	repoStatus, err := s.goGit.GetRepositoryStatus(ctx, worktreePath)
 	if err != nil {
-		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to get repository status", err)
+		return nil, core.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to get repository status", err)
 	}
 
 	project, err := s.findProjectByWorktree(ctx, worktreePath)
 	if err != nil {
-		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to find parent project", err)
+		return nil, core.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to find parent project", err)
 	}
 
 	worktrees, err := s.cli.ListWorktrees(ctx, project.GitRepoPath)
 	if err != nil {
-		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to get worktree info", err)
+		return nil, core.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "failed to get worktree info", err)
 	}
 
-	var worktreeInfo *domain.WorktreeInfo
+	var worktreeInfo *core.WorktreeInfo
 	for i := range worktrees {
 		if worktrees[i].Path == worktreePath {
 			worktreeInfo = &worktrees[i]
@@ -230,7 +230,7 @@ func (s *worktreeService) GetWorktreeStatus(ctx context.Context, worktreePath st
 	}
 
 	if worktreeInfo == nil {
-		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "worktree not found in list", nil)
+		return nil, core.NewWorktreeServiceError(worktreePath, "", "GetWorktreeStatus", "worktree not found in list", nil)
 	}
 
 	branchStatus := "up-to-date"
@@ -242,7 +242,7 @@ func (s *worktreeService) GetWorktreeStatus(ctx context.Context, worktreePath st
 		branchStatus = "behind"
 	}
 
-	return &domain.WorktreeStatus{
+	return &core.WorktreeStatus{
 		WorktreeInfo:          worktreeInfo,
 		RepositoryStatus:      &repoStatus,
 		LastChecked:           time.Now(),
@@ -254,22 +254,22 @@ func (s *worktreeService) GetWorktreeStatus(ctx context.Context, worktreePath st
 
 func (s *worktreeService) ValidateWorktree(ctx context.Context, worktreePath string) error {
 	if worktreePath == "" {
-		return domain.NewValidationError("ValidateWorktree", "worktreePath", "", "worktree path cannot be empty")
+		return core.NewOpValidationError("ValidateWorktree", "worktreePath", "", "worktree path cannot be empty")
 	}
 
 	err := s.goGit.ValidateRepository(worktreePath)
 	if err != nil {
-		return domain.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "invalid git repository", err)
+		return core.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "invalid git repository", err)
 	}
 
 	project, err := s.findProjectByWorktree(ctx, worktreePath)
 	if err != nil {
-		return domain.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "failed to find parent project", err)
+		return core.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "failed to find parent project", err)
 	}
 
 	worktrees, err := s.cli.ListWorktrees(ctx, project.GitRepoPath)
 	if err != nil {
-		return domain.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "failed to list worktrees", err)
+		return core.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "failed to list worktrees", err)
 	}
 
 	isWorktree := false
@@ -281,33 +281,35 @@ func (s *worktreeService) ValidateWorktree(ctx context.Context, worktreePath str
 	}
 
 	if !isWorktree {
-		return domain.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "path is not a valid worktree", nil)
+		return core.NewWorktreeServiceError(worktreePath, "", "ValidateWorktree", "path is not a valid worktree", nil)
 	}
 
 	return nil
 }
 
-func (s *worktreeService) validateCreateRequest(req *domain.CreateWorktreeRequest) error {
-	branchValidation := domain.ValidateBranchName(req.BranchName)
+func (s *worktreeService) validateCreateRequest(req *core.CreateWorktreeRequest) error {
+	branchValidation := core.ValidateBranchName(req.BranchName)
 	if branchValidation.IsError() {
 		return branchValidation.Error
 	}
 
 	if req.Context == nil {
-		return domain.NewValidationError("CreateWorktreeRequest", "Context", "", "context is required").
-			WithSuggestions([]string{"Run from within a project or worktree directory"})
+		err := core.NewOpValidationError("CreateWorktreeRequest", "Context", "", "context is required")
+		err.Suggestions = []string{"Run from within a project or worktree directory"}
+		return err
 	}
-	if req.ProjectName == "" && req.Context.Type != domain.ContextProject {
-		return domain.NewValidationError("CreateWorktreeRequest", "ProjectName", "", "project name required when not in project context").
-			WithSuggestions([]string{"Specify a project name (e.g., my-project/feature-branch)", "Run from within a project directory"})
+	if req.ProjectName == "" && req.Context.Type != core.ContextProject {
+		err := core.NewOpValidationError("CreateWorktreeRequest", "ProjectName", "", "project name required when not in project context")
+		err.Suggestions = []string{"Specify a project name (e.g., my-project/feature-branch)", "Run from within a project directory"}
+		return err
 	}
 
 	return nil
 }
 
-func (s *worktreeService) validateDeleteRequest(req *domain.DeleteWorktreeRequest) error {
+func (s *worktreeService) validateDeleteRequest(req *core.DeleteWorktreeRequest) error {
 	if req.WorktreePath == "" {
-		return domain.NewValidationError("DeleteWorktreeRequest", "WorktreePath", "", "worktree path cannot be empty")
+		return core.NewOpValidationError("DeleteWorktreeRequest", "WorktreePath", "", "worktree path cannot be empty")
 	}
 
 	return nil
@@ -323,7 +325,7 @@ func (s *worktreeService) calculateWorktreePath(projectName, branchName string) 
 	return filepath.Join(s.config.WorktreesDirectory, safeProjectName, safeBranchName)
 }
 
-func (s *worktreeService) findProjectByWorktree(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {
+func (s *worktreeService) findProjectByWorktree(ctx context.Context, worktreePath string) (*core.ProjectInfo, error) {
 	if info, err := s.findProjectFromConfig(ctx, worktreePath); err != nil {
 		return nil, err
 	} else if info != nil {
@@ -333,12 +335,12 @@ func (s *worktreeService) findProjectByWorktree(ctx context.Context, worktreePat
 	return s.findProjectByListing(ctx, worktreePath)
 }
 
-func (s *worktreeService) findProjectFromConfig(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {
+func (s *worktreeService) findProjectFromConfig(ctx context.Context, worktreePath string) (*core.ProjectInfo, error) {
 	if s.config == nil || s.config.WorktreesDirectory == "" || s.config.ProjectsDirectory == "" {
 		return nil, nil
 	}
 
-	projectName, err := domain.ExtractProjectFromWorktreePath(worktreePath, s.config.WorktreesDirectory)
+	projectName, err := core.ExtractProjectFromWorktreePath(worktreePath, s.config.WorktreesDirectory)
 	if err != nil || projectName == "" {
 		return nil, nil
 	}
@@ -356,7 +358,7 @@ func (s *worktreeService) findProjectFromConfig(ctx context.Context, worktreePat
 	return info, nil
 }
 
-func (s *worktreeService) findProjectByListing(ctx context.Context, worktreePath string) (*domain.ProjectInfo, error) {
+func (s *worktreeService) findProjectByListing(ctx context.Context, worktreePath string) (*core.ProjectInfo, error) {
 	projects, err := s.projectService.ListProjects(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list projects: %w", err)
@@ -368,10 +370,10 @@ func (s *worktreeService) findProjectByListing(ctx context.Context, worktreePath
 		}
 	}
 
-	return nil, domain.NewWorktreeServiceError(worktreePath, "", "findProjectByWorktree", "worktree not found in any project", nil)
+	return nil, core.NewWorktreeServiceError(worktreePath, "", "findProjectByWorktree", "worktree not found in any project", nil)
 }
 
-func (s *worktreeService) isWorktreeInProject(worktreePath string, project *domain.ProjectInfo) bool {
+func (s *worktreeService) isWorktreeInProject(worktreePath string, project *core.ProjectInfo) bool {
 	for _, wt := range project.Worktrees {
 		if wt.Path == worktreePath {
 			return true
@@ -380,21 +382,21 @@ func (s *worktreeService) isWorktreeInProject(worktreePath string, project *doma
 	return false
 }
 
-func (s *worktreeService) PruneMergedWorktrees(ctx context.Context, req *domain.PruneWorktreesRequest) (*domain.PruneWorktreesResult, error) {
+func (s *worktreeService) PruneMergedWorktrees(ctx context.Context, req *core.PruneWorktreesRequest) (*core.PruneWorktreesResult, error) {
 	if err := s.validatePruneRequest(req); err != nil {
 		return nil, err
 	}
 
-	var projects []*domain.ProjectInfo
+	var projects []*core.ProjectInfo
 
 	if req.AllProjects {
 		summaries, err := s.projectService.ListProjectSummaries(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list projects: %w", err)
 		}
-		projects = make([]*domain.ProjectInfo, len(summaries))
+		projects = make([]*core.ProjectInfo, len(summaries))
 		for i, summary := range summaries {
-			projects[i] = &domain.ProjectInfo{
+			projects[i] = &core.ProjectInfo{
 				Name:        summary.Name,
 				Path:        summary.Path,
 				GitRepoPath: summary.GitRepoPath,
@@ -403,13 +405,13 @@ func (s *worktreeService) PruneMergedWorktrees(ctx context.Context, req *domain.
 	} else if req.SpecificWorktree != "" {
 		parts := strings.Split(req.SpecificWorktree, "/")
 		if len(parts) != 2 {
-			return nil, domain.NewValidationError("PruneWorktreesRequest", "SpecificWorktree", req.SpecificWorktree, "must be in format project/branch")
+			return nil, core.NewOpValidationError("PruneWorktreesRequest", "SpecificWorktree", req.SpecificWorktree, "must be in format project/branch")
 		}
 		project, err := s.projectService.DiscoverProject(ctx, parts[0], req.Context)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve project: %w", err)
 		}
-		projects = []*domain.ProjectInfo{project}
+		projects = []*core.ProjectInfo{project}
 	} else {
 		projectName := req.ProjectName
 		if projectName == "" && req.Context != nil {
@@ -420,21 +422,21 @@ func (s *worktreeService) PruneMergedWorktrees(ctx context.Context, req *domain.
 			if err != nil {
 				return nil, fmt.Errorf("failed to get project info from context: %w", err)
 			}
-			projects = []*domain.ProjectInfo{project}
+			projects = []*core.ProjectInfo{project}
 		} else {
 			project, err := s.projectService.DiscoverProject(ctx, projectName, req.Context)
 			if err != nil {
 				return nil, fmt.Errorf("failed to resolve project: %w", err)
 			}
-			projects = []*domain.ProjectInfo{project}
+			projects = []*core.ProjectInfo{project}
 		}
 	}
 
-	result := &domain.PruneWorktreesResult{
-		DeletedWorktrees:     []*domain.PruneWorktreeResult{},
-		SkippedWorktrees:     []*domain.PruneWorktreeResult{},
-		ProtectedSkipped:     []*domain.PruneWorktreeResult{},
-		UnmergedSkipped:      []*domain.PruneWorktreeResult{},
+	result := &core.PruneWorktreesResult{
+		DeletedWorktrees:     []*core.PruneWorktreeResult{},
+		SkippedWorktrees:     []*core.PruneWorktreeResult{},
+		ProtectedSkipped:     []*core.PruneWorktreeResult{},
+		UnmergedSkipped:      []*core.PruneWorktreeResult{},
 		TotalDeleted:         0,
 		TotalSkipped:         0,
 		TotalBranchesDeleted: 0,
@@ -461,14 +463,14 @@ func (s *worktreeService) PruneMergedWorktrees(ctx context.Context, req *domain.
 	return result, nil
 }
 
-func (s *worktreeService) validatePruneRequest(req *domain.PruneWorktreesRequest) error {
+func (s *worktreeService) validatePruneRequest(req *core.PruneWorktreesRequest) error {
 	if req.SpecificWorktree != "" && req.AllProjects {
-		return domain.NewValidationError("PruneWorktreesRequest", "AllProjects", "true", "cannot use --all with specific worktree")
+		return core.NewOpValidationError("PruneWorktreesRequest", "AllProjects", "true", "cannot use --all with specific worktree")
 	}
 	return nil
 }
 
-func (s *worktreeService) pruneProjectWorktrees(ctx context.Context, req *domain.PruneWorktreesRequest, project *domain.ProjectInfo, result *domain.PruneWorktreesResult, singleWorktreeTarget string) {
+func (s *worktreeService) pruneProjectWorktrees(ctx context.Context, req *core.PruneWorktreesRequest, project *core.ProjectInfo, result *core.PruneWorktreesResult, singleWorktreeTarget string) {
 	worktrees, err := s.cli.ListWorktrees(ctx, project.GitRepoPath)
 	if err != nil {
 		return
@@ -485,7 +487,7 @@ func (s *worktreeService) pruneProjectWorktrees(ctx context.Context, req *domain
 			continue
 		}
 
-		pruneResult := &domain.PruneWorktreeResult{
+		pruneResult := &core.PruneWorktreeResult{
 			ProjectName:   project.Name,
 			WorktreePath:  wt.Path,
 			BranchName:    wt.Branch,
@@ -508,7 +510,7 @@ type worktreeSkipResult struct {
 	category string
 }
 
-func (s *worktreeService) checkWorktreeSkip(ctx context.Context, wt domain.WorktreeInfo, project *domain.ProjectInfo, cwd string, req *domain.PruneWorktreesRequest) *worktreeSkipResult {
+func (s *worktreeService) checkWorktreeSkip(ctx context.Context, wt core.WorktreeInfo, project *core.ProjectInfo, cwd string, req *core.PruneWorktreesRequest) *worktreeSkipResult {
 	if cwd != "" && (strings.HasPrefix(cwd, wt.Path+string(filepath.Separator)) || cwd == wt.Path) {
 		return &worktreeSkipResult{reason: "cannot prune current worktree", category: "current"}
 	}
@@ -540,7 +542,7 @@ func (s *worktreeService) checkWorktreeSkip(ctx context.Context, wt domain.Workt
 	return nil
 }
 
-func (s *worktreeService) addSkippedResult(result *domain.PruneWorktreesResult, pruneResult *domain.PruneWorktreeResult, skip *worktreeSkipResult) {
+func (s *worktreeService) addSkippedResult(result *core.PruneWorktreesResult, pruneResult *core.PruneWorktreeResult, skip *worktreeSkipResult) {
 	pruneResult.SkipReason = skip.reason
 	pruneResult.Error = skip.err
 
@@ -557,7 +559,7 @@ func (s *worktreeService) addSkippedResult(result *domain.PruneWorktreesResult, 
 	result.TotalSkipped++
 }
 
-func (s *worktreeService) deleteWorktreeAndBranch(ctx context.Context, project *domain.ProjectInfo, wt domain.WorktreeInfo, req *domain.PruneWorktreesRequest, pruneResult *domain.PruneWorktreeResult, result *domain.PruneWorktreesResult) {
+func (s *worktreeService) deleteWorktreeAndBranch(ctx context.Context, project *core.ProjectInfo, wt core.WorktreeInfo, req *core.PruneWorktreesRequest, pruneResult *core.PruneWorktreeResult, result *core.PruneWorktreesResult) {
 	err := s.cli.DeleteWorktree(ctx, project.GitRepoPath, wt.Path, req.Force)
 	if err != nil {
 		pruneResult.Error = err
@@ -594,7 +596,7 @@ func (s *worktreeService) isProtectedBranch(branchName string) bool {
 func (s *worktreeService) BranchExists(ctx context.Context, projectPath string, branchName string) (bool, error) {
 	exists, err := s.goGit.BranchExists(ctx, projectPath, branchName)
 	if err != nil {
-		return false, domain.NewWorktreeServiceError(projectPath, branchName, "BranchExists", "failed to check branch existence", err)
+		return false, core.NewWorktreeServiceError(projectPath, branchName, "BranchExists", "failed to check branch existence", err)
 	}
 	return exists, nil
 }
@@ -602,15 +604,15 @@ func (s *worktreeService) BranchExists(ctx context.Context, projectPath string, 
 func (s *worktreeService) IsBranchMerged(ctx context.Context, worktreePath string, branchName string) (bool, error) {
 	merged, err := s.cli.IsBranchMerged(ctx, worktreePath, branchName)
 	if err != nil {
-		return false, domain.NewWorktreeServiceError(worktreePath, branchName, "IsBranchMerged", "failed to check merge status", err)
+		return false, core.NewWorktreeServiceError(worktreePath, branchName, "IsBranchMerged", "failed to check merge status", err)
 	}
 	return merged, nil
 }
 
-func (s *worktreeService) GetWorktreeByPath(ctx context.Context, projectPath, worktreePath string) (*domain.WorktreeInfo, error) {
+func (s *worktreeService) GetWorktreeByPath(ctx context.Context, projectPath, worktreePath string) (*core.WorktreeInfo, error) {
 	worktrees, err := s.cli.ListWorktrees(ctx, projectPath)
 	if err != nil {
-		return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeByPath", "failed to list worktrees", err)
+		return nil, core.NewWorktreeServiceError(worktreePath, "", "GetWorktreeByPath", "failed to list worktrees", err)
 	}
 
 	for i := range worktrees {
@@ -619,5 +621,5 @@ func (s *worktreeService) GetWorktreeByPath(ctx context.Context, projectPath, wo
 		}
 	}
 
-	return nil, domain.NewWorktreeServiceError(worktreePath, "", "GetWorktreeByPath", "worktree not found", nil)
+	return nil, core.NewWorktreeServiceError(worktreePath, "", "GetWorktreeByPath", "worktree not found", nil)
 }

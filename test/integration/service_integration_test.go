@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
 )
@@ -18,25 +18,25 @@ func TestShellIntegration_Inference(t *testing.T) {
 	testCases := []struct {
 		name          string
 		configPath    string
-		expectedShell domain.ShellType
+		expectedShell core.ShellType
 		expectError   bool
 	}{
 		{
 			name:          "infer bash from .bashrc",
 			configPath:    "/home/user/.bashrc",
-			expectedShell: domain.ShellBash,
+			expectedShell: core.ShellBash,
 			expectError:   false,
 		},
 		{
 			name:          "infer zsh from .zshrc",
 			configPath:    "/home/user/.zshrc",
-			expectedShell: domain.ShellZsh,
+			expectedShell: core.ShellZsh,
 			expectError:   false,
 		},
 		{
 			name:          "infer fish from config.fish",
 			configPath:    "/home/user/.config/fish/config.fish",
-			expectedShell: domain.ShellFish,
+			expectedShell: core.ShellFish,
 			expectError:   false,
 		},
 		{
@@ -49,7 +49,7 @@ func TestShellIntegration_Inference(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			shellType, err := domain.InferShellTypeFromPath(tc.configPath)
+			shellType, err := core.InferShellTypeFromPath(tc.configPath)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -69,10 +69,10 @@ func TestShellWrapperBlock_Content(t *testing.T) {
 
 	t.Run("bash wrapper contains expected function", func(t *testing.T) {
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := service.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &core.Config{})
 
-		request := &domain.GenerateWrapperRequest{
-			ShellType: domain.ShellBash,
+		request := &core.GenerateWrapperRequest{
+			ShellType: core.ShellBash,
 		}
 
 		result, err := shellService.GenerateWrapper(nil, request)
@@ -96,10 +96,10 @@ func TestShellWrapperBlock_Content(t *testing.T) {
 
 	t.Run("zsh wrapper contains expected function", func(t *testing.T) {
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := service.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &core.Config{})
 
-		request := &domain.GenerateWrapperRequest{
-			ShellType: domain.ShellZsh,
+		request := &core.GenerateWrapperRequest{
+			ShellType: core.ShellZsh,
 		}
 
 		result, err := shellService.GenerateWrapper(nil, request)
@@ -121,10 +121,10 @@ func TestShellWrapperBlock_Content(t *testing.T) {
 
 	t.Run("fish wrapper contains expected function", func(t *testing.T) {
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := service.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &core.Config{})
 
-		request := &domain.GenerateWrapperRequest{
-			ShellType: domain.ShellFish,
+		request := &core.GenerateWrapperRequest{
+			ShellType: core.ShellFish,
 		}
 
 		result, err := shellService.GenerateWrapper(nil, request)
@@ -149,7 +149,7 @@ func TestShellWrapperBlock_Content(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := service.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &core.Config{})
 
 		// Create config with existing wrapper block
 		initialContent := `# Bash config
@@ -159,8 +159,8 @@ func TestShellWrapperBlock_Content(t *testing.T) {
 `
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
-		request := &domain.SetupShellRequest{
-			ShellType:      domain.ShellBash,
+		request := &core.SetupShellRequest{
+			ShellType:      core.ShellBash,
 			ConfigFile:     configFile,
 			ForceOverwrite: true,
 		}
@@ -196,7 +196,7 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := service.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &core.Config{})
 
 		initialContent := `# Bash config
 ### BEGIN TWIGGIT WRAPPER
@@ -205,8 +205,8 @@ func TestShellService_ForceReinstall(t *testing.T) {
 `
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
-		request := &domain.SetupShellRequest{
-			ShellType:      domain.ShellBash,
+		request := &core.SetupShellRequest{
+			ShellType:      core.ShellBash,
 			ConfigFile:     configFile,
 			ForceOverwrite: true,
 		}
@@ -237,13 +237,13 @@ func TestShellService_ForceReinstall(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := service.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &core.Config{})
 
 		initialContent := "# Bash config"
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
-		request := &domain.SetupShellRequest{
-			ShellType:      domain.ShellBash,
+		request := &core.SetupShellRequest{
+			ShellType:      core.ShellBash,
 			ConfigFile:     configFile,
 			ForceOverwrite: true,
 		}
@@ -274,7 +274,7 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := service.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &core.Config{})
 
 		initialContent := `# Bash config
 ### BEGIN TWIGGIT WRAPPER
@@ -283,8 +283,8 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 `
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
-		request := &domain.SetupShellRequest{
-			ShellType:      domain.ShellBash,
+		request := &core.SetupShellRequest{
+			ShellType:      core.ShellBash,
 			ConfigFile:     configFile,
 			ForceOverwrite: false,
 		}
@@ -307,13 +307,13 @@ func TestShellService_SkipWhenInstalled(t *testing.T) {
 		configFile := filepath.Join(tempDir, ".bashrc")
 
 		shellInfra := infrastructure.NewShellInfrastructure()
-		shellService := service.NewShellService(shellInfra, &domain.Config{})
+		shellService := service.NewShellService(shellInfra, &core.Config{})
 
 		initialContent := "# Bash config"
 		require.NoError(t, os.WriteFile(configFile, []byte(initialContent), 0644))
 
-		request := &domain.SetupShellRequest{
-			ShellType:      domain.ShellBash,
+		request := &core.SetupShellRequest{
+			ShellType:      core.ShellBash,
 			ConfigFile:     configFile,
 			ForceOverwrite: false,
 		}

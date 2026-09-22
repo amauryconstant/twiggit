@@ -14,7 +14,7 @@ import (
 	"github.com/knadh/koanf/v2"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 var _ application.HookRunner = (*hookRunner)(nil)
@@ -36,7 +36,7 @@ func NewHookRunner(executor CommandExecutor, hookTimeoutSeconds ...int) applicat
 	}
 }
 
-func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (*domain.HookResult, error) {
+func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (*core.HookResult, error) {
 	if req.ConfigFilePath == "" {
 		return noOpResult(req), nil
 	}
@@ -61,9 +61,9 @@ func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (
 		return noOpResult(req), nil
 	}
 
-	var definition *domain.HookDefinition
+	var definition *core.HookDefinition
 	switch req.HookType {
-	case domain.HookPostCreate:
+	case core.HookPostCreate:
 		definition = config.PostCreate
 	default:
 		return noOpResult(req), nil
@@ -76,8 +76,8 @@ func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (
 	return r.executeCommands(ctx, req, definition.Commands)
 }
 
-func noOpResult(req *application.HookRunRequest) *domain.HookResult {
-	return &domain.HookResult{
+func noOpResult(req *application.HookRunRequest) *core.HookResult {
+	return &core.HookResult{
 		HookType:     req.HookType,
 		HasExecuted:  false,
 		IsSuccessful: true,
@@ -85,7 +85,7 @@ func noOpResult(req *application.HookRunRequest) *domain.HookResult {
 	}
 }
 
-func (r *hookRunner) readHookConfig(path string) (*domain.HookConfig, error) {
+func (r *hookRunner) readHookConfig(path string) (*core.HookConfig, error) {
 	k := koanf.New(".")
 
 	if err := k.Load(file.Provider(path), toml.Parser()); err != nil {
@@ -93,7 +93,7 @@ func (r *hookRunner) readHookConfig(path string) (*domain.HookConfig, error) {
 	}
 
 	var hookConfig struct {
-		Hooks *domain.HookConfig `koanf:"hooks"`
+		Hooks *core.HookConfig `koanf:"hooks"`
 	}
 
 	if err := k.Unmarshal("", &hookConfig); err != nil {
@@ -103,8 +103,8 @@ func (r *hookRunner) readHookConfig(path string) (*domain.HookConfig, error) {
 	return hookConfig.Hooks, nil
 }
 
-func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookRunRequest, commands []string) (*domain.HookResult, error) {
-	result := &domain.HookResult{
+func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookRunRequest, commands []string) (*core.HookResult, error) {
+	result := &core.HookResult{
 		HookType:     req.HookType,
 		HasExecuted:  true,
 		IsSuccessful: true,
@@ -135,7 +135,7 @@ func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookR
 					output += strings.TrimSpace(cmdResult.Stderr)
 				}
 			}
-			result.Failures = append(result.Failures, domain.HookFailure{
+			result.Failures = append(result.Failures, core.HookFailure{
 				Command:  cmd,
 				ExitCode: exitCode,
 				Output:   output,

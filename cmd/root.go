@@ -7,13 +7,13 @@ import (
 	"github.com/spf13/cobra"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // CommandConfig holds the configuration for CLI commands
 type CommandConfig struct {
 	Services *ServiceContainer
-	Config   *domain.Config
+	Config   *core.Config
 }
 
 // ServiceContainer holds all service dependencies for commands
@@ -43,10 +43,10 @@ across multiple projects.`,
 		},
 	}
 
-	// Wrap flag-parse errors in domain.UsageError so IsCobraUsageError
+	// Wrap flag-parse errors in core.UsageError so IsCobraUsageError
 	// dispatches them to ExitCodeUsage without substring matching.
 	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
-		return domain.UsageWrap(err)
+		return core.UsageWrap(err)
 	})
 
 	// Add persistent verbose flag

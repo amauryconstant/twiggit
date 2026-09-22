@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 	"twiggit/test/mocks"
 
@@ -111,7 +111,7 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 
 	t.Run("NoFallbackLogic", func(t *testing.T) {
 		mockGoGit := mocks.NewMockGoGitClient()
-		mockGoGit.On("ListBranches", mock.Anything, mock.AnythingOfType("string")).Return([]domain.BranchInfo(nil), assert.AnError)
+		mockGoGit.On("ListBranches", mock.Anything, mock.AnythingOfType("string")).Return([]core.BranchInfo(nil), assert.AnError)
 
 		_, err := mockGoGit.ListBranches(context.Background(), repoPath)
 		require.Error(t, err)

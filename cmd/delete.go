@@ -7,7 +7,7 @@ import (
 
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 )
 
@@ -68,7 +68,7 @@ func executeDelete(c *cobra.Command, config *CommandConfig, target string, force
 	return deleteWorktree(ctx, config, c, worktreePath, force, changeDir, currentCtx)
 }
 
-func resolveWorktreeTarget(config *CommandConfig, target string) (*domain.Context, string, error) {
+func resolveWorktreeTarget(config *CommandConfig, target string) (*core.Context, string, error) {
 	currentCtx, err := config.Services.ContextService.GetCurrentContext()
 	if err != nil {
 		return nil, "", fmt.Errorf("context detection failed: %w", err)
@@ -79,26 +79,26 @@ func resolveWorktreeTarget(config *CommandConfig, target string) (*domain.Contex
 		return nil, "", fmt.Errorf("failed to resolve target %s: %w", target, err)
 	}
 
-	if resolution.Type == domain.PathTypeInvalid {
+	if resolution.Type == core.PathTypeInvalid {
 		return nil, "", fmt.Errorf("invalid target format: %s", resolution.Explanation)
 	}
 
 	// Validate ResolvedPath is non-empty when Type indicates a worktree path was resolved
-	if resolution.Type == domain.PathTypeWorktree && resolution.ResolvedPath == "" {
-		return nil, "", domain.NewValidationError("resolveWorktreeTarget", "ResolvedPath", "", "resolved path cannot be empty")
+	if resolution.Type == core.PathTypeWorktree && resolution.ResolvedPath == "" {
+		return nil, "", core.NewOpValidationError("resolveWorktreeTarget", "ResolvedPath", "", "resolved path cannot be empty")
 	}
 
 	return currentCtx, resolution.ResolvedPath, nil
 }
 
-func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
+func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *core.Context) error {
 	if force {
 		return nil
 	}
 
 	status, err := config.Services.WorktreeService.GetWorktreeStatus(ctx, worktreePath)
 	if err != nil {
-		if errors.Is(err, domain.ErrWorktreeNotFound) {
+		if errors.Is(err, core.ErrWorktreeNotFound) {
 			if changeDir {
 				navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
 				if navigationTarget != "" {
@@ -107,7 +107,7 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra
 			} else {
 				_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s (already removed)\n", worktreePath)
 			}
-			return domain.NewNavigationServiceError(worktreePath, currentCtx.Path, "DeleteWorktree", "worktree not found", nil)
+			return core.NewNavigationServiceError(worktreePath, currentCtx.Path, "DeleteWorktree", "worktree not found", nil)
 		}
 		return fmt.Errorf("failed to check worktree status: %w", err)
 	}
@@ -119,7 +119,7 @@ func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra
 	return nil
 }
 
-func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath string, mergedOnly bool, currentCtx *domain.Context) error {
+func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath string, mergedOnly bool, currentCtx *core.Context) error {
 	if !mergedOnly {
 		return nil
 	}
@@ -141,9 +141,9 @@ func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath
 	return nil
 }
 
-func getDeleteNavigationTarget(ctx context.Context, config *CommandConfig, _ string, currentCtx *domain.Context) string {
-	if currentCtx.Type == domain.ContextWorktree {
-		req := &domain.ResolvePathRequest{
+func getDeleteNavigationTarget(ctx context.Context, config *CommandConfig, _ string, currentCtx *core.Context) string {
+	if currentCtx.Type == core.ContextWorktree {
+		req := &core.ResolvePathRequest{
 			Target:  "main",
 			Context: currentCtx,
 		}
@@ -155,7 +155,7 @@ func getDeleteNavigationTarget(ctx context.Context, config *CommandConfig, _ str
 	return ""
 }
 
-func deleteWorktree(ctx context.Context, config *CommandConfig, c *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *domain.Context) error {
+func deleteWorktree(ctx context.Context, config *CommandConfig, c *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *core.Context) error {
 	logv(c, 1, "Deleting worktree at %s", worktreePath)
 
 	logv(c, 2, "  project: %s", currentCtx.ProjectName)
@@ -166,7 +166,7 @@ func deleteWorktree(ctx context.Context, config *CommandConfig, c *cobra.Command
 	}
 	logv(c, 2, "  force: %t", force)
 
-	req := &domain.DeleteWorktreeRequest{
+	req := &core.DeleteWorktreeRequest{
 		WorktreePath: worktreePath,
 		Force:        force,
 		Context:      currentCtx,

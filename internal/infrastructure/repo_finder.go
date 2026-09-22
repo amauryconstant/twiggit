@@ -8,7 +8,7 @@ import (
 	"slices"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 type RepoFinder struct {
@@ -19,10 +19,10 @@ func NewRepoFinder(goGit application.GoGitClient) *RepoFinder {
 	return &RepoFinder{goGit: goGit}
 }
 
-func (f *RepoFinder) FindGitRepositories(dir string) ([]domain.GitDir, error) {
+func (f *RepoFinder) FindGitRepositories(dir string) ([]core.GitDir, error) {
 	if _, err := os.Stat(dir); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return []domain.GitDir{}, nil
+			return []core.GitDir{}, nil
 		}
 		return nil, fmt.Errorf("failed to stat directory %s: %w", dir, err)
 	}
@@ -32,7 +32,7 @@ func (f *RepoFinder) FindGitRepositories(dir string) ([]domain.GitDir, error) {
 		return nil, fmt.Errorf("failed to read directory %s: %w", dir, err)
 	}
 
-	repos := make([]domain.GitDir, 0, len(entries))
+	repos := make([]core.GitDir, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -43,7 +43,7 @@ func (f *RepoFinder) FindGitRepositories(dir string) ([]domain.GitDir, error) {
 				continue
 			}
 		}
-		repos = append(repos, domain.GitDir{
+		repos = append(repos, core.GitDir{
 			Name: entry.Name(),
 			Path: candidate,
 		})

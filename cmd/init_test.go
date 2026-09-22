@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
@@ -109,10 +109,10 @@ func TestInitCmd_FlagValidation_ForceRequiresInstall(t *testing.T) {
 
 func TestInitCmd_StdoutMode_CallsGenerateWrapper(t *testing.T) {
 	shellService := mocks.NewMockShellService()
-	shellService.On("GenerateWrapper", context.Background(), &domain.GenerateWrapperRequest{
-		ShellType: domain.ShellBash,
-	}).Return(&domain.GenerateWrapperResult{
-		ShellType:      domain.ShellBash,
+	shellService.On("GenerateWrapper", context.Background(), &core.GenerateWrapperRequest{
+		ShellType: core.ShellBash,
+	}).Return(&core.GenerateWrapperResult{
+		ShellType:      core.ShellBash,
 		WrapperContent: "# Twiggit bash wrapper\ntwiggit() { echo test; }",
 		Message:        "Wrapper generated successfully",
 	}, nil)
@@ -143,10 +143,10 @@ func TestInitCmd_StdoutMode_AutoDetectsShell(t *testing.T) {
 	t.Setenv("SHELL", "/bin/zsh")
 
 	shellService := mocks.NewMockShellService()
-	shellService.On("GenerateWrapper", context.Background(), &domain.GenerateWrapperRequest{
-		ShellType: domain.ShellZsh,
-	}).Return(&domain.GenerateWrapperResult{
-		ShellType:      domain.ShellZsh,
+	shellService.On("GenerateWrapper", context.Background(), &core.GenerateWrapperRequest{
+		ShellType: core.ShellZsh,
+	}).Return(&core.GenerateWrapperResult{
+		ShellType:      core.ShellZsh,
 		WrapperContent: "# Twiggit zsh wrapper\ntwiggit() { echo test; }",
 		Message:        "Wrapper generated successfully",
 	}, nil)
@@ -172,12 +172,12 @@ func TestInitCmd_StdoutMode_AutoDetectsShell(t *testing.T) {
 
 func TestInitCmd_InstallMode_CallsSetupShell(t *testing.T) {
 	shellService := mocks.NewMockShellService()
-	shellService.On("SetupShell", context.Background(), &domain.SetupShellRequest{
-		ShellType:      domain.ShellBash,
+	shellService.On("SetupShell", context.Background(), &core.SetupShellRequest{
+		ShellType:      core.ShellBash,
 		ForceOverwrite: false,
 		ConfigFile:     "",
-	}).Return(&domain.SetupShellResult{
-		ShellType:   domain.ShellBash,
+	}).Return(&core.SetupShellResult{
+		ShellType:   core.ShellBash,
 		IsInstalled: true,
 		ConfigFile:  "/home/user/.bashrc",
 		Message:     "Shell wrapper installed successfully",
@@ -205,12 +205,12 @@ func TestInitCmd_InstallMode_CallsSetupShell(t *testing.T) {
 
 func TestInitCmd_InstallMode_WithCustomConfig(t *testing.T) {
 	shellService := mocks.NewMockShellService()
-	shellService.On("SetupShell", context.Background(), &domain.SetupShellRequest{
-		ShellType:      domain.ShellBash,
+	shellService.On("SetupShell", context.Background(), &core.SetupShellRequest{
+		ShellType:      core.ShellBash,
 		ForceOverwrite: false,
 		ConfigFile:     "/custom/bashrc",
-	}).Return(&domain.SetupShellResult{
-		ShellType:   domain.ShellBash,
+	}).Return(&core.SetupShellResult{
+		ShellType:   core.ShellBash,
 		IsInstalled: true,
 		ConfigFile:  "/custom/bashrc",
 		Message:     "Shell wrapper installed successfully",
@@ -238,12 +238,12 @@ func TestInitCmd_InstallMode_WithCustomConfig(t *testing.T) {
 
 func TestInitCmd_InstallMode_WithForce(t *testing.T) {
 	shellService := mocks.NewMockShellService()
-	shellService.On("SetupShell", context.Background(), &domain.SetupShellRequest{
-		ShellType:      domain.ShellBash,
+	shellService.On("SetupShell", context.Background(), &core.SetupShellRequest{
+		ShellType:      core.ShellBash,
 		ForceOverwrite: true,
 		ConfigFile:     "",
-	}).Return(&domain.SetupShellResult{
-		ShellType:   domain.ShellBash,
+	}).Return(&core.SetupShellResult{
+		ShellType:   core.ShellBash,
 		IsInstalled: true,
 		ConfigFile:  "/home/user/.bashrc",
 		Message:     "Shell wrapper installed successfully",
@@ -267,8 +267,8 @@ func TestInitCmd_InstallMode_WithForce(t *testing.T) {
 
 func TestDisplayInitResults_Skipped(t *testing.T) {
 	out := &bytes.Buffer{}
-	result := &domain.SetupShellResult{
-		ShellType:   domain.ShellBash,
+	result := &core.SetupShellResult{
+		ShellType:   core.ShellBash,
 		IsInstalled: true,
 		IsSkipped:   true,
 		ConfigFile:  "/home/user/.bashrc",
@@ -286,8 +286,8 @@ func TestDisplayInitResults_Skipped(t *testing.T) {
 
 func TestDisplayInitResults_Installed(t *testing.T) {
 	out := &bytes.Buffer{}
-	result := &domain.SetupShellResult{
-		ShellType:   domain.ShellFish,
+	result := &core.SetupShellResult{
+		ShellType:   core.ShellFish,
 		IsInstalled: true,
 		ConfigFile:  "/home/user/.config/fish/config.fish",
 		Message:     "Shell wrapper installed successfully",
@@ -305,8 +305,8 @@ func TestDisplayInitResults_Installed(t *testing.T) {
 
 func TestDisplayInitResults_NotInstalled(t *testing.T) {
 	out := &bytes.Buffer{}
-	result := &domain.SetupShellResult{
-		ShellType:   domain.ShellBash,
+	result := &core.SetupShellResult{
+		ShellType:   core.ShellBash,
 		IsInstalled: false,
 		ConfigFile:  "/home/user/.bashrc",
 		Message:     "Installation failed",

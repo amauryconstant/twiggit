@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func TestGoGitClient_OpenRepository(t *testing.T) {
@@ -91,7 +91,7 @@ func TestGoGitClient_GetRepositoryStatus(t *testing.T) {
 
 	status, err := client.GetRepositoryStatus(context.Background(), "/non/existent/path")
 	require.Error(t, err)
-	assert.Equal(t, domain.RepositoryStatus{}, status)
+	assert.Equal(t, core.RepositoryStatus{}, status)
 
 	repoPath := setupTestRepo(t, tempDir)
 	status, err = client.GetRepositoryStatus(context.Background(), repoPath)
@@ -148,7 +148,7 @@ func TestGoGitClient_GetCommitInfo(t *testing.T) {
 	assert.Nil(t, commit)
 }
 
-func findBranch(branches []domain.BranchInfo, name string) *domain.BranchInfo {
+func findBranch(branches []core.BranchInfo, name string) *core.BranchInfo {
 	for _, branch := range branches {
 		if branch.Name == name {
 			return &branch

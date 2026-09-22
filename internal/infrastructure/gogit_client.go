@@ -11,7 +11,7 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 var _ application.GoGitClient = (*goGitClient)(nil)
@@ -69,7 +69,7 @@ func (c *goGitClient) OpenRepository(path string) (*git.Repository, error) {
 	// Normalize path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, domain.NewGitRepositoryError(path, "failed to get absolute path", err)
+		return nil, core.NewGitRepositoryError(path, "failed to get absolute path", err)
 	}
 
 	// Check cache first
@@ -80,7 +80,7 @@ func (c *goGitClient) OpenRepository(path string) (*git.Repository, error) {
 	// Open repository
 	repo, err := git.PlainOpen(absPath)
 	if err != nil {
-		return nil, domain.NewGitRepositoryError(path, "failed to open git repository", err)
+		return nil, core.NewGitRepositoryError(path, "failed to open git repository", err)
 	}
 
 	// Cache the repository
@@ -90,7 +90,7 @@ func (c *goGitClient) OpenRepository(path string) (*git.Repository, error) {
 }
 
 // ListBranches lists all branches in repository (idempotent)
-func (c *goGitClient) ListBranches(_ context.Context, repoPath string) ([]domain.BranchInfo, error) {
+func (c *goGitClient) ListBranches(_ context.Context, repoPath string) ([]core.BranchInfo, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -98,21 +98,21 @@ func (c *goGitClient) ListBranches(_ context.Context, repoPath string) ([]domain
 
 	branches, err := repo.Branches()
 	if err != nil {
-		return nil, domain.NewGitRepositoryError(repoPath, "failed to list branches", err)
+		return nil, core.NewGitRepositoryError(repoPath, "failed to list branches", err)
 	}
 
-	var branchInfos []domain.BranchInfo
+	var branchInfos []core.BranchInfo
 
 	// Get current branch reference
 	headRef, err := repo.Head()
 	if err != nil {
-		return nil, domain.NewGitRepositoryError(repoPath, "failed to get HEAD reference", err)
+		return nil, core.NewGitRepositoryError(repoPath, "failed to get HEAD reference", err)
 	}
 
 	err = branches.ForEach(func(ref *plumbing.Reference) error {
 		branchName := ref.Name().Short()
 		if !strings.HasPrefix(branchName, "refs/") {
-			branchInfo := domain.BranchInfo{
+			branchInfo := core.BranchInfo{
 				Name:      branchName,
 				IsCurrent: ref.Name() == headRef.Name(),
 			}
@@ -138,7 +138,7 @@ func (c *goGitClient) ListBranches(_ context.Context, repoPath string) ([]domain
 	})
 
 	if err != nil {
-		return nil, domain.NewGitRepositoryError(repoPath, "failed to iterate branches", err)
+		return nil, core.NewGitRepositoryError(repoPath, "failed to iterate branches", err)
 	}
 
 	return branchInfos, nil
@@ -158,29 +158,29 @@ func (c *goGitClient) BranchExists(_ context.Context, repoPath, branchName strin
 		return false, nil
 	}
 	if err != nil {
-		return false, domain.NewGitRepositoryError(repoPath, "failed to check branch "+branchName, err)
+		return false, core.NewGitRepositoryError(repoPath, "failed to check branch "+branchName, err)
 	}
 
 	return true, nil
 }
 
 // GetRepositoryStatus returns repository status (idempotent)
-func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (domain.RepositoryStatus, error) {
+func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (core.RepositoryStatus, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
-		return domain.RepositoryStatus{}, err
+		return core.RepositoryStatus{}, err
 	}
 
 	// Get worktree
 	worktree, err := repo.Worktree()
 	if err != nil {
-		return domain.RepositoryStatus{}, domain.NewGitRepositoryError(repoPath, "failed to get worktree", err)
+		return core.RepositoryStatus{}, core.NewGitRepositoryError(repoPath, "failed to get worktree", err)
 	}
 
 	// Get status
 	status, err := worktree.Status()
 	if err != nil {
-		return domain.RepositoryStatus{}, domain.NewGitRepositoryError(repoPath, "failed to get repository status", err)
+		return core.RepositoryStatus{}, core.NewGitRepositoryError(repoPath, "failed to get repository status", err)
 	}
 
 	// Workaround for go-git worktree issue:
@@ -203,7 +203,7 @@ func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (d
 		// In worktrees, repo.Head() may fail with "reference not found"
 		// even though HEAD file exists. We can still return a valid status
 		// without branch/commit info.
-		repoStatus := domain.RepositoryStatus{
+		repoStatus := core.RepositoryStatus{
 			IsClean: len(filteredStatus) == 0,
 			Branch:  "unknown",
 			Commit:  "",
@@ -211,7 +211,7 @@ func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (d
 		return repoStatus, nil
 	}
 
-	repoStatus := domain.RepositoryStatus{
+	repoStatus := core.RepositoryStatus{
 		IsClean: len(filteredStatus) == 0,
 		Branch:  headRef.Name().Short(),
 		Commit:  headRef.Hash().String(),
@@ -240,20 +240,20 @@ func (c *goGitClient) GetRepositoryStatus(_ context.Context, repoPath string) (d
 func (c *goGitClient) ValidateRepository(path string) error {
 	_, err := git.PlainOpen(path)
 	if err != nil {
-		return domain.NewGitRepositoryError(path, "not a valid git repository", err)
+		return core.NewGitRepositoryError(path, "not a valid git repository", err)
 	}
 	return nil
 }
 
 // GetRepositoryInfo returns comprehensive repository information
-func (c *goGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
+func (c *goGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*core.GitRepository, error) {
 	_, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get basic info
-	info := &domain.GitRepository{
+	info := &core.GitRepository{
 		Path:   repoPath,
 		IsBare: false, // go-git doesn't expose IsBare directly, assume false for worktrees
 	}
@@ -288,7 +288,7 @@ func (c *goGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*
 }
 
 // ListRemotes lists all remotes in repository
-func (c *goGitClient) ListRemotes(_ context.Context, repoPath string) ([]domain.RemoteInfo, error) {
+func (c *goGitClient) ListRemotes(_ context.Context, repoPath string) ([]core.RemoteInfo, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -296,13 +296,13 @@ func (c *goGitClient) ListRemotes(_ context.Context, repoPath string) ([]domain.
 
 	remotes, err := repo.Remotes()
 	if err != nil {
-		return nil, domain.NewGitRepositoryError(repoPath, "failed to list remotes", err)
+		return nil, core.NewGitRepositoryError(repoPath, "failed to list remotes", err)
 	}
 
-	remoteInfos := make([]domain.RemoteInfo, 0, len(remotes))
+	remoteInfos := make([]core.RemoteInfo, 0, len(remotes))
 
 	for _, remote := range remotes {
-		remoteInfo := domain.RemoteInfo{
+		remoteInfo := core.RemoteInfo{
 			Name: remote.Config().Name,
 		}
 
@@ -319,7 +319,7 @@ func (c *goGitClient) ListRemotes(_ context.Context, repoPath string) ([]domain.
 }
 
 // GetCommitInfo returns information about a specific commit
-func (c *goGitClient) GetCommitInfo(_ context.Context, repoPath, commitHash string) (*domain.CommitInfo, error) {
+func (c *goGitClient) GetCommitInfo(_ context.Context, repoPath, commitHash string) (*core.CommitInfo, error) {
 	repo, err := c.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -331,11 +331,11 @@ func (c *goGitClient) GetCommitInfo(_ context.Context, repoPath, commitHash stri
 	// Get commit object
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
-		return nil, domain.NewGitRepositoryError(repoPath, "failed to get commit "+commitHash, err)
+		return nil, core.NewGitRepositoryError(repoPath, "failed to get commit "+commitHash, err)
 	}
 
 	hashStr := commit.Hash.String()
-	commitInfo := &domain.CommitInfo{
+	commitInfo := &core.CommitInfo{
 		Hash:      hashStr,
 		ShortHash: hashStr[:min(7, len(hashStr))],
 		Author:    commit.Author.Name,

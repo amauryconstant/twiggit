@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // CommandResult represents the result of executing a command
@@ -69,14 +69,14 @@ func (e *commandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd strin
 	// Check if command failed to start (e.g., command not found)
 	if err != nil {
 		if _, found := extractExitCode(err); !found {
-			return nil, domain.NewGitCommandError(cmd, args, -1, result.Stdout, result.Stderr,
+			return nil, core.NewGitCommandError(cmd, args, -1, result.Stdout, result.Stderr,
 				fmt.Sprintf("failed to execute command: %v", err), err)
 		}
 	}
 
 	// For non-zero exit codes, return the result with an error (original behavior)
 	if result.ExitCode != 0 {
-		return result, domain.NewGitCommandError(cmd, args, result.ExitCode, result.Stdout, result.Stderr,
+		return result, core.NewGitCommandError(cmd, args, result.ExitCode, result.Stdout, result.Stderr,
 			"command exited with non-zero status", nil)
 	}
 

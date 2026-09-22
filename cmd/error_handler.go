@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // ExitCode defines the exit codes used by the application.
@@ -15,7 +15,7 @@ import (
 //
 //	0 ExitCodeSuccess — clean run
 //	1 ExitCodeError   — any non-usage failure, runtime error, or recovered panic
-//	2 ExitCodeUsage   — typed domain.UsageError
+//	2 ExitCodeUsage   — typed core.UsageError
 //
 // Per-resource NotFound categories share ExitCodeError; they are
 // distinguished in the formatter hint layer.
@@ -83,16 +83,15 @@ func CategorizeError(err error) ErrorCategory {
 	if IsCobraUsageError(err) {
 		return ErrorCategoryCobra
 	}
-	if errors.Is(err, domain.ErrGitRepoNotFound) ||
-		errors.Is(err, domain.ErrWorktreeNotFound) ||
-		errors.Is(err, domain.ErrProjectNotFound) ||
-		errors.Is(err, domain.ErrResolutionNotFound) {
+	if errors.Is(err, core.ErrGitRepoNotFound) ||
+		errors.Is(err, core.ErrWorktreeNotFound) ||
+		errors.Is(err, core.ErrProjectNotFound) ||
+		errors.Is(err, core.ErrResolutionNotFound) {
 		return ErrorCategoryService
 	}
-	if errors.As(err, new(*domain.ValidationError)) ||
-		errors.As(err, new(*domain.WorktreeServiceError)) ||
-		errors.As(err, new(*domain.ProjectServiceError)) ||
-		errors.As(err, new(*domain.ServiceError)) {
+	if errors.As(err, new(*core.ValidationError)) ||
+		errors.As(err, new(*core.OperationError)) ||
+		errors.As(err, new(*core.NotFoundError)) {
 		return ErrorCategoryService
 	}
 	return ErrorCategoryGeneric
@@ -100,13 +99,13 @@ func CategorizeError(err error) ErrorCategory {
 
 // IsCobraUsageError reports whether err is a typed domain UsageError.
 // cmd/root.go's SetFlagErrorFunc wraps cobra/pflag flag-parse errors
-// in *domain.UsageError before they propagate, so this single
+// in *core.UsageError before they propagate, so this single
 // errors.As match covers all flag-validation paths.
 func IsCobraUsageError(err error) bool {
 	if err == nil {
 		return false
 	}
-	var ue *domain.UsageError
+	var ue *core.UsageError
 	return errors.As(err, &ue)
 }
 

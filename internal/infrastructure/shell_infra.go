@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 var _ application.ShellInfrastructure = (*shellInfrastructure)(nil)
@@ -21,10 +21,10 @@ func NewShellInfrastructure() application.ShellInfrastructure {
 }
 
 // GenerateWrapper generates a shell wrapper for the specified shell type
-func (s *shellInfrastructure) GenerateWrapper(shellType domain.ShellType) (string, error) {
+func (s *shellInfrastructure) GenerateWrapper(shellType core.ShellType) (string, error) {
 	template := s.getWrapperTemplate(shellType)
 	if template == "" {
-		return "", domain.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
+		return "", core.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
 	}
 
 	// Pure function composition for wrapper generation
@@ -32,26 +32,26 @@ func (s *shellInfrastructure) GenerateWrapper(shellType domain.ShellType) (strin
 }
 
 // DetectConfigFile detects the appropriate config file for the shell type
-func (s *shellInfrastructure) DetectConfigFile(shellType domain.ShellType) (string, error) {
+func (s *shellInfrastructure) DetectConfigFile(shellType core.ShellType) (string, error) {
 	// Check HOME env var first (for test isolation), fallback to system home
 	home := os.Getenv("HOME")
 	if home == "" {
 		var err error
 		home, err = os.UserHomeDir()
 		if err != nil {
-			return "", domain.NewShellConfigError("", "failed to get home directory", err)
+			return "", core.NewShellConfigError("", "failed to get home directory", err)
 		}
 	}
 
 	configFiles := s.getConfigFiles(shellType)
 	if len(configFiles) == 0 {
-		return "", domain.NewShellInvalidTypeError(string(shellType), "no config files available for shell type", nil)
+		return "", core.NewShellInvalidTypeError(string(shellType), "no config files available for shell type", nil)
 	}
 
 	// Check for existing config files in order of preference
 	absHome, err := filepath.Abs(home)
 	if err != nil {
-		return "", domain.NewShellConfigError("", "failed to resolve home directory", nil)
+		return "", core.NewShellConfigError("", "failed to resolve home directory", nil)
 	}
 	for _, configFile := range configFiles {
 		configPath := filepath.Join(absHome, configFile)
@@ -72,14 +72,14 @@ func (s *shellInfrastructure) DetectConfigFile(shellType domain.ShellType) (stri
 }
 
 // InstallWrapper installs the wrapper to the shell config file
-func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper, configFile string, force bool) error {
+func (s *shellInfrastructure) InstallWrapper(shellType core.ShellType, wrapper, configFile string, force bool) error {
 	if configFile == "" {
-		return domain.NewShellConfigError("", "config file path is empty", nil)
+		return core.NewShellConfigError("", "config file path is empty", nil)
 	}
 
 	parentDir := filepath.Dir(configFile)
 	if _, err := os.Stat(parentDir); errors.Is(err, os.ErrNotExist) {
-		return domain.NewShellConfigError("", "parent directory does not exist", err)
+		return core.NewShellConfigError("", "parent directory does not exist", err)
 	}
 
 	fileExists := true
@@ -90,7 +90,7 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 	if !fileExists {
 		// Create the file if it doesn't exist
 		if err := os.WriteFile(configFile, []byte(wrapper), 0644); err != nil { // #nosec G306 -- standard perms for shell configs
-			return domain.NewShellWrapperError(string(shellType), "installation", "failed to create config file", err)
+			return core.NewShellWrapperError(string(shellType), "installation", "failed to create config file", err)
 		}
 		return nil
 	}
@@ -98,7 +98,7 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 	// Read existing content
 	content, err := os.ReadFile(configFile) // #nosec G304 -- configFile from DetectConfigFile which validates path
 	if err != nil {
-		return domain.NewShellWrapperError(string(shellType), "installation", "failed to read config file", err)
+		return core.NewShellWrapperError(string(shellType), "installation", "failed to read config file", err)
 	}
 
 	contentStr := string(content)
@@ -106,7 +106,7 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 	// Check if wrapper block exists
 	if s.hasWrapperBlock(contentStr) {
 		if !force {
-			return domain.NewShellAlreadyInstalledError(string(shellType), "wrapper already installed", nil)
+			return core.NewShellAlreadyInstalledError(string(shellType), "wrapper already installed", nil)
 		}
 		// Remove existing wrapper block
 		contentStr = s.removeWrapperBlock(contentStr)
@@ -115,44 +115,44 @@ func (s *shellInfrastructure) InstallWrapper(shellType domain.ShellType, wrapper
 	// Append wrapper to config file
 	updatedContent := s.appendWrapper(contentStr, wrapper)
 	if err := os.WriteFile(configFile, []byte(updatedContent), 0644); err != nil { // #nosec G306,G703 -- standard perms for shell configs, path from DetectConfigFile
-		return domain.NewShellWrapperError(string(shellType), "installation", "failed to write wrapper to config file", err)
+		return core.NewShellWrapperError(string(shellType), "installation", "failed to write wrapper to config file", err)
 	}
 
 	return nil
 }
 
 // ValidateInstallation validates whether the wrapper is installed
-func (s *shellInfrastructure) ValidateInstallation(shellType domain.ShellType, configFile string) error {
+func (s *shellInfrastructure) ValidateInstallation(shellType core.ShellType, configFile string) error {
 	if configFile == "" {
-		return domain.NewShellConfigError("", "config file path is empty", nil)
+		return core.NewShellConfigError("", "config file path is empty", nil)
 	}
 
 	if _, err := os.Stat(configFile); errors.Is(err, os.ErrNotExist) {
-		return domain.NewShellNotInstalledError(string(shellType), "config file does not exist", nil)
+		return core.NewShellNotInstalledError(string(shellType), "config file does not exist", nil)
 	}
 
 	// Read config file and check for wrapper
 	content, err := os.ReadFile(configFile) // #nosec G304 -- configFile from DetectConfigFile which validates path
 	if err != nil {
-		return domain.NewShellNotInstalledError(string(shellType), "failed to read config file", err)
+		return core.NewShellNotInstalledError(string(shellType), "failed to read config file", err)
 	}
 
 	// Check for wrapper block delimiters
 	if !s.hasWrapperBlock(string(content)) {
-		return domain.NewShellNotInstalledError(string(shellType), "wrapper block not found", nil)
+		return core.NewShellNotInstalledError(string(shellType), "wrapper block not found", nil)
 	}
 
 	return nil
 }
 
 // getWrapperTemplate returns the wrapper template for the specified shell type
-func (s *shellInfrastructure) getWrapperTemplate(shellType domain.ShellType) string {
+func (s *shellInfrastructure) getWrapperTemplate(shellType core.ShellType) string {
 	switch shellType {
-	case domain.ShellBash:
+	case core.ShellBash:
 		return s.bashWrapperTemplate()
-	case domain.ShellZsh:
+	case core.ShellZsh:
 		return s.zshWrapperTemplate()
-	case domain.ShellFish:
+	case core.ShellFish:
 		return s.fishWrapperTemplate()
 	default:
 		return ""
@@ -160,7 +160,7 @@ func (s *shellInfrastructure) getWrapperTemplate(shellType domain.ShellType) str
 }
 
 // ComposeWrapper composes the wrapper with template replacements (pure function)
-func (s *shellInfrastructure) ComposeWrapper(template string, shellType domain.ShellType) string {
+func (s *shellInfrastructure) ComposeWrapper(template string, shellType core.ShellType) string {
 	// Pure function: no side effects, deterministic output
 	replacements := map[string]string{
 		"{{SHELL_TYPE}}": string(shellType),
@@ -176,13 +176,13 @@ func (s *shellInfrastructure) ComposeWrapper(template string, shellType domain.S
 }
 
 // getConfigFiles returns the list of config files for the shell type
-func (s *shellInfrastructure) getConfigFiles(shellType domain.ShellType) []string {
+func (s *shellInfrastructure) getConfigFiles(shellType core.ShellType) []string {
 	switch shellType {
-	case domain.ShellBash:
+	case core.ShellBash:
 		return []string{".bashrc", ".bash_profile", ".profile"}
-	case domain.ShellZsh:
+	case core.ShellZsh:
 		return []string{".zshrc", ".zprofile", ".profile"}
-	case domain.ShellFish:
+	case core.ShellFish:
 		return []string{".config/fish/config.fish", "config.fish", ".fishrc"}
 	default:
 		return []string{}
@@ -206,9 +206,9 @@ type shellTemplateConfig struct {
 }
 
 // getShellTemplateConfig returns shell-specific template configuration
-func getShellTemplateConfig(shellType domain.ShellType) shellTemplateConfig {
+func getShellTemplateConfig(shellType core.ShellType) shellTemplateConfig {
 	switch shellType {
-	case domain.ShellBash, domain.ShellZsh:
+	case core.ShellBash, core.ShellZsh:
 		return shellTemplateConfig{
 			caseBegin:     `case "$1" in`,
 			caseEnd:       "esac",
@@ -223,7 +223,7 @@ func getShellTemplateConfig(shellType domain.ShellType) shellTemplateConfig {
 			funcDef:       "twiggit() {",
 			funcEnd:       "}",
 		}
-	case domain.ShellFish:
+	case core.ShellFish:
 		return shellTemplateConfig{
 			caseBegin:     `switch "$argv[1]"`,
 			caseEnd:       "end",
@@ -257,7 +257,7 @@ func getShellTemplateConfig(shellType domain.ShellType) shellTemplateConfig {
 }
 
 // wrapperTemplate returns the shell wrapper template with shell-specific syntax
-func (s *shellInfrastructure) wrapperTemplate(shellType domain.ShellType) string {
+func (s *shellInfrastructure) wrapperTemplate(shellType core.ShellType) string {
 	config := getShellTemplateConfig(shellType)
 
 	return `### BEGIN TWIGGIT WRAPPER
@@ -304,7 +304,7 @@ func (s *shellInfrastructure) wrapperTemplate(shellType domain.ShellType) string
 
 // bashWrapperTemplate returns the bash wrapper template with Carapace completion
 func (s *shellInfrastructure) bashWrapperTemplate() string {
-	return s.wrapperTemplate(domain.ShellBash) + `
+	return s.wrapperTemplate(core.ShellBash) + `
 ### BEGIN TWIGGIT COMPLETION
 source <(command twiggit _carapace bash)
 ### END TWIGGIT COMPLETION`
@@ -312,7 +312,7 @@ source <(command twiggit _carapace bash)
 
 // zshWrapperTemplate returns the zsh wrapper template with Carapace completion
 func (s *shellInfrastructure) zshWrapperTemplate() string {
-	return s.wrapperTemplate(domain.ShellZsh) + `
+	return s.wrapperTemplate(core.ShellZsh) + `
 ### BEGIN TWIGGIT COMPLETION
 source <(command twiggit _carapace zsh)
 ### END TWIGGIT COMPLETION`
@@ -320,7 +320,7 @@ source <(command twiggit _carapace zsh)
 
 // fishWrapperTemplate returns the fish wrapper template with Carapace completion
 func (s *shellInfrastructure) fishWrapperTemplate() string {
-	return s.wrapperTemplate(domain.ShellFish) + `
+	return s.wrapperTemplate(core.ShellFish) + `
 ### BEGIN TWIGGIT COMPLETION
 command twiggit _carapace fish | source
 ### END TWIGGIT COMPLETION`

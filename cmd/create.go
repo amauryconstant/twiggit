@@ -8,7 +8,7 @@ import (
 
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // NewCreateCommand creates a new create command
@@ -64,7 +64,7 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 	branchName := extractBranchNameForValidation(spec)
 
 	// Validate branch name first (before any context detection or project discovery)
-	branchValidation := domain.ValidateBranchName(branchName)
+	branchValidation := core.ValidateBranchName(branchName)
 	if branchValidation.IsError() {
 		return branchValidation.Error
 	}
@@ -90,14 +90,14 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 	// Validate source branch exists before creating worktree
 	sourceBranchExists, err := config.Services.WorktreeService.BranchExists(ctx, project.Path, source)
 	if err != nil {
-		return domain.NewValidationError("CreateWorktreeRequest", "source", source, "failed to check if source branch exists: "+err.Error())
+		return core.NewOpValidationError("CreateWorktreeRequest", "source", source, "failed to check if source branch exists: "+err.Error())
 	}
 	if !sourceBranchExists {
-		return domain.NewValidationError("CreateWorktreeRequest", "source", source, fmt.Sprintf("source branch '%s' does not exist", source))
+		return core.NewOpValidationError("CreateWorktreeRequest", "source", source, fmt.Sprintf("source branch '%s' does not exist", source))
 	}
 
 	// Create worktree request
-	req := &domain.CreateWorktreeRequest{
+	req := &core.CreateWorktreeRequest{
 		ProjectName:  project.Name,
 		BranchName:   branchName,
 		SourceBranch: source,
@@ -139,15 +139,15 @@ func executeCreate(cmd *cobra.Command, config *CommandConfig, spec, source strin
 }
 
 // parseProjectBranch parses the project/branch specification
-func parseProjectBranch(spec string, ctx *domain.Context) (string, string, error) {
+func parseProjectBranch(spec string, ctx *core.Context) (string, string, error) {
 	if strings.Contains(spec, "/") {
 		parts := strings.SplitN(spec, "/", 2)
 		if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-			return "", "", domain.NewValidationError("parseProjectBranch", "spec", spec, "invalid format: expected <project>/<branch>")
+			return "", "", core.NewOpValidationError("parseProjectBranch", "spec", spec, "invalid format: expected <project>/<branch>")
 		}
 		projectName := parts[0]
 
-		if validation := domain.ValidateProjectName(projectName); validation.IsError() {
+		if validation := core.ValidateProjectName(projectName); validation.IsError() {
 			return "", "", validation.Error
 		}
 
@@ -158,7 +158,7 @@ func parseProjectBranch(spec string, ctx *domain.Context) (string, string, error
 		return ctx.ProjectName, spec, nil
 	}
 
-	return "", "", domain.NewValidationError("parseProjectBranch", "spec", spec, "cannot infer project: not in a project context and no project specified")
+	return "", "", core.NewOpValidationError("parseProjectBranch", "spec", spec, "cannot infer project: not in a project context and no project specified")
 }
 
 // extractBranchNameForValidation extracts branch name from spec for validation
@@ -175,7 +175,7 @@ func extractBranchNameForValidation(spec string) string {
 }
 
 // displayCreateSuccess displays the success message for worktree creation
-func displayCreateSuccess(out io.Writer, worktree *domain.WorktreeInfo) error {
+func displayCreateSuccess(out io.Writer, worktree *core.WorktreeInfo) error {
 	_, err := fmt.Fprintf(out, "Created worktree: %s -> %s\n", worktree.Branch, worktree.Path)
 	if err != nil {
 		return fmt.Errorf("failed to display success message: %w", err)
@@ -184,7 +184,7 @@ func displayCreateSuccess(out io.Writer, worktree *domain.WorktreeInfo) error {
 }
 
 // displayHookFailures displays hook failure warnings to stderr
-func displayHookFailures(out io.Writer, result *domain.HookResult) {
+func displayHookFailures(out io.Writer, result *core.HookResult) {
 	_, _ = fmt.Fprintf(out, "\nWarning: %d post-create hook(s) failed. Worktree created but setup may be incomplete.\n", len(result.Failures))
 	for _, failure := range result.Failures {
 		_, _ = fmt.Fprintf(out, "\n  Command: %s\n", failure.Command)

@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // NewListCommand creates a new list command
@@ -54,7 +54,7 @@ func executeList(cmd *cobra.Command, config *CommandConfig, all bool, output str
 	}
 
 	// Build list request
-	req := &domain.ListWorktreesRequest{
+	req := &core.ListWorktreesRequest{
 		Context:         currentCtx,
 		IncludeMain:     false, // By default, don't include main worktree
 		ListAllProjects: all,   // Use --all flag to list worktrees from all projects
@@ -96,7 +96,7 @@ func executeList(cmd *cobra.Command, config *CommandConfig, all bool, output str
 }
 
 // displayWorktrees displays the worktrees using the specified formatter
-func displayWorktrees(out io.Writer, worktrees []*domain.WorktreeInfo, formatter OutputFormatter) error {
+func displayWorktrees(out io.Writer, worktrees []*core.WorktreeInfo, formatter OutputFormatter) error {
 	formatted := formatter.FormatWorktrees(worktrees)
 	if _, err := fmt.Fprint(out, formatted); err != nil {
 		return fmt.Errorf("failed to display worktrees: %w", err)

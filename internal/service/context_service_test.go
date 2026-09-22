@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	fixtures "twiggit/test/fixtures"
 	"twiggit/test/mocks"
 )
@@ -27,7 +27,7 @@ func TestContextService_GetCurrentContext(t *testing.T) {
 	tests := []struct {
 		name            string
 		setupMock       func(*mocks.MockContextDetector, *mocks.MockContextResolver)
-		expectedContext *domain.Context
+		expectedContext *core.Context
 		expectedError   string
 	}{
 		{
@@ -35,8 +35,8 @@ func TestContextService_GetCurrentContext(t *testing.T) {
 			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
 				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat", []domain.SuggestionOption(nil)).Return(
-					[]*domain.ResolutionSuggestion{
+				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*core.Context"), "feat", []core.SuggestionOption(nil)).Return(
+					[]*core.ResolutionSuggestion{
 						{
 							Text:        "feature-branch",
 							Description: "Feature branch",
@@ -87,7 +87,7 @@ func TestContextService_DetectContextFromPath(t *testing.T) {
 		name            string
 		path            string
 		setupMock       func(*mocks.MockContextDetector)
-		expectedContext *domain.Context
+		expectedContext *core.Context
 		expectedError   string
 	}{
 		{
@@ -151,7 +151,7 @@ func TestContextService_ResolveIdentifier(t *testing.T) {
 		name           string
 		identifier     string
 		setupMock      func(*mocks.MockContextDetector, *mocks.MockContextResolver)
-		expectedResult *domain.ResolutionResult
+		expectedResult *core.ResolutionResult
 		expectedError  string
 	}{
 		{
@@ -160,7 +160,7 @@ func TestContextService_ResolveIdentifier(t *testing.T) {
 			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
 				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "main").Return(
+				resolver.On("ResolveIdentifier", mock.AnythingOfType("*core.Context"), "main").Return(
 					fixtures.NewProjectResolutionResult(), nil)
 			},
 			expectedResult: fixtures.NewProjectResolutionResult(),
@@ -179,7 +179,7 @@ func TestContextService_ResolveIdentifier(t *testing.T) {
 			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
 				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "invalid-branch").Return(
+				resolver.On("ResolveIdentifier", mock.AnythingOfType("*core.Context"), "invalid-branch").Return(
 					nil, errors.New("resolution failed"))
 			},
 			expectedError: "failed to resolve identifier 'invalid-branch'",
@@ -217,34 +217,34 @@ func TestContextService_ResolveIdentifier(t *testing.T) {
 func TestContextService_ResolveIdentifierFromContext(t *testing.T) {
 	tests := []struct {
 		name           string
-		context        *domain.Context
+		context        *core.Context
 		identifier     string
 		setupMock      func(*mocks.MockContextDetector, *mocks.MockContextResolver)
-		expectedResult *domain.ResolutionResult
+		expectedResult *core.ResolutionResult
 		expectedError  string
 	}{
 		{
 			name: "successful resolution with provided context",
-			context: &domain.Context{
-				Type:        domain.ContextWorktree,
+			context: &core.Context{
+				Type:        core.ContextWorktree,
 				ProjectName: "test-project",
 				BranchName:  "current-branch",
 			},
 			identifier: "other-branch",
 			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
-				resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "other-branch").Return(
+				resolver.On("ResolveIdentifier", mock.AnythingOfType("*core.Context"), "other-branch").Return(
 					fixtures.NewWorktreeResolutionResult(), nil)
 			},
 			expectedResult: fixtures.NewWorktreeResolutionResult(),
 		},
 		{
 			name: "resolver fails",
-			context: &domain.Context{
-				Type: domain.ContextProject,
+			context: &core.Context{
+				Type: core.ContextProject,
 			},
 			identifier: "invalid",
 			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
-				resolver.On("ResolveIdentifier", mock.AnythingOfType("*domain.Context"), "invalid").Return(
+				resolver.On("ResolveIdentifier", mock.AnythingOfType("*core.Context"), "invalid").Return(
 					nil, errors.New("resolution failed"))
 			},
 			expectedError: "failed to resolve identifier 'invalid'",
@@ -283,7 +283,7 @@ func TestContextService_GetCompletionSuggestions(t *testing.T) {
 		name                string
 		partial             string
 		setupMock           func(*mocks.MockContextDetector, *mocks.MockContextResolver)
-		expectedSuggestions []*domain.ResolutionSuggestion
+		expectedSuggestions []*core.ResolutionSuggestion
 		expectedError       string
 	}{
 		{
@@ -292,7 +292,7 @@ func TestContextService_GetCompletionSuggestions(t *testing.T) {
 			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
 				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "feat", []domain.SuggestionOption(nil)).Return(
+				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*core.Context"), "feat", []core.SuggestionOption(nil)).Return(
 					fixtures.NewFeatureSuggestions(), nil)
 			},
 			expectedSuggestions: fixtures.NewFeatureSuggestions(),
@@ -311,7 +311,7 @@ func TestContextService_GetCompletionSuggestions(t *testing.T) {
 			setupMock: func(detector *mocks.MockContextDetector, resolver *mocks.MockContextResolver) {
 				detector.On("DetectContext", mock.AnythingOfType("string")).Return(
 					fixtures.NewProjectContext(), nil)
-				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*domain.Context"), "invalid", []domain.SuggestionOption(nil)).Return(
+				resolver.On("GetResolutionSuggestions", mock.AnythingOfType("*core.Context"), "invalid", []core.SuggestionOption(nil)).Return(
 					nil, errors.New("suggestions failed"))
 			},
 			expectedError: "failed to get completion suggestions",

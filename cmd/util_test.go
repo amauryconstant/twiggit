@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
@@ -190,13 +190,13 @@ func TestResolveNavigationTarget_WithExplicitTarget(t *testing.T) {
 	}
 
 	// Set up expectations
-	mockCtxService.On("GetCurrentContext").Return(&domain.Context{
-		Type: domain.ContextProject,
+	mockCtxService.On("GetCurrentContext").Return(&core.Context{
+		Type: core.ContextProject,
 	}, nil)
 
-	mockNavService.On("ResolvePath", mock.Anything, mock.MatchedBy(func(req *domain.ResolvePathRequest) bool {
+	mockNavService.On("ResolvePath", mock.Anything, mock.MatchedBy(func(req *core.ResolvePathRequest) bool {
 		return req.Target == "feature-branch"
-	})).Return(&domain.ResolutionResult{
+	})).Return(&core.ResolutionResult{
 		ResolvedPath: "/path/to/feature-branch",
 	}, nil)
 
@@ -226,15 +226,15 @@ func TestResolveNavigationTarget_FromWorktreeUsesCurrentBranch(t *testing.T) {
 	}
 
 	// Set up expectations - from worktree context
-	mockCtxService.On("GetCurrentContext").Return(&domain.Context{
-		Type:       domain.ContextWorktree,
+	mockCtxService.On("GetCurrentContext").Return(&core.Context{
+		Type:       core.ContextWorktree,
 		BranchName: "current-feature",
 	}, nil)
 
 	// When target is empty, should use current branch from worktree context
-	mockNavService.On("ResolvePath", mock.Anything, mock.MatchedBy(func(req *domain.ResolvePathRequest) bool {
+	mockNavService.On("ResolvePath", mock.Anything, mock.MatchedBy(func(req *core.ResolvePathRequest) bool {
 		return req.Target == "current-feature"
-	})).Return(&domain.ResolutionResult{
+	})).Return(&core.ResolutionResult{
 		ResolvedPath: "/path/to/current-feature",
 	}, nil)
 
@@ -245,7 +245,7 @@ func TestResolveNavigationTarget_FromWorktreeUsesCurrentBranch(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.NotNil(t, currentCtx)
-	assert.Equal(t, domain.ContextWorktree, currentCtx.Type)
+	assert.Equal(t, core.ContextWorktree, currentCtx.Type)
 	assert.Equal(t, "current-feature", currentCtx.BranchName)
 	assert.NotNil(t, result)
 
@@ -265,14 +265,14 @@ func TestResolveNavigationTarget_FromProjectUsesMain(t *testing.T) {
 	}
 
 	// Set up expectations - from project context
-	mockCtxService.On("GetCurrentContext").Return(&domain.Context{
-		Type: domain.ContextProject,
+	mockCtxService.On("GetCurrentContext").Return(&core.Context{
+		Type: core.ContextProject,
 	}, nil)
 
 	// When target is empty from project context, should default to "main"
-	mockNavService.On("ResolvePath", mock.Anything, mock.MatchedBy(func(req *domain.ResolvePathRequest) bool {
+	mockNavService.On("ResolvePath", mock.Anything, mock.MatchedBy(func(req *core.ResolvePathRequest) bool {
 		return req.Target == "main"
-	})).Return(&domain.ResolutionResult{
+	})).Return(&core.ResolutionResult{
 		ResolvedPath: "/path/to/main",
 	}, nil)
 
@@ -283,7 +283,7 @@ func TestResolveNavigationTarget_FromProjectUsesMain(t *testing.T) {
 	// Assert
 	require.NoError(t, err)
 	assert.NotNil(t, currentCtx)
-	assert.Equal(t, domain.ContextProject, currentCtx.Type)
+	assert.Equal(t, core.ContextProject, currentCtx.Type)
 	assert.NotNil(t, result)
 
 	mockCtxService.AssertExpectations(t)
@@ -302,8 +302,8 @@ func TestResolveNavigationTarget_OutsideGitErrors(t *testing.T) {
 	}
 
 	// Set up expectations - outside git context
-	mockCtxService.On("GetCurrentContext").Return(&domain.Context{
-		Type: domain.ContextOutsideGit,
+	mockCtxService.On("GetCurrentContext").Return(&core.Context{
+		Type: core.ContextOutsideGit,
 	}, nil)
 
 	// Execute with empty target from outside git context
@@ -359,8 +359,8 @@ func TestResolveNavigationTarget_ResolutionFailure(t *testing.T) {
 	}
 
 	// Set up expectations
-	mockCtxService.On("GetCurrentContext").Return(&domain.Context{
-		Type: domain.ContextProject,
+	mockCtxService.On("GetCurrentContext").Return(&core.Context{
+		Type: core.ContextProject,
 	}, nil)
 
 	mockNavService.On("ResolvePath", mock.Anything, mock.Anything).Return(nil, assert.AnError)

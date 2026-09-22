@@ -9,27 +9,27 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
-func setupShellService() (application.ShellService, *domain.Config) {
-	config := domain.DefaultConfig()
+func setupShellService() (application.ShellService, *core.Config) {
+	config := core.DefaultConfig()
 
-	bashWrapper, _ := domain.ShellWrapper(domain.ShellBash)
-	zshWrapper, _ := domain.ShellWrapper(domain.ShellZsh)
-	fishWrapper, _ := domain.ShellWrapper(domain.ShellFish)
+	bashWrapper, _ := core.ShellWrapper(core.ShellBash)
+	zshWrapper, _ := core.ShellWrapper(core.ShellZsh)
+	fishWrapper, _ := core.ShellWrapper(core.ShellFish)
 
 	shellInfra := mocks.NewMockShellInfrastructure()
-	shellInfra.On("GenerateWrapper", domain.ShellBash).Return(bashWrapper, nil)
-	shellInfra.On("GenerateWrapper", domain.ShellZsh).Return(zshWrapper, nil)
-	shellInfra.On("GenerateWrapper", domain.ShellFish).Return(fishWrapper, nil)
-	shellInfra.On("DetectConfigFile", domain.ShellBash).Return("/home/user/.bashrc", nil)
-	shellInfra.On("DetectConfigFile", domain.ShellZsh).Return("/home/user/.zshrc", nil)
-	shellInfra.On("DetectConfigFile", domain.ShellFish).Return("/home/user/.config/fish/config.fish", nil)
-	shellInfra.On("DetectConfigFile", mock.AnythingOfType("domain.ShellType")).Return("", nil).Maybe()
-	shellInfra.On("InstallWrapper", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(domain.NewShellWrapperError("mock", "installation", "mock installation failure", nil))
-	shellInfra.On("ValidateInstallation", mock.Anything, mock.Anything).Return(domain.NewShellNotInstalledError("mock", "mock validation failure", nil))
+	shellInfra.On("GenerateWrapper", core.ShellBash).Return(bashWrapper, nil)
+	shellInfra.On("GenerateWrapper", core.ShellZsh).Return(zshWrapper, nil)
+	shellInfra.On("GenerateWrapper", core.ShellFish).Return(fishWrapper, nil)
+	shellInfra.On("DetectConfigFile", core.ShellBash).Return("/home/user/.bashrc", nil)
+	shellInfra.On("DetectConfigFile", core.ShellZsh).Return("/home/user/.zshrc", nil)
+	shellInfra.On("DetectConfigFile", core.ShellFish).Return("/home/user/.config/fish/config.fish", nil)
+	shellInfra.On("DetectConfigFile", mock.AnythingOfType("core.ShellType")).Return("", nil).Maybe()
+	shellInfra.On("InstallWrapper", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(core.NewShellWrapperError("mock", "installation", "mock installation failure", nil))
+	shellInfra.On("ValidateInstallation", mock.Anything, mock.Anything).Return(core.NewShellNotInstalledError("mock", "mock validation failure", nil))
 	service := NewShellService(shellInfra, config)
 
 	return service, config
@@ -38,30 +38,30 @@ func setupShellService() (application.ShellService, *domain.Config) {
 func TestShellService_SetupShell(t *testing.T) {
 	tests := []struct {
 		name        string
-		request     *domain.SetupShellRequest
+		request     *core.SetupShellRequest
 		expectError bool
-		validate    func(*testing.T, *domain.SetupShellResult)
+		validate    func(*testing.T, *core.SetupShellResult)
 	}{
 		{
 			name: "force reinstall setup for bash",
-			request: &domain.SetupShellRequest{
-				ShellType:      domain.ShellBash,
+			request: &core.SetupShellRequest{
+				ShellType:      core.ShellBash,
 				ForceOverwrite: true,
 			},
 			expectError: true,
 		},
 		{
 			name: "force reinstall setup for zsh",
-			request: &domain.SetupShellRequest{
-				ShellType:      domain.ShellZsh,
+			request: &core.SetupShellRequest{
+				ShellType:      core.ShellZsh,
 				ForceOverwrite: true,
 			},
 			expectError: true,
 		},
 		{
 			name: "force reinstall setup for fish",
-			request: &domain.SetupShellRequest{
-				ShellType:      domain.ShellFish,
+			request: &core.SetupShellRequest{
+				ShellType:      core.ShellFish,
 				ForceOverwrite: true,
 			},
 			expectError: true,
@@ -92,7 +92,7 @@ func TestShellService_SetupShell(t *testing.T) {
 func TestShellService_SetupShellValidation(t *testing.T) {
 	tests := []struct {
 		name         string
-		request      *domain.SetupShellRequest
+		request      *core.SetupShellRequest
 		setEnv       func(*testing.T)
 		unsetEnv     func()
 		expectError  bool
@@ -100,8 +100,8 @@ func TestShellService_SetupShellValidation(t *testing.T) {
 	}{
 		{
 			name: "invalid shell type",
-			request: &domain.SetupShellRequest{
-				ShellType:      domain.ShellType("invalid"),
+			request: &core.SetupShellRequest{
+				ShellType:      core.ShellType("invalid"),
 				ForceOverwrite: false,
 			},
 			expectError:  true,
@@ -109,8 +109,8 @@ func TestShellService_SetupShellValidation(t *testing.T) {
 		},
 		{
 			name: "empty shell type with unsupported SHELL",
-			request: &domain.SetupShellRequest{
-				ShellType:      domain.ShellType(""),
+			request: &core.SetupShellRequest{
+				ShellType:      core.ShellType(""),
 				ForceOverwrite: false,
 			},
 			setEnv: func(t *testing.T) {
@@ -155,27 +155,27 @@ func TestShellService_SetupShellValidation(t *testing.T) {
 func TestShellService_ValidateInstallation(t *testing.T) {
 	tests := []struct {
 		name        string
-		request     *domain.ValidateInstallationRequest
+		request     *core.ValidateInstallationRequest
 		expectError bool
 	}{
 		{
 			name: "validate bash installation",
-			request: &domain.ValidateInstallationRequest{
-				ShellType: domain.ShellBash,
+			request: &core.ValidateInstallationRequest{
+				ShellType: core.ShellBash,
 			},
 			expectError: false,
 		},
 		{
 			name: "validate zsh installation",
-			request: &domain.ValidateInstallationRequest{
-				ShellType: domain.ShellZsh,
+			request: &core.ValidateInstallationRequest{
+				ShellType: core.ShellZsh,
 			},
 			expectError: false,
 		},
 		{
 			name: "validate fish installation",
-			request: &domain.ValidateInstallationRequest{
-				ShellType: domain.ShellFish,
+			request: &core.ValidateInstallationRequest{
+				ShellType: core.ShellFish,
 			},
 			expectError: false,
 		},
@@ -203,7 +203,7 @@ func TestShellService_ValidateInstallation(t *testing.T) {
 func TestShellService_ValidateInstallationValidation(t *testing.T) {
 	tests := []struct {
 		name         string
-		request      *domain.ValidateInstallationRequest
+		request      *core.ValidateInstallationRequest
 		setEnv       func(*testing.T)
 		unsetEnv     func()
 		expectError  bool
@@ -211,16 +211,16 @@ func TestShellService_ValidateInstallationValidation(t *testing.T) {
 	}{
 		{
 			name: "invalid shell type",
-			request: &domain.ValidateInstallationRequest{
-				ShellType: domain.ShellType("invalid"),
+			request: &core.ValidateInstallationRequest{
+				ShellType: core.ShellType("invalid"),
 			},
 			expectError:  true,
 			errorMessage: "unsupported shell type",
 		},
 		{
 			name: "empty shell type with unsupported SHELL",
-			request: &domain.ValidateInstallationRequest{
-				ShellType: domain.ShellType(""),
+			request: &core.ValidateInstallationRequest{
+				ShellType: core.ShellType(""),
 			},
 			setEnv: func(t *testing.T) {
 				t.Helper()
@@ -264,18 +264,18 @@ func TestShellService_ValidateInstallationValidation(t *testing.T) {
 func TestShellService_GenerateWrapper(t *testing.T) {
 	tests := []struct {
 		name        string
-		request     *domain.GenerateWrapperRequest
+		request     *core.GenerateWrapperRequest
 		expectError bool
-		validate    func(*testing.T, *domain.GenerateWrapperResult)
+		validate    func(*testing.T, *core.GenerateWrapperResult)
 	}{
 		{
 			name: "generate bash wrapper",
-			request: &domain.GenerateWrapperRequest{
-				ShellType: domain.ShellBash,
+			request: &core.GenerateWrapperRequest{
+				ShellType: core.ShellBash,
 			},
-			validate: func(t *testing.T, result *domain.GenerateWrapperResult) {
+			validate: func(t *testing.T, result *core.GenerateWrapperResult) {
 				t.Helper()
-				assert.Equal(t, domain.ShellBash, result.ShellType)
+				assert.Equal(t, core.ShellBash, result.ShellType)
 				assert.NotEmpty(t, result.WrapperContent)
 				assert.Contains(t, result.WrapperContent, "twiggit() {")
 				assert.Contains(t, result.WrapperContent, "# Twiggit bash wrapper")
@@ -283,12 +283,12 @@ func TestShellService_GenerateWrapper(t *testing.T) {
 		},
 		{
 			name: "generate zsh wrapper",
-			request: &domain.GenerateWrapperRequest{
-				ShellType: domain.ShellZsh,
+			request: &core.GenerateWrapperRequest{
+				ShellType: core.ShellZsh,
 			},
-			validate: func(t *testing.T, result *domain.GenerateWrapperResult) {
+			validate: func(t *testing.T, result *core.GenerateWrapperResult) {
 				t.Helper()
-				assert.Equal(t, domain.ShellZsh, result.ShellType)
+				assert.Equal(t, core.ShellZsh, result.ShellType)
 				assert.NotEmpty(t, result.WrapperContent)
 				assert.Contains(t, result.WrapperContent, "twiggit() {")
 				assert.Contains(t, result.WrapperContent, "# Twiggit zsh wrapper")
@@ -296,12 +296,12 @@ func TestShellService_GenerateWrapper(t *testing.T) {
 		},
 		{
 			name: "generate fish wrapper",
-			request: &domain.GenerateWrapperRequest{
-				ShellType: domain.ShellFish,
+			request: &core.GenerateWrapperRequest{
+				ShellType: core.ShellFish,
 			},
-			validate: func(t *testing.T, result *domain.GenerateWrapperResult) {
+			validate: func(t *testing.T, result *core.GenerateWrapperResult) {
 				t.Helper()
-				assert.Equal(t, domain.ShellFish, result.ShellType)
+				assert.Equal(t, core.ShellFish, result.ShellType)
 				assert.NotEmpty(t, result.WrapperContent)
 				assert.Contains(t, result.WrapperContent, "function twiggit")
 				assert.Contains(t, result.WrapperContent, "# Twiggit fish wrapper")
@@ -330,22 +330,22 @@ func TestShellService_GenerateWrapper(t *testing.T) {
 func TestShellService_GenerateWrapperValidation(t *testing.T) {
 	tests := []struct {
 		name         string
-		request      *domain.GenerateWrapperRequest
+		request      *core.GenerateWrapperRequest
 		expectError  bool
 		errorMessage string
 	}{
 		{
 			name: "invalid shell type",
-			request: &domain.GenerateWrapperRequest{
-				ShellType: domain.ShellType("invalid"),
+			request: &core.GenerateWrapperRequest{
+				ShellType: core.ShellType("invalid"),
 			},
 			expectError:  true,
 			errorMessage: "unsupported shell type",
 		},
 		{
 			name: "empty shell type",
-			request: &domain.GenerateWrapperRequest{
-				ShellType: domain.ShellType(""),
+			request: &core.GenerateWrapperRequest{
+				ShellType: core.ShellType(""),
 			},
 			expectError:  true,
 			errorMessage: "unsupported shell type",
@@ -375,15 +375,15 @@ func TestShellService_GenerateWrapperValidation(t *testing.T) {
 func TestShellService_SetupShellAutoDetection(t *testing.T) {
 	tests := []struct {
 		name        string
-		request     *domain.SetupShellRequest
+		request     *core.SetupShellRequest
 		setEnv      func(*testing.T)
 		unsetEnv    func()
 		expectError bool
-		validate    func(*testing.T, *domain.SetupShellResult)
+		validate    func(*testing.T, *core.SetupShellResult)
 	}{
 		{
 			name: "auto-detect bash when no args provided",
-			request: &domain.SetupShellRequest{
+			request: &core.SetupShellRequest{
 				ShellType:  "",
 				ConfigFile: "",
 			},
@@ -393,15 +393,15 @@ func TestShellService_SetupShellAutoDetection(t *testing.T) {
 			},
 			unsetEnv:    func() {},
 			expectError: true,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
+			validate: func(t *testing.T, result *core.SetupShellResult) {
 				t.Helper()
-				assert.Equal(t, domain.ShellBash, result.ShellType)
+				assert.Equal(t, core.ShellBash, result.ShellType)
 				assert.Contains(t, result.ConfigFile, ".bashrc")
 			},
 		},
 		{
 			name: "auto-detect zsh when no args provided",
-			request: &domain.SetupShellRequest{
+			request: &core.SetupShellRequest{
 				ShellType:  "",
 				ConfigFile: "",
 			},
@@ -411,15 +411,15 @@ func TestShellService_SetupShellAutoDetection(t *testing.T) {
 			},
 			unsetEnv:    func() {},
 			expectError: true,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
+			validate: func(t *testing.T, result *core.SetupShellResult) {
 				t.Helper()
-				assert.Equal(t, domain.ShellZsh, result.ShellType)
+				assert.Equal(t, core.ShellZsh, result.ShellType)
 				assert.Contains(t, result.ConfigFile, ".zshrc")
 			},
 		},
 		{
 			name: "auto-detect fish when no args provided",
-			request: &domain.SetupShellRequest{
+			request: &core.SetupShellRequest{
 				ShellType:  "",
 				ConfigFile: "",
 			},
@@ -429,15 +429,15 @@ func TestShellService_SetupShellAutoDetection(t *testing.T) {
 			},
 			unsetEnv:    func() {},
 			expectError: true,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
+			validate: func(t *testing.T, result *core.SetupShellResult) {
 				t.Helper()
-				assert.Equal(t, domain.ShellFish, result.ShellType)
+				assert.Equal(t, core.ShellFish, result.ShellType)
 				assert.Contains(t, result.ConfigFile, "config.fish")
 			},
 		},
 		{
 			name: "error when SHELL not set",
-			request: &domain.SetupShellRequest{
+			request: &core.SetupShellRequest{
 				ShellType:  "",
 				ConfigFile: "",
 			},
@@ -450,7 +450,7 @@ func TestShellService_SetupShellAutoDetection(t *testing.T) {
 		},
 		{
 			name: "error when SHELL is unsupported",
-			request: &domain.SetupShellRequest{
+			request: &core.SetupShellRequest{
 				ShellType:  "",
 				ConfigFile: "",
 			},
@@ -463,8 +463,8 @@ func TestShellService_SetupShellAutoDetection(t *testing.T) {
 		},
 		{
 			name: "explicit shell overrides auto-detection",
-			request: &domain.SetupShellRequest{
-				ShellType:  domain.ShellZsh,
+			request: &core.SetupShellRequest{
+				ShellType:  core.ShellZsh,
 				ConfigFile: "",
 			},
 			setEnv: func(t *testing.T) {
@@ -473,15 +473,15 @@ func TestShellService_SetupShellAutoDetection(t *testing.T) {
 			},
 			unsetEnv:    func() {},
 			expectError: true,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
+			validate: func(t *testing.T, result *core.SetupShellResult) {
 				t.Helper()
-				assert.Equal(t, domain.ShellZsh, result.ShellType)
+				assert.Equal(t, core.ShellZsh, result.ShellType)
 				assert.Contains(t, result.ConfigFile, ".zshrc")
 			},
 		},
 		{
 			name: "explicit config file overrides auto-detection",
-			request: &domain.SetupShellRequest{
+			request: &core.SetupShellRequest{
 				ShellType:  "",
 				ConfigFile: "/custom/zshrc",
 			},
@@ -491,15 +491,15 @@ func TestShellService_SetupShellAutoDetection(t *testing.T) {
 			},
 			unsetEnv:    func() {},
 			expectError: true,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
+			validate: func(t *testing.T, result *core.SetupShellResult) {
 				t.Helper()
 				assert.Equal(t, "/custom/zshrc", result.ConfigFile)
 			},
 		},
 		{
 			name: "both explicit shell and config file specified",
-			request: &domain.SetupShellRequest{
-				ShellType:  domain.ShellBash,
+			request: &core.SetupShellRequest{
+				ShellType:  core.ShellBash,
 				ConfigFile: "/custom/bashrc",
 			},
 			setEnv: func(t *testing.T) {
@@ -507,9 +507,9 @@ func TestShellService_SetupShellAutoDetection(t *testing.T) {
 			},
 			unsetEnv:    func() {},
 			expectError: true,
-			validate: func(t *testing.T, result *domain.SetupShellResult) {
+			validate: func(t *testing.T, result *core.SetupShellResult) {
 				t.Helper()
-				assert.Equal(t, domain.ShellBash, result.ShellType)
+				assert.Equal(t, core.ShellBash, result.ShellType)
 				assert.Equal(t, "/custom/bashrc", result.ConfigFile)
 			},
 		},

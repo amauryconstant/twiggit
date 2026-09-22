@@ -6,21 +6,31 @@ import (
 	"fmt"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 var _ application.ShellService = (*shellService)(nil)
 
+// isShellOp reports whether err (or any wrapped error in its chain) is a
+// core.OperationError whose Op field matches the supplied value.
+func isShellOp(err error, op string) bool {
+	var oe *core.OperationError
+	if !errors.As(err, &oe) {
+		return false
+	}
+	return oe.Op == op
+}
+
 // shellService implements the ShellService interface
 type shellService struct {
 	integration application.ShellInfrastructure
-	config      *domain.Config
+	config      *core.Config
 }
 
 // NewShellService creates a new ShellService instance
 func NewShellService(
 	integration application.ShellInfrastructure,
-	config *domain.Config,
+	config *core.Config,
 ) application.ShellService {
 	return &shellService{
 		integration: integration,
@@ -30,11 +40,11 @@ func NewShellService(
 
 // detectShellAndConfig auto-detects shell type and config file when both are empty
 // or infers one from the other when only one is provided
-func (s *shellService) detectShellAndConfig(shellType domain.ShellType, configFile string) (domain.ShellType, string, error) {
+func (s *shellService) detectShellAndConfig(shellType core.ShellType, configFile string) (core.ShellType, string, error) {
 	// Auto-detect shell and config file when both are empty
 	if shellType == "" && configFile == "" {
 		var err error
-		shellType, err = domain.DetectShellFromEnv()
+		shellType, err = core.DetectShellFromEnv()
 		if err != nil {
 			return "", "", fmt.Errorf("shell auto-detection failed: %w", err)
 		}
@@ -48,7 +58,7 @@ func (s *shellService) detectShellAndConfig(shellType domain.ShellType, configFi
 
 	// Infer shell type from config file if not specified
 	if shellType == "" && configFile != "" {
-		inferredType, err := domain.InferShellTypeFromPath(configFile)
+		inferredType, err := core.InferShellTypeFromPath(configFile)
 		if err != nil {
 			return "", "", fmt.Errorf("failed to infer shell type: %w", err)
 		}
@@ -68,21 +78,21 @@ func (s *shellService) detectShellAndConfig(shellType domain.ShellType, configFi
 }
 
 // SetupShell sets up shell integration for the specified shell type
-func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellRequest) (*domain.SetupShellResult, error) {
+func (s *shellService) SetupShell(_ context.Context, req *core.SetupShellRequest) (*core.SetupShellResult, error) {
 	shellType, configFile, err := s.detectShellAndConfig(req.ShellType, req.ConfigFile)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate shell type
-	if !domain.IsValidShellType(shellType) {
-		return nil, domain.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
+	if !core.IsValidShellType(shellType) {
+		return nil, core.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
 	}
 
 	// Check existing installation
 	if !req.ForceOverwrite {
 		if err := s.integration.ValidateInstallation(shellType, configFile); err == nil {
-			return &domain.SetupShellResult{
+			return &core.SetupShellResult{
 				ShellType:   shellType,
 				IsInstalled: true,
 				IsSkipped:   true,
@@ -101,8 +111,8 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 	// Install wrapper
 	if err := s.integration.InstallWrapper(shellType, wrapper, configFile, req.ForceOverwrite); err != nil {
 		// Check if it's already installed error
-		if errors.Is(err, domain.ErrShellAlreadyInstalled) {
-			return &domain.SetupShellResult{
+		if isShellOp(err, "shell.already_installed") {
+			return &core.SetupShellResult{
 				ShellType:   shellType,
 				IsInstalled: true,
 				IsSkipped:   true,
@@ -113,7 +123,7 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 		return nil, fmt.Errorf("failed to install wrapper: %w", err)
 	}
 
-	return &domain.SetupShellResult{
+	return &core.SetupShellResult{
 		ShellType:   shellType,
 		IsInstalled: true,
 		ConfigFile:  configFile,
@@ -122,22 +132,22 @@ func (s *shellService) SetupShell(_ context.Context, req *domain.SetupShellReque
 }
 
 // ValidateInstallation validates whether shell integration is installed
-func (s *shellService) ValidateInstallation(_ context.Context, req *domain.ValidateInstallationRequest) (*domain.ValidateInstallationResult, error) {
+func (s *shellService) ValidateInstallation(_ context.Context, req *core.ValidateInstallationRequest) (*core.ValidateInstallationResult, error) {
 	shellType, configFile, err := s.detectShellAndConfig(req.ShellType, req.ConfigFile)
 	if err != nil {
 		return nil, err
 	}
 
 	// Validate shell type
-	if !domain.IsValidShellType(shellType) {
-		return nil, domain.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
+	if !core.IsValidShellType(shellType) {
+		return nil, core.NewShellInvalidTypeError(string(shellType), "unsupported shell type", nil)
 	}
 
 	// Validate installation
 	err = s.integration.ValidateInstallation(shellType, configFile)
 	if err != nil {
-		if errors.Is(err, domain.ErrShellNotInstalled) {
-			return &domain.ValidateInstallationResult{
+		if isShellOp(err, "shell.not_installed") {
+			return &core.ValidateInstallationResult{
 				ShellType:   shellType,
 				IsInstalled: false,
 				ConfigFile:  configFile,
@@ -147,7 +157,7 @@ func (s *shellService) ValidateInstallation(_ context.Context, req *domain.Valid
 		return nil, fmt.Errorf("failed to validate installation: %w", err)
 	}
 
-	return &domain.ValidateInstallationResult{
+	return &core.ValidateInstallationResult{
 		ShellType:   shellType,
 		IsInstalled: true,
 		ConfigFile:  configFile,
@@ -156,7 +166,7 @@ func (s *shellService) ValidateInstallation(_ context.Context, req *domain.Valid
 }
 
 // GenerateWrapper generates a shell wrapper for the specified shell type
-func (s *shellService) GenerateWrapper(_ context.Context, req *domain.GenerateWrapperRequest) (*domain.GenerateWrapperResult, error) {
+func (s *shellService) GenerateWrapper(_ context.Context, req *core.GenerateWrapperRequest) (*core.GenerateWrapperResult, error) {
 	// Pure function: validate request first
 	if err := req.ValidateGenerateWrapperRequest(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
@@ -182,7 +192,7 @@ func (s *shellService) GenerateWrapper(_ context.Context, req *domain.GenerateWr
 		templateUsed = "custom"
 	}
 
-	return &domain.GenerateWrapperResult{
+	return &core.GenerateWrapperResult{
 		ShellType:      req.ShellType,
 		WrapperContent: wrapper,
 		TemplateUsed:   templateUsed,

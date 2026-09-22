@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 	"twiggit/test/mocks"
 )
@@ -47,7 +47,7 @@ func TestProjectDiscovery_Integration(t *testing.T) {
 	// nonRepoPath remains a non-git directory
 
 	// Create configuration
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  projectsDir,
 		WorktreesDirectory: worktreesDir,
 	}
@@ -62,8 +62,8 @@ func TestProjectDiscovery_Integration(t *testing.T) {
 	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
 	// Test context detection from outside git
-	ctx := &domain.Context{
-		Type: domain.ContextOutsideGit,
+	ctx := &core.Context{
+		Type: core.ContextOutsideGit,
 		Path: tempDir,
 	}
 
@@ -72,7 +72,7 @@ func TestProjectDiscovery_Integration(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, suggestions, 1, "Should find 1 project matching 'proj'")
 	assert.Equal(t, "project1", suggestions[0].Text)
-	assert.Equal(t, domain.PathTypeProject, suggestions[0].Type)
+	assert.Equal(t, core.PathTypeProject, suggestions[0].Type)
 	assert.Equal(t, "project1", suggestions[0].ProjectName)
 
 	// Test suggestions with partial "test"
@@ -90,7 +90,7 @@ func TestProjectDiscovery_Integration(t *testing.T) {
 	projectNames := make(map[string]bool)
 	for _, suggestion := range suggestions {
 		projectNames[suggestion.Text] = true
-		assert.Equal(t, domain.PathTypeProject, suggestion.Type)
+		assert.Equal(t, core.PathTypeProject, suggestion.Type)
 		assert.Equal(t, "Project directory", suggestion.Description)
 	}
 	assert.True(t, projectNames["project1"], "Should include project1")
@@ -100,7 +100,7 @@ func TestProjectDiscovery_Integration(t *testing.T) {
 	// Test resolution of project identifier
 	result, err := resolver.ResolveIdentifier(ctx, "project1")
 	require.NoError(t, err)
-	assert.Equal(t, domain.PathTypeProject, result.Type)
+	assert.Equal(t, core.PathTypeProject, result.Type)
 	assert.Equal(t, "project1", result.ProjectName)
 	assert.Equal(t, project1Path, result.ResolvedPath)
 	assert.Contains(t, result.Explanation, "project1")
@@ -141,7 +141,7 @@ func setupTestGitRepo(t *testing.T, repoPath string) {
 func TestContextResolution_WithExistingOnly_Integration(t *testing.T) {
 	tempDir := t.TempDir()
 
-	resolver := infrastructure.NewContextResolver(&domain.Config{
+	resolver := infrastructure.NewContextResolver(&core.Config{
 		ProjectsDirectory:  tempDir,
 		WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
 	}, nil, nil)
@@ -152,8 +152,8 @@ func TestContextResolution_WithExistingOnly_Integration(t *testing.T) {
 	testFile := filepath.Join(projectPath, "test.txt")
 	require.NoError(t, os.WriteFile(testFile, []byte("test"), 0644))
 
-	ctx := &domain.Context{
-		Type:        domain.ContextProject,
+	ctx := &core.Context{
+		Type:        core.ContextProject,
 		ProjectName: "test-project",
 		Path:        projectPath,
 	}
@@ -183,23 +183,23 @@ func TestWithExistingOnly_ExistingWorktrees(t *testing.T) {
 
 	nonExistingWorktreePath := filepath.Join(worktreesDir, "test-project", "feature-2")
 
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  projectsDir,
 		WorktreesDirectory: worktreesDir,
 	}
 
 	mockGitService := mocks.NewMockGitService()
 	mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
-	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
-	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{
+	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]core.BranchInfo{}, nil)
+	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]core.WorktreeInfo{
 		{Branch: "feature-1", Path: existingWorktreePath},
 		{Branch: "feature-2", Path: nonExistingWorktreePath},
 	}, nil)
 
 	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-	ctx := &domain.Context{
-		Type:        domain.ContextProject,
+	ctx := &core.Context{
+		Type:        core.ContextProject,
 		ProjectName: "test-project",
 		Path:        projectPath,
 	}
@@ -233,23 +233,23 @@ func TestWithExistingOnly_AllWorktreesExist(t *testing.T) {
 	require.NoError(t, os.MkdirAll(worktree1Path, 0755))
 	require.NoError(t, os.MkdirAll(worktree2Path, 0755))
 
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  projectsDir,
 		WorktreesDirectory: worktreesDir,
 	}
 
 	mockGitService := mocks.NewMockGitService()
 	mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
-	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
-	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{
+	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]core.BranchInfo{}, nil)
+	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]core.WorktreeInfo{
 		{Branch: "feature-1", Path: worktree1Path},
 		{Branch: "feature-2", Path: worktree2Path},
 	}, nil)
 
 	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-	ctx := &domain.Context{
-		Type:        domain.ContextProject,
+	ctx := &core.Context{
+		Type:        core.ContextProject,
 		ProjectName: "test-project",
 		Path:        projectPath,
 	}
@@ -284,23 +284,23 @@ func TestWithExistingOnly_NoWorktreesExist(t *testing.T) {
 	nonExisting1 := filepath.Join(worktreesDir, "test-project", "feature-1")
 	nonExisting2 := filepath.Join(worktreesDir, "test-project", "feature-2")
 
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  projectsDir,
 		WorktreesDirectory: worktreesDir,
 	}
 
 	mockGitService := mocks.NewMockGitService()
 	mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
-	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
-	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{
+	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]core.BranchInfo{}, nil)
+	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]core.WorktreeInfo{
 		{Branch: "feature-1", Path: nonExisting1},
 		{Branch: "feature-2", Path: nonExisting2},
 	}, nil)
 
 	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-	ctx := &domain.Context{
-		Type:        domain.ContextProject,
+	ctx := &core.Context{
+		Type:        core.ContextProject,
 		ProjectName: "test-project",
 		Path:        projectPath,
 	}
@@ -325,20 +325,20 @@ func TestWithExistingOnly_SkipsMainSuggestion(t *testing.T) {
 
 	setupTestGitRepo(t, projectPath)
 
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  projectsDir,
 		WorktreesDirectory: worktreesDir,
 	}
 
 	mockGitService := mocks.NewMockGitService()
 	mockGitService.MockGoGitClient.On("ValidateRepository", projectPath).Return(nil)
-	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]domain.BranchInfo{}, nil)
-	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]domain.WorktreeInfo{}, nil)
+	mockGitService.MockGoGitClient.On("ListBranches", context.Background(), projectPath).Return([]core.BranchInfo{}, nil)
+	mockGitService.MockCLIClient.On("ListWorktrees", context.Background(), projectPath).Return([]core.WorktreeInfo{}, nil)
 
 	resolver := infrastructure.NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-	ctx := &domain.Context{
-		Type:        domain.ContextProject,
+	ctx := &core.Context{
+		Type:        core.ContextProject,
 		ProjectName: "test-project",
 		Path:        projectPath,
 	}

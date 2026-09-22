@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -20,10 +20,10 @@ func NewMockContextDetector() *MockContextDetector {
 }
 
 // DetectContext provides a mock function with given fields: dir
-func (m *MockContextDetector) DetectContext(dir string) (*domain.Context, error) {
+func (m *MockContextDetector) DetectContext(dir string) (*core.Context, error) {
 	args := m.Called(dir)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*domain.Context), args.Error(1)
+	return args.Get(0).(*core.Context), args.Error(1)
 }

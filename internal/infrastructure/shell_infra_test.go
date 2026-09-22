@@ -9,19 +9,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func TestShellInfrastructure_GenerateWrapper(t *testing.T) {
 	tests := []struct {
 		name        string
-		shellType   domain.ShellType
+		shellType   core.ShellType
 		expectError bool
 		validate    func(t *testing.T, wrapper string)
 	}{
 		{
 			name:      "generate bash wrapper",
-			shellType: domain.ShellBash,
+			shellType: core.ShellBash,
 			validate: func(t *testing.T, wrapper string) {
 				t.Helper()
 				assert.Contains(t, wrapper, "twiggit() {")
@@ -32,7 +32,7 @@ func TestShellInfrastructure_GenerateWrapper(t *testing.T) {
 		},
 		{
 			name:      "generate zsh wrapper",
-			shellType: domain.ShellZsh,
+			shellType: core.ShellZsh,
 			validate: func(t *testing.T, wrapper string) {
 				t.Helper()
 				assert.Contains(t, wrapper, "twiggit() {")
@@ -43,7 +43,7 @@ func TestShellInfrastructure_GenerateWrapper(t *testing.T) {
 		},
 		{
 			name:      "generate fish wrapper",
-			shellType: domain.ShellFish,
+			shellType: core.ShellFish,
 			validate: func(t *testing.T, wrapper string) {
 				t.Helper()
 				assert.Contains(t, wrapper, "function twiggit")
@@ -72,7 +72,7 @@ func TestShellInfrastructure_GenerateWrapper(t *testing.T) {
 
 func TestShellInfrastructure_GenerateWrapper_InvalidShellType(t *testing.T) {
 	service := NewShellInfrastructure()
-	wrapper, err := service.GenerateWrapper(domain.ShellType("invalid"))
+	wrapper, err := service.GenerateWrapper(core.ShellType("invalid"))
 
 	require.Error(t, err)
 	assert.Empty(t, wrapper)
@@ -82,10 +82,10 @@ func TestShellInfrastructure_GenerateWrapper_InvalidShellType(t *testing.T) {
 func TestShellInfrastructure_GenerateWrapper_SyntaxValidation(t *testing.T) {
 	tests := []struct {
 		name      string
-		shellType domain.ShellType
+		shellType core.ShellType
 	}{
-		{name: "bash wrapper syntax", shellType: domain.ShellBash},
-		{name: "zsh wrapper syntax", shellType: domain.ShellZsh},
+		{name: "bash wrapper syntax", shellType: core.ShellBash},
+		{name: "zsh wrapper syntax", shellType: core.ShellZsh},
 	}
 
 	for _, tc := range tests {
@@ -100,7 +100,7 @@ func TestShellInfrastructure_GenerateWrapper_SyntaxValidation(t *testing.T) {
 			assert.Contains(t, wrapper, "]]; then", "wrapper should use ]]; then for conditional end")
 
 			syntaxCheckCmd := "bash"
-			if tc.shellType == domain.ShellZsh {
+			if tc.shellType == core.ShellZsh {
 				syntaxCheckCmd = "zsh"
 			}
 
@@ -123,7 +123,7 @@ func TestShellInfrastructure_GenerateWrapper_SyntaxValidation(t *testing.T) {
 
 func TestShellInfrastructure_GenerateWrapper_FishSyntaxValidation(t *testing.T) {
 	service := NewShellInfrastructure()
-	wrapper, err := service.GenerateWrapper(domain.ShellFish)
+	wrapper, err := service.GenerateWrapper(core.ShellFish)
 	require.NoError(t, err)
 
 	assert.NotContains(t, wrapper, "]] ]]", "fish wrapper should not contain bash-style double brackets")
@@ -139,20 +139,20 @@ func TestShellInfrastructure_GenerateWrapper_FishSyntaxValidation(t *testing.T) 
 func TestShellInfrastructure_DetectConfigFile(t *testing.T) {
 	tests := []struct {
 		name        string
-		shellType   domain.ShellType
+		shellType   core.ShellType
 		expectError bool
 	}{
 		{
 			name:      "detect bash config file",
-			shellType: domain.ShellBash,
+			shellType: core.ShellBash,
 		},
 		{
 			name:      "detect zsh config file",
-			shellType: domain.ShellZsh,
+			shellType: core.ShellZsh,
 		},
 		{
 			name:      "detect fish config file",
-			shellType: domain.ShellFish,
+			shellType: core.ShellFish,
 		},
 	}
 
@@ -180,22 +180,22 @@ func TestShellInfrastructure_ValidateInstallation(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		shellType   domain.ShellType
+		shellType   core.ShellType
 		expectError bool
 	}{
 		{
 			name:        "validate bash installation",
-			shellType:   domain.ShellBash,
+			shellType:   core.ShellBash,
 			expectError: true,
 		},
 		{
 			name:        "validate zsh installation",
-			shellType:   domain.ShellZsh,
+			shellType:   core.ShellZsh,
 			expectError: true,
 		},
 		{
 			name:        "validate fish installation",
-			shellType:   domain.ShellFish,
+			shellType:   core.ShellFish,
 			expectError: true,
 		},
 	}
@@ -208,8 +208,9 @@ func TestShellInfrastructure_ValidateInstallation(t *testing.T) {
 
 			if tc.expectError {
 				require.Error(t, err)
-				var shellErr *domain.ShellNotInstalledError
-				require.ErrorAs(t, err, &shellErr)
+				var oe *core.OperationError
+				require.ErrorAs(t, err, &oe)
+				require.Equal(t, "shell.not_installed", oe.Op)
 			} else {
 				require.NoError(t, err)
 			}
@@ -219,7 +220,7 @@ func TestShellInfrastructure_ValidateInstallation(t *testing.T) {
 
 func TestShellInfrastructure_ValidateInstallation_InvalidShellType(t *testing.T) {
 	service := NewShellInfrastructure()
-	err := service.ValidateInstallation(domain.ShellType("invalid"), "")
+	err := service.ValidateInstallation(core.ShellType("invalid"), "")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "config file path is empty")

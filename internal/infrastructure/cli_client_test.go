@@ -8,19 +8,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func TestCLIClient_ParseWorktreeLine(t *testing.T) {
 	testCases := []struct {
 		name           string
 		line           string
-		expectedResult *domain.WorktreeInfo
+		expectedResult *core.WorktreeInfo
 	}{
 		{
 			name:           "worktree line",
 			line:           "worktree /path/to/worktree",
-			expectedResult: &domain.WorktreeInfo{Path: "/path/to/worktree"},
+			expectedResult: &core.WorktreeInfo{Path: "/path/to/worktree"},
 		},
 		{
 			name:           "HEAD line",
@@ -169,8 +169,9 @@ func TestCLIClient_CreateWorktree_Failure(t *testing.T) {
 
 	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
 	require.Error(t, err)
-	var worktreeErr *domain.GitWorktreeError
+	var worktreeErr *core.OperationError
 	require.ErrorAs(t, err, &worktreeErr)
+	require.Equal(t, "git.worktree", worktreeErr.Op)
 }
 
 func TestCLIClient_DeleteWorktree(t *testing.T) {
@@ -471,7 +472,7 @@ func TestCLIClient_NilResultGuards(t *testing.T) {
 	})
 }
 
-func findWorktree(worktrees []domain.WorktreeInfo, path string) *domain.WorktreeInfo {
+func findWorktree(worktrees []core.WorktreeInfo, path string) *core.WorktreeInfo {
 	for _, worktree := range worktrees {
 		if worktree.Path == path {
 			return &worktree

@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -20,19 +20,19 @@ func NewMockContextResolver() *MockContextResolver {
 }
 
 // ResolveIdentifier provides a mock function with given fields: ctx, identifier
-func (m *MockContextResolver) ResolveIdentifier(ctx *domain.Context, identifier string) (*domain.ResolutionResult, error) {
+func (m *MockContextResolver) ResolveIdentifier(ctx *core.Context, identifier string) (*core.ResolutionResult, error) {
 	args := m.Called(ctx, identifier)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*domain.ResolutionResult), args.Error(1)
+	return args.Get(0).(*core.ResolutionResult), args.Error(1)
 }
 
 // GetResolutionSuggestions provides a mock function with given fields: ctx, partial, opts
-func (m *MockContextResolver) GetResolutionSuggestions(ctx *domain.Context, partial string, opts ...domain.SuggestionOption) ([]*domain.ResolutionSuggestion, error) {
+func (m *MockContextResolver) GetResolutionSuggestions(ctx *core.Context, partial string, opts ...core.SuggestionOption) ([]*core.ResolutionSuggestion, error) {
 	args := m.Called(ctx, partial, opts)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]*domain.ResolutionSuggestion), args.Error(1)
+	return args.Get(0).([]*core.ResolutionSuggestion), args.Error(1)
 }

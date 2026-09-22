@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func setupConfigManagerTest(t *testing.T) (application.ConfigManager, string, string) {
@@ -34,7 +34,7 @@ func TestConfigManager_LoadDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, config)
 
-	defaultConfig := domain.DefaultConfig()
+	defaultConfig := core.DefaultConfig()
 
 	assert.Contains(t, config.ProjectsDirectory, "Projects", "ProjectsDirectory should contain 'Projects'")
 	assert.Contains(t, config.WorktreesDirectory, "Worktrees", "WorktreesDirectory should contain 'Worktrees'")
@@ -116,7 +116,7 @@ func TestConfigManager_BuildDefaultConfig(t *testing.T) {
 
 	require.NotNil(t, config)
 
-	expectedConfig := domain.DefaultConfig()
+	expectedConfig := core.DefaultConfig()
 
 	assert.Contains(t, config.ProjectsDirectory, "Projects")
 	assert.Contains(t, config.WorktreesDirectory, "Worktrees")
@@ -144,7 +144,7 @@ func TestConfigManager_ConfigFileExists(t *testing.T) {
 }
 
 func TestConfigManager_ValidateConfig(t *testing.T) {
-	validConfig := &domain.Config{
+	validConfig := &core.Config{
 		ProjectsDirectory:   "/home/user/Projects",
 		WorktreesDirectory:  "/home/user/Worktrees",
 		DefaultSourceBranch: "main",
@@ -153,7 +153,7 @@ func TestConfigManager_ValidateConfig(t *testing.T) {
 	err := validateConfig(validConfig)
 	require.NoError(t, err)
 
-	invalidConfig := &domain.Config{
+	invalidConfig := &core.Config{
 		ProjectsDirectory:   "",
 		WorktreesDirectory:  "",
 		DefaultSourceBranch: "",
@@ -164,7 +164,7 @@ func TestConfigManager_ValidateConfig(t *testing.T) {
 }
 
 func TestConfigManager_CopyConfig(t *testing.T) {
-	originalConfig := &domain.Config{
+	originalConfig := &core.Config{
 		ProjectsDirectory:   "/home/user/Projects",
 		WorktreesDirectory:  "/home/user/Worktrees",
 		DefaultSourceBranch: "main",
@@ -189,7 +189,7 @@ func TestConfigManager_LoadDefaultsErrorHandling(t *testing.T) {
 	require.NoError(t, err, "Load() should succeed with valid default keys")
 	require.NotNil(t, config, "Config should be loaded successfully")
 
-	defaultConfig := domain.DefaultConfig()
+	defaultConfig := core.DefaultConfig()
 	assert.Equal(t, defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
 	assert.Equal(t, defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
 	assert.Equal(t, defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
@@ -328,11 +328,11 @@ func TestConfigManager_NormalizeConfigPaths(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			config := &domain.Config{
+			config := &core.Config{
 				ProjectsDirectory:  tc.projectsDir,
 				WorktreesDirectory: tc.worktreesDir,
-				Shell: domain.ShellConfig{
-					Wrapper: domain.ShellWrapperConfig{
+				Shell: core.ShellConfig{
+					Wrapper: core.ShellWrapperConfig{
 						BackupDir: tc.backupDir,
 					},
 				},

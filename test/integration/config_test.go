@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 )
 
@@ -157,7 +157,7 @@ func TestConfigManager_Integration_NoConfigFile(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should load defaults when no config file exists
-	defaultConfig := domain.DefaultConfig()
+	defaultConfig := core.DefaultConfig()
 	assert.Equal(t, defaultConfig.ProjectsDirectory, config.ProjectsDirectory)
 	assert.Equal(t, defaultConfig.WorktreesDirectory, config.WorktreesDirectory)
 	assert.Equal(t, defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)

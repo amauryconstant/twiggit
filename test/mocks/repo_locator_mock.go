@@ -2,7 +2,7 @@ package mocks
 
 import (
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/mock"
 )
@@ -20,10 +20,10 @@ func NewMockRepoLocator() *MockRepoLocator {
 }
 
 // FindGitRepositories provides a mock function with given fields: dir
-func (m *MockRepoLocator) FindGitRepositories(dir string) ([]domain.GitDir, error) {
+func (m *MockRepoLocator) FindGitRepositories(dir string) ([]core.GitDir, error) {
 	args := m.Called(dir)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]domain.GitDir), args.Error(1)
+	return args.Get(0).([]core.GitDir), args.Error(1)
 }

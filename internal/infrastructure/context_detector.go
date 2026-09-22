@@ -11,7 +11,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 const contextDetectorCacheSize = 256
@@ -32,17 +32,17 @@ func defaultContextDetectorCacheFactory(size int) (*lru.Cache[string, worktreeCa
 }
 
 type contextDetector struct {
-	config *domain.Config
+	config *core.Config
 	cache  *lru.Cache[string, worktreeCacheEntry]
 	mu     sync.RWMutex
 	ttl    time.Duration
 }
 
-func NewContextDetector(cfg *domain.Config) (application.ContextDetector, error) {
+func NewContextDetector(cfg *core.Config) (application.ContextDetector, error) {
 	return newContextDetectorWithCacheFactory(cfg, defaultContextDetectorCacheFactory)
 }
 
-func newContextDetectorWithCacheFactory(cfg *domain.Config, factory contextDetectorCacheFactory) (application.ContextDetector, error) {
+func newContextDetectorWithCacheFactory(cfg *core.Config, factory contextDetectorCacheFactory) (application.ContextDetector, error) {
 	ttl := parseTTL(cfg.ContextDetection.CacheTTL, 5*time.Second)
 	cache, err := factory(contextDetectorCacheSize)
 	if err != nil {
@@ -65,36 +65,36 @@ func parseTTL(ttlStr string, defaultTTL time.Duration) time.Duration {
 	return defaultTTL
 }
 
-func (cd *contextDetector) DetectContext(dir string) (*domain.Context, error) {
+func (cd *contextDetector) DetectContext(dir string) (*core.Context, error) {
 	// Validate input directory
 	if dir == "" {
-		return nil, domain.NewContextDetectionError("", "empty directory path", nil)
+		return nil, core.NewContextDetectionError("", "empty directory path", nil)
 	}
 
 	// Check if directory exists
 	if _, err := os.Stat(dir); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, domain.NewContextDetectionError(dir, "directory does not exist", err)
+			return nil, core.NewContextDetectionError(dir, "directory does not exist", err)
 		}
-		return nil, domain.NewContextDetectionError(dir, "cannot access directory", err)
+		return nil, core.NewContextDetectionError(dir, "cannot access directory", err)
 	}
 
 	// Normalize path and resolve symlinks
-	normalizedDir, err := domain.NormalizePath(dir)
+	normalizedDir, err := core.NormalizePath(dir)
 	if err != nil {
-		return nil, domain.NewContextDetectionError(dir, "failed to normalize directory", err)
+		return nil, core.NewContextDetectionError(dir, "failed to normalize directory", err)
 	}
 
 	// Perform detection
 	ctx := cd.detectContextInternal(normalizedDir)
 	if ctx == nil {
-		return nil, domain.NewContextDetectionError(normalizedDir, "failed to detect context for directory", nil)
+		return nil, core.NewContextDetectionError(normalizedDir, "failed to detect context for directory", nil)
 	}
 
 	return ctx, nil
 }
 
-func (cd *contextDetector) detectContextInternal(dir string) *domain.Context {
+func (cd *contextDetector) detectContextInternal(dir string) *core.Context {
 	// Priority 1: Check worktree pattern first
 	if ctx := cd.detectWorktreeContext(dir); ctx != nil {
 		return ctx
@@ -106,14 +106,14 @@ func (cd *contextDetector) detectContextInternal(dir string) *domain.Context {
 	}
 
 	// Priority 3: Outside git context
-	return &domain.Context{
-		Type:        domain.ContextOutsideGit,
+	return &core.Context{
+		Type:        core.ContextOutsideGit,
 		Path:        dir,
 		Explanation: "Not in a git repository or worktree",
 	}
 }
 
-func (cd *contextDetector) detectWorktreeContext(dir string) *domain.Context {
+func (cd *contextDetector) detectWorktreeContext(dir string) *core.Context {
 	// Normalize worktree directory
 	worktreeDir := filepath.Clean(cd.config.WorktreesDirectory)
 
@@ -145,8 +145,8 @@ func (cd *contextDetector) detectWorktreeContext(dir string) *domain.Context {
 		return nil
 	}
 
-	return &domain.Context{
-		Type:        domain.ContextWorktree,
+	return &core.Context{
+		Type:        core.ContextWorktree,
 		ProjectName: projectName,
 		BranchName:  branchName,
 		Path:        dir,
@@ -154,13 +154,13 @@ func (cd *contextDetector) detectWorktreeContext(dir string) *domain.Context {
 	}
 }
 
-func (cd *contextDetector) detectProjectContext(dir string) *domain.Context {
-	gitDir, ok := domain.FindGitDirByTraversal(dir)
+func (cd *contextDetector) detectProjectContext(dir string) *core.Context {
+	gitDir, ok := core.FindGitDirByTraversal(dir)
 	if ok {
 		projectName := cd.extractProjectName(gitDir)
 
-		return &domain.Context{
-			Type:        domain.ContextProject,
+		return &core.Context{
+			Type:        core.ContextProject,
 			ProjectName: projectName,
 			Path:        gitDir,
 			Explanation: fmt.Sprintf("In project directory '%s'", projectName),

@@ -8,24 +8,24 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
 func TestNavigationService(t *testing.T) {
 	tests := []struct {
 		name         string
-		request      *domain.ResolvePathRequest
+		request      *core.ResolvePathRequest
 		expectError  bool
 		errorMessage string
 		setupMocks   func(*mocks.MockProjectService, *mocks.MockContextService)
 	}{
 		{
 			name: "valid branch resolution from project context",
-			request: &domain.ResolvePathRequest{
+			request: &core.ResolvePathRequest{
 				Target: "feature-branch",
-				Context: &domain.Context{
-					Type:        domain.ContextProject,
+				Context: &core.Context{
+					Type:        core.ContextProject,
 					ProjectName: "test-project",
 				},
 			},
@@ -34,10 +34,10 @@ func TestNavigationService(t *testing.T) {
 		},
 		{
 			name: "empty target",
-			request: &domain.ResolvePathRequest{
+			request: &core.ResolvePathRequest{
 				Target: "",
-				Context: &domain.Context{
-					Type: domain.ContextOutsideGit,
+				Context: &core.Context{
+					Type: core.ContextOutsideGit,
 				},
 			},
 			expectError:  true,
@@ -48,7 +48,7 @@ func TestNavigationService(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			config := domain.DefaultConfig()
+			config := core.DefaultConfig()
 
 			projectService := mocks.NewMockProjectService()
 			contextService := mocks.NewMockContextService()
@@ -57,8 +57,8 @@ func TestNavigationService(t *testing.T) {
 
 			// Only setup the default expectation if not expecting an error
 			if !tc.expectError {
-				contextService.On("ResolveIdentifierFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
-					Type:         domain.PathTypeWorktree,
+				contextService.On("ResolveIdentifierFromContext", mock.AnythingOfType("*core.Context"), mock.AnythingOfType("string")).Return(&core.ResolutionResult{
+					Type:         core.PathTypeWorktree,
 					ResolvedPath: "/path/to/worktree",
 				}, nil)
 			}
@@ -84,7 +84,7 @@ func TestNavigationService(t *testing.T) {
 }
 
 func TestNavigationService_ValidatePath(t *testing.T) {
-	config := domain.DefaultConfig()
+	config := core.DefaultConfig()
 	projectService := mocks.NewMockProjectService()
 	contextService := mocks.NewMockContextService()
 	service := NewNavigationService(projectService, contextService, config)
@@ -123,18 +123,18 @@ func TestNavigationService_ValidatePath(t *testing.T) {
 }
 
 func TestNavigationService_GetNavigationSuggestions(t *testing.T) {
-	config := domain.DefaultConfig()
+	config := core.DefaultConfig()
 
 	tests := []struct {
 		name        string
-		context     *domain.Context
+		context     *core.Context
 		partial     string
 		expectError bool
 	}{
 		{
 			name: "valid suggestions from project context",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 			},
 			partial:     "feat",
@@ -142,8 +142,8 @@ func TestNavigationService_GetNavigationSuggestions(t *testing.T) {
 		},
 		{
 			name: "suggestions from outside context",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 			},
 			partial:     "test",
 			expectError: false,
@@ -156,21 +156,21 @@ func TestNavigationService_GetNavigationSuggestions(t *testing.T) {
 			contextService := mocks.NewMockContextService()
 
 			// Setup both mock expectations since the service may call either
-			contextService.On("GetCompletionSuggestionsFromContext", mock.AnythingOfType("*domain.Context"), mock.AnythingOfType("string")).Return([]*domain.ResolutionSuggestion{
+			contextService.On("GetCompletionSuggestionsFromContext", mock.AnythingOfType("*core.Context"), mock.AnythingOfType("string")).Return([]*core.ResolutionSuggestion{
 				{
 					Text:        "feature-branch",
 					Description: "Feature branch",
-					Type:        domain.PathTypeWorktree,
+					Type:        core.PathTypeWorktree,
 					ProjectName: "test-project",
 					BranchName:  "feature-branch",
 				},
 			}, nil).Maybe()
 
-			contextService.On("GetCompletionSuggestions", mock.AnythingOfType("string")).Return([]*domain.ResolutionSuggestion{
+			contextService.On("GetCompletionSuggestions", mock.AnythingOfType("string")).Return([]*core.ResolutionSuggestion{
 				{
 					Text:        "test-project",
 					Description: "Test project",
-					Type:        domain.PathTypeProject,
+					Type:        core.PathTypeProject,
 					ProjectName: "test-project",
 				},
 			}, nil).Maybe()

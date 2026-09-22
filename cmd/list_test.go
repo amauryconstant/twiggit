@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
@@ -32,11 +32,11 @@ func TestListCommand_Execute(t *testing.T) {
 			name: "list worktrees in project context",
 			args: []string{},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{
-					Type:        domain.ContextProject,
+				mockCS.On("GetCurrentContext").Return(&core.Context{
+					Type:        core.ContextProject,
 					ProjectName: "test-project",
 				}, nil)
-				mockWS.On("ListWorktrees", mock.Anything, mock.AnythingOfType("*domain.ListWorktreesRequest")).Return([]*domain.WorktreeInfo{
+				mockWS.On("ListWorktrees", mock.Anything, mock.AnythingOfType("*core.ListWorktreesRequest")).Return([]*core.WorktreeInfo{
 					{Path: "/home/user/Worktrees/test-project/main", Branch: "main"},
 					{Path: "/home/user/Worktrees/test-project/feature", Branch: "feature"},
 				}, nil)
@@ -50,8 +50,8 @@ func TestListCommand_Execute(t *testing.T) {
 			name: "list all worktrees with --all flag",
 			args: []string{"--all"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
-				mockWS.On("ListWorktrees", mock.Anything, mock.AnythingOfType("*domain.ListWorktreesRequest")).Return([]*domain.WorktreeInfo{}, nil)
+				mockCS.On("GetCurrentContext").Return(&core.Context{Type: core.ContextOutsideGit}, nil)
+				mockWS.On("ListWorktrees", mock.Anything, mock.AnythingOfType("*core.ListWorktreesRequest")).Return([]*core.WorktreeInfo{}, nil)
 			},
 			expectError: false,
 		},

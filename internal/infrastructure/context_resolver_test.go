@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
-func setupContextResolverTest(t *testing.T) *domain.Config {
+func setupContextResolverTest(t *testing.T) *core.Config {
 	t.Helper()
-	return &domain.Config{
+	return &core.Config{
 		ProjectsDirectory:  "/home/user/Projects",
 		WorktreesDirectory: "/home/user/Worktrees",
 	}
@@ -24,9 +24,9 @@ func setupContextResolverTest(t *testing.T) *domain.Config {
 func TestContextResolver_ResolveIdentifier(t *testing.T) {
 	tests := []struct {
 		name           string
-		context        *domain.Context
+		context        *core.Context
 		identifier     string
-		expectedType   domain.PathType
+		expectedType   core.PathType
 		expectedProj   string
 		expectedBranch string
 		expectedPath   string
@@ -34,69 +34,69 @@ func TestContextResolver_ResolveIdentifier(t *testing.T) {
 	}{
 		{
 			name: "project context - main to project root",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
 			identifier:   "main",
-			expectedType: domain.PathTypeProject,
+			expectedType: core.PathTypeProject,
 			expectedProj: "test-project",
 			expectedPath: "/home/user/Projects/test-project",
 		},
 		{
 			name: "project context - branch to worktree",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
 			identifier:     "feature-branch",
-			expectedType:   domain.PathTypeWorktree,
+			expectedType:   core.PathTypeWorktree,
 			expectedProj:   "test-project",
 			expectedBranch: "feature-branch",
 			expectedPath:   "/home/user/Worktrees/test-project/feature-branch",
 		},
 		{
 			name: "worktree context - main to project root",
-			context: &domain.Context{
-				Type:        domain.ContextWorktree,
+			context: &core.Context{
+				Type:        core.ContextWorktree,
 				ProjectName: "test-project",
 				BranchName:  "current-branch",
 				Path:        "/home/user/Worktrees/test-project/current-branch",
 			},
 			identifier:   "main",
-			expectedType: domain.PathTypeProject,
+			expectedType: core.PathTypeProject,
 			expectedProj: "test-project",
 			expectedPath: "/home/user/Projects/test-project",
 		},
 		{
 			name: "outside git context - project to project directory",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:   "test-project",
-			expectedType: domain.PathTypeProject,
+			expectedType: core.PathTypeProject,
 			expectedProj: "test-project",
 			expectedPath: "/home/user/Projects/test-project",
 		},
 		{
 			name: "cross-project reference",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:     "other-project/feature-branch",
-			expectedType:   domain.PathTypeWorktree,
+			expectedType:   core.PathTypeWorktree,
 			expectedProj:   "other-project",
 			expectedBranch: "feature-branch",
 			expectedPath:   "/home/user/Worktrees/other-project/feature-branch",
 		},
 		{
 			name: "empty identifier",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:  "",
@@ -104,22 +104,22 @@ func TestContextResolver_ResolveIdentifier(t *testing.T) {
 		},
 		{
 			name: "invalid cross-project reference",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:   "project/branch/extra",
-			expectedType: domain.PathTypeInvalid,
+			expectedType: core.PathTypeInvalid,
 			expectedPath: "",
 		},
 		{
 			name: "unknown context",
-			context: &domain.Context{
-				Type: domain.ContextUnknown,
+			context: &core.Context{
+				Type: core.ContextUnknown,
 				Path: "/home/user",
 			},
 			identifier:   "test",
-			expectedType: domain.PathTypeInvalid,
+			expectedType: core.PathTypeInvalid,
 			expectedPath: "",
 		},
 	}
@@ -150,15 +150,15 @@ func TestContextResolver_ResolveIdentifier(t *testing.T) {
 func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
 	tests := []struct {
 		name          string
-		context       *domain.Context
+		context       *core.Context
 		partial       string
 		expectedCount int
 		expectedTexts []string
 	}{
 		{
 			name: "project context - partial 'm'",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -168,8 +168,8 @@ func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
 		},
 		{
 			name: "worktree context - partial 'main'",
-			context: &domain.Context{
-				Type:        domain.ContextWorktree,
+			context: &core.Context{
+				Type:        core.ContextWorktree,
 				ProjectName: "test-project",
 				BranchName:  "current-branch",
 				Path:        "/home/user/Worktrees/test-project/current-branch",
@@ -180,8 +180,8 @@ func TestContextResolver_GetResolutionSuggestions(t *testing.T) {
 		},
 		{
 			name: "outside git context - partial 'test'",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			partial:       "test",
@@ -214,8 +214,8 @@ func TestContextResolver_WorktreeContextResolution(t *testing.T) {
 	config := setupContextResolverTest(t)
 	resolver := NewContextResolver(config, nil, nil)
 
-	ctx := &domain.Context{
-		Type:        domain.ContextWorktree,
+	ctx := &core.Context{
+		Type:        core.ContextWorktree,
 		ProjectName: "my-project",
 		BranchName:  "current-branch",
 		Path:        "/home/user/Worktrees/my-project/current-branch",
@@ -224,7 +224,7 @@ func TestContextResolver_WorktreeContextResolution(t *testing.T) {
 	result, err := resolver.ResolveIdentifier(ctx, "other-branch")
 	require.NoError(t, err)
 
-	assert.Equal(t, domain.PathTypeWorktree, result.Type)
+	assert.Equal(t, core.PathTypeWorktree, result.Type)
 	assert.Equal(t, "my-project", result.ProjectName)
 	assert.Equal(t, "other-branch", result.BranchName)
 	assert.Equal(t, "/home/user/Worktrees/my-project/other-branch", result.ResolvedPath)
@@ -235,8 +235,8 @@ func TestContextResolver_CrossProjectReference(t *testing.T) {
 	config := setupContextResolverTest(t)
 	resolver := NewContextResolver(config, nil, nil)
 
-	ctx := &domain.Context{
-		Type:        domain.ContextProject,
+	ctx := &core.Context{
+		Type:        core.ContextProject,
 		ProjectName: "current-project",
 		Path:        "/home/user/Projects/current-project",
 	}
@@ -244,7 +244,7 @@ func TestContextResolver_CrossProjectReference(t *testing.T) {
 	result, err := resolver.ResolveIdentifier(ctx, "other-project/feature-branch")
 	require.NoError(t, err)
 
-	assert.Equal(t, domain.PathTypeWorktree, result.Type)
+	assert.Equal(t, core.PathTypeWorktree, result.Type)
 	assert.Equal(t, "other-project", result.ProjectName)
 	assert.Equal(t, "feature-branch", result.BranchName)
 	assert.Equal(t, "/home/user/Worktrees/other-project/feature-branch", result.ResolvedPath)
@@ -475,7 +475,7 @@ func TestContextResolver_ContainsPathTraversal(t *testing.T) {
 func TestContextResolver_PathTraversalProtection(t *testing.T) {
 	tests := []struct {
 		name          string
-		context       *domain.Context
+		context       *core.Context
 		identifier    string
 		expectError   bool
 		errorContains string
@@ -483,8 +483,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 	}{
 		{
 			name: "path traversal attack - worktree resolution from project context",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -495,8 +495,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "path traversal attack - worktree resolution from worktree context",
-			context: &domain.Context{
-				Type:        domain.ContextWorktree,
+			context: &core.Context{
+				Type:        core.ContextWorktree,
 				ProjectName: "test-project",
 				BranchName:  "current-branch",
 				Path:        "/home/user/Worktrees/test-project/current-branch",
@@ -508,8 +508,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "path traversal attack - project resolution from worktree context",
-			context: &domain.Context{
-				Type:        domain.ContextWorktree,
+			context: &core.Context{
+				Type:        core.ContextWorktree,
 				ProjectName: "../../../etc",
 				BranchName:  "current-branch",
 				Path:        "/home/user/Worktrees/test-project/current-branch",
@@ -521,8 +521,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "path traversal attack - project resolution from outside git context",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:    "../../../etc/passwd",
@@ -532,8 +532,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "path traversal attack - cross-project reference",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:    "../../../etc/passwd/../../passwd",
@@ -543,8 +543,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "absolute path escape attempt",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -554,8 +554,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "valid path with special characters should work",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -565,8 +565,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "cross-project reference with traversal in project",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:    "../../etc/passwd/branch",
@@ -576,8 +576,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "cross-project reference with traversal in branch",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:    "other-project/../../../etc/passwd",
@@ -587,8 +587,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "normal branch resolution should work",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -598,8 +598,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "normal project resolution should work",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:  "test-project",
@@ -608,8 +608,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "normal cross-project reference should work",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:  "other-project/feature-branch",
@@ -618,8 +618,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "URL-encoded path traversal lowercase",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -630,8 +630,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "URL-encoded path traversal uppercase",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -642,8 +642,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "URL-encoded path traversal mixed case",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -654,8 +654,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "double URL-encoded path traversal",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "test-project",
 				Path:        "/home/user/Projects/test-project",
 			},
@@ -666,8 +666,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "URL-encoded path traversal in project name",
-			context: &domain.Context{
-				Type:        domain.ContextWorktree,
+			context: &core.Context{
+				Type:        core.ContextWorktree,
 				ProjectName: "%2e%2e",
 				BranchName:  "current-branch",
 				Path:        "/home/user/Worktrees/test-project/current-branch",
@@ -679,8 +679,8 @@ func TestContextResolver_PathTraversalProtection(t *testing.T) {
 		},
 		{
 			name: "URL-encoded path traversal in cross-project reference",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 				Path: "/home/user",
 			},
 			identifier:    "project/%2e%2e%2f%2e%2e",
@@ -728,8 +728,8 @@ func setupMinimalTestRepo(t *testing.T, path string) {
 func TestContextResolver_DescriptionFormats(t *testing.T) {
 	t.Run("main suggestion has project root directory description", func(t *testing.T) {
 		config := setupContextResolverTest(t)
-		ctx := &domain.Context{
-			Type:        domain.ContextProject,
+		ctx := &core.Context{
+			Type:        core.ContextProject,
 			ProjectName: "test-project",
 			Path:        "/home/user/Projects/test-project",
 		}
@@ -745,19 +745,19 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 
 	t.Run("worktree suggestion has worktree for branch description", func(t *testing.T) {
 		config := setupContextResolverTest(t)
-		ctx := &domain.Context{
-			Type:        domain.ContextProject,
+		ctx := &core.Context{
+			Type:        core.ContextProject,
 			ProjectName: "test-project",
 			Path:        "/home/user/Projects/test-project",
 		}
 
 		mockGitService := mocks.NewMockGitService()
 		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/home/user/Projects/test-project").
-			Return([]domain.WorktreeInfo{
+			Return([]core.WorktreeInfo{
 				{Branch: "feature-1", Path: "/home/user/Worktrees/test-project/feature-1"},
 			}, nil)
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, "/home/user/Projects/test-project").
-			Return([]domain.BranchInfo{}, nil)
+			Return([]core.BranchInfo{}, nil)
 
 		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "feature-1")
@@ -770,17 +770,17 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 
 	t.Run("branch without worktree has create worktree description", func(t *testing.T) {
 		config := setupContextResolverTest(t)
-		ctx := &domain.Context{
-			Type:        domain.ContextProject,
+		ctx := &core.Context{
+			Type:        core.ContextProject,
 			ProjectName: "test-project",
 			Path:        "/home/user/Projects/test-project",
 		}
 
 		mockGitService := mocks.NewMockGitService()
 		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, "/home/user/Projects/test-project").
-			Return([]domain.WorktreeInfo{}, nil)
+			Return([]core.WorktreeInfo{}, nil)
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, "/home/user/Projects/test-project").
-			Return([]domain.BranchInfo{{Name: "develop"}}, nil)
+			Return([]core.BranchInfo{{Name: "develop"}}, nil)
 
 		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 		suggestions, err := resolver.GetResolutionSuggestions(ctx, "develop")
@@ -799,7 +799,7 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(project1Path, ".git"), 0755))
 		setupMinimalTestRepo(t, project1Path)
 
-		config := &domain.Config{
+		config := &core.Config{
 			ProjectsDirectory:  projectsDir,
 			WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
 		}
@@ -809,8 +809,8 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 
 		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-		ctx := &domain.Context{
-			Type: domain.ContextOutsideGit,
+		ctx := &core.Context{
+			Type: core.ContextOutsideGit,
 			Path: tempDir,
 		}
 
@@ -819,7 +819,7 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(suggestions), 1)
 
-		var project1 *domain.ResolutionSuggestion
+		var project1 *core.ResolutionSuggestion
 		for _, sug := range suggestions {
 			if sug.Text == "project1" {
 				project1 = sug
@@ -921,7 +921,7 @@ func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
 		setupMinimalTestRepo(t, project1Path)
 		setupMinimalTestRepo(t, project2Path)
 
-		config := &domain.Config{
+		config := &core.Config{
 			ProjectsDirectory:  projectsDir,
 			WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
 		}
@@ -930,14 +930,14 @@ func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
 		mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
 		mockGitService.MockGoGitClient.On("ValidateRepository", project2Path).Return(nil)
 		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, project1Path).
-			Return([]domain.WorktreeInfo{}, nil)
+			Return([]core.WorktreeInfo{}, nil)
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
-			Return([]domain.BranchInfo{}, nil)
+			Return([]core.BranchInfo{}, nil)
 
 		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-		ctx := &domain.Context{
-			Type:        domain.ContextProject,
+		ctx := &core.Context{
+			Type:        core.ContextProject,
 			ProjectName: "project1",
 			Path:        project1Path,
 		}
@@ -947,7 +947,7 @@ func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
 
 		var projectNames []string
 		for _, sug := range suggestions {
-			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
+			if sug.Type == core.PathTypeProject && sug.BranchName == "" {
 				projectNames = append(projectNames, sug.Text)
 			}
 		}
@@ -967,10 +967,10 @@ func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
 		setupMinimalTestRepo(t, project1Path)
 		setupMinimalTestRepo(t, archivePath)
 
-		config := &domain.Config{
+		config := &core.Config{
 			ProjectsDirectory:  projectsDir,
 			WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
-			Completion: domain.CompletionConfig{
+			Completion: core.CompletionConfig{
 				ExcludeProjects: []string{"archive-*"},
 			},
 		}
@@ -979,14 +979,14 @@ func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
 		mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
 		mockGitService.MockGoGitClient.On("ValidateRepository", archivePath).Return(nil)
 		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, project1Path).
-			Return([]domain.WorktreeInfo{}, nil)
+			Return([]core.WorktreeInfo{}, nil)
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
-			Return([]domain.BranchInfo{}, nil)
+			Return([]core.BranchInfo{}, nil)
 
 		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-		ctx := &domain.Context{
-			Type:        domain.ContextProject,
+		ctx := &core.Context{
+			Type:        core.ContextProject,
 			ProjectName: "project1",
 			Path:        project1Path,
 		}
@@ -996,7 +996,7 @@ func TestContextResolver_ProjectSuggestionsFromProjectContext(t *testing.T) {
 
 		var projectNames []string
 		for _, sug := range suggestions {
-			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
+			if sug.Type == core.PathTypeProject && sug.BranchName == "" {
 				projectNames = append(projectNames, sug.Text)
 			}
 		}
@@ -1022,7 +1022,7 @@ func TestContextResolver_ProjectSuggestionsFromWorktreeContext(t *testing.T) {
 		worktreePath := filepath.Join(worktreesDir, "project1", "feature-branch")
 		require.NoError(t, os.MkdirAll(worktreePath, 0755))
 
-		config := &domain.Config{
+		config := &core.Config{
 			ProjectsDirectory:  projectsDir,
 			WorktreesDirectory: worktreesDir,
 		}
@@ -1031,16 +1031,16 @@ func TestContextResolver_ProjectSuggestionsFromWorktreeContext(t *testing.T) {
 		mockGitService.MockGoGitClient.On("ValidateRepository", project1Path).Return(nil)
 		mockGitService.MockGoGitClient.On("ValidateRepository", project2Path).Return(nil)
 		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, project1Path).
-			Return([]domain.WorktreeInfo{
+			Return([]core.WorktreeInfo{
 				{Branch: "feature-branch", Path: worktreePath},
 			}, nil)
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, project1Path).
-			Return([]domain.BranchInfo{}, nil)
+			Return([]core.BranchInfo{}, nil)
 
 		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-		ctx := &domain.Context{
-			Type:        domain.ContextWorktree,
+		ctx := &core.Context{
+			Type:        core.ContextWorktree,
 			ProjectName: "project1",
 			BranchName:  "feature-branch",
 			Path:        worktreePath,
@@ -1051,7 +1051,7 @@ func TestContextResolver_ProjectSuggestionsFromWorktreeContext(t *testing.T) {
 
 		var projectNames []string
 		for _, sug := range suggestions {
-			if sug.Type == domain.PathTypeProject && sug.BranchName == "" {
+			if sug.Type == core.PathTypeProject && sug.BranchName == "" {
 				projectNames = append(projectNames, sug.Text)
 			}
 		}
@@ -1062,10 +1062,10 @@ func TestContextResolver_ProjectSuggestionsFromWorktreeContext(t *testing.T) {
 
 func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
 	t.Run("excludes branches matching patterns", func(t *testing.T) {
-		config := &domain.Config{
+		config := &core.Config{
 			ProjectsDirectory:  "/home/user/Projects",
 			WorktreesDirectory: "/home/user/Worktrees",
-			Completion: domain.CompletionConfig{
+			Completion: core.CompletionConfig{
 				ExcludeBranches: []string{"dependabot/*", "renovate/*"},
 			},
 		}
@@ -1075,12 +1075,12 @@ func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
 		worktreePath := "/home/user/Worktrees/my-project/feature-branch"
 
 		mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, projectPath).
-			Return([]domain.WorktreeInfo{
+			Return([]core.WorktreeInfo{
 				{Branch: "feature-branch", Path: worktreePath},
 				{Branch: "other-branch", Path: "/home/user/Worktrees/my-project/other-branch"},
 			}, nil)
 		mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, projectPath).
-			Return([]domain.BranchInfo{
+			Return([]core.BranchInfo{
 				{Name: "main"},
 				{Name: "dependabot/npm-123"},
 				{Name: "renovate/docker-456"},
@@ -1088,8 +1088,8 @@ func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
 
 		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-		ctx := &domain.Context{
-			Type:        domain.ContextProject,
+		ctx := &core.Context{
+			Type:        core.ContextProject,
 			ProjectName: "my-project",
 			Path:        "/home/user/Projects/my-project",
 		}
@@ -1120,10 +1120,10 @@ func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
 			setupMinimalTestRepo(t, projectPath)
 		}
 
-		config := &domain.Config{
+		config := &core.Config{
 			ProjectsDirectory:  projectsDir,
 			WorktreesDirectory: filepath.Join(tempDir, "worktrees"),
-			Completion: domain.CompletionConfig{
+			Completion: core.CompletionConfig{
 				ExcludeProjects: []string{"archived-*"},
 			},
 		}
@@ -1136,8 +1136,8 @@ func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
 
 		resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-		ctx := &domain.Context{
-			Type: domain.ContextOutsideGit,
+		ctx := &core.Context{
+			Type: core.ContextOutsideGit,
 			Path: tempDir,
 		}
 
@@ -1156,10 +1156,10 @@ func TestContextResolver_ExclusionPatternFiltering(t *testing.T) {
 }
 
 func TestContextResolver_FuzzyMatchingEnabled(t *testing.T) {
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  "/home/user/Projects",
 		WorktreesDirectory: "/home/user/Worktrees",
-		Navigation: domain.NavigationConfig{
+		Navigation: core.NavigationConfig{
 			FuzzyMatching: true,
 		},
 	}
@@ -1169,20 +1169,20 @@ func TestContextResolver_FuzzyMatchingEnabled(t *testing.T) {
 
 	mockGitService := mocks.NewMockGitService()
 	mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, projectPath).
-		Return([]domain.WorktreeInfo{
+		Return([]core.WorktreeInfo{
 			{Branch: "feature-branch", Path: worktreePath},
 			{Branch: "other-branch", Path: "/home/user/Worktrees/my-project/other-branch"},
 		}, nil)
 	mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, projectPath).
-		Return([]domain.BranchInfo{
+		Return([]core.BranchInfo{
 			{Name: "feature-123"},
 			{Name: "main"},
 		}, nil)
 
 	resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-	ctx := &domain.Context{
-		Type:        domain.ContextProject,
+	ctx := &core.Context{
+		Type:        core.ContextProject,
 		ProjectName: "my-project",
 		Path:        "/home/user/Projects/my-project",
 	}
@@ -1199,7 +1199,7 @@ func TestContextResolver_FuzzyMatchingEnabled(t *testing.T) {
 }
 
 func TestContextResolver_WorktreeStatusFields(t *testing.T) {
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  "/home/user/Projects",
 		WorktreesDirectory: "/home/user/Worktrees",
 	}
@@ -1209,19 +1209,19 @@ func TestContextResolver_WorktreeStatusFields(t *testing.T) {
 	projectPath := "/home/user/Projects/my-project"
 
 	mockGitService.MockCLIClient.On("ListWorktrees", mock.Anything, projectPath).
-		Return([]domain.WorktreeInfo{
+		Return([]core.WorktreeInfo{
 			{Branch: "feature-branch", Path: worktreePath},
 			{Branch: "other-branch", Path: "/home/user/Worktrees/my-project/other-branch"},
 		}, nil)
 	mockGitService.MockGoGitClient.On("ListBranches", mock.Anything, projectPath).
-		Return([]domain.BranchInfo{}, nil)
+		Return([]core.BranchInfo{}, nil)
 	mockGitService.MockGoGitClient.On("GetRepositoryStatus", mock.Anything, worktreePath).
-		Return(domain.RepositoryStatus{IsClean: false}, nil)
+		Return(core.RepositoryStatus{IsClean: false}, nil)
 
 	resolver := NewContextResolver(config, mockGitService.MockGoGitClient, mockGitService.MockCLIClient)
 
-	ctx := &domain.Context{
-		Type:        domain.ContextWorktree,
+	ctx := &core.Context{
+		Type:        core.ContextWorktree,
 		ProjectName: "my-project",
 		BranchName:  "feature-branch",
 		Path:        worktreePath,

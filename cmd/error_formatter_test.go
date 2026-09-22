@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func TestNewErrorFormatter(t *testing.T) {
@@ -35,8 +35,8 @@ func TestNewErrorFormatterWithOptions(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatValidationError(t *testing.T) {
-	validationErr := domain.NewValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required").
-		WithSuggestions([]string{"Provide a valid branch name"})
+	validationErr := core.NewOpValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required")
+	validationErr.Suggestions = []string{"Provide a valid branch name"}
 
 	formatter := NewErrorFormatter()
 	output := formatter.Format(validationErr)
@@ -48,24 +48,24 @@ func TestErrorFormatter_FormatValidationError(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatValidationErrorWithContext(t *testing.T) {
-	validationErr := domain.NewValidationError("CreateWorktreeRequest", "ProjectName", "", "project name required when not in project context").
-		WithContext("Current directory: /home/user/random-dir")
+	validationErr := core.NewOpValidationError("CreateWorktreeRequest", "ProjectName", "", "project name required when not in project context")
+	validationErr.Suggestions = []string{"Current directory: /home/user/random-dir"}
 
 	formatter := NewErrorFormatter()
 	output := formatter.Format(validationErr)
 
 	assert.Contains(t, output, "Error:")
 	assert.Contains(t, output, "project name required when not in project context")
-	assert.Contains(t, output, "Context:")
+	assert.Contains(t, output, "Hint:")
 	assert.Contains(t, output, "Current directory: /home/user/random-dir")
 }
 
 func TestErrorFormatter_FormatValidationErrorMultipleSuggestions(t *testing.T) {
-	validationErr := domain.NewValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required").
-		WithSuggestions([]string{
-			"Provide a valid branch name",
-			"Branch names should follow git naming conventions",
-		})
+	validationErr := core.NewOpValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required")
+	validationErr.Suggestions = []string{
+		"Provide a valid branch name",
+		"Branch names should follow git naming conventions",
+	}
 
 	formatter := NewErrorFormatter()
 	output := formatter.Format(validationErr)
@@ -82,14 +82,14 @@ func TestErrorFormatter_FormatShellSubtypes(t *testing.T) {
 		err     error
 		contain string
 	}{
-		{"ShellAlreadyInstalledError", domain.NewShellAlreadyInstalledError("bash", "ctx", nil), "shell wrapper already installed"},
-		{"ShellNotInstalledError", domain.NewShellNotInstalledError("bash", "ctx", nil), "shell wrapper not installed"},
-		{"ShellInvalidTypeError", domain.NewShellInvalidTypeError("powershell", "ctx", nil), "invalid shell type"},
-		{"ShellInferenceError", domain.NewShellInferenceError("fish", "ctx", nil), "could not infer shell type"},
-		{"ShellDetectionError", domain.NewShellDetectionError("ctx", nil), "shell detection failed"},
-		{"ShellWrapperError installation", domain.NewShellWrapperError("bash", "installation", "ctx", nil), "wrapper installation failed"},
-		{"ShellWrapperError generation", domain.NewShellWrapperError("bash", "generation", "ctx", nil), "wrapper generation failed"},
-		{"ShellConfigError", domain.NewShellConfigError("/home/u/.bashrc", "ctx", nil), "config file error"},
+		{"ShellAlreadyInstalledError", core.NewShellAlreadyInstalledError("bash", "ctx", nil), "shell wrapper already installed"},
+		{"ShellNotInstalledError", core.NewShellNotInstalledError("bash", "ctx", nil), "shell wrapper not installed"},
+		{"ShellInvalidTypeError", core.NewShellInvalidTypeError("powershell", "ctx", nil), "invalid shell type"},
+		{"ShellInferenceError", core.NewShellInferenceError("fish", "ctx", nil), "could not infer shell type"},
+		{"ShellDetectionError", core.NewShellDetectionError("ctx", nil), "shell detection failed"},
+		{"ShellWrapperError installation", core.NewShellWrapperError("bash", "installation", "ctx", nil), "wrapper installation failed"},
+		{"ShellWrapperError generation", core.NewShellWrapperError("bash", "generation", "ctx", nil), "wrapper generation failed"},
+		{"ShellConfigError", core.NewShellConfigError("/home/u/.bashrc", "ctx", nil), "config file error"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -101,7 +101,7 @@ func TestErrorFormatter_FormatShellSubtypes(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatWorktreeServiceErrorWithHint(t *testing.T) {
-	err := domain.NewWorktreeServiceError("/path/to/worktree", "feature-branch", "ResolvePath", "operation failed", domain.ErrWorktreeNotFound)
+	err := core.NewWorktreeServiceError("/path/to/worktree", "feature-branch", "ResolvePath", "operation failed", core.ErrWorktreeNotFound)
 	output := NewErrorFormatter().Format(err)
 
 	assert.Contains(t, output, "Error:")
@@ -109,7 +109,7 @@ func TestErrorFormatter_FormatWorktreeServiceErrorWithHint(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatProjectServiceErrorWithHint(t *testing.T) {
-	err := domain.NewProjectServiceError("nonexistent-project", "", "DiscoverProject", "project not found", domain.ErrProjectNotFound)
+	err := core.NewProjectServiceError("nonexistent-project", "", "DiscoverProject", "project not found", core.ErrProjectNotFound)
 	output := NewErrorFormatter().Format(err)
 
 	assert.Contains(t, output, "Error:")
@@ -118,7 +118,7 @@ func TestErrorFormatter_FormatProjectServiceErrorWithHint(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatGitRepositoryErrorWithHint(t *testing.T) {
-	err := domain.NewGitRepositoryError("/path/to/repo", "failed to open", domain.ErrGitRepoNotFound)
+	err := core.NewGitRepositoryError("/path/to/repo", "failed to open", core.ErrGitRepoNotFound)
 	output := NewErrorFormatter().Format(err)
 
 	assert.Contains(t, output, "Error:")
@@ -126,7 +126,7 @@ func TestErrorFormatter_FormatGitRepositoryErrorWithHint(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatNavigationServiceErrorWithHint(t *testing.T) {
-	err := domain.NewNavigationServiceError("feature", "ctx", "ResolvePath", "target not found", domain.ErrResolutionNotFound)
+	err := core.NewNavigationServiceError("feature", "ctx", "ResolvePath", "target not found", core.ErrResolutionNotFound)
 	output := NewErrorFormatter().Format(err)
 
 	assert.Contains(t, output, "Error:")
@@ -134,7 +134,7 @@ func TestErrorFormatter_FormatNavigationServiceErrorWithHint(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatGenericServiceError(t *testing.T) {
-	genericErr := domain.NewServiceError("ContextService", "GetCurrentContext", "failed to detect context", nil)
+	genericErr := core.NewServiceError("ContextService", "GetCurrentContext", "failed to detect context", nil)
 	output := NewErrorFormatter().Format(genericErr)
 
 	assert.Contains(t, output, "Error:")
@@ -142,7 +142,7 @@ func TestErrorFormatter_FormatGenericServiceError(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatResolutionError(t *testing.T) {
-	resErr := domain.NewResolutionError("target", "/path/to/project", "target not found", nil, nil)
+	resErr := core.NewResolutionError("target", "/path/to/project", "target not found", nil, nil)
 	output := NewErrorFormatter().Format(resErr)
 
 	assert.Contains(t, output, "Error:")
@@ -150,7 +150,7 @@ func TestErrorFormatter_FormatResolutionError(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatGitCommandError(t *testing.T) {
-	err := domain.NewGitCommandError("git", []string{"status"}, 1, "", "error output", "command failed", nil)
+	err := core.NewGitCommandError("git", []string{"status"}, 1, "", "error output", "command failed", nil)
 	output := NewErrorFormatter().Format(err)
 
 	assert.Contains(t, output, "Error:")
@@ -158,7 +158,7 @@ func TestErrorFormatter_FormatGitCommandError(t *testing.T) {
 }
 
 func TestErrorFormatter_FormatConflictError(t *testing.T) {
-	err := domain.NewConflictError("worktree", "feature", "CreateWorktree", "already exists", nil)
+	err := core.NewConflictError("worktree", "feature", "CreateWorktree", "already exists", nil)
 	output := NewErrorFormatter().Format(err)
 
 	assert.Contains(t, output, "Error:")
@@ -166,8 +166,8 @@ func TestErrorFormatter_FormatConflictError(t *testing.T) {
 }
 
 func TestErrorFormatter_QuietModeSuppressesHints(t *testing.T) {
-	validationErr := domain.NewValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required").
-		WithSuggestions([]string{"Provide a valid branch name"})
+	validationErr := core.NewOpValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required")
+	validationErr.Suggestions = []string{"Provide a valid branch name"}
 
 	formatter := NewErrorFormatterWithOptions(true)
 	output := formatter.Format(validationErr)
@@ -178,8 +178,8 @@ func TestErrorFormatter_QuietModeSuppressesHints(t *testing.T) {
 }
 
 func TestErrorFormatter_QuietModePreservesErrorMessage(t *testing.T) {
-	validationErr := domain.NewValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required").
-		WithSuggestions([]string{"Provide a valid branch name"})
+	validationErr := core.NewOpValidationError("CreateWorktreeRequest", "BranchName", "", "branch name is required")
+	validationErr.Suggestions = []string{"Provide a valid branch name"}
 
 	formatter := NewErrorFormatterWithOptions(true)
 	output := formatter.Format(validationErr)
@@ -195,19 +195,17 @@ func TestErrorFormatter_FormatGenericError(t *testing.T) {
 	assert.Contains(t, output, "something went wrong")
 }
 
-func TestErrorFormatter_RegistrationOrder(t *testing.T) {
+func TestErrorFormatter_RegistrationCount(t *testing.T) {
 	formatter := NewErrorFormatter()
-	// 17 formatters: 7 shell + 3 git + 3 navigation/resolution/conflict + 2 worktree/project + 1 validation + 1 service
-	assert.Len(t, formatter.matchers, 17)
+	// 3 formatters: ValidationError, NotFoundError, OperationError.
+	assert.Len(t, formatter.matchers, 3)
 }
 
 func TestErrorFormatter_SpecificityOrdering(t *testing.T) {
 	formatter := NewErrorFormatter()
-	// WorktreeServiceError is wrapped in a ValidationError chain; the
-	// more specific type must win because it is registered later in
-	// the chain than ValidationError (which is first).
-	vErr := domain.NewValidationError("R", "f", "v", "m")
-	wErr := domain.NewWorktreeServiceError("/path", "b", "o", "msg", vErr)
+	// ValidationError is terminal; the wrapping OperationError wins.
+	ve := core.NewOpValidationError("R", "f", "v", "m")
+	wErr := core.NewWorktreeServiceError("/path", "b", "o", "msg", ve)
 	output := formatter.Format(wErr)
 	assert.Contains(t, output, "Hint: Use 'twiggit list' to see available worktrees")
 }
@@ -218,10 +216,10 @@ func TestErrorFormatter_NotFoundHintDiscrimination(t *testing.T) {
 		err  error
 		hint string
 	}{
-		{"project not found", domain.NewProjectServiceError("p", "/p", "o", "m", domain.ErrProjectNotFound), "Use 'twiggit list --all' to see available projects"},
-		{"worktree not found", domain.NewWorktreeServiceError("/p", "b", "o", "m", domain.ErrWorktreeNotFound), "Use 'twiggit list' to see available worktrees"},
-		{"resolution not found", domain.NewNavigationServiceError("t", "c", "o", "m", domain.ErrResolutionNotFound), "Use 'twiggit list' to see available navigation targets"},
-		{"git repo not found", domain.NewGitRepositoryError("/p", "m", domain.ErrGitRepoNotFound), "Verify the repository path"},
+		{"project not found", core.NewProjectServiceError("p", "/p", "o", "m", core.ErrProjectNotFound), "Use 'twiggit list --all' to see available projects"},
+		{"worktree not found", core.NewWorktreeServiceError("/p", "b", "o", "m", core.ErrWorktreeNotFound), "Use 'twiggit list' to see available worktrees"},
+		{"resolution not found", core.NewNavigationServiceError("t", "c", "o", "m", core.ErrResolutionNotFound), "Use 'twiggit list' to see available navigation targets"},
+		{"git repo not found", core.NewGitRepositoryError("/p", "m", core.ErrGitRepoNotFound), "Verify the repository path"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -232,30 +230,28 @@ func TestErrorFormatter_NotFoundHintDiscrimination(t *testing.T) {
 }
 
 func TestAsType(t *testing.T) {
-	t.Run("matches wrapped typed error", func(t *testing.T) {
-		wrapped := domain.NewGitRepositoryError("/p", "m", errors.New("io"))
+	t.Run("matches wrapped OperationError", func(t *testing.T) {
+		wrapped := core.NewGitRepositoryError("/p", "m", errors.New("io"))
 		err := error(wrapped)
-		got, ok := asType[*domain.GitRepositoryError](err)
+		got, ok := asType[*core.OperationError](err)
 		assert.True(t, ok)
 		assert.Equal(t, wrapped, got)
 	})
 	t.Run("returns false on non-matching type", func(t *testing.T) {
 		err := errors.New("plain")
-		_, ok := asType[*domain.GitRepositoryError](err)
+		_, ok := asType[*core.OperationError](err)
 		assert.False(t, ok)
 	})
 }
 
 func TestFormatValidationError(t *testing.T) {
-	validationErr := domain.NewValidationError("CreateWorktreeRequest", "branch", "feature-1", "branch name cannot be empty").
-		WithSuggestions([]string{"Specify a branch name"}).
-		WithContext("context info")
+	validationErr := core.NewOpValidationError("CreateWorktreeRequest", "branch", "feature-1", "branch name cannot be empty")
+	validationErr.Suggestions = []string{"Specify a branch name"}
 
 	output := formatValidationError(validationErr)
 
 	assert.True(t, strings.HasPrefix(output, "Error:"))
 	assert.Contains(t, output, "Hint:")
-	assert.Contains(t, output, "Context:")
 }
 
 func TestFormatGenericError(t *testing.T) {

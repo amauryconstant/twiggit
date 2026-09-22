@@ -7,11 +7,11 @@ import (
 
 	"github.com/carapace-sh/carapace"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // getCompletionTimeout returns the completion timeout duration from config, defaulting to 500ms
-func getCompletionTimeout(config *domain.Config) time.Duration {
+func getCompletionTimeout(config *core.Config) time.Duration {
 	if config == nil {
 		return 500 * time.Millisecond
 	}
@@ -25,7 +25,7 @@ func getCompletionTimeout(config *domain.Config) time.Duration {
 
 // actionWorktreeTarget provides completion for worktree targets (project/branch)
 // Supports progressive completion via ActionMultiParts("/")
-func actionWorktreeTarget(config *CommandConfig, opts ...domain.SuggestionOption) carapace.Action {
+func actionWorktreeTarget(config *CommandConfig, opts ...core.SuggestionOption) carapace.Action {
 	return carapace.ActionMultiParts("/", func(c carapace.Context) carapace.Action {
 		timeout := getCompletionTimeout(config.Config)
 
@@ -64,7 +64,7 @@ func actionBranches(config *CommandConfig) carapace.Action {
 }
 
 // actionProjectsOrBranches suggests projects or branches based on current context
-func actionProjectsOrBranches(c carapace.Context, config *CommandConfig, opts []domain.SuggestionOption) carapace.Action {
+func actionProjectsOrBranches(c carapace.Context, config *CommandConfig, opts []core.SuggestionOption) carapace.Action {
 	ctx, err := config.Services.ContextService.GetCurrentContext()
 	if err != nil {
 		return carapace.ActionValues()
@@ -85,8 +85,8 @@ func actionBranchesForProject(projectName string, config *CommandConfig) carapac
 
 	return carapace.ActionCallback(func(_ carapace.Context) carapace.Action {
 		// Create synthetic context for the target project
-		targetCtx := &domain.Context{
-			Type:        domain.ContextProject,
+		targetCtx := &core.Context{
+			Type:        core.ContextProject,
 			ProjectName: projectName,
 			Path:        filepath.Join(config.Config.ProjectsDirectory, projectName),
 		}
@@ -99,9 +99,9 @@ func actionBranchesForProject(projectName string, config *CommandConfig) carapac
 
 		// Filter to only include worktrees and branches for this project
 		// (exclude other project suggestions)
-		filtered := make([]*domain.ResolutionSuggestion, 0, len(suggestions))
+		filtered := make([]*core.ResolutionSuggestion, 0, len(suggestions))
 		for _, s := range suggestions {
-			if s.ProjectName == projectName && s.Type != domain.PathTypeProject {
+			if s.ProjectName == projectName && s.Type != core.PathTypeProject {
 				filtered = append(filtered, s)
 			}
 		}
@@ -114,7 +114,7 @@ func actionBranchesForProject(projectName string, config *CommandConfig) carapac
 // 1. Current worktree first
 // 2. Default branch second
 // 3. Other branches alphabetically
-func sortSuggestions(suggestions []*domain.ResolutionSuggestion, defaultBranch string) {
+func sortSuggestions(suggestions []*core.ResolutionSuggestion, defaultBranch string) {
 	sort.SliceStable(suggestions, func(i, j int) bool {
 		si, sj := suggestions[i], suggestions[j]
 
@@ -144,9 +144,9 @@ func sortSuggestions(suggestions []*domain.ResolutionSuggestion, defaultBranch s
 	})
 }
 
-// suggestionsToCarapaceAction converts domain.ResolutionSuggestion to carapace.Action
+// suggestionsToCarapaceAction converts core.ResolutionSuggestion to carapace.Action
 // Uses Batch to apply "/" suffix to project suggestions only
-func suggestionsToCarapaceAction(suggestions []*domain.ResolutionSuggestion, defaultBranch string) carapace.Action {
+func suggestionsToCarapaceAction(suggestions []*core.ResolutionSuggestion, defaultBranch string) carapace.Action {
 	if len(suggestions) == 0 {
 		return carapace.ActionValues()
 	}
@@ -160,7 +160,7 @@ func suggestionsToCarapaceAction(suggestions []*domain.ResolutionSuggestion, def
 
 	for _, s := range suggestions {
 		// Projects get "/" suffix for progressive completion
-		if s.Type == domain.PathTypeProject && s.BranchName == "" {
+		if s.Type == core.PathTypeProject && s.BranchName == "" {
 			projectValues = append(projectValues, s.Text)
 			projectDescs = append(projectDescs, s.Description)
 		} else {

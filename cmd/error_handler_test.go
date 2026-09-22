@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func TestHandleCLIError_NilError(t *testing.T) {
@@ -16,37 +16,37 @@ func TestHandleCLIError_NilError(t *testing.T) {
 }
 
 func TestHandleCLIError_ValidationError(t *testing.T) {
-	err := domain.NewValidationError("TestRequest", "field", "value", "invalid field")
+	err := core.NewOpValidationError("TestRequest", "field", "value", "invalid field")
 	assert.Equal(t, ExitCodeError, HandleCLIError(err))
 }
 
 func TestHandleCLIError_GitRepositoryError(t *testing.T) {
-	err := domain.NewGitRepositoryError("/path/to/repo", "failed to open", errors.New("some error"))
+	err := core.NewGitRepositoryError("/path/to/repo", "failed to open", errors.New("some error"))
 	assert.Equal(t, ExitCodeError, HandleCLIError(err))
 }
 
 func TestHandleCLIError_GitWorktreeError(t *testing.T) {
-	err := domain.NewGitWorktreeError("/path/to/worktree", "feature", "failed to delete", errors.New("some error"))
+	err := core.NewGitWorktreeError("/path/to/worktree", "feature", "failed to delete", errors.New("some error"))
 	assert.Equal(t, ExitCodeError, HandleCLIError(err))
 }
 
 func TestHandleCLIError_WorktreeServiceError(t *testing.T) {
-	err := domain.NewWorktreeServiceError("/path/to/worktree", "feature", "DeleteWorktree", "operation failed", errors.New("some error"))
+	err := core.NewWorktreeServiceError("/path/to/worktree", "feature", "DeleteWorktree", "operation failed", errors.New("some error"))
 	assert.Equal(t, ExitCodeError, HandleCLIError(err))
 }
 
 func TestHandleCLIError_ProjectServiceError(t *testing.T) {
-	err := domain.NewProjectServiceError("myproject", "/path/to/project", "DiscoverProject", "operation failed", errors.New("some error"))
+	err := core.NewProjectServiceError("myproject", "/path/to/project", "DiscoverProject", "operation failed", errors.New("some error"))
 	assert.Equal(t, ExitCodeError, HandleCLIError(err))
 }
 
 func TestHandleCLIError_NavigationServiceError(t *testing.T) {
-	err := domain.NewNavigationServiceError("main", "project context", "ResolvePath", "operation failed", errors.New("some error"))
+	err := core.NewNavigationServiceError("main", "project context", "ResolvePath", "operation failed", errors.New("some error"))
 	assert.Equal(t, ExitCodeError, HandleCLIError(err))
 }
 
 func TestHandleCLIError_ServiceError(t *testing.T) {
-	err := domain.NewServiceError("MyService", "DoSomething", "operation failed", errors.New("some error"))
+	err := core.NewServiceError("MyService", "DoSomething", "operation failed", errors.New("some error"))
 	assert.Equal(t, ExitCodeError, HandleCLIError(err))
 }
 
@@ -62,23 +62,23 @@ func TestGetExitCodeForError_ThreeCodeDispatch(t *testing.T) {
 		want ExitCode
 	}{
 		{"nil", nil, ExitCodeSuccess},
-		{"validation error", domain.NewValidationError("R", "f", "v", "m"), ExitCodeError},
-		{"git repo error", domain.NewGitRepositoryError("/p", "m", nil), ExitCodeError},
-		{"git worktree error", domain.NewGitWorktreeError("/p", "b", "m", nil), ExitCodeError},
-		{"git command error", domain.NewGitCommandError("g", nil, 1, "", "", "m", nil), ExitCodeError},
-		{"worktree service error", domain.NewWorktreeServiceError("/p", "b", "o", "m", nil), ExitCodeError},
-		{"project service error", domain.NewProjectServiceError("n", "/p", "o", "m", nil), ExitCodeError},
-		{"navigation service error", domain.NewNavigationServiceError("t", "c", "o", "m", nil), ExitCodeError},
-		{"service error", domain.NewServiceError("S", "O", "m", nil), ExitCodeError},
-		{"conflict error", domain.NewConflictError("r", "i", "o", "m", nil), ExitCodeError},
-		{"shell already installed", domain.NewShellAlreadyInstalledError("bash", "ctx", nil), ExitCodeError},
-		{"shell not installed", domain.NewShellNotInstalledError("bash", "ctx", nil), ExitCodeError},
-		{"shell invalid type", domain.NewShellInvalidTypeError("powershell", "ctx", nil), ExitCodeError},
-		{"shell inference", domain.NewShellInferenceError("bash", "ctx", nil), ExitCodeError},
-		{"shell detection", domain.NewShellDetectionError("ctx", nil), ExitCodeError},
-		{"shell wrapper generation", domain.NewShellWrapperError("bash", "generation", "ctx", nil), ExitCodeError},
-		{"shell wrapper installation", domain.NewShellWrapperError("bash", "installation", "ctx", nil), ExitCodeError},
-		{"shell config", domain.NewShellConfigError("/p", "ctx", nil), ExitCodeError},
+		{"validation error", core.NewOpValidationError("R", "f", "v", "m"), ExitCodeError},
+		{"git repo error", core.NewGitRepositoryError("/p", "m", nil), ExitCodeError},
+		{"git worktree error", core.NewGitWorktreeError("/p", "b", "m", nil), ExitCodeError},
+		{"git command error", core.NewGitCommandError("g", nil, 1, "", "", "m", nil), ExitCodeError},
+		{"worktree service error", core.NewWorktreeServiceError("/p", "b", "o", "m", nil), ExitCodeError},
+		{"project service error", core.NewProjectServiceError("n", "/p", "o", "m", nil), ExitCodeError},
+		{"navigation service error", core.NewNavigationServiceError("t", "c", "o", "m", nil), ExitCodeError},
+		{"service error", core.NewServiceError("S", "O", "m", nil), ExitCodeError},
+		{"conflict error", core.NewConflictError("r", "i", "o", "m", nil), ExitCodeError},
+		{"shell already installed", core.NewShellAlreadyInstalledError("bash", "ctx", nil), ExitCodeError},
+		{"shell not installed", core.NewShellNotInstalledError("bash", "ctx", nil), ExitCodeError},
+		{"shell invalid type", core.NewShellInvalidTypeError("powershell", "ctx", nil), ExitCodeError},
+		{"shell inference", core.NewShellInferenceError("bash", "ctx", nil), ExitCodeError},
+		{"shell detection", core.NewShellDetectionError("ctx", nil), ExitCodeError},
+		{"shell wrapper generation", core.NewShellWrapperError("bash", "generation", "ctx", nil), ExitCodeError},
+		{"shell wrapper installation", core.NewShellWrapperError("bash", "installation", "ctx", nil), ExitCodeError},
+		{"shell config", core.NewShellConfigError("/p", "ctx", nil), ExitCodeError},
 		{"generic error", errors.New("plain"), ExitCodeError},
 	}
 	for _, tt := range tests {
@@ -93,9 +93,9 @@ func TestGetExitCodeForError_UsageError(t *testing.T) {
 		name string
 		err  error
 	}{
-		{"usage error with cause", domain.NewUsageError("--config requires --install", errors.New("flag: --config"))},
-		{"usage error no cause", domain.NewUsageError("--force requires --install", nil)},
-		{"wrapped usage error", domain.UsageWrap(errors.New("raw pflag error"))},
+		{"usage error with cause", core.NewUsageError("--config requires --install", errors.New("flag: --config"))},
+		{"usage error no cause", core.NewUsageError("--force requires --install", nil)},
+		{"wrapped usage error", core.UsageWrap(errors.New("raw pflag error"))},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -109,10 +109,10 @@ func TestCategorizeError_SentinelNotFoundDispatch(t *testing.T) {
 		name string
 		err  error
 	}{
-		{"err git repo not found", domain.NewGitRepositoryError("/p", "m", nil)},
-		{"err worktree not found", domain.NewGitWorktreeError("/p", "b", "m", nil)},
-		{"err project not found", domain.NewProjectServiceError("n", "/p", "o", "m", nil)},
-		{"err resolution not found", domain.NewNavigationServiceError("t", "c", "o", "m", nil)},
+		{"err git repo not found", core.NewGitRepositoryError("/p", "m", nil)},
+		{"err worktree not found", core.NewGitWorktreeError("/p", "b", "m", nil)},
+		{"err project not found", core.NewProjectServiceError("n", "/p", "o", "m", nil)},
+		{"err resolution not found", core.NewNavigationServiceError("t", "c", "o", "m", nil)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -122,11 +122,11 @@ func TestCategorizeError_SentinelNotFoundDispatch(t *testing.T) {
 }
 
 func TestCategorizeError_UsageError(t *testing.T) {
-	assert.Equal(t, ErrorCategoryCobra, CategorizeError(domain.NewUsageError("--foo", nil)))
+	assert.Equal(t, ErrorCategoryCobra, CategorizeError(core.NewUsageError("--foo", nil)))
 }
 
 func TestCategorizeError_ValidationError(t *testing.T) {
-	assert.Equal(t, ErrorCategoryService, CategorizeError(domain.NewValidationError("R", "f", "v", "m")))
+	assert.Equal(t, ErrorCategoryService, CategorizeError(core.NewOpValidationError("R", "f", "v", "m")))
 }
 
 func TestCategorizeError_Generic(t *testing.T) {
@@ -134,35 +134,28 @@ func TestCategorizeError_Generic(t *testing.T) {
 }
 
 func TestIsCobraUsageError_UsageError(t *testing.T) {
-	assert.True(t, IsCobraUsageError(domain.NewUsageError("--foo", nil)))
-	assert.True(t, IsCobraUsageError(domain.UsageWrap(errors.New("raw"))))
+	assert.True(t, IsCobraUsageError(core.NewUsageError("--foo", nil)))
+	assert.True(t, IsCobraUsageError(core.UsageWrap(errors.New("raw"))))
 }
 
 func TestIsCobraUsageError_NonUsageError(t *testing.T) {
 	assert.False(t, IsCobraUsageError(errors.New("plain")))
-	assert.False(t, IsCobraUsageError(domain.NewValidationError("R", "f", "v", "m")))
+	assert.False(t, IsCobraUsageError(core.NewOpValidationError("R", "f", "v", "m")))
 	assert.False(t, IsCobraUsageError(nil))
 }
 
-func TestUsageError_SentinelParticipation(t *testing.T) {
-	err := domain.NewUsageError("--foo", nil)
-	assert.ErrorIs(t, err, domain.ErrUsageFlag)
-	assert.NotErrorIs(t, err, domain.ErrWorktreeNotFound)
-}
-
-func TestUsageError_Unwrap(t *testing.T) {
-	cause := errors.New("parser failure")
-	err := domain.NewUsageError("--foo", cause)
-	assert.Equal(t, cause, err.Unwrap())
-	assert.ErrorIs(t, err, domain.ErrUsageFlag)
-	assert.ErrorIs(t, err, cause)
+// TestUsageError_IsTerminal pins the terminal-Unwrap contract added when
+// the Err field was dropped from UsageError.
+func TestUsageError_IsTerminal(t *testing.T) {
+	err := core.NewUsageError("--foo", errors.New("parser failure"))
+	assert.NoError(t, err.Unwrap(), "UsageError.Unwrap returns nil (terminal)")
 }
 
 // TestIsCobraArgumentError_AliasParity pins the legacy-alias contract: any future
 // rename of the canonical detector must keep `IsCobraArgumentError` returning the
 // same boolean so external callers do not silently diverge.
 func TestIsCobraArgumentError_AliasParity(t *testing.T) {
-	err := domain.NewUsageError("--foo", nil)
+	err := core.NewUsageError("--foo", nil)
 	assert.Equal(t, IsCobraUsageError(err), IsCobraArgumentError(err))
 }
 
@@ -181,8 +174,8 @@ func TestWrapArgsValidator_WrapsAsUsageError(t *testing.T) {
 	err := wrapped(cmd, nil)
 	must.Error(err)
 
-	var ue *domain.UsageError
-	is.ErrorAs(err, &ue, "args-validator failure must wrap into *domain.UsageError")
+	var ue *core.UsageError
+	is.ErrorAs(err, &ue, "args-validator failure must wrap into *core.UsageError")
 	is.True(IsCobraUsageError(err), "IsCobraUsageError must match the wrapped error")
 	is.Equal(ExitCodeUsage, GetExitCodeForError(err), "exit code must be 2")
 }
@@ -196,7 +189,7 @@ func TestWrapArgsValidator_NilOnPass(t *testing.T) {
 }
 
 func TestHandleCLIErrorWithCommand_ValidationErrorReturnsOne(t *testing.T) {
-	err := domain.NewValidationError("Req", "field", "value", "validation failed")
+	err := core.NewOpValidationError("Req", "field", "value", "validation failed")
 	is := assert.New(t)
 	is.Equal(ExitCodeError, HandleCLIErrorWithCommand(nil, err))
 	is.Equal(ExitCodeError, GetExitCodeForError(err))
@@ -207,10 +200,10 @@ func TestHandleCLIErrorWithCommand_NotFoundReturnsOne(t *testing.T) {
 		name string
 		err  error
 	}{
-		{"git repo not found", domain.NewGitRepositoryError("/p", "m", nil)},
-		{"worktree not found", domain.NewGitWorktreeError("/p", "b", "m", nil)},
-		{"project not found", domain.NewProjectServiceError("n", "/p", "o", "m", nil)},
-		{"resolution not found", domain.NewNavigationServiceError("t", "c", "o", "m", nil)},
+		{"git repo not found", core.NewGitRepositoryError("/p", "m", nil)},
+		{"worktree not found", core.NewGitWorktreeError("/p", "b", "m", nil)},
+		{"project not found", core.NewProjectServiceError("n", "/p", "o", "m", nil)},
+		{"resolution not found", core.NewNavigationServiceError("t", "c", "o", "m", nil)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

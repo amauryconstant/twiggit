@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 )
 
@@ -24,7 +24,7 @@ import (
 type ConcurrentTestSuite struct {
 	suite.Suite
 	tempDir     string
-	config      *domain.Config
+	config      *core.Config
 	gitExecutor infrastructure.CommandExecutor
 }
 
@@ -42,7 +42,7 @@ func (s *ConcurrentTestSuite) SetupTest() {
 	require.NoError(s.T(), os.MkdirAll(worktreesDir, 0755))
 
 	// Create config
-	s.config = &domain.Config{
+	s.config = &core.Config{
 		ProjectsDirectory:   projectsDir,
 		WorktreesDirectory:  worktreesDir,
 		DefaultSourceBranch: "main",

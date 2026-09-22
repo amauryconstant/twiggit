@@ -9,7 +9,7 @@ import (
 
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 )
 
@@ -72,7 +72,7 @@ func executePrune(c *cobra.Command, config *CommandConfig, force, yes, deleteBra
 	}
 
 	// Build the base request
-	req := &domain.PruneWorktreesRequest{
+	req := &core.PruneWorktreesRequest{
 		Context:          currentCtx,
 		Force:            force,
 		DeleteBranches:   deleteBranches,
@@ -143,7 +143,7 @@ func confirmBulkPrune(c *cobra.Command) (bool, error) {
 	return response == "y" || response == "yes", nil
 }
 
-func outputPruneResults(c *cobra.Command, result *domain.PruneWorktreesResult, dryRun bool) {
+func outputPruneResults(c *cobra.Command, result *core.PruneWorktreesResult, dryRun bool) {
 	errOut := c.OutOrStderr()
 
 	if dryRun {

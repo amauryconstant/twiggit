@@ -9,7 +9,7 @@ import (
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // NewInitCmd creates a new init command
@@ -41,16 +41,16 @@ Examples:
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate flag combinations
 			if configFile != "" && !install {
-				return domain.NewUsageError("--config requires --install", nil)
+				return core.NewUsageError("--config requires --install", nil)
 			}
 			if force && !install {
-				return domain.NewUsageError("--force requires --install", nil)
+				return core.NewUsageError("--force requires --install", nil)
 			}
 
 			// Parse shell type from positional argument
-			var shellType domain.ShellType
+			var shellType core.ShellType
 			if len(args) > 0 {
-				shellType = domain.ShellType(args[0])
+				shellType = core.ShellType(args[0])
 			}
 
 			if install {
@@ -73,24 +73,25 @@ Examples:
 }
 
 // runInitStdout outputs the shell wrapper to stdout (default behavior)
-func runInitStdout(cmd *cobra.Command, config *CommandConfig, shellType domain.ShellType) error {
+func runInitStdout(cmd *cobra.Command, config *CommandConfig, shellType core.ShellType) error {
 	// Auto-detect shell if not specified
 	if shellType == "" {
 		var err error
-		shellType, err = domain.DetectShellFromEnv()
+		shellType, err = core.DetectShellFromEnv()
 		if err != nil {
 			return fmt.Errorf("shell auto-detection failed: %w", err)
 		}
 	}
 
 	// Validate shell type
-	if !domain.IsValidShellType(shellType) {
-		return domain.NewValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type").
-			WithSuggestions([]string{"Supported shells: bash, zsh, fish"})
+	if !core.IsValidShellType(shellType) {
+		err := core.NewOpValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type")
+		err.Suggestions = []string{"Supported shells: bash, zsh, fish"}
+		return err
 	}
 
 	// Generate wrapper
-	request := &domain.GenerateWrapperRequest{
+	request := &core.GenerateWrapperRequest{
 		ShellType: shellType,
 	}
 
@@ -106,23 +107,24 @@ func runInitStdout(cmd *cobra.Command, config *CommandConfig, shellType domain.S
 }
 
 // runInitInstall installs the wrapper to a shell config file
-func runInitInstall(cmd *cobra.Command, config *CommandConfig, shellType domain.ShellType, configFile string, force bool) error {
+func runInitInstall(cmd *cobra.Command, config *CommandConfig, shellType core.ShellType, configFile string, force bool) error {
 	// Auto-detect shell if not specified
 	if shellType == "" {
 		var err error
-		shellType, err = domain.DetectShellFromEnv()
+		shellType, err = core.DetectShellFromEnv()
 		if err != nil {
 			return fmt.Errorf("shell auto-detection failed: %w", err)
 		}
 	}
 
 	// Validate shell type
-	if !domain.IsValidShellType(shellType) {
-		return domain.NewValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type").
-			WithSuggestions([]string{"Supported shells: bash, zsh, fish"})
+	if !core.IsValidShellType(shellType) {
+		err := core.NewOpValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type")
+		err.Suggestions = []string{"Supported shells: bash, zsh, fish"}
+		return err
 	}
 
-	request := &domain.SetupShellRequest{
+	request := &core.SetupShellRequest{
 		ShellType:      shellType,
 		ForceOverwrite: force,
 		ConfigFile:     configFile,
@@ -141,7 +143,7 @@ func runInitInstall(cmd *cobra.Command, config *CommandConfig, shellType domain.
 }
 
 // displayInitResults outputs installation results (for install mode only)
-func displayInitResults(out io.Writer, result *domain.SetupShellResult) error {
+func displayInitResults(out io.Writer, result *core.SetupShellResult) error {
 	if result.IsSkipped {
 		_, _ = fmt.Fprintf(out, "Shell wrapper already installed for %s\n", result.ShellType)
 		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)

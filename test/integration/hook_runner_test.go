@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 )
 
@@ -45,7 +45,7 @@ commands = ["echo hello"]
 	s.Require().NoError(err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -72,7 +72,7 @@ commands = [
 	s.Require().NoError(err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -99,7 +99,7 @@ commands = [
 	s.Require().NoError(err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -124,7 +124,7 @@ commands = ["printenv TWIGGIT_PROJECT_NAME"]
 	s.Require().NoError(err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ProjectName:    "test-project",
 		BranchName:     "feature-branch",
@@ -151,7 +151,7 @@ commands = ["touch marker.txt"]
 	s.Require().NoError(err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -168,7 +168,7 @@ commands = ["touch marker.txt"]
 
 func (s *HookRunnerIntegrationSuite) TestRun_NoConfigFile_ReturnsNotExecuted() {
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: filepath.Join(s.configDir, "nonexistent.toml"),
 	}
@@ -190,7 +190,7 @@ key = "value"
 	s.Require().NoError(err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}

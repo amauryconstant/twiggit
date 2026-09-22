@@ -6,7 +6,7 @@ import (
 
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // NewCDCommand creates a new cd command
@@ -61,10 +61,10 @@ func executeCD(cmd *cobra.Command, config *CommandConfig, target string) error {
 
 	// Validate that the resolved path exists
 	if err := config.Services.NavigationService.ValidatePath(ctx, result.ResolvedPath); err != nil {
-		if result.Type == domain.PathTypeWorktree {
-			return domain.NewNavigationServiceError(target, currentCtx.Path, "ResolvePath", "worktree not found", nil)
+		if result.Type == core.PathTypeWorktree {
+			return core.NewNavigationServiceError(target, currentCtx.Path, "ResolvePath", "worktree not found", nil)
 		}
-		return domain.NewNavigationServiceError(target, currentCtx.Path, "ResolvePath", "project not found", nil)
+		return core.NewNavigationServiceError(target, currentCtx.Path, "ResolvePath", "project not found", nil)
 	}
 
 	// Output the resolved path for shell integration

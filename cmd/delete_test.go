@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
@@ -32,19 +32,19 @@ func TestDeleteCommand_Execute(t *testing.T) {
 			name: "delete worktree with safety checks",
 			args: []string{"test-project/feature-branch"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockNS *mocks.MockNavigationService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{}, nil)
-				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
+				mockCS.On("GetCurrentContext").Return(&core.Context{}, nil)
+				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&core.ResolutionResult{
 					ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
 				}, nil)
-				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&domain.WorktreeInfo{
+				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&core.WorktreeInfo{
 					Path:   "/home/user/Worktrees/test-project/feature-branch",
 					Branch: "feature-branch",
 				}, nil)
-				mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&domain.WorktreeStatus{
+				mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&core.WorktreeStatus{
 					IsClean:               true,
 					HasUncommittedChanges: false,
 				}, nil)
-				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*domain.DeleteWorktreeRequest")).Return(nil)
+				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*core.DeleteWorktreeRequest")).Return(nil)
 			},
 			expectError: false,
 		},
@@ -53,10 +53,10 @@ func TestDeleteCommand_Execute(t *testing.T) {
 			name: "force delete dirty worktree",
 			args: []string{"--force", "test-project/feature-branch"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockNS *mocks.MockNavigationService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{}, nil)
-				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&domain.ResolutionResult{}, nil)
-				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&domain.WorktreeInfo{}, nil)
-				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*domain.DeleteWorktreeRequest")).Return(nil)
+				mockCS.On("GetCurrentContext").Return(&core.Context{}, nil)
+				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&core.ResolutionResult{}, nil)
+				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&core.WorktreeInfo{}, nil)
+				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*core.DeleteWorktreeRequest")).Return(nil)
 			},
 			expectError: false,
 		},
@@ -65,23 +65,23 @@ func TestDeleteCommand_Execute(t *testing.T) {
 			name: "delete with -C flag from worktree context outputs project path",
 			args: []string{"-C", "test-project/feature-branch"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockNS *mocks.MockNavigationService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{
-					Type:       domain.ContextWorktree,
+				mockCS.On("GetCurrentContext").Return(&core.Context{
+					Type:       core.ContextWorktree,
 					BranchName: "feature-branch",
 					Path:       "/home/user/Worktrees/test-project/feature-branch",
 				}, nil)
-				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
+				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&core.ResolutionResult{
 					ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
 				}, nil)
-				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&domain.WorktreeInfo{
+				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&core.WorktreeInfo{
 					Path:   "/home/user/Worktrees/test-project/feature-branch",
 					Branch: "feature-branch",
 				}, nil)
-				mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&domain.WorktreeStatus{
+				mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&core.WorktreeStatus{
 					IsClean: true,
 				}, nil)
-				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*domain.DeleteWorktreeRequest")).Return(nil)
-				mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*domain.ResolvePathRequest")).Return(&domain.ResolutionResult{
+				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*core.DeleteWorktreeRequest")).Return(nil)
+				mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*core.ResolvePathRequest")).Return(&core.ResolutionResult{
 					ResolvedPath: "/home/user/Projects/test-project",
 				}, nil)
 			},
@@ -95,21 +95,21 @@ func TestDeleteCommand_Execute(t *testing.T) {
 			name: "delete with -C flag from project context outputs nothing",
 			args: []string{"-C", "test-project/feature-branch"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockNS *mocks.MockNavigationService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{
-					Type: domain.ContextProject,
+				mockCS.On("GetCurrentContext").Return(&core.Context{
+					Type: core.ContextProject,
 					Path: "/home/user/Projects/test-project",
 				}, nil)
-				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
+				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&core.ResolutionResult{
 					ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
 				}, nil)
-				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&domain.WorktreeInfo{
+				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&core.WorktreeInfo{
 					Path:   "/home/user/Worktrees/test-project/feature-branch",
 					Branch: "feature-branch",
 				}, nil)
-				mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&domain.WorktreeStatus{
+				mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&core.WorktreeStatus{
 					IsClean: true,
 				}, nil)
-				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*domain.DeleteWorktreeRequest")).Return(nil)
+				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*core.DeleteWorktreeRequest")).Return(nil)
 			},
 			expectError: false,
 			validateOut: func(output string) bool {
@@ -121,21 +121,21 @@ func TestDeleteCommand_Execute(t *testing.T) {
 			name: "delete with -C flag from outside git context outputs nothing",
 			args: []string{"-C", "test-project/feature-branch"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockNS *mocks.MockNavigationService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{
-					Type: domain.ContextOutsideGit,
+				mockCS.On("GetCurrentContext").Return(&core.Context{
+					Type: core.ContextOutsideGit,
 					Path: "/home/user",
 				}, nil)
-				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
+				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&core.ResolutionResult{
 					ResolvedPath: "/home/user/Worktrees/test-project/feature-branch",
 				}, nil)
-				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&domain.WorktreeInfo{
+				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&core.WorktreeInfo{
 					Path:   "/home/user/Worktrees/test-project/feature-branch",
 					Branch: "feature-branch",
 				}, nil)
-				mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&domain.WorktreeStatus{
+				mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&core.WorktreeStatus{
 					IsClean: true,
 				}, nil)
-				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*domain.DeleteWorktreeRequest")).Return(nil)
+				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*core.DeleteWorktreeRequest")).Return(nil)
 			},
 			expectError: false,
 			validateOut: func(output string) bool {
@@ -147,10 +147,10 @@ func TestDeleteCommand_Execute(t *testing.T) {
 			name: "delete with -f short form flag works correctly",
 			args: []string{"-f", "test-project/feature-branch"},
 			setupMocks: func(mockWS *mocks.MockWorktreeService, mockCS *mocks.MockContextService, mockNS *mocks.MockNavigationService) {
-				mockCS.On("GetCurrentContext").Return(&domain.Context{}, nil)
-				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&domain.ResolutionResult{}, nil)
-				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&domain.WorktreeInfo{}, nil)
-				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*domain.DeleteWorktreeRequest")).Return(nil)
+				mockCS.On("GetCurrentContext").Return(&core.Context{}, nil)
+				mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&core.ResolutionResult{}, nil)
+				mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&core.WorktreeInfo{}, nil)
+				mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*core.DeleteWorktreeRequest")).Return(nil)
 			},
 			expectError: false,
 		},

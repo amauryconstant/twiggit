@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/cmd"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
@@ -25,7 +25,7 @@ func TestRootCommand_Integration(t *testing.T) {
 				ContextService:    mocks.NewMockContextService(),
 				ShellService:      mocks.NewMockShellService(),
 			},
-			Config: &domain.Config{},
+			Config: &core.Config{},
 		}
 
 		// Create root command
@@ -57,7 +57,7 @@ func TestRootCommand_Integration(t *testing.T) {
 				ContextService:    mocks.NewMockContextService(),
 				ShellService:      mocks.NewMockShellService(),
 			},
-			Config: &domain.Config{},
+			Config: &core.Config{},
 		}
 
 		rootCmd := cmd.NewRootCommand(config)
@@ -95,7 +95,7 @@ func TestRootCommand_Integration(t *testing.T) {
 				ContextService:    mocks.NewMockContextService(),
 				ShellService:      mocks.NewMockShellService(),
 			},
-			Config: &domain.Config{},
+			Config: &core.Config{},
 		}
 
 		rootCmd := cmd.NewRootCommand(config)
@@ -113,14 +113,14 @@ func TestCreateCommand_WithCdFlag(t *testing.T) {
 		mockCS := mocks.NewMockContextService()
 		mockPS := mocks.NewMockProjectService()
 
-		mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
-		mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*domain.Context")).Return(&domain.ProjectInfo{
+		mockCS.On("GetCurrentContext").Return(&core.Context{Type: core.ContextOutsideGit}, nil)
+		mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*core.Context")).Return(&core.ProjectInfo{
 			Name:        "test-project",
 			GitRepoPath: "/tmp/test-project",
 		}, nil)
 		mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-		mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
-			Worktree: &domain.WorktreeInfo{
+		mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*core.CreateWorktreeRequest")).Return(&core.CreateWorktreeResult{
+			Worktree: &core.WorktreeInfo{
 				Path:   "/tmp/test-project/feature-branch",
 				Branch: "feature-branch",
 			},
@@ -153,14 +153,14 @@ func TestCreateCommand_WithCdFlag(t *testing.T) {
 		mockCS := mocks.NewMockContextService()
 		mockPS := mocks.NewMockProjectService()
 
-		mockCS.On("GetCurrentContext").Return(&domain.Context{Type: domain.ContextOutsideGit}, nil)
-		mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*domain.Context")).Return(&domain.ProjectInfo{
+		mockCS.On("GetCurrentContext").Return(&core.Context{Type: core.ContextOutsideGit}, nil)
+		mockPS.On("DiscoverProject", mock.Anything, "test-project", mock.AnythingOfType("*core.Context")).Return(&core.ProjectInfo{
 			Name:        "test-project",
 			GitRepoPath: "/tmp/test-project",
 		}, nil)
 		mockWS.On("BranchExists", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-		mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*domain.CreateWorktreeRequest")).Return(&domain.CreateWorktreeResult{
-			Worktree: &domain.WorktreeInfo{
+		mockWS.On("CreateWorktree", mock.Anything, mock.AnythingOfType("*core.CreateWorktreeRequest")).Return(&core.CreateWorktreeResult{
+			Worktree: &core.WorktreeInfo{
 				Path:   "/tmp/test-project/feature-branch",
 				Branch: "feature-branch",
 			},
@@ -195,20 +195,20 @@ func TestDeleteCommand_WithCdFlag(t *testing.T) {
 		mockCS := mocks.NewMockContextService()
 		mockNS := mocks.NewMockNavigationService()
 
-		mockCS.On("GetCurrentContext").Return(&domain.Context{
-			Type:       domain.ContextWorktree,
+		mockCS.On("GetCurrentContext").Return(&core.Context{
+			Type:       core.ContextWorktree,
 			BranchName: "feature-branch",
 			Path:       "/tmp/test-project/feature-branch",
 		}, nil)
-		mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
+		mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&core.ResolutionResult{
 			ResolvedPath: "/tmp/test-project/feature-branch",
 		}, nil)
-		mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&domain.WorktreeStatus{IsClean: true}, nil)
-		mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&domain.WorktreeInfo{
+		mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&core.WorktreeStatus{IsClean: true}, nil)
+		mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&core.WorktreeInfo{
 			Branch: "feature-branch",
 		}, nil)
-		mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*domain.DeleteWorktreeRequest")).Return(nil)
-		mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*domain.ResolvePathRequest")).Return(&domain.ResolutionResult{
+		mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*core.DeleteWorktreeRequest")).Return(nil)
+		mockNS.On("ResolvePath", mock.Anything, mock.AnythingOfType("*core.ResolvePathRequest")).Return(&core.ResolutionResult{
 			ResolvedPath: "/tmp/test-project",
 		}, nil)
 
@@ -238,18 +238,18 @@ func TestDeleteCommand_WithCdFlag(t *testing.T) {
 		mockCS := mocks.NewMockContextService()
 		mockNS := mocks.NewMockNavigationService()
 
-		mockCS.On("GetCurrentContext").Return(&domain.Context{
-			Type: domain.ContextProject,
+		mockCS.On("GetCurrentContext").Return(&core.Context{
+			Type: core.ContextProject,
 			Path: "/tmp/test-project",
 		}, nil)
-		mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&domain.ResolutionResult{
+		mockCS.On("ResolveIdentifier", mock.AnythingOfType("string")).Return(&core.ResolutionResult{
 			ResolvedPath: "/tmp/test-project/feature-branch",
 		}, nil)
-		mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&domain.WorktreeStatus{IsClean: true}, nil)
-		mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&domain.WorktreeInfo{
+		mockWS.On("GetWorktreeStatus", mock.Anything, mock.AnythingOfType("string")).Return(&core.WorktreeStatus{IsClean: true}, nil)
+		mockWS.On("GetWorktreeByPath", mock.Anything, mock.Anything, mock.Anything).Return(&core.WorktreeInfo{
 			Branch: "feature-branch",
 		}, nil)
-		mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*domain.DeleteWorktreeRequest")).Return(nil)
+		mockWS.On("DeleteWorktree", mock.Anything, mock.AnythingOfType("*core.DeleteWorktreeRequest")).Return(nil)
 
 		config := &cmd.CommandConfig{
 			Services: &cmd.ServiceContainer{

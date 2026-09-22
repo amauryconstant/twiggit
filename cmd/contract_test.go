@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func TestCommandInterfaces_ContractCompliance(t *testing.T) {
@@ -57,7 +57,7 @@ func setupListCommand() *cobra.Command {
 			NavigationService: nil,
 			ContextService:    nil,
 		},
-		Config: domain.DefaultConfig(),
+		Config: core.DefaultConfig(),
 	}
 	return NewListCommand(config)
 }
@@ -71,7 +71,7 @@ func setupCreateCommand() *cobra.Command {
 			NavigationService: nil,
 			ContextService:    nil,
 		},
-		Config: domain.DefaultConfig(),
+		Config: core.DefaultConfig(),
 	}
 	return NewCreateCommand(config)
 }
@@ -85,7 +85,7 @@ func setupDeleteCommand() *cobra.Command {
 			NavigationService: nil,
 			ContextService:    nil,
 		},
-		Config: domain.DefaultConfig(),
+		Config: core.DefaultConfig(),
 	}
 	return NewDeleteCommand(config)
 }
@@ -99,7 +99,7 @@ func setupCDCommand() *cobra.Command {
 			NavigationService: nil,
 			ContextService:    nil,
 		},
-		Config: domain.DefaultConfig(),
+		Config: core.DefaultConfig(),
 	}
 	return NewCDCommand(config)
 }

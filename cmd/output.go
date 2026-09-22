@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"strings"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // OutputFormatter defines the interface for formatting worktree output
 type OutputFormatter interface {
-	FormatWorktrees(worktrees []*domain.WorktreeInfo) string
+	FormatWorktrees(worktrees []*core.WorktreeInfo) string
 }
 
 // TextFormatter implements text-based output formatting
 type TextFormatter struct{}
 
 // FormatWorktrees formats worktrees as human-readable text
-func (f *TextFormatter) FormatWorktrees(worktrees []*domain.WorktreeInfo) string {
+func (f *TextFormatter) FormatWorktrees(worktrees []*core.WorktreeInfo) string {
 	if len(worktrees) == 0 {
 		return "No worktrees found"
 	}
@@ -41,7 +41,7 @@ func (f *TextFormatter) FormatWorktrees(worktrees []*domain.WorktreeInfo) string
 type JSONFormatter struct{}
 
 // FormatWorktrees formats worktrees as compact JSON
-func (f *JSONFormatter) FormatWorktrees(worktrees []*domain.WorktreeInfo) string {
+func (f *JSONFormatter) FormatWorktrees(worktrees []*core.WorktreeInfo) string {
 	// Convert domain types to JSON-serializable types
 	worktreeList := WorktreeListJSON{
 		Worktrees: make([]WorktreeJSON, len(worktrees)),
@@ -78,7 +78,7 @@ type WorktreeListJSON struct {
 }
 
 // getStatus converts WorktreeInfo to a status string
-func getStatus(wt *domain.WorktreeInfo) string {
+func getStatus(wt *core.WorktreeInfo) string {
 	if wt.IsDetached {
 		return "detached"
 	}

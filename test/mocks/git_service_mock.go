@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/stretchr/testify/mock"
@@ -32,12 +32,12 @@ func (m *MockGoGitClient) OpenRepository(path string) (*git.Repository, error) {
 }
 
 // ListBranches mocks listing branches in a repository
-func (m *MockGoGitClient) ListBranches(ctx context.Context, repoPath string) ([]domain.BranchInfo, error) {
+func (m *MockGoGitClient) ListBranches(ctx context.Context, repoPath string) ([]core.BranchInfo, error) {
 	args := m.Called(ctx, repoPath)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]domain.BranchInfo), args.Error(1)
+	return args.Get(0).([]core.BranchInfo), args.Error(1)
 }
 
 // BranchExists mocks checking if a branch exists
@@ -47,9 +47,9 @@ func (m *MockGoGitClient) BranchExists(ctx context.Context, repoPath, branchName
 }
 
 // GetRepositoryStatus mocks getting repository status
-func (m *MockGoGitClient) GetRepositoryStatus(ctx context.Context, repoPath string) (domain.RepositoryStatus, error) {
+func (m *MockGoGitClient) GetRepositoryStatus(ctx context.Context, repoPath string) (core.RepositoryStatus, error) {
 	args := m.Called(ctx, repoPath)
-	return args.Get(0).(domain.RepositoryStatus), args.Error(1)
+	return args.Get(0).(core.RepositoryStatus), args.Error(1)
 }
 
 // ValidateRepository mocks validating a repository
@@ -59,30 +59,30 @@ func (m *MockGoGitClient) ValidateRepository(path string) error {
 }
 
 // GetRepositoryInfo mocks getting repository information
-func (m *MockGoGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*domain.GitRepository, error) {
+func (m *MockGoGitClient) GetRepositoryInfo(ctx context.Context, repoPath string) (*core.GitRepository, error) {
 	args := m.Called(ctx, repoPath)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*domain.GitRepository), args.Error(1)
+	return args.Get(0).(*core.GitRepository), args.Error(1)
 }
 
 // ListRemotes mocks listing repository remotes
-func (m *MockGoGitClient) ListRemotes(ctx context.Context, repoPath string) ([]domain.RemoteInfo, error) {
+func (m *MockGoGitClient) ListRemotes(ctx context.Context, repoPath string) ([]core.RemoteInfo, error) {
 	args := m.Called(ctx, repoPath)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]domain.RemoteInfo), args.Error(1)
+	return args.Get(0).([]core.RemoteInfo), args.Error(1)
 }
 
 // GetCommitInfo mocks getting commit information
-func (m *MockGoGitClient) GetCommitInfo(ctx context.Context, repoPath, commitHash string) (*domain.CommitInfo, error) {
+func (m *MockGoGitClient) GetCommitInfo(ctx context.Context, repoPath, commitHash string) (*core.CommitInfo, error) {
 	args := m.Called(ctx, repoPath, commitHash)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*domain.CommitInfo), args.Error(1)
+	return args.Get(0).(*core.CommitInfo), args.Error(1)
 }
 
 var _ application.CLIClient = (*MockCLIClient)(nil)
@@ -110,12 +110,12 @@ func (m *MockCLIClient) DeleteWorktree(ctx context.Context, repoPath, worktreePa
 }
 
 // ListWorktrees mocks listing worktrees in a repository
-func (m *MockCLIClient) ListWorktrees(ctx context.Context, repoPath string) ([]domain.WorktreeInfo, error) {
+func (m *MockCLIClient) ListWorktrees(ctx context.Context, repoPath string) ([]core.WorktreeInfo, error) {
 	args := m.Called(ctx, repoPath)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).([]domain.WorktreeInfo), args.Error(1)
+	return args.Get(0).([]core.WorktreeInfo), args.Error(1)
 }
 
 // PruneWorktrees mocks pruning worktrees in a repository

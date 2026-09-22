@@ -12,19 +12,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func TestContextDetector_ContextTypeString(t *testing.T) {
 	tests := []struct {
 		name     string
-		context  domain.ContextType
+		context  core.ContextType
 		expected string
 	}{
-		{"unknown", domain.ContextUnknown, "unknown"},
-		{"project", domain.ContextProject, "project"},
-		{"worktree", domain.ContextWorktree, "worktree"},
-		{"outside git", domain.ContextOutsideGit, "outside-git"},
+		{"unknown", core.ContextUnknown, "unknown"},
+		{"project", core.ContextProject, "project"},
+		{"worktree", core.ContextWorktree, "worktree"},
+		{"outside git", core.ContextOutsideGit, "outside-git"},
 	}
 
 	for _, tc := range tests {
@@ -37,12 +37,12 @@ func TestContextDetector_ContextTypeString(t *testing.T) {
 func TestContextDetector_PathTypeString(t *testing.T) {
 	tests := []struct {
 		name     string
-		pathType domain.PathType
+		pathType core.PathType
 		expected string
 	}{
-		{"project", domain.PathTypeProject, "project"},
-		{"worktree", domain.PathTypeWorktree, "worktree"},
-		{"invalid", domain.PathTypeInvalid, "invalid"},
+		{"project", core.PathTypeProject, "project"},
+		{"worktree", core.PathTypeWorktree, "worktree"},
+		{"invalid", core.PathTypeInvalid, "invalid"},
 	}
 
 	for _, tc := range tests {
@@ -56,7 +56,7 @@ func TestContextDetector_DetectContext(t *testing.T) {
 	tests := []struct {
 		name           string
 		setupFunc      func(t *testing.T) string
-		expectedType   domain.ContextType
+		expectedType   core.ContextType
 		expectedProj   string
 		expectedBranch string
 		expectError    bool
@@ -69,7 +69,7 @@ func TestContextDetector_DetectContext(t *testing.T) {
 				require.NoError(t, os.Mkdir(filepath.Join(dir, ".git"), 0755))
 				return dir
 			},
-			expectedType: domain.ContextProject,
+			expectedType: core.ContextProject,
 		},
 		{
 			name: "worktree context in worktree pattern",
@@ -84,7 +84,7 @@ func TestContextDetector_DetectContext(t *testing.T) {
 
 				return worktreeDir
 			},
-			expectedType:   domain.ContextWorktree,
+			expectedType:   core.ContextWorktree,
 			expectedProj:   "test-project",
 			expectedBranch: "feature-branch",
 		},
@@ -95,7 +95,7 @@ func TestContextDetector_DetectContext(t *testing.T) {
 				dir := t.TempDir()
 				return dir
 			},
-			expectedType: domain.ContextOutsideGit,
+			expectedType: core.ContextOutsideGit,
 		},
 		{
 			name: "empty directory path",
@@ -119,17 +119,17 @@ func TestContextDetector_DetectContext(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := tc.setupFunc(t)
 
-			var config *domain.Config
-			if tc.expectedType == domain.ContextWorktree {
+			var config *core.Config
+			if tc.expectedType == core.ContextWorktree {
 				baseDir := dir
 				for i := 0; i < 3; i++ {
 					baseDir = filepath.Dir(baseDir)
 				}
-				config = &domain.Config{
+				config = &core.Config{
 					WorktreesDirectory: filepath.Join(baseDir, "Worktrees"),
 				}
 			} else {
-				config = &domain.Config{
+				config = &core.Config{
 					WorktreesDirectory: filepath.Join(filepath.Dir(dir), "Worktrees"),
 				}
 			}
@@ -163,7 +163,7 @@ func TestContextDetector_WorktreePriority(t *testing.T) {
 	gitFile := filepath.Join(worktreeDir, ".git")
 	require.NoError(t, os.WriteFile(gitFile, []byte("gitdir: /path/to/git/dir"), 0644))
 
-	config := &domain.Config{
+	config := &core.Config{
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
 
@@ -172,7 +172,7 @@ func TestContextDetector_WorktreePriority(t *testing.T) {
 	ctx, err := detector.DetectContext(worktreeDir)
 
 	require.NoError(t, err)
-	assert.Equal(t, domain.ContextWorktree, ctx.Type)
+	assert.Equal(t, core.ContextWorktree, ctx.Type)
 	assert.Equal(t, "test-project", ctx.ProjectName)
 	assert.Equal(t, "main", ctx.BranchName)
 }
@@ -186,7 +186,7 @@ func TestContextDetector_ProjectTraversal(t *testing.T) {
 	gitDir := filepath.Join(tempDir, ".git")
 	require.NoError(t, os.Mkdir(gitDir, 0755))
 
-	config := &domain.Config{
+	config := &core.Config{
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
 
@@ -195,7 +195,7 @@ func TestContextDetector_ProjectTraversal(t *testing.T) {
 	ctx, err := detector.DetectContext(nestedDir)
 
 	require.NoError(t, err)
-	assert.Equal(t, domain.ContextProject, ctx.Type)
+	assert.Equal(t, core.ContextProject, ctx.Type)
 	assert.Equal(t, filepath.Base(tempDir), ctx.ProjectName)
 	assert.Equal(t, tempDir, ctx.Path)
 }
@@ -209,7 +209,7 @@ func TestContextDetector_InvalidWorktree(t *testing.T) {
 	gitDir := filepath.Join(worktreeDir, ".git")
 	require.NoError(t, os.Mkdir(gitDir, 0755))
 
-	config := &domain.Config{
+	config := &core.Config{
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
 
@@ -218,7 +218,7 @@ func TestContextDetector_InvalidWorktree(t *testing.T) {
 	ctx, err := detector.DetectContext(worktreeDir)
 
 	require.NoError(t, err)
-	assert.NotEqual(t, domain.ContextWorktree, ctx.Type)
+	assert.NotEqual(t, core.ContextWorktree, ctx.Type)
 }
 
 func TestContextDetector_CrossPlatform(t *testing.T) {
@@ -238,7 +238,7 @@ func testWindowsPaths(t *testing.T) {
 
 	tempDir := t.TempDir()
 
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  filepath.Join(tempDir, "Projects"),
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
@@ -253,7 +253,7 @@ func testWindowsPaths(t *testing.T) {
 
 	ctx, err := detector.DetectContext(projectDir)
 	require.NoError(t, err)
-	assert.Equal(t, domain.ContextProject, ctx.Type)
+	assert.Equal(t, core.ContextProject, ctx.Type)
 }
 
 func testUnixPaths(t *testing.T) {
@@ -261,7 +261,7 @@ func testUnixPaths(t *testing.T) {
 
 	tempDir := t.TempDir()
 
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  filepath.Join(tempDir, "Projects"),
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
@@ -276,19 +276,19 @@ func testUnixPaths(t *testing.T) {
 
 	ctx, err := detector.DetectContext(projectDir)
 	require.NoError(t, err)
-	assert.Equal(t, domain.ContextProject, ctx.Type)
+	assert.Equal(t, core.ContextProject, ctx.Type)
 }
 
 func TestContextDetectionError(t *testing.T) {
-	err := domain.NewContextDetectionError("/test/path", "test message", nil)
+	err := core.NewContextDetectionError("/test/path", "test message", nil)
 
-	assert.Equal(t, "context detection failed for /test/path: test message", err.Error())
+	assert.Equal(t, "context.detection: test message (entity: /test/path)", err.Error())
 	require.NoError(t, err.Unwrap())
 
 	originalErr := assert.AnError
-	err = domain.NewContextDetectionError("/test/path", "test message", originalErr)
+	err = core.NewContextDetectionError("/test/path", "test message", originalErr)
 
-	assert.Equal(t, "context detection failed for /test/path: test message", err.Error())
+	assert.Equal(t, "context.detection: test message (entity: /test/path): assert.AnError general error for testing", err.Error())
 	assert.Equal(t, originalErr, err.Unwrap())
 }
 
@@ -299,7 +299,7 @@ func TestNewContextDetector_CacheAllocatorFailure(t *testing.T) {
 	}
 
 	detector, err := newContextDetectorWithCacheFactory(
-		&domain.Config{WorktreesDirectory: "/tmp/wt"},
+		&core.Config{WorktreesDirectory: "/tmp/wt"},
 		failingFactory,
 	)
 	require.Error(t, err)
@@ -315,7 +315,7 @@ func TestNewContextDetector_CacheFactoryReceivesRequestedSize(t *testing.T) {
 	}
 
 	detector, err := newContextDetectorWithCacheFactory(
-		&domain.Config{WorktreesDirectory: "/tmp/wt"},
+		&core.Config{WorktreesDirectory: "/tmp/wt"},
 		captureFactory,
 	)
 	require.NoError(t, err)

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func setupHookRunnerTest(t *testing.T) (application.HookRunner, *MockCommandExecutor, string) {
@@ -27,7 +27,7 @@ func TestHookRunner_Run_NoConfigFile_ReturnsNotExecuted(t *testing.T) {
 	runner, _, _ := setupHookRunnerTest(t)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   "/tmp/worktree",
 		ConfigFilePath: "/nonexistent/.twiggit.toml",
 	}
@@ -48,7 +48,7 @@ func TestHookRunner_Run_EmptyConfigFile_ReturnsNotExecuted(t *testing.T) {
 	require.NoError(t, err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -77,7 +77,7 @@ commands = ["mise trust", "npm install"]
 	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Twice()
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ProjectName:    "test-project",
 		BranchName:     "feature",
@@ -119,7 +119,7 @@ commands = ["mise trust", "npm install", "echo done"]
 	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -146,7 +146,7 @@ commands = ["mise trust"]
 	require.NoError(t, err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -169,7 +169,7 @@ func TestHookRunner_Run_MissingCommandsArray_ReturnsNotExecuted(t *testing.T) {
 	require.NoError(t, err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -193,7 +193,7 @@ commands = []
 	require.NoError(t, err)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -224,7 +224,7 @@ commands = ["echo test"]
 	}).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil)
 
 	req := &application.HookRunRequest{
-		HookType:       domain.HookPostCreate,
+		HookType:       core.HookPostCreate,
 		WorktreePath:   "/worktree/path",
 		ProjectName:    "my-project",
 		BranchName:     "feature-branch",

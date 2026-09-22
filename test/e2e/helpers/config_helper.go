@@ -14,7 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/pelletier/go-toml"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 // ConfigHelper provides configuration management utilities for E2E tests
@@ -134,21 +134,21 @@ max_concurrent = 1
 		GinkgoT().Fatalf("Invalid TOML configuration: %v", err)
 	}
 
-	// Validate against domain.Config struct
-	config := &domain.Config{
+	// Validate against core.Config struct
+	config := &core.Config{
 		ProjectsDirectory:   c.projectsDir,
 		WorktreesDirectory:  c.worktreesDir,
 		DefaultSourceBranch: c.defaultBranch,
-		ContextDetection: domain.ContextDetectionConfig{
+		ContextDetection: core.ContextDetectionConfig{
 			CacheTTL:            "1m",
 			GitOperationTimeout: "10s",
 			EnableGitValidation: true,
 		},
-		Git: domain.GitConfig{
+		Git: core.GitConfig{
 			CLITimeout:   10,
 			CacheEnabled: false,
 		},
-		Services: domain.ServiceConfig{
+		Services: core.ServiceConfig{
 			CacheEnabled:  false,
 			CacheTTL:      time.Minute,
 			ConcurrentOps: false,

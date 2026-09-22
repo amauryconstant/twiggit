@@ -12,35 +12,35 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/test/mocks"
 )
 
 type stubRepoLocator struct {
-	dirs []domain.GitDir
+	dirs []core.GitDir
 	err  error
 }
 
-func (s *stubRepoLocator) FindGitRepositories(dir string) ([]domain.GitDir, error) {
+func (s *stubRepoLocator) FindGitRepositories(dir string) ([]core.GitDir, error) {
 	return s.dirs, s.err
 }
 
 func configureGitMock(goGit *mocks.MockGoGitClient, cli *mocks.MockCLIClient) {
 	goGit.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
-	goGit.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+	goGit.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&core.GitRepository{
 		Path:          "/path/to/project",
 		IsBare:        false,
 		DefaultBranch: "main",
-		Remotes:       []domain.RemoteInfo{},
-		Branches:      []domain.BranchInfo{},
-		Worktrees:     []domain.WorktreeInfo{},
-		Status:        domain.RepositoryStatus{},
+		Remotes:       []core.RemoteInfo{},
+		Branches:      []core.BranchInfo{},
+		Worktrees:     []core.WorktreeInfo{},
+		Status:        core.RepositoryStatus{},
 	}, nil).Maybe()
-	cli.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
+	cli.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]core.WorktreeInfo{}, nil)
 }
 
 func TestProjectService_DiscoverProject(t *testing.T) {
-	config := domain.DefaultConfig()
+	config := core.DefaultConfig()
 	goGit := mocks.NewMockGoGitClient()
 	cli := mocks.NewMockCLIClient()
 	configureGitMock(goGit, cli)
@@ -50,23 +50,23 @@ func TestProjectService_DiscoverProject(t *testing.T) {
 	tests := []struct {
 		name         string
 		projectName  string
-		context      *domain.Context
+		context      *core.Context
 		expectError  bool
 		errorMessage string
 	}{
 		{
 			name:        "valid project discovery",
 			projectName: "test-project",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 			},
 			expectError: false,
 		},
 		{
 			name:        "empty project name outside context",
 			projectName: "",
-			context: &domain.Context{
-				Type: domain.ContextOutsideGit,
+			context: &core.Context{
+				Type: core.ContextOutsideGit,
 			},
 			expectError:  true,
 			errorMessage: "project name required when outside git context",
@@ -74,8 +74,8 @@ func TestProjectService_DiscoverProject(t *testing.T) {
 		{
 			name:        "project discovery from project context",
 			projectName: "",
-			context: &domain.Context{
-				Type:        domain.ContextProject,
+			context: &core.Context{
+				Type:        core.ContextProject,
 				ProjectName: "project",
 				Path:        "/path/to/project",
 			},
@@ -105,7 +105,7 @@ func TestProjectService_DiscoverProject(t *testing.T) {
 }
 
 func TestProjectService_ValidateProject(t *testing.T) {
-	config := domain.DefaultConfig()
+	config := core.DefaultConfig()
 	goGit := mocks.NewMockGoGitClient()
 	cli := mocks.NewMockCLIClient()
 	configureGitMock(goGit, cli)
@@ -150,12 +150,12 @@ func TestProjectService_ListProjects(t *testing.T) {
 	projectDir := filepath.Join(tempDir, "demo")
 	require.NoError(t, os.MkdirAll(projectDir, 0755))
 
-	config := &domain.Config{ProjectsDirectory: tempDir}
+	config := &core.Config{ProjectsDirectory: tempDir}
 	goGit := mocks.NewMockGoGitClient()
 	cli := mocks.NewMockCLIClient()
 	configureGitMock(goGit, cli)
 	repoLocator := &stubRepoLocator{
-		dirs: []domain.GitDir{{Name: "demo", Path: projectDir}},
+		dirs: []core.GitDir{{Name: "demo", Path: projectDir}},
 	}
 	service := NewProjectService(goGit, cli, repoLocator, config)
 
@@ -167,7 +167,7 @@ func TestProjectService_ListProjects(t *testing.T) {
 }
 
 func TestProjectService_GetProjectInfo(t *testing.T) {
-	config := domain.DefaultConfig()
+	config := core.DefaultConfig()
 	goGit := mocks.NewMockGoGitClient()
 	cli := mocks.NewMockCLIClient()
 	configureGitMock(goGit, cli)
@@ -217,7 +217,7 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 		projectName    string
 		expectError    bool
 		errorMessage   string
-		validateResult func(*testing.T, *domain.ProjectInfo)
+		validateResult func(*testing.T, *core.ProjectInfo)
 	}{
 		{
 			name: "directory not found error",
@@ -225,7 +225,7 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 				t.Helper()
 				tempDir := t.TempDir()
 				projectsDir := filepath.Join(tempDir, "nonexistent")
-				config := &domain.Config{
+				config := &core.Config{
 					ProjectsDirectory: projectsDir,
 				}
 				service := &projectService{
@@ -251,22 +251,22 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 				gitDir := filepath.Join(projectPath, ".git")
 				require.NoError(t, os.Mkdir(gitDir, 0755))
 
-				config := &domain.Config{
+				config := &core.Config{
 					ProjectsDirectory: projectsDir,
 				}
 				goGit := mocks.NewMockGoGitClient()
 				cli := mocks.NewMockCLIClient()
 				goGit.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
-				goGit.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+				goGit.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&core.GitRepository{
 					Path:          "/path/to/project",
 					IsBare:        false,
 					DefaultBranch: "main",
-					Remotes:       []domain.RemoteInfo{},
-					Branches:      []domain.BranchInfo{},
-					Worktrees:     []domain.WorktreeInfo{},
-					Status:        domain.RepositoryStatus{},
+					Remotes:       []core.RemoteInfo{},
+					Branches:      []core.BranchInfo{},
+					Worktrees:     []core.WorktreeInfo{},
+					Status:        core.RepositoryStatus{},
 				}, nil)
-				cli.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
+				cli.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]core.WorktreeInfo{}, nil)
 
 				service := &projectService{
 					goGit:  goGit,
@@ -277,7 +277,7 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 			},
 			projectName: "TestProject",
 			expectError: false,
-			validateResult: func(t *testing.T, result *domain.ProjectInfo) {
+			validateResult: func(t *testing.T, result *core.ProjectInfo) {
 				t.Helper()
 				assert.Equal(t, "testproject", result.Name)
 			},
@@ -296,22 +296,22 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 				gitDir := filepath.Join(projectPath, ".git")
 				require.NoError(t, os.Mkdir(gitDir, 0755))
 
-				config := &domain.Config{
+				config := &core.Config{
 					ProjectsDirectory: projectsDir,
 				}
 				goGit := mocks.NewMockGoGitClient()
 				cli := mocks.NewMockCLIClient()
 				goGit.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
-				goGit.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+				goGit.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&core.GitRepository{
 					Path:          "/path/to/project",
 					IsBare:        false,
 					DefaultBranch: "main",
-					Remotes:       []domain.RemoteInfo{},
-					Branches:      []domain.BranchInfo{},
-					Worktrees:     []domain.WorktreeInfo{},
-					Status:        domain.RepositoryStatus{},
+					Remotes:       []core.RemoteInfo{},
+					Branches:      []core.BranchInfo{},
+					Worktrees:     []core.WorktreeInfo{},
+					Status:        core.RepositoryStatus{},
 				}, nil)
-				cli.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
+				cli.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]core.WorktreeInfo{}, nil)
 
 				service := &projectService{
 					goGit:  goGit,
@@ -322,7 +322,7 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 			},
 			projectName: "myproject",
 			expectError: false,
-			validateResult: func(t *testing.T, result *domain.ProjectInfo) {
+			validateResult: func(t *testing.T, result *core.ProjectInfo) {
 				t.Helper()
 				assert.Equal(t, "myproject", result.Name)
 			},
@@ -343,22 +343,22 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 					require.NoError(t, os.Mkdir(gitDir, 0755))
 				}
 
-				config := &domain.Config{
+				config := &core.Config{
 					ProjectsDirectory: projectsDir,
 				}
 				goGit := mocks.NewMockGoGitClient()
 				cli := mocks.NewMockCLIClient()
 				goGit.On("ValidateRepository", mock.AnythingOfType("string")).Return(nil)
-				goGit.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&domain.GitRepository{
+				goGit.On("GetRepositoryInfo", mock.Anything, mock.AnythingOfType("string")).Return(&core.GitRepository{
 					Path:          "/path/to/project",
 					IsBare:        false,
 					DefaultBranch: "main",
-					Remotes:       []domain.RemoteInfo{},
-					Branches:      []domain.BranchInfo{},
-					Worktrees:     []domain.WorktreeInfo{},
-					Status:        domain.RepositoryStatus{},
+					Remotes:       []core.RemoteInfo{},
+					Branches:      []core.BranchInfo{},
+					Worktrees:     []core.WorktreeInfo{},
+					Status:        core.RepositoryStatus{},
 				}, nil)
-				cli.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]domain.WorktreeInfo{}, nil)
+				cli.On("ListWorktrees", mock.Anything, mock.AnythingOfType("string")).Return([]core.WorktreeInfo{}, nil)
 
 				service := &projectService{
 					goGit:  goGit,
@@ -369,7 +369,7 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 			},
 			projectName: "aproject",
 			expectError: false,
-			validateResult: func(t *testing.T, result *domain.ProjectInfo) {
+			validateResult: func(t *testing.T, result *core.ProjectInfo) {
 				t.Helper()
 				assert.Equal(t, "aproject", result.Name)
 			},
@@ -382,7 +382,7 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 				projectsDir := filepath.Join(tempDir, "projects")
 				require.NoError(t, os.Mkdir(projectsDir, 0755))
 
-				config := &domain.Config{
+				config := &core.Config{
 					ProjectsDirectory: projectsDir,
 				}
 
@@ -404,7 +404,7 @@ func TestProjectService_SearchProjectByName(t *testing.T) {
 
 				require.NoError(t, os.WriteFile(projectsDir, []byte("not a directory"), 0644))
 
-				config := &domain.Config{
+				config := &core.Config{
 					ProjectsDirectory: projectsDir,
 				}
 

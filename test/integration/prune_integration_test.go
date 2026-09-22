@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"twiggit/internal/application"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
 	"twiggit/test/mocks"
@@ -62,8 +62,8 @@ func (s *PruneIntegrationTestSuite) setupTestRepo(projectName string) (repoPath 
 }
 
 func (s *PruneIntegrationTestSuite) createWorktreeService(repoPath string) application.WorktreeService {
-	config := domain.DefaultConfig()
-	projectInfo := &domain.ProjectInfo{
+	config := core.DefaultConfig()
+	projectInfo := &core.ProjectInfo{
 		Name:        "test-project",
 		Path:        repoPath,
 		GitRepoPath: repoPath,
@@ -71,8 +71,8 @@ func (s *PruneIntegrationTestSuite) createWorktreeService(repoPath string) appli
 	mockProjectService := mocks.NewMockProjectService()
 	mockProjectService.On("DiscoverProject", context.Background(), "test-project", mock.Anything).Return(projectInfo, nil)
 	mockProjectService.On("GetProjectInfo", context.Background(), repoPath).Return(projectInfo, nil)
-	mockProjectService.On("ListProjects", context.Background()).Return([]*domain.ProjectInfo{projectInfo}, nil)
-	mockProjectService.On("ListProjectSummaries", context.Background()).Return([]*domain.ProjectSummary{{
+	mockProjectService.On("ListProjects", context.Background()).Return([]*core.ProjectInfo{projectInfo}, nil)
+	mockProjectService.On("ListProjectSummaries", context.Background()).Return([]*core.ProjectSummary{{
 		Name:        projectInfo.Name,
 		Path:        projectInfo.Path,
 		GitRepoPath: projectInfo.GitRepoPath,
@@ -138,8 +138,8 @@ func (s *PruneIntegrationTestSuite) TestPruneMergedWorktrees_DryRun() {
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         true,
 		Force:          false,
 		DeleteBranches: false,
@@ -196,8 +196,8 @@ func (s *PruneIntegrationTestSuite) TestPruneMergedWorktrees_FullLifecycle() {
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         false,
 		Force:          false,
 		DeleteBranches: false,
@@ -232,8 +232,8 @@ func (s *PruneIntegrationTestSuite) TestPruneMergedWorktrees_WithDeleteBranches(
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         false,
 		Force:          false,
 		DeleteBranches: true,
@@ -270,8 +270,8 @@ func (s *PruneIntegrationTestSuite) TestProtectedBranch_Skipped() {
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         false,
 		Force:          true,
 		DeleteBranches: true,
@@ -305,8 +305,8 @@ func (s *PruneIntegrationTestSuite) TestMergeStatus_UnmergedSkipped() {
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         false,
 		Force:          true,
 		DeleteBranches: false,
@@ -324,9 +324,9 @@ func (s *PruneIntegrationTestSuite) TestPruneErrorHandling_InvalidWorktreeFormat
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
+	req := &core.PruneWorktreesRequest{
 		SpecificWorktree: "invalid-format",
-		Context:          &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+		Context:          &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 	}
 
 	result, err := worktreeService.PruneMergedWorktrees(context.Background(), req)
@@ -336,14 +336,14 @@ func (s *PruneIntegrationTestSuite) TestPruneErrorHandling_InvalidWorktreeFormat
 }
 
 func (s *PruneIntegrationTestSuite) TestPruneConfig_DefaultProtectedBranches() {
-	config := domain.DefaultConfig()
+	config := core.DefaultConfig()
 	s.Contains(config.Validation.ProtectedBranches, "main")
 	s.Contains(config.Validation.ProtectedBranches, "master")
 	s.Contains(config.Validation.ProtectedBranches, "develop")
 }
 
 func (s *PruneIntegrationTestSuite) TestPruneConfig_CustomProtectedBranches() {
-	config := domain.DefaultConfig()
+	config := core.DefaultConfig()
 	config.Validation.ProtectedBranches = []string{"main", "custom-protected"}
 
 	s.Contains(config.Validation.ProtectedBranches, "main")
@@ -372,8 +372,8 @@ func (s *PruneIntegrationTestSuite) TestUncommittedChanges_SkippedWithoutForce()
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         false,
 		Force:          false,
 		DeleteBranches: false,
@@ -419,8 +419,8 @@ func (s *PruneIntegrationTestSuite) TestUncommittedChanges_ForceBypasses() {
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         false,
 		Force:          true,
 		DeleteBranches: false,
@@ -460,8 +460,8 @@ func (s *PruneIntegrationTestSuite) TestCurrentWorktree_Skipped() {
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         false,
 		Force:          true,
 		DeleteBranches: false,
@@ -495,9 +495,9 @@ func (s *PruneIntegrationTestSuite) TestNavigationOutput_SingleWorktreePrune() {
 	err = s.cliClient.CreateWorktree(context.Background(), repoPath, "feature-nav", "main", worktreePath)
 	s.Require().NoError(err)
 
-	config := domain.DefaultConfig()
+	config := core.DefaultConfig()
 	config.ProjectsDirectory = tempDir
-	projectInfo := &domain.ProjectInfo{
+	projectInfo := &core.ProjectInfo{
 		Name:        "test-repo",
 		Path:        repoPath,
 		GitRepoPath: repoPath,
@@ -505,8 +505,8 @@ func (s *PruneIntegrationTestSuite) TestNavigationOutput_SingleWorktreePrune() {
 	mockProjectService := mocks.NewMockProjectService()
 	mockProjectService.On("DiscoverProject", context.Background(), "test-repo", mock.Anything).Return(projectInfo, nil)
 	mockProjectService.On("GetProjectInfo", context.Background(), repoPath).Return(projectInfo, nil)
-	mockProjectService.On("ListProjects", context.Background()).Return([]*domain.ProjectInfo{projectInfo}, nil)
-	mockProjectService.On("ListProjectSummaries", context.Background()).Return([]*domain.ProjectSummary{{
+	mockProjectService.On("ListProjects", context.Background()).Return([]*core.ProjectInfo{projectInfo}, nil)
+	mockProjectService.On("ListProjectSummaries", context.Background()).Return([]*core.ProjectSummary{{
 		Name:        projectInfo.Name,
 		Path:        projectInfo.Path,
 		GitRepoPath: projectInfo.GitRepoPath,
@@ -514,9 +514,9 @@ func (s *PruneIntegrationTestSuite) TestNavigationOutput_SingleWorktreePrune() {
 	mockProjectService.On("ValidateProject", context.Background(), repoPath).Return(nil)
 	worktreeService := service.NewWorktreeService(s.goGitClient, s.cliClient, mockProjectService, config, nil)
 
-	req := &domain.PruneWorktreesRequest{
+	req := &core.PruneWorktreesRequest{
 		SpecificWorktree: "test-repo/feature-nav",
-		Context:          &domain.Context{Type: domain.ContextProject, ProjectName: "test-repo", Path: repoPath},
+		Context:          &core.Context{Type: core.ContextProject, ProjectName: "test-repo", Path: repoPath},
 		DryRun:           false,
 		Force:            false,
 		DeleteBranches:   false,
@@ -563,8 +563,8 @@ func (s *PruneIntegrationTestSuite) TestOperationSummary_CorrectTotals() {
 
 	worktreeService := s.createWorktreeService(repoPath)
 
-	req := &domain.PruneWorktreesRequest{
-		Context:        &domain.Context{Type: domain.ContextProject, ProjectName: "test-project", Path: repoPath},
+	req := &core.PruneWorktreesRequest{
+		Context:        &core.Context{Type: core.ContextProject, ProjectName: "test-project", Path: repoPath},
 		DryRun:         false,
 		Force:          true,
 		DeleteBranches: true,

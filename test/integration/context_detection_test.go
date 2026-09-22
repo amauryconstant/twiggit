@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 	"twiggit/internal/infrastructure"
 	"twiggit/internal/service"
 )
@@ -23,14 +23,14 @@ func TestContextDetector_Integration(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		setupFunc      func(*testing.T, *domain.Config) string
-		expectedType   domain.ContextType
+		setupFunc      func(*testing.T, *core.Config) string
+		expectedType   core.ContextType
 		expectedProj   string
 		expectedBranch string
 	}{
 		{
 			name: "real git repository detection",
-			setupFunc: func(t *testing.T, config *domain.Config) string {
+			setupFunc: func(t *testing.T, config *core.Config) string {
 				t.Helper()
 				repoDir := filepath.Join(config.ProjectsDirectory, "test-repo")
 				require.NoError(t, os.MkdirAll(repoDir, 0755))
@@ -42,12 +42,12 @@ func TestContextDetector_Integration(t *testing.T) {
 
 				return repoDir
 			},
-			expectedType: domain.ContextProject,
+			expectedType: core.ContextProject,
 			expectedProj: "test-repo",
 		},
 		{
 			name: "real git worktree detection",
-			setupFunc: func(t *testing.T, config *domain.Config) string {
+			setupFunc: func(t *testing.T, config *core.Config) string {
 				t.Helper()
 				// Setup main repository
 				mainRepo := filepath.Join(config.ProjectsDirectory, "main-repo")
@@ -86,7 +86,7 @@ func TestContextDetector_Integration(t *testing.T) {
 
 				return worktreeDir
 			},
-			expectedType:   domain.ContextWorktree,
+			expectedType:   core.ContextWorktree,
 			expectedProj:   "main-repo",
 			expectedBranch: "feature-branch",
 		},
@@ -95,7 +95,7 @@ func TestContextDetector_Integration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
-			config := &domain.Config{
+			config := &core.Config{
 				ProjectsDirectory:  filepath.Join(tempDir, "Projects"),
 				WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 			}
@@ -121,7 +121,7 @@ func TestContextResolver_Integration(t *testing.T) {
 	}
 
 	tempDir := t.TempDir()
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  filepath.Join(tempDir, "Projects"),
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
@@ -172,14 +172,14 @@ func TestContextResolver_Integration(t *testing.T) {
 	// Test resolving "main" from project context
 	result, err := resolver.ResolveIdentifier(projectCtx, "main")
 	require.NoError(t, err)
-	assert.Equal(t, domain.PathTypeProject, result.Type)
+	assert.Equal(t, core.PathTypeProject, result.Type)
 	assert.Equal(t, "test-project", result.ProjectName)
 	assert.Equal(t, mainRepo, result.ResolvedPath)
 
 	// Test resolving branch name from project context
 	result, err = resolver.ResolveIdentifier(projectCtx, "feature-branch")
 	require.NoError(t, err)
-	assert.Equal(t, domain.PathTypeWorktree, result.Type)
+	assert.Equal(t, core.PathTypeWorktree, result.Type)
 	assert.Equal(t, "test-project", result.ProjectName)
 	assert.Equal(t, "feature-branch", result.BranchName)
 	assert.Equal(t, worktreeDir, result.ResolvedPath)
@@ -191,7 +191,7 @@ func TestContextResolver_Integration(t *testing.T) {
 	// Test resolving "main" from worktree context
 	result, err = resolver.ResolveIdentifier(worktreeCtx, "main")
 	require.NoError(t, err)
-	assert.Equal(t, domain.PathTypeProject, result.Type)
+	assert.Equal(t, core.PathTypeProject, result.Type)
 	assert.Equal(t, "test-project", result.ProjectName)
 	assert.Equal(t, mainRepo, result.ResolvedPath)
 }
@@ -202,7 +202,7 @@ func TestContextService_Integration(t *testing.T) {
 	}
 
 	tempDir := t.TempDir()
-	config := &domain.Config{
+	config := &core.Config{
 		ProjectsDirectory:  filepath.Join(tempDir, "Projects"),
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
 	}
@@ -257,13 +257,13 @@ func TestContextService_Integration(t *testing.T) {
 	// Test getting current context
 	ctx, err := contextService.GetCurrentContext()
 	require.NoError(t, err)
-	assert.Equal(t, domain.ContextProject, ctx.Type)
+	assert.Equal(t, core.ContextProject, ctx.Type)
 	assert.Equal(t, "service-test", ctx.ProjectName)
 
 	// Test resolving identifier from current context
 	result, err := contextService.ResolveIdentifier("main")
 	require.NoError(t, err)
-	assert.Equal(t, domain.PathTypeProject, result.Type)
+	assert.Equal(t, core.PathTypeProject, result.Type)
 	assert.Equal(t, "service-test", result.ProjectName)
 	assert.Equal(t, repoDir, result.ResolvedPath)
 

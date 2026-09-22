@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"twiggit/internal/domain"
+	"twiggit/internal/core"
 )
 
 func TestSuggestions_SortSuggestions(t *testing.T) {
@@ -13,12 +13,12 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		suggestions   []*domain.ResolutionSuggestion
+		suggestions   []*core.ResolutionSuggestion
 		expectedOrder []string
 	}{
 		{
 			name: "current worktree first, default branch second, alphabetical rest",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "feature-branch", IsCurrent: false},
 				{Text: "develop", IsCurrent: false},
 				{Text: "main", IsCurrent: false},
@@ -29,7 +29,7 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 		},
 		{
 			name: "multiple current worktrees (only one should be current)",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "feature-a", IsCurrent: false},
 				{Text: "current", IsCurrent: true},
 				{Text: "main", IsCurrent: false},
@@ -38,7 +38,7 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 		},
 		{
 			name: "no current worktree - default branch first",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "feature-branch", IsCurrent: false},
 				{Text: "develop", IsCurrent: false},
 				{Text: "main", IsCurrent: false},
@@ -48,7 +48,7 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 		},
 		{
 			name: "no default branch - alphabetical only",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "feature-branch", IsCurrent: false},
 				{Text: "develop", IsCurrent: false},
 				{Text: "bugfix", IsCurrent: false},
@@ -57,19 +57,19 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 		},
 		{
 			name:          "empty suggestions",
-			suggestions:   []*domain.ResolutionSuggestion{},
+			suggestions:   []*core.ResolutionSuggestion{},
 			expectedOrder: []string{},
 		},
 		{
 			name: "single suggestion",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "main", IsCurrent: false},
 			},
 			expectedOrder: []string{"main"},
 		},
 		{
 			name: "current worktree is also default branch - current takes precedence",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "feature", IsCurrent: false},
 				{Text: "main", IsCurrent: true},
 			},
@@ -77,7 +77,7 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 		},
 		{
 			name: "custom default branch (develop)",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "feature", IsCurrent: false},
 				{Text: "main", IsCurrent: false},
 				{Text: "develop", IsCurrent: false},
@@ -86,7 +86,7 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 		},
 		{
 			name: "all worktrees are current (edge case - shouldn't happen but test stability)",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "a", IsCurrent: true},
 				{Text: "b", IsCurrent: true},
 				{Text: "c", IsCurrent: true},
@@ -95,7 +95,7 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 		},
 		{
 			name: "no current worktrees - default branch second",
-			suggestions: []*domain.ResolutionSuggestion{
+			suggestions: []*core.ResolutionSuggestion{
 				{Text: "feature", IsCurrent: false},
 				{Text: "main", IsCurrent: false},
 				{Text: "develop", IsCurrent: false},
@@ -106,7 +106,7 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			suggestions := make([]*domain.ResolutionSuggestion, len(tt.suggestions))
+			suggestions := make([]*core.ResolutionSuggestion, len(tt.suggestions))
 			copy(suggestions, tt.suggestions)
 
 			testDefaultBranch := defaultBranch
@@ -129,7 +129,7 @@ func TestSuggestions_SortSuggestions(t *testing.T) {
 func TestSuggestions_GetCompletionTimeout(t *testing.T) {
 	tests := []struct {
 		name     string
-		config   *domain.Config
+		config   *core.Config
 		expected string
 	}{
 		{
@@ -139,8 +139,8 @@ func TestSuggestions_GetCompletionTimeout(t *testing.T) {
 		},
 		{
 			name: "empty timeout returns default",
-			config: &domain.Config{
-				Completion: domain.CompletionConfig{
+			config: &core.Config{
+				Completion: core.CompletionConfig{
 					Timeout: "",
 				},
 			},
@@ -148,8 +148,8 @@ func TestSuggestions_GetCompletionTimeout(t *testing.T) {
 		},
 		{
 			name: "valid custom timeout",
-			config: &domain.Config{
-				Completion: domain.CompletionConfig{
+			config: &core.Config{
+				Completion: core.CompletionConfig{
 					Timeout: "1s",
 				},
 			},
@@ -157,8 +157,8 @@ func TestSuggestions_GetCompletionTimeout(t *testing.T) {
 		},
 		{
 			name: "invalid timeout falls back to default",
-			config: &domain.Config{
-				Completion: domain.CompletionConfig{
+			config: &core.Config{
+				Completion: core.CompletionConfig{
 					Timeout: "invalid",
 				},
 			},
@@ -177,7 +177,7 @@ func TestSuggestions_GetCompletionTimeout(t *testing.T) {
 func TestSuggestions_SuggestionsToCarapaceAction(t *testing.T) {
 	tests := []struct {
 		name                 string
-		suggestions          []*domain.ResolutionSuggestion
+		suggestions          []*core.ResolutionSuggestion
 		defaultBranch        string
 		expectProjects       bool
 		expectBranches       bool
@@ -186,16 +186,16 @@ func TestSuggestions_SuggestionsToCarapaceAction(t *testing.T) {
 	}{
 		{
 			name:           "empty suggestions returns empty action",
-			suggestions:    []*domain.ResolutionSuggestion{},
+			suggestions:    []*core.ResolutionSuggestion{},
 			defaultBranch:  "main",
 			expectProjects: false,
 			expectBranches: false,
 		},
 		{
 			name: "only projects - separated correctly",
-			suggestions: []*domain.ResolutionSuggestion{
-				{Text: "project1", Type: domain.PathTypeProject, BranchName: "", Description: "Project directory"},
-				{Text: "project2", Type: domain.PathTypeProject, BranchName: "", Description: "Project directory"},
+			suggestions: []*core.ResolutionSuggestion{
+				{Text: "project1", Type: core.PathTypeProject, BranchName: "", Description: "Project directory"},
+				{Text: "project2", Type: core.PathTypeProject, BranchName: "", Description: "Project directory"},
 			},
 			defaultBranch:        "main",
 			expectProjects:       true,
@@ -204,9 +204,9 @@ func TestSuggestions_SuggestionsToCarapaceAction(t *testing.T) {
 		},
 		{
 			name: "only branches - separated correctly",
-			suggestions: []*domain.ResolutionSuggestion{
-				{Text: "main", Type: domain.PathTypeWorktree, BranchName: "main", Description: "Worktree"},
-				{Text: "develop", Type: domain.PathTypeWorktree, BranchName: "develop", Description: "Worktree"},
+			suggestions: []*core.ResolutionSuggestion{
+				{Text: "main", Type: core.PathTypeWorktree, BranchName: "main", Description: "Worktree"},
+				{Text: "develop", Type: core.PathTypeWorktree, BranchName: "develop", Description: "Worktree"},
 			},
 			defaultBranch:       "main",
 			expectProjects:      false,
@@ -215,11 +215,11 @@ func TestSuggestions_SuggestionsToCarapaceAction(t *testing.T) {
 		},
 		{
 			name: "mixed projects and branches - both separated",
-			suggestions: []*domain.ResolutionSuggestion{
-				{Text: "project1", Type: domain.PathTypeProject, BranchName: "", Description: "Project directory"},
-				{Text: "main", Type: domain.PathTypeWorktree, BranchName: "main", Description: "Worktree"},
-				{Text: "project2", Type: domain.PathTypeProject, BranchName: "", Description: "Project directory"},
-				{Text: "develop", Type: domain.PathTypeWorktree, BranchName: "develop", Description: "Worktree"},
+			suggestions: []*core.ResolutionSuggestion{
+				{Text: "project1", Type: core.PathTypeProject, BranchName: "", Description: "Project directory"},
+				{Text: "main", Type: core.PathTypeWorktree, BranchName: "main", Description: "Worktree"},
+				{Text: "project2", Type: core.PathTypeProject, BranchName: "", Description: "Project directory"},
+				{Text: "develop", Type: core.PathTypeWorktree, BranchName: "develop", Description: "Worktree"},
 			},
 			defaultBranch:        "main",
 			expectProjects:       true,
@@ -229,8 +229,8 @@ func TestSuggestions_SuggestionsToCarapaceAction(t *testing.T) {
 		},
 		{
 			name: "project with branch name (cross-project) treated as branch",
-			suggestions: []*domain.ResolutionSuggestion{
-				{Text: "project1/main", Type: domain.PathTypeProject, BranchName: "main", Description: "Cross-project"},
+			suggestions: []*core.ResolutionSuggestion{
+				{Text: "project1/main", Type: core.PathTypeProject, BranchName: "main", Description: "Cross-project"},
 			},
 			defaultBranch:       "main",
 			expectProjects:      false,
@@ -248,7 +248,7 @@ func TestSuggestions_SuggestionsToCarapaceAction(t *testing.T) {
 }
 
 func TestSuggestions_SmartSortingPreservesDescription(t *testing.T) {
-	suggestions := []*domain.ResolutionSuggestion{
+	suggestions := []*core.ResolutionSuggestion{
 		{Text: "feature", IsCurrent: false, Description: "Feature branch"},
 		{Text: "main", IsCurrent: false, Description: "Default branch"},
 		{Text: "current", IsCurrent: true, Description: "Current worktree"},
@@ -266,7 +266,7 @@ func TestSuggestions_SmartSortingPreservesDescription(t *testing.T) {
 }
 
 func TestSuggestions_SmartSortingWithDirtyIndicator(t *testing.T) {
-	suggestions := []*domain.ResolutionSuggestion{
+	suggestions := []*core.ResolutionSuggestion{
 		{Text: "clean-branch", IsCurrent: false, IsDirty: false},
 		{Text: "dirty-branch", IsCurrent: true, IsDirty: true},
 		{Text: "main", IsCurrent: false, IsDirty: false},
