@@ -10,18 +10,15 @@ import (
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
-	"twiggit/internal/infrastructure"
 	"twiggit/test/mocks"
 )
 
 func setupShellService() (application.ShellService, *domain.Config) {
 	config := domain.DefaultConfig()
 
-	realShellInfra := infrastructure.NewShellInfrastructure()
-
-	bashWrapper, _ := realShellInfra.GenerateWrapper(domain.ShellBash)
-	zshWrapper, _ := realShellInfra.GenerateWrapper(domain.ShellZsh)
-	fishWrapper, _ := realShellInfra.GenerateWrapper(domain.ShellFish)
+	bashWrapper, _ := domain.ShellWrapper(domain.ShellBash)
+	zshWrapper, _ := domain.ShellWrapper(domain.ShellZsh)
+	fishWrapper, _ := domain.ShellWrapper(domain.ShellFish)
 
 	shellInfra := mocks.NewMockShellInfrastructure()
 	shellInfra.On("GenerateWrapper", domain.ShellBash).Return(bashWrapper, nil)

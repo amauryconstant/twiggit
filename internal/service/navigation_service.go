@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 
@@ -52,7 +53,7 @@ func (s *navigationService) ValidatePath(_ context.Context, path string) error {
 	}
 
 	// Check if path exists
-	if _, err := os.Stat(path); os.IsNotExist(err) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		return domain.NewNavigationServiceError(path, "", "ValidatePath", "path does not exist", nil)
 	}
 

@@ -2,38 +2,38 @@ package service
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"twiggit/internal/application"
 	"twiggit/internal/domain"
-	"twiggit/internal/infrastructure"
 )
 
 var _ application.ProjectService = (*projectService)(nil)
 
-// projectService implements ProjectService interface
 type projectService struct {
-	gitService     application.GitClient
-	contextService application.ContextService
-	config         *domain.Config
+	goGit       application.GoGitClient
+	cli         application.CLIClient
+	repoLocator application.RepoLocator
+	config      *domain.Config
 }
 
-// NewProjectService creates a new ProjectService instance
 func NewProjectService(
-	gitService application.GitClient,
-	contextService application.ContextService,
+	goGit application.GoGitClient,
+	cli application.CLIClient,
+	repoLocator application.RepoLocator,
 	config *domain.Config,
 ) application.ProjectService {
 	return &projectService{
-		gitService:     gitService,
-		contextService: contextService,
-		config:         config,
+		goGit:       goGit,
+		cli:         cli,
+		repoLocator: repoLocator,
+		config:      config,
 	}
 }
 
-// DiscoverProject discovers a project by name or from context
 func (s *projectService) DiscoverProject(ctx context.Context, projectName string, context *domain.Context) (*domain.ProjectInfo, error) {
 	if projectName != "" {
 		return s.discoverProjectByName(ctx, projectName, context)
@@ -46,14 +46,12 @@ func (s *projectService) DiscoverProject(ctx context.Context, projectName string
 	return nil, domain.NewValidationError("DiscoverProject", "projectName", "", "project name required when outside git context")
 }
 
-// ValidateProject validates that a project is properly configured
 func (s *projectService) ValidateProject(_ context.Context, projectPath string) error {
 	if projectPath == "" {
 		return domain.NewValidationError("ValidateProject", "projectPath", "", "project path cannot be empty")
 	}
 
-	// Validate that path contains a git repository
-	err := s.gitService.ValidateRepository(projectPath)
+	err := s.goGit.ValidateRepository(projectPath)
 	if err != nil {
 		return domain.NewProjectServiceError("", projectPath, "ValidateProject", "invalid git repository", err)
 	}
@@ -61,11 +59,10 @@ func (s *projectService) ValidateProject(_ context.Context, projectPath string) 
 	return nil
 }
 
-// ListProjects lists all available projects with full info (including worktrees)
 func (s *projectService) ListProjects(ctx context.Context) ([]*domain.ProjectInfo, error) {
 	projectsDir := s.config.ProjectsDirectory
 
-	gitDirs, err := infrastructure.FindGitRepositories(projectsDir, s.gitService)
+	gitDirs, err := s.repoLocator.FindGitRepositories(projectsDir)
 	if err != nil {
 		return nil, domain.NewProjectServiceError("", projectsDir, "ListProjects", "failed to scan for git repositories", err)
 	}
@@ -83,11 +80,10 @@ func (s *projectService) ListProjects(ctx context.Context) ([]*domain.ProjectInf
 	return projects, nil
 }
 
-// ListProjectSummaries lists project names/paths without loading worktrees
 func (s *projectService) ListProjectSummaries(ctx context.Context) ([]*domain.ProjectSummary, error) {
 	projectsDir := s.config.ProjectsDirectory
 
-	gitDirs, err := infrastructure.FindGitRepositories(projectsDir, s.gitService)
+	gitDirs, err := s.repoLocator.FindGitRepositories(projectsDir)
 	if err != nil {
 		return nil, domain.NewProjectServiceError("", projectsDir, "ListProjectSummaries", "failed to scan for git repositories", err)
 	}
@@ -111,51 +107,42 @@ func (s *projectService) ListProjectSummaries(ctx context.Context) ([]*domain.Pr
 	return summaries, nil
 }
 
-// GetProjectInfo retrieves detailed information about a project
 func (s *projectService) GetProjectInfo(ctx context.Context, projectPath string) (*domain.ProjectInfo, error) {
 	if projectPath == "" {
 		return nil, domain.NewValidationError("GetProjectInfo", "projectPath", "", "project path cannot be empty")
 	}
 
-	// Validate project first
 	if err := s.ValidateProject(ctx, projectPath); err != nil {
 		return nil, err
 	}
 
-	// If projectPath is a worktree, get the main repository path
 	mainRepoPath := s.findMainRepoFromWorktree(projectPath)
 
-	// Get repository info
-	repoInfo, err := s.gitService.GetRepositoryInfo(ctx, mainRepoPath)
+	repoInfo, err := s.goGit.GetRepositoryInfo(ctx, mainRepoPath)
 	if err != nil {
 		return nil, domain.NewProjectServiceError("", projectPath, "GetProjectInfo", "failed to get repository info", err)
 	}
 
-	// Get worktrees
-	worktrees, err := s.gitService.ListWorktrees(ctx, mainRepoPath)
+	worktrees, err := s.cli.ListWorktrees(ctx, mainRepoPath)
 	if err != nil {
 		return nil, domain.NewProjectServiceError("", projectPath, "GetProjectInfo", "failed to list worktrees", err)
 	}
 
-	// Convert worktrees to pointers
 	worktreePtrs := make([]*domain.WorktreeInfo, len(worktrees))
 	for i := range worktrees {
 		worktreePtrs[i] = &worktrees[i]
 	}
 
-	// Convert branches to pointers
 	branchPtrs := make([]*domain.BranchInfo, len(repoInfo.Branches))
 	for i := range repoInfo.Branches {
 		branchPtrs[i] = &repoInfo.Branches[i]
 	}
 
-	// Convert remotes to pointers
 	remotePtrs := make([]*domain.RemoteInfo, len(repoInfo.Remotes))
 	for i := range repoInfo.Remotes {
 		remotePtrs[i] = &repoInfo.Remotes[i]
 	}
 
-	// Extract project name from main repository path
 	projectName := filepath.Base(mainRepoPath)
 
 	return &domain.ProjectInfo{
@@ -170,36 +157,27 @@ func (s *projectService) GetProjectInfo(ctx context.Context, projectPath string)
 	}, nil
 }
 
-// Private helper methods
-
 func (s *projectService) discoverProjectByName(ctx context.Context, projectName string, currentContext *domain.Context) (*domain.ProjectInfo, error) {
-	// If in project context and project name matches, use context path
 	if currentContext != nil && currentContext.Type == domain.ContextProject {
 		if currentContext.ProjectName == projectName {
 			return s.GetProjectInfo(ctx, currentContext.Path)
 		}
 	}
 
-	// Look for project in projects directory
 	projectPath := filepath.Join(s.config.ProjectsDirectory, projectName)
 
-	// Validate project
 	if err := s.ValidateProject(ctx, projectPath); err != nil {
-		// Try to find it in other locations
 		return s.searchProjectByName(ctx, projectName)
 	}
 
-	// Get project info
 	return s.GetProjectInfo(ctx, projectPath)
 }
 
 func (s *projectService) discoverProjectFromContext(ctx context.Context, context *domain.Context) (*domain.ProjectInfo, error) {
 	switch context.Type {
 	case domain.ContextProject, domain.ContextWorktree:
-		// Use the path from context
 		projectPath := context.Path
 		if context.Type == domain.ContextWorktree {
-			// For worktree context, we need to find the main project repository
 			projectPath = s.findMainRepoFromWorktree(context.Path)
 		}
 
@@ -214,12 +192,9 @@ func (s *projectService) discoverProjectFromContext(ctx context.Context, context
 }
 
 func (s *projectService) searchProjectByName(ctx context.Context, projectName string) (*domain.ProjectInfo, error) {
-	// Search in projects directory
 	projectsDir := s.config.ProjectsDirectory
 
-	// Check if projects directory exists
-	if _, err := os.Stat(projectsDir); os.IsNotExist(err) {
-		// Projects directory doesn't exist, return project not found
+	if _, err := os.Stat(projectsDir); errors.Is(err, os.ErrNotExist) {
 		return nil, domain.NewProjectServiceError(projectName, "", "searchProjectByName", "project not found", nil)
 	}
 
@@ -247,7 +222,7 @@ func (s *projectService) findMainRepoFromWorktree(worktreePath string) string {
 		return mainRepo
 	}
 
-	if mainRepo := infrastructure.FindMainRepoByTraversal(worktreePath); mainRepo != "" {
+	if mainRepo := domain.FindMainRepoByTraversal(worktreePath); mainRepo != "" {
 		return mainRepo
 	}
 
@@ -259,14 +234,14 @@ func (s *projectService) findMainRepoFromConfig(worktreePath string) string {
 		return ""
 	}
 
-	projectName, err := infrastructure.ExtractProjectFromWorktreePath(worktreePath, s.config.WorktreesDirectory)
+	projectName, err := domain.ExtractProjectFromWorktreePath(worktreePath, s.config.WorktreesDirectory)
 	if err != nil || projectName == "" {
 		return ""
 	}
 
 	mainRepoPath := filepath.Join(s.config.ProjectsDirectory, projectName)
 
-	if infrastructure.IsMainRepo(mainRepoPath) {
+	if domain.IsMainRepo(mainRepoPath) {
 		return mainRepoPath
 	}
 

@@ -16,9 +16,8 @@ import (
 func TestNewContextService(t *testing.T) {
 	detector := mocks.NewMockContextDetector()
 	resolver := mocks.NewMockContextResolver()
-	config := fixtures.NewTestConfig()
 
-	service := NewContextService(detector, resolver, config)
+	service := NewContextService(detector, resolver)
 	if service == nil {
 		t.Error("expected service to be non-nil")
 	}
@@ -60,8 +59,7 @@ func TestContextService_GetCurrentContext(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			detector := mocks.NewMockContextDetector()
 			resolver := mocks.NewMockContextResolver()
-			config := fixtures.NewTestConfig()
-			service := NewContextService(detector, resolver, config)
+			service := NewContextService(detector, resolver)
 
 			tt.setupMock(detector, resolver)
 
@@ -125,8 +123,7 @@ func TestContextService_DetectContextFromPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			detector := mocks.NewMockContextDetector()
 			resolver := mocks.NewMockContextResolver()
-			config := fixtures.NewTestConfig()
-			service := NewContextService(detector, resolver, config)
+			service := NewContextService(detector, resolver)
 
 			tt.setupMock(detector)
 
@@ -193,8 +190,7 @@ func TestContextService_ResolveIdentifier(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			detector := mocks.NewMockContextDetector()
 			resolver := mocks.NewMockContextResolver()
-			config := fixtures.NewTestConfig()
-			service := NewContextService(detector, resolver, config)
+			service := NewContextService(detector, resolver)
 
 			tt.setupMock(detector, resolver)
 
@@ -259,8 +255,7 @@ func TestContextService_ResolveIdentifierFromContext(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			detector := mocks.NewMockContextDetector()
 			resolver := mocks.NewMockContextResolver()
-			config := fixtures.NewTestConfig()
-			service := NewContextService(detector, resolver, config)
+			service := NewContextService(detector, resolver)
 
 			tt.setupMock(detector, resolver)
 
@@ -327,8 +322,7 @@ func TestContextService_GetCompletionSuggestions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			detector := mocks.NewMockContextDetector()
 			resolver := mocks.NewMockContextResolver()
-			config := fixtures.NewTestConfig()
-			service := NewContextService(detector, resolver, config)
+			service := NewContextService(detector, resolver)
 
 			tt.setupMock(detector, resolver)
 

@@ -136,9 +136,7 @@ func (m *MockCLIClient) DeleteBranch(ctx context.Context, repoPath, branchName s
 	return args.Error(0)
 }
 
-var _ application.GitClient = (*MockGitService)(nil)
-
-// MockGitService implements application.GitClient for testing
+// MockGitService bundles the Go-git and CLI mocks for tests that need both.
 type MockGitService struct {
 	*MockGoGitClient
 	*MockCLIClient
