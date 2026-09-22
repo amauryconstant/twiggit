@@ -34,7 +34,7 @@ See `application-service-interfaces`.
 
 ## REMOVED Requirements
 
-### Requirement: Per-project worktree mutation mutex
+### Requirement: Concurrency safety
 
 **Reason**: The current implementation carries a single
 `sync.Mutex` field on `worktreeService` that serializes every

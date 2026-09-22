@@ -56,16 +56,15 @@ SHALL exist; the two role interfaces are the only injection points.
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
 
-## ADDED Requirements
-
-### Requirement: GoGitClient constructor returns error
+### Requirement: Cache configuration
 
 `NewGoGitClient()` SHALL create a client with cache enabled
 (default size 25). `NewGoGitClientWithSize(n)` SHALL allow custom
 sizes; `n <= 0` SHALL fall back to 25. `cacheEnabled=false` SHALL
 bypass the cache entirely. Both constructors SHALL return
 `(*GoGitClient, error)`; the error SHALL be non-nil when the
-underlying LRU cache cannot be allocated.
+underlying LRU cache cannot be allocated. Callers SHALL propagate
+the construction error rather than discard it.
 
 #### Scenario: Successful construction
 
@@ -80,3 +79,9 @@ underlying LRU cache cannot be allocated.
 - **AND** callers SHALL propagate the error
 - **AND** the constructor SHALL NOT silently return a client with a
   nil cache
+
+#### Scenario: Definition holds
+
+- **WHEN** the surface described above is exercised
+- **THEN** it SHALL match the documented shape exactly
+- **AND** the implementation SHALL compile against the contract

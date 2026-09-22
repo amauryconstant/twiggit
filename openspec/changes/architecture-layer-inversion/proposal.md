@@ -152,10 +152,11 @@ together.
 
 ### New Capabilities
 
-None. `RepoLocator` and the new `domain.ShellWrapper` fit under
-existing `application-service-interfaces` and a future
-`domain-shell-wrappers` spec (deferred — no behavior change
-because the wrapper content is byte-for-byte unchanged).
+- `domain-path-utils` — symlink-aware filesystem path helpers
+  (`ExtractProjectFromWorktreePath`, `NormalizePath`,
+  `IsPathUnder`) move from `internal/infrastructure/` to
+  `internal/domain/`. Plain `error` returns; service boundary
+  wraps into typed service errors.
 
 ### Modified Capabilities
 
@@ -168,7 +169,9 @@ because the wrapper content is byte-for-byte unchanged).
 - `infrastructure-git-client` — drop the "composite GitClient is
   the only injection point" sentence in requirement 1; document
   the role-interface split.
-- `infrastructure-path-utils` — remove requirement 4 (path-utility error-wrapping contract); helpers now live in `internal/domain/`
+- `infrastructure-path-utils` — full REMOVED (all 4 requirements)
+  because the helpers move to the new `domain-path-utils`
+  capability.
 - `domain-context-types` — add `PathTypeUnknown = iota 0`;
   existing values shift by +1.
 - `domain-hook-types` — `HookResult.Executed` → `HasExecuted`;
@@ -198,7 +201,29 @@ because the wrapper content is byte-for-byte unchanged).
 | Public API of `internal/infrastructure` | `*Impl` types renamed; `CompositeGitClient` deleted |
 | Tests | Mechanical rename across `test/integration`, `test/concurrent`, `test/e2e/fixtures`; new domain test files |
 | Lint | depguard blocks reverse imports; existing service → infrastructure imports fail until slice 3 lands |
-| Version | Hard break (release bump handled outside this change) |
+| API impact | Hard break; no deprecation aliases; consumers must migrate |
+
+### Pure-identifier renames (no spec coverage required)
+
+The following renames are pure identifier changes with no observable
+behavior change. Per project spec rules ("specs describe behavior, not
+implementation"), no spec delta is required:
+
+- `domain.Result[T].NewErrorResult[T]` → `NewErrResult[T]`
+- `domain.WorktreeInfo.Modified` → `IsModified`
+- `domain.ShellResult.Installed` → `IsInstalled`; `Skipped` → `IsSkipped`
+
+These appear in `tasks.md` for tracking but generate no requirement-level
+change.
+
+### Mock strategy
+
+`testify/mock` is retained for `MockGitClientBundle`,
+`MockShellInfrastructure`, and other test doubles. The
+`golang-cli-architecture` skill recommends `moq` (state-based function
+fields) over `testify/mock` for interfaces with 5+ methods. `GoGitClient`
+(8 methods) and `CLIClient` (6 methods) qualify. The migration to `moq`
+is out of scope for this change; deferred to a future quality change.
 
 ## Non-goals
 

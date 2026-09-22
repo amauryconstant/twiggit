@@ -466,15 +466,21 @@ become per-line nolint with explanation.
 
 ### 13. `depguard` rules per layer; `nolintlint` enforced
 
-**Choice.** Add `depguard` rules:
+**Choice.** Add `depguard` rules with both `allow:` lists AND explicit
+`deny:` blocks per layer (per the `golang-cli-architecture`
+recommendation — explicit `deny:` blocks surface descriptive CI
+failure messages rather than the generic "import not allowed"):
 
 - `domain` (existing): allow `$gostd`, `internal/domain`
 - `service` (new): allow `$gostd`, `internal/domain`,
-  `internal/application`, `internal/service`
+  `internal/application`, `internal/service`; deny
+  `twiggit/internal/infrastructure`, `twiggit/cmd`
 - `application` (new): allow `$gostd`, `internal/domain`,
-  `internal/application`
+  `internal/application`; deny `twiggit/internal/infrastructure`,
+  `twiggit/internal/service`, `twiggit/cmd`
 - `infrastructure` (new): allow `$gostd`, `internal/domain`,
-  `internal/application`, `internal/infrastructure`
+  `internal/application`, `internal/infrastructure`; deny
+  `twiggit/internal/service`, `twiggit/cmd`
 - `cmd` (new): allow `$gostd`, `internal/domain`,
   `internal/application`, `internal/service`,
   `internal/infrastructure`, `internal/version`, `twiggit/cmd`
@@ -502,55 +508,94 @@ overhead the project does not use.
 
 ### 14. Vertical-slice execution order with slice-scoped test rewrites
 
-**Choice.** Nine vertical slices land in order:
+**Choice.** Nine vertical slices land in order. Slice 4 (infrastructure
+rewrite) splits into five atomic sub-slices per the
+`golang-refactoring` skill rule for atomic single-category changes:
+each step SHALL be purely structural or purely behavioral, never
+both.
 
-1. Domain expansion (new files, no breakage): `pathutils.go`,
-   `git_repo.go`, `shell_wrapper.go`, `GitDir`, `PathTypeUnknown`
-   iota shift, `IsModified`, `IsInstalled`, `IsSkipped`,
-   `HasExecuted`, `IsSuccessful`, `ErrResult`. Domain tests
-   rewrite for the renames.
-2. Application interface split: drop `GitClient` umbrella, add
-   `RepoLocator`.
-3. Service layer inversion: `worktree_service.go`,
+1. Domain expansion (slice 1, new files + renames, no breakage):
+   `pathutils.go`, `git_repo.go`, `shell_wrapper.go`, `GitDir`,
+   `PathTypeUnknown` iota shift, `IsModified`, `IsInstalled`,
+   `IsSkipped`, `HasExecuted`, `IsSuccessful`, `ErrResult`. Plus the
+   20-constructor `NewXxxErr` rename and the `Result[T]` aliasing
+   audit (tasks 2.5a, 2.5b, 2.9). Domain tests rewrite for the
+   renames.
+2. Application interface split (slice 2): drop `GitClient`
+   umbrella, add `RepoLocator`.
+3. Service layer inversion (slice 3): `worktree_service.go`,
    `project_service.go`, `context_service.go`, `shell_service.go`,
    `shell_service_test.go` rewrite for the new dependencies.
    Drop `sync.Mutex`, drop unused fields, log swallowed errors
-   via `slog`.
-4. Infrastructure rewrite: delete `pathutils.go`, `git_utils.go`,
-   `git_client.go`, `interfaces.go`; add `repo_finder.go`;
-   rename `*Impl` types; fix nil-deref sites in `cli_client.go`,
-   `hook_runner.go`; drop `_ = remoteRef`, bound `hash[:7]`;
-   change `NewGoGitClient*` signature; swap
-   `context_detector` cache to LRU. `os.IsNotExist` →
-   `errors.Is` everywhere in touched files. `HasPrefix+TrimPrefix`
-   → `CutPrefix` at the two flagged sites.
-5. `main.go` rewires: drop `NewCompositeGitClient`, pass two
-   clients, update constructor names.
-6. Test mocks: `MockGitClientBundle` struct in
+   via `slog` (single-handling rule per `golang-error-handling`:
+   log OR return, never both).
+4. Infrastructure rewrite (slice 4, six atomic sub-slices per the
+   `golang-refactoring` skill 100-500 lines per PR rule; each
+   sub-slice is purely structural or purely behavioral, never both):
+   - **4a Pure renames** (structural): `*Impl` suffix removal on
+      every implementation type the inversion touches.
+   - **4b-i NewGoGitClient signature** (behavioral):
+      `NewGoGitClient` and `NewGoGitClientWithSize` return
+      `(*GoGitClient, error)` so `lru.New` allocation failures
+      propagate.
+   - **4b-ii NewContextDetector signature** (behavioral):
+      `NewContextDetector` returns `(*ContextDetector, error)`
+      so the `lru.New` allocation error in `context_detector.go`
+      propagates.
+   - **4c-i Nil-guards** (behavioral): nil-guards in
+      `cli_client.go` (6 sites) and `hook_runner.go:137`.
+   - **4c-ii `errors.Is` migration + bound slice** (behavioral):
+      `os.IsNotExist` → `errors.Is` across all `internal/`; bound
+      `hash[:7]`; `CutPrefix` swap; `_ = remoteRef` workaround
+      drop.
+   - **4c-iii LRU cache swap** (behavioral): replace unbounded
+      `map[string]cached` in `context_detector.go` with LRU
+      (size 256).
+   - **4c-iv Resolver + config refactor** (behavioral):
+      two-role-interface injection on `context_resolver.go`;
+      `domain.ProjectSummary` swap; `slices.Clone` for
+      `ProtectedBranches` in `config_manager.go`.
+   - **4d Refactors** (structural): delete `pathutils.go`,
+      `git_utils.go`, `git_client.go`, `interfaces.go`; add
+      `repo_finder.go`; collapse `noOpResult` helper in
+      `hook_runner.go`.
+   - **4e Test rewrites** (anchor): `cli_client_test.go`,
+      `gogit_client_test.go` updated for the new constructors and
+      nil-guard semantics.
+5. `main.go` rewires (slice 5): drop `NewCompositeGitClient`,
+   pass two clients, update constructor names. `NewRepoFinder`
+   returns concrete `*RepoFinder` (per `golang-naming` "return
+   structs" rule); assignment to `application.RepoLocator`
+   happens at the consumer site.
+6. Test mocks (slice 6): `MockGitClientBundle` struct in
    `test/mocks/git_service_mock.go`; rename `*Impl` mocks.
    Mechanical rename across `test/integration/`,
-   `test/concurrent/`, `test/e2e/fixtures/`.
-7. `.golangci.yml`: extend `depguard`, drop `gocognit`, add
-   `nolintlint`, add `errcheck.check-type-assertions`, drop
-   blanket `Close` exclusion, add per-line nolints.
-8. Spec deltas (this change): the 6 deltas already in
-   `specs/`.
-9. Verification: `mise run verify`, `mise run test`,
+   `test/concurrent/`, `test/e2e/fixtures/`, including
+   `domain.NewXxxError(` → `domain.NewXxxErr(`.
+7. `.golangci.yml` (slice 7): extend `depguard` with both
+   `allow:` lists and explicit `deny:` blocks (per
+   `golang-cli-architecture`); drop `gocognit`; add `nolintlint`;
+   add `errcheck.check-type-assertions`; drop blanket `Close`
+   exclusion; add per-line nolints.
+8. Spec deltas (slice 8, this change): the seven deltas already
+   in `specs/`.
+9. Verification (slice 9): `mise run verify`, `mise run test`,
    `openspec validate architecture-layer-inversion --json`.
 
 **Rationale.** Per project rule (tests after impl), each slice
-lands implementation + tests in the same commit. Vertical
-slicing means each commit compiles and passes tests in
-isolation, so `git bisect` works. The `golang-refactoring`
-skill recommends "stacked PRs" for layered refactors; the nine
-slices become nine reviewable commits or PRs.
+lands implementation + tests together. Vertical slicing means
+each step compiles and passes tests in isolation, so reviewers
+can audit each piece in sequence. Slice 4 itself spans six
+atomic sub-slices for reviewable PR size per the
+`golang-refactoring` skill 100-500 lines per PR rule (single
+category per sub-slice).
 
 **Alternatives considered:**
 
 - Layer-by-layer (all-domain, then all-service, then
-  all-cmd). Bigger blast radius per commit; harder to bisect.
-  Rejected.
-- One mega-commit. Un-reviewable. Rejected.
+  all-cmd). Bigger blast radius per step; harder to isolate
+  regressions. Rejected.
+- One mega-step. Un-reviewable. Rejected.
 
 ### 15. Defer interface segregation and consumer-side interface placement
 
@@ -601,14 +646,14 @@ visual cue.
 - Generate mocks via `moq`. The project uses `testify/mock`;
   switching mid-refactor expands scope. Rejected.
 
-### 17. Test rewrites land in each slice's commit
+### 17. Test rewrites land with each slice
 
 **Choice.** Per project rule (tests after impl), each slice
-includes its test changes in the same commit (or split commit
-with the test commit immediately after the impl commit).
-Domain tests for new helpers land in slice 1; service tests
-for the new constructors in slice 3; infrastructure tests for
-the safety fixes in slice 4; test/mocks updates in slice 6.
+includes its test changes alongside the implementation (or in
+a follow-up step right after the impl step). Domain tests for
+new helpers land in slice 1; service tests for the new
+constructors in slice 3; infrastructure tests for the safety
+fixes in slice 4; test/mocks updates in slice 6.
 
 **Rationale.** The `openspec/config.yaml` rule says tests
 written AFTER implementation. Vertical slices are the smallest
@@ -618,17 +663,17 @@ in every test; that work lives in the quality change, not here.
 
 **Alternatives considered:**
 
-- Single test PR after all implementation. Defers regression
-  risk until the end; harder to bisect. Rejected.
+- Single test batch after all implementation. Defers regression
+  risk until the end; harder to isolate regressions. Rejected.
 
 ### 18. Spec drift on `application-worktree-management` is resolved by deletion
 
-**Choice.** Delete requirement 2 ("Per-project worktree
-mutation mutex") from `application-worktree-management`. The
-implementation has a single struct mutex that does not satisfy
-the spec; the project does not currently need per-project
-mutexes; the implementation does not satisfy the spec today
-or after this change.
+**Choice.** Delete requirement 2 ("Concurrency safety", the
+existing header name) from `application-worktree-management`.
+The implementation has a single struct mutex that does not
+satisfy the spec; the project does not currently need
+per-project mutexes; the implementation does not satisfy the
+spec today or after this change.
 
 **Rationale.** The `golang-design-patterns` skill flags the
 single struct mutex as dead code. The spec drift is a
@@ -641,6 +686,55 @@ future change can reintroduce it with a real implementation.
 - Implement the per-project mutex in this change. Real work,
   ~100 lines + tests. Out of scope. Rejected.
 - Leave both as-is. Spec drift remains. Rejected.
+
+### 19. Domain error constructor naming: keep `NewXxxError` style
+
+**Choice.** Keep every domain error constructor as `NewXxxError(...)`.
+Sentinel error variables retain their existing `ErrXxx` prefix per the
+`golang-naming` skill rule that reserves the `Err` prefix for sentinel
+error variables.
+
+**Rationale.** The `golang-naming` skill rule (`PathError`,
+`SyntaxError` table entry) places the `Error` suffix on error types
+and `Err` prefix on sentinel variables. Different syntactic positions
+disambiguate: `NewGitRepositoryError(...)` returns `*GitRepositoryError`;
+`ErrGitRepoNotFound` is an error value. The skill's rule wins over
+the proposal-draft abbreviation. Existing project convention
+(`NewGitRepositoryError`, `NewWorktreeServiceError`,
+`NewContextDetectionError`, `NewConfigError` in
+`internal/infrastructure/AGENTS.md` and `internal/application/AGENTS.md`)
+already follows the full-word style; the rename is a no-op for
+constructor naming. The `domain-typed-errors/spec.md` Error type
+taxonomy table keeps `NewXxxError` column entries.
+
+Twenty constructors land in slice 1 (task 2.5a). Call-site
+propagation across `internal/`, `cmd/`, and `test/` runs through
+`gopls rename` per identifier (per the `golang-refactoring` skill
+"gopls Rename > LLM hand-edits" rule), which refuses on
+interface-satisfaction breakage rather than silently producing a
+bad diff.
+
+**Scope note.** Decision 19 covers error-type constructors and
+sentinel error variables only. The `domain.Result[T].NewErrorResult[T]`
+→ `NewErrResult[T]` rename in `tasks.md` 2.5 is a generic-result
+constructor rename, NOT an error type rename. It is outside the
+scope of Decision 19 and requires no spec delta per the project
+rule that specs describe behavior, not implementation detail.
+The `domain-typed-errors` spec owns `domain.*Error` definitions;
+`Result[T]` is not an error type, so it is not in this spec's
+surface. The rename lives in tasks.md for tracking and propagates
+mechanically via `gopls rename`.
+
+**Alternatives considered:**
+
+- `NewXxxErr` abbreviation (constructors share root with sentinels
+  like `ErrGitRepoNotFound`). Rejected: violates `golang-naming`
+  skill `Error`-suffix rule and breaks project convention. Drift
+  risk from the existing `NewGitRepositoryError` etc. in
+  `internal/infrastructure/AGENTS.md` and `internal/application/AGENTS.md`.
+- Rename only the constructors touched by slice 1 (the originally
+  listed `NewErrorResult → NewErrResult`). Drift between this
+  change and a future rename. Rejected.
 
 ## Risks / Trade-offs
 
@@ -657,7 +751,7 @@ future change can reintroduce it with a real implementation.
 
 - **Depguard rule ordering.** Adding the per-layer rules
   BEFORE the slice that removes the offending imports would
-  fail the lint mid-PR. → Mitigation: slice 7 (rules) lands
+  fail the lint mid-stream. → Mitigation: slice 7 (rules) lands
   after slices 3-5 (which remove the offending imports).
 
 - **`MockGitClientBundle` test ergonomics.** Service tests
@@ -706,15 +800,23 @@ future change can reintroduce it with a real implementation.
    `mise run test` once more. Failing tests at this point
    identify rename-mechanical-update gaps.
 4. Archive the change with `openspec-archive-change
-   architecture-layer-inversion` after the implementation PR
-   merges. The 6 spec deltas merge into
+   architecture-layer-inversion` after the implementation lands.
+   The 7 spec deltas are written to
    `openspec/specs/<capability>/spec.md` per `openspec-archive-change`'s
    contract.
-5. **Rollback:** every slice is a discrete commit (or PR);
-   `git revert` from the merge commit restores the prior state.
-   The `depguard` rule addition is the only point at which a
-   half-merged state breaks the build; staging the rule in
-   slice 7 keeps every earlier slice self-consistent.
+5. **depguard ordering note.** Slice 7 (`.golangci.yml` with
+   per-layer `depguard` rules and `deny:` blocks) MUST land
+   together with the slices that remove the offending reverse
+   imports (slices 3, 4d). If the depguard rules are added
+   before slices 3-4d land, every existing
+   `service → infrastructure` import fails CI. Sequence:
+   slices 1-6 → slice 7 → slices 8-9. Reverting any slice
+   cleanly restores the prior state because the depguard rule
+   addition is the only point at which a partial application
+   breaks the build; staging the rule in slice 7 keeps every
+   earlier slice self-consistent.
+6. **Rollback:** every slice is a discrete step; reverting
+   restores the prior state.
 
 ## Open Questions
 
