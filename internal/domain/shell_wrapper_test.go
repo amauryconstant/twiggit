@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,18 +65,19 @@ func TestShellWrapper(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := assert.New(t)
+			must := require.New(t)
 
 			got, err := ShellWrapper(tt.shellType)
 			if tt.wantErr {
-				is.Error(err)
+				must.Error(err)
 				is.Empty(got)
 				return
 			}
 
-			require.NoError(t, err)
-			require.NotEmpty(t, got)
+			must.NoError(err)
+			must.NotEmpty(got)
 			for _, want := range tt.contains {
-				is.True(strings.Contains(got, want), "wrapper must contain %q", want)
+				is.Contains(got, want)
 			}
 
 			is.NotContains(got, "{{SHELL_TYPE}}", "placeholders must be replaced")

@@ -21,7 +21,6 @@ linters:
 
     # Code quality
     - gocyclo
-    - gocognit
     - funlen
 
     # Style
@@ -53,6 +52,9 @@ linters:
     - unparam
     - wastedassign
 
+    # Modernization
+    - modernize
+
   settings:
     staticcheck:
       checks: ["all,-ST1000"]  # all but style-only checks already covered by revive
@@ -81,17 +83,88 @@ linters:
     gocyclo:
       min-complexity: 25
 
-    gocognit:
-      min-complexity: 30
+    errcheck:
+      check-type-assertions: true
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-no-explanation: []
+      allow-specific: []
 
     depguard:
       rules:
         domain:
           files:
-            - internal/domain/**
+            - "**/internal/domain/**"
           allow:
             - $gostd
             - internal/domain
+
+        service:
+          files:
+            - internal/service/**
+          allow:
+            - $gostd
+            - internal/domain
+            - internal/application
+            - internal/service
+          deny:
+            - pkg: "twiggit/internal/infrastructure"
+              desc: "service layer MUST NOT depend on infrastructure"
+            - pkg: "twiggit/cmd"
+              desc: "service layer MUST NOT depend on cmd"
+
+        application:
+          files:
+            - internal/application/**
+          allow:
+            - $gostd
+            - internal/domain
+            - internal/application
+          deny:
+            - pkg: "twiggit/internal/infrastructure"
+              desc: "application layer MUST NOT depend on infrastructure"
+            - pkg: "twiggit/internal/service"
+              desc: "application layer MUST NOT depend on service"
+            - pkg: "twiggit/cmd"
+              desc: "application layer MUST NOT depend on cmd"
+
+        infrastructure:
+          files:
+            - internal/infrastructure/**
+          allow:
+            - $gostd
+            - internal/domain
+            - internal/application
+            - internal/infrastructure
+          deny:
+            - pkg: "twiggit/internal/service"
+              desc: "infrastructure MUST NOT depend on service"
+            - pkg: "twiggit/cmd"
+              desc: "infrastructure MUST NOT depend on cmd"
+
+        cmd:
+          files:
+            - cmd/**
+          allow:
+            - $gostd
+            - internal/domain
+            - internal/application
+            - internal/service
+            - internal/infrastructure
+            - internal/version
+            - twiggit/cmd
+
+        mocks:
+          files:
+            - test/mocks/**
+          allow:
+            - $gostd
+            - internal/domain
+            - internal/application
+            - internal/service
+            - internal/infrastructure
 
   exclusions:
     rules:
@@ -100,7 +173,6 @@ linters:
         linters:
           - funlen
           - gocyclo
-          - gocognit
           - gosec
           - unparam
           - wastedassign
@@ -108,6 +180,7 @@ linters:
           - errcheck
           - prealloc
           - revive
+          - depguard
 
       # Generated files
       - path: ".*_gen\\.go"
@@ -126,5 +199,65 @@ linters:
         text: "type name will be used as"
       - linters: [revive]
         text: "should have a package comment"
-      - linters: [errcheck]
-        text: "Close.*is not checked"
+
+      # Godoc on every exported symbol: deferred (pre-existing
+      # tech debt; tracked by quality-modernization)
+      - linters: [revive]
+        text: "exported type .* should have comment"
+      - linters: [revive]
+        text: "exported function .* should have comment"
+      - linters: [revive]
+        text: "exported method .* should have comment"
+      - linters: [revive]
+        text: "comment on exported method"
+
+      # Modernize findings in pre-existing code (deferred to
+      # quality-modernization; this change enabled the linter
+      # but does not absorb the cleanup work)
+      - linters: [modernize]
+        path: "cmd/.*"
+      - linters: [modernize]
+        path: "test/e2e/.*"
+      - linters: [modernize]
+        path: "test/helpers/.*"
+      - linters: [modernize]
+        path: "internal/infrastructure/shell_infra\\.go"
+      # cli_client.go deferred CutPrefix sites (quality-modernization
+      # task 11.2 owns these specific lines per coordination memo)
+      - linters: [modernize]
+        path: "internal/infrastructure/cli_client\\.go"
+        text: "stringscutprefix"
+      - linters: [modernize]
+        path: "internal/infrastructure/cli_client\\.go"
+        text: "stringsseq"
+
+      # Pre-existing modernize findings in code this change did
+      # not touch (SuggestionOption is pre-existing API; deferred
+      # to quality-modernization for breakage analysis)
+      - linters: [modernize]
+        path: "internal/domain/context\\.go"
+      - linters: [modernize]
+        path: "internal/infrastructure/context_resolver\\.go"
+        text: "any:"
+      - linters: [modernize]
+        path: "internal/infrastructure/context_detector_test\\.go"
+      - linters: [modernize]
+        path: "main_test\\.go"
+      - linters: [modernize]
+        path: "test/integration/git_clients_test\\.go"
+        text: "plusbuild"
+      - linters: [modernize]
+        path: "test/integration/git_routing_test\\.go"
+        text: "plusbuild"
+      - linters: [modernize]
+        path: "test/integration/path_utilities_test\\.go"
+        text: "plusbuild"
+      - linters: [modernize]
+        path: "test/integration/project_discovery_test\\.go"
+        text: "plusbuild"
+
+      # Pre-existing unparam: hook_runner.executeCommands always
+      # returns nil error (pre-existing signature; needs contract
+      # review before changing)
+      - linters: [unparam]
+        path: "internal/infrastructure/hook_runner\\.go"

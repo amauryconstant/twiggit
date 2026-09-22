@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/infrastructure"
+	"twiggit/internal/domain"
 )
 
 func TestNormalizePath_Integration(t *testing.T) {
@@ -34,7 +34,7 @@ func TestNormalizePath_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test relative path conversion
-		result, err := infrastructure.NormalizePath("test.txt")
+		result, err := domain.NormalizePath("test.txt")
 		require.NoError(t, err)
 		assert.True(t, filepath.IsAbs(result))
 		assert.Equal(t, filepath.Join(subDir, "test.txt"), result)
@@ -58,7 +58,7 @@ func TestNormalizePath_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test symlink resolution
-		result, err := infrastructure.NormalizePath(symlinkPath)
+		result, err := domain.NormalizePath(symlinkPath)
 		require.NoError(t, err)
 		assert.Equal(t, targetFile, result)
 	})
@@ -76,7 +76,7 @@ func TestNormalizePath_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test broken symlink handling
-		result, err := infrastructure.NormalizePath(symlinkPath)
+		result, err := domain.NormalizePath(symlinkPath)
 		require.NoError(t, err)
 		// Should fallback to absolute path of symlink itself
 		assert.True(t, filepath.IsAbs(result))
@@ -105,7 +105,7 @@ func TestNormalizePath_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test directory symlink resolution
-		result, err := infrastructure.NormalizePath(filepath.Join(symlinkDir, "file.txt"))
+		result, err := domain.NormalizePath(filepath.Join(symlinkDir, "file.txt"))
 		require.NoError(t, err)
 		assert.Equal(t, targetFile, result)
 	})
@@ -137,7 +137,7 @@ func TestNormalizePath_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test complex symlink resolution
-		result, err := infrastructure.NormalizePath(filepath.Join(symlink2, "deep.txt"))
+		result, err := domain.NormalizePath(filepath.Join(symlink2, "deep.txt"))
 		require.NoError(t, err)
 		assert.Equal(t, deepFile, result)
 	})
@@ -167,7 +167,7 @@ func TestNormalizePath_Integration(t *testing.T) {
 		err = os.Chdir(tempDir)
 		require.NoError(t, err)
 
-		result, err := infrastructure.NormalizePath("root.txt")
+		result, err := domain.NormalizePath("root.txt")
 		require.NoError(t, err)
 		assert.Equal(t, rootFile, result)
 
@@ -175,12 +175,12 @@ func TestNormalizePath_Integration(t *testing.T) {
 		err = os.Chdir(nestedDir)
 		require.NoError(t, err)
 
-		result, err = infrastructure.NormalizePath("nested.txt")
+		result, err = domain.NormalizePath("nested.txt")
 		require.NoError(t, err)
 		assert.Equal(t, nestedFile, result)
 
 		// Test relative path from nested directory
-		result, err = infrastructure.NormalizePath("../../root.txt")
+		result, err = domain.NormalizePath("../../root.txt")
 		require.NoError(t, err)
 		assert.Equal(t, rootFile, result)
 	})
@@ -234,7 +234,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := infrastructure.IsPathUnder(tt.base, tt.target)
+				result, err := domain.IsPathUnder(tt.base, tt.target)
 				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			})
@@ -260,12 +260,12 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test symlink relationships
-		result, err := infrastructure.IsPathUnder(symlinkBase, filepath.Join(symlinkBase, "subdir"))
+		result, err := domain.IsPathUnder(symlinkBase, filepath.Join(symlinkBase, "subdir"))
 		require.NoError(t, err)
 		assert.True(t, result)
 
 		// Test mixed real/symlink paths
-		_, err = infrastructure.IsPathUnder(realBase, filepath.Join(symlinkBase, "subdir"))
+		_, err = domain.IsPathUnder(realBase, filepath.Join(symlinkBase, "subdir"))
 		require.NoError(t, err)
 	})
 
@@ -287,11 +287,11 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test relative paths
-		result, err := infrastructure.IsPathUnder("base", "base/sub")
+		result, err := domain.IsPathUnder("base", "base/sub")
 		require.NoError(t, err)
 		assert.True(t, result)
 
-		result, err = infrastructure.IsPathUnder("base/sub", "base")
+		result, err = domain.IsPathUnder("base/sub", "base")
 		require.NoError(t, err)
 		assert.False(t, result) // "base" is parent of "base/sub", so "base" is NOT under "base/sub"
 
@@ -299,11 +299,11 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		err = os.Chdir(baseDir)
 		require.NoError(t, err)
 
-		result, err = infrastructure.IsPathUnder(".", "sub")
+		result, err = domain.IsPathUnder(".", "sub")
 		require.NoError(t, err)
 		assert.True(t, result)
 
-		result, err = infrastructure.IsPathUnder("sub", "..")
+		result, err = domain.IsPathUnder("sub", "..")
 		require.NoError(t, err)
 		assert.False(t, result) // ".." is parent of "sub", so ".." is not under "sub"
 	})
@@ -359,7 +359,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				result, err := infrastructure.IsPathUnder(tt.base, tt.target)
+				result, err := domain.IsPathUnder(tt.base, tt.target)
 				require.NoError(t, err)
 				assert.Equal(t, tt.expected, result)
 			})
@@ -374,7 +374,7 @@ func TestPathUtils_Integration_EdgeCases(t *testing.T) {
 		// Test with non-existent paths
 		nonExistent := filepath.Join(tempDir, "does_not_exist")
 
-		result, err := infrastructure.NormalizePath(nonExistent)
+		result, err := domain.NormalizePath(nonExistent)
 		require.NoError(t, err)
 		assert.True(t, filepath.IsAbs(result))
 		assert.Contains(t, result, "does_not_exist")
@@ -383,7 +383,7 @@ func TestPathUtils_Integration_EdgeCases(t *testing.T) {
 		base := filepath.Join(tempDir, "base")
 		target := filepath.Join(base, "sub")
 
-		isUnder, err := infrastructure.IsPathUnder(base, target)
+		isUnder, err := domain.IsPathUnder(base, target)
 		require.NoError(t, err)
 		assert.True(t, isUnder) // Should work with non-existent paths
 	})
@@ -403,7 +403,7 @@ func TestPathUtils_Integration_EdgeCases(t *testing.T) {
 
 		// Test NormalizePath with restricted directory
 		// This should still work as it doesn't need to read the directory contents
-		result, err := infrastructure.NormalizePath(restrictedDir)
+		result, err := domain.NormalizePath(restrictedDir)
 		// May succeed or fail depending on the system, but shouldn't panic
 		if err != nil {
 			assert.Contains(t, err.Error(), "failed to normalize path")
@@ -422,7 +422,7 @@ func TestPathUtils_Integration_EdgeCases(t *testing.T) {
 		err := os.Mkdir(longPath, 0755)
 		require.NoError(t, err)
 
-		result, err := infrastructure.NormalizePath(longPath)
+		result, err := domain.NormalizePath(longPath)
 		require.NoError(t, err)
 		assert.True(t, filepath.IsAbs(result))
 		assert.Contains(t, result, longName)

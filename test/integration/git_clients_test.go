@@ -59,7 +59,7 @@ func TestGitOperations_Integration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Test repository validation
-		err := client.ValidateRepository(repoPath)
+		err = client.ValidateRepository(repoPath)
 		require.NoError(t, err)
 
 		// Test opening repository

@@ -18,6 +18,7 @@ func TestIsMainRepo(t *testing.T) {
 		{
 			name: "directory with .git as directory and no gitdir file is main repo",
 			setup: func(t *testing.T, dir string) {
+				t.Helper()
 				require.NoError(t, os.MkdirAll(filepath.Join(dir, ".git"), 0o755))
 			},
 			expected: true,
@@ -25,6 +26,7 @@ func TestIsMainRepo(t *testing.T) {
 		{
 			name: "directory with .git and gitdir file is worktree, not main repo",
 			setup: func(t *testing.T, dir string) {
+				t.Helper()
 				gitDir := filepath.Join(dir, ".git")
 				require.NoError(t, os.MkdirAll(gitDir, 0o755))
 				require.NoError(t, os.WriteFile(filepath.Join(gitDir, "gitdir"), []byte("gitdir: /tmp/somewhere"), 0o644))
@@ -34,6 +36,7 @@ func TestIsMainRepo(t *testing.T) {
 		{
 			name: "directory without .git is not a main repo",
 			setup: func(t *testing.T, dir string) {
+				t.Helper()
 				_ = dir
 			},
 			expected: false,

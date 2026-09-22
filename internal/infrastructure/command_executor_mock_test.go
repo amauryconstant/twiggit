@@ -21,16 +21,16 @@ func NewMockCommandExecutor() *MockCommandExecutor {
 func (m *MockCommandExecutor) Execute(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
 	resultArgs := m.Called(ctx, dir, cmd, args)
 	if resultArgs.Get(0) == nil {
-		return nil, resultArgs.Error(1) //nolint:wrapcheck
+		return nil, resultArgs.Error(1)
 	}
-	return resultArgs.Get(0).(*CommandResult), resultArgs.Error(1) //nolint:wrapcheck
+	return resultArgs.Get(0).(*CommandResult), resultArgs.Error(1)
 }
 
 // ExecuteWithTimeout executes the mock command with timeout
 func (m *MockCommandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd string, timeout time.Duration, args ...string) (*CommandResult, error) {
 	resultArgs := m.Called(ctx, dir, cmd, timeout, args)
 	if resultArgs.Get(0) == nil {
-		return nil, resultArgs.Error(1) //nolint:wrapcheck
+		return nil, resultArgs.Error(1)
 	}
-	return resultArgs.Get(0).(*CommandResult), resultArgs.Error(1) //nolint:wrapcheck
+	return resultArgs.Get(0).(*CommandResult), resultArgs.Error(1)
 }

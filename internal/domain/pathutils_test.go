@@ -47,8 +47,9 @@ func TestExtractProjectFromWorktreePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := assert.New(t)
+			must := require.New(t)
 			got, err := ExtractProjectFromWorktreePath(tt.worktreePath, tt.worktreesDir)
-			is.NoError(err)
+			must.NoError(err)
 			is.Equal(tt.expected, got)
 		})
 	}
@@ -80,8 +81,9 @@ func TestNormalizePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := assert.New(t)
+			must := require.New(t)
 			got, err := NormalizePath(tt.input)
-			is.NoError(err)
+			must.NoError(err)
 			is.True(filepath.IsAbs(got), "normalized path must be absolute")
 		})
 	}
@@ -147,12 +149,13 @@ func TestIsPathUnder(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := assert.New(t)
+			must := require.New(t)
 			got, err := IsPathUnder(tt.base, tt.target)
 			if tt.wantErr {
 				is.Error(err)
 				return
 			}
-			is.NoError(err)
+			must.NoError(err)
 			is.Equal(tt.expected, got)
 		})
 	}

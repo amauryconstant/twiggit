@@ -1,7 +1,6 @@
 package infrastructure
 
 import (
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -834,7 +833,7 @@ func TestContextResolver_DescriptionFormats(t *testing.T) {
 
 func TestContextResolver_WithExistingOnlyFilter(t *testing.T) {
 	_, err := os.Stat("/tmp/nonexistent")
-	require.True(t, errors.Is(err, os.ErrNotExist))
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
 func TestContextResolver_FuzzyMatch(t *testing.T) {

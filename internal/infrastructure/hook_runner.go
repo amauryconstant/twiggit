@@ -46,7 +46,7 @@ func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (
 	if rootErr != nil {
 		return noOpResult(req), nil
 	}
-	defer root.Close()
+	defer root.Close() //nolint:errcheck // read-only filesystem stat cleanup, no actionable error
 	if _, err := root.Stat(filepath.Base(req.ConfigFilePath)); errors.Is(err, os.ErrNotExist) {
 		return noOpResult(req), nil
 	}

@@ -125,7 +125,7 @@ func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, so
 		return domain.NewGitWorktreeError(worktreePath, branchName,
 			"git worktree add succeeded but parent directory not accessible", err)
 	}
-	defer root.Close()
+	defer root.Close() //nolint:errcheck // read-only filesystem stat cleanup, no actionable error
 	if _, err := root.Stat(filepath.Base(worktreePath)); err != nil {
 		return domain.NewGitWorktreeError(worktreePath, branchName,
 			"git worktree add succeeded but worktree directory not found", err)

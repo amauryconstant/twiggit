@@ -65,6 +65,6 @@ func TestWorktreeInfo_UsedInGitRepositoryList(t *testing.T) {
 		},
 	}
 	require.Len(repo.Worktrees, 2)
-	is.True(repo.Worktrees[0].IsModified == false)
+	is.False(repo.Worktrees[0].IsModified)
 	is.True(repo.Worktrees[1].IsModified)
 }

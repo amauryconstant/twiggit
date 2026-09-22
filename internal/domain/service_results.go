@@ -38,7 +38,7 @@ func cloneSlice[T any](value T) T {
 	}
 	dst := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
 	reflect.Copy(dst, v)
-	return dst.Interface().(T)
+	return dst.Interface().(T) //nolint:errcheck // reflect.Copy guarantees non-nil dst; type assertion to T cannot fail
 }
 
 // IsSuccess returns true if the result is successful

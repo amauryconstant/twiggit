@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -335,9 +334,9 @@ func TestErrorsIsChain(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := assert.New(t)
-			is.True(errors.Is(tt.err, tt.ownSentinel), "errors.Is must reach own sentinel for %s", tt.name)
-			is.False(errors.Is(tt.err, tt.otherNotFoundA), "must not match unrelated sentinel %v", tt.otherNotFoundA)
-			is.False(errors.Is(tt.err, tt.otherNotFoundB), "must not match unrelated sentinel %v", tt.otherNotFoundB)
+			is.ErrorIs(tt.err, tt.ownSentinel)
+			is.NotErrorIs(tt.err, tt.otherNotFoundA)
+			is.NotErrorIs(tt.err, tt.otherNotFoundB)
 		})
 	}
 }
@@ -371,7 +370,7 @@ func TestErrorsIsChain_WrappedCause(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := assert.New(t)
-			is.True(errors.Is(tt.err, tt.ownSentinel))
+			is.ErrorIs(tt.err, tt.ownSentinel)
 		})
 	}
 }
