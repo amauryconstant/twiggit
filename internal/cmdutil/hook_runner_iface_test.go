@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 )
 
 // HookRunnerFunc adapts a plain function to the HookRunner interface.
@@ -84,4 +85,45 @@ func TestHookRunnerFunc_PropagatesError(t *testing.T) {
 	result, err := runner.Run(t.Context(), &core.HookRunRequest{})
 	require.ErrorIs(t, err, boom)
 	assert.Nil(t, result)
+}
+
+// TestGitHookRunner_SatisfiesHookRunner pins the consumer-side
+// interface declaration: the production *git.HookRunner type (in
+// internal/git/hook_runner.go) must satisfy cmdutil.HookRunner so
+// cmd/ can consume it through Factory.GitHookRunner / the run-time
+// interface. The assertion lives in cmdutil because git cannot import
+// cmdutil (cycle: cmdutil → git for Factory).
+func TestGitHookRunner_SatisfiesHookRunner(t *testing.T) {
+	t.Parallel()
+
+	runner := git.NewHookRunner(git.NewCommandExecutor(0))
+
+	// Compile-time + runtime interface assertion. If git.HookRunner
+	// ever drifts away from the Run signature, this assignment fails
+	// to compile.
+	var iface HookRunner = runner
+
+	assert.NotNil(t, iface)
+	assert.Equal(t, "*git.HookRunner", typeName(iface))
+}
+
+// typeName is a tiny helper to keep the assertion message informative
+// without depending on reflect in the wider codebase.
+func typeName(v any) string {
+	if v == nil {
+		return "<nil>"
+	}
+	return runtimeTypeName(v)
+}
+
+// runtimeTypeName extracts the dynamic type name via a type switch on
+// the concrete *git.HookRunner shape we just assigned. Avoids
+// importing reflect for one assertion.
+func runtimeTypeName(v any) string {
+	switch v.(type) {
+	case *git.HookRunner:
+		return "*git.HookRunner"
+	default:
+		return "<unknown>"
+	}
 }

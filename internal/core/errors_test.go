@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGitWorktreeError_FormatErrorMessage(t *testing.T) {
@@ -61,6 +62,64 @@ func TestOperationError_Unwrap(t *testing.T) {
 	cause := errors.New("underlying")
 	op := NewGitRepositoryError("/p", "msg", cause)
 	assert.Equal(t, cause, op.Unwrap())
+}
+
+// TestFourTypeHierarchy_PublicSurface pins domain-typed-errors MODIFIED:
+// every demoted constructor must return one of the four canonical
+// core.Error subtypes (ValidationError, NotFoundError, OperationError,
+// UsageError). The 20-type legacy taxonomy is collapsed; any future
+// constructor that returns a different type trips this test.
+func TestFourTypeHierarchy_PublicSurface(t *testing.T) {
+	t.Parallel()
+
+	constructors := []struct {
+		name string
+		err  error
+	}{
+		{"NewValidationError → ValidationError", NewValidationError("f", "v", "m")},
+		{"NewOpValidationError → ValidationError", NewOpValidationError("op", "f", "v", "m")},
+		{"NewGitRepositoryError → OperationError", NewGitRepositoryError("/p", "msg", nil)},
+		{"NewGitWorktreeError → OperationError", NewGitWorktreeError("/p", "b", "msg", nil)},
+		{"NewGitCommandError → OperationError", NewGitCommandError("git", nil, 1, "", "", "msg", nil)},
+		{"NewShellDetectionError → OperationError", NewShellDetectionError("ctx", nil)},
+		{"NewShellAlreadyInstalledError → OperationError", NewShellAlreadyInstalledError("bash", "ctx", nil)},
+		{"NewShellNotInstalledError → OperationError", NewShellNotInstalledError("bash", "ctx", nil)},
+		{"NewShellInvalidTypeError → OperationError", NewShellInvalidTypeError("ps", "ctx", nil)},
+		{"NewServiceError → ValidationError", NewServiceError("svc", "op", "msg", nil)},
+		{"NewWorktreeServiceError → ValidationError", NewWorktreeServiceError("/p", "b", "op", "msg", nil)},
+		{"NewProjectServiceError → ValidationError", NewProjectServiceError("n", "/p", "op", "msg", nil)},
+		{"NewNavigationServiceError → ValidationError", NewNavigationServiceError("t", "ctx", "op", "msg", nil)},
+		{"NewResolutionError → ValidationError", NewResolutionError("t", "ctx", "msg", nil, nil)},
+		{"NewConflictError → ValidationError", NewConflictError("r", "i", "op", "msg", nil)},
+		{"NewUsageError → UsageError", NewUsageError("bad arg", nil)},
+	}
+
+	for _, tc := range constructors {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			must := require.New(t)
+
+			must.Error(tc.err)
+
+			var ve *ValidationError
+			var oe *OperationError
+			var ne *NotFoundError
+			var ue *UsageError
+
+			switch {
+			case errors.As(tc.err, &ve):
+				// ok — ValidationError subtype
+			case errors.As(tc.err, &oe):
+				// ok — OperationError subtype
+			case errors.As(tc.err, &ne):
+				// ok — NotFoundError subtype
+			case errors.As(tc.err, &ue):
+				// ok — UsageError subtype
+			default:
+				t.Fatalf("%s returned a type outside the four-type hierarchy: %T", tc.name, tc.err)
+			}
+		})
+	}
 }
 
 // TestErrSentinels_WalkThroughWraps asserts each demoted constructor

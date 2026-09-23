@@ -6,31 +6,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/iostreams"
 )
-
-// iosFromCmd returns the *iostreams.IOStreams associated with cmd.
-// Thin wrapper around cmdutil.IOStreamsFromCmd so error_handler.go and
-// any local helper can share one lookup path.
-func iosFromCmd(cmd *cobra.Command) *iostreams.IOStreams {
-	return cmdutil.IOStreamsFromCmd(cmd)
-}
-
-// isQuiet is kept as a small accessor for run paths that need the
-// persistent --quiet flag before opts is fully populated. Prefers the
-// flag value when present; falls back to ios.Quiet.
-func isQuiet(cmd *cobra.Command) bool {
-	if cmd == nil {
-		return false
-	}
-	if cmd.Flags().Lookup("quiet") != nil {
-		q, _ := cmd.Flags().GetBool("quiet")
-		return q
-	}
-	return iosFromCmd(cmd).Quiet
-}
 
 // verbosef is the verbose-output gate used by every command. It is
 // a thin wrapper around iostreams.IOStreams.Verbosef that tolerates
