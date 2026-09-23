@@ -1,7 +1,6 @@
 package iostreams_test
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +34,6 @@ func TestStyles_RendersWhenColorEnabled(t *testing.T) {
 		"Header":  s.Header,
 		"Dim":     s.Dim,
 	} {
-		fn := fn
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			got := fn(in)
@@ -48,7 +46,7 @@ func TestStyles_RendersWhenColorEnabled(t *testing.T) {
 				t.Fatalf("expected lipgloss-rendered output for %s, got identity", name)
 			}
 			// All lipgloss-colored output begins with an ANSI escape.
-			assert.True(t, strings.Contains(got, "\x1b["), "%s should contain ANSI escape", name)
+			assert.Contains(t, got, "\x1b[", "%s should contain ANSI escape", name)
 		})
 	}
 }

@@ -23,7 +23,6 @@ func TestComposeWrapper_EmptyTemplateUsesDefaultPerShell(t *testing.T) {
 		{core.ShellFish, "fish"},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(string(tc.shell), func(t *testing.T) {
 			t.Parallel()
 			got := output.ComposeWrapper("", tc.shell)

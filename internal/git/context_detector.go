@@ -45,7 +45,7 @@ type contextDetector struct {
 type ContextDetector = contextDetector
 
 // NewContextDetector creates a new context detector backed by an LRU cache.
-func NewContextDetector(cfg *core.Config) (*contextDetector, error) {
+func NewContextDetector(cfg *core.Config) (*ContextDetector, error) {
 	return newContextDetectorWithCacheFactory(cfg, defaultContextDetectorCacheFactory)
 }
 
@@ -103,7 +103,7 @@ func (cd *contextDetector) DetectContext(dir string) (*core.Context, error) {
 		return nil, detectOpError(dir, "cannot access directory", rootErr)
 	}
 	_, statErr := root.Stat(filepath.Base(absDir))
-	root.Close()
+	_ = root.Close()
 	if statErr != nil {
 		if errors.Is(statErr, os.ErrNotExist) {
 			return nil, detectOpError(dir, "directory does not exist", statErr)

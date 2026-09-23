@@ -1,5 +1,4 @@
 //go:build e2e
-// +build e2e
 
 // Package e2e provides end-to-end tests for twiggit cd command.
 // Tests validate context-aware navigation between projects and worktrees.

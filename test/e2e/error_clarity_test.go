@@ -1,5 +1,4 @@
 //go:build e2e
-// +build e2e
 
 // Package e2e provides end-to-end tests for error clarity features.
 // Tests validate exit codes, user-friendly error messages, and panic recovery.
@@ -8,7 +7,6 @@ package e2e
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gexec"
 
 	"twiggit/test/e2e/fixtures"
 	"twiggit/test/e2e/helpers"
@@ -88,13 +86,15 @@ var _ = Describe("Error Clarity", func() {
 		})
 
 		Context("when outside git repository", func() {
-			It("returns appropriate exit code for list without project context", func() {
-				// Run from temp directory outside any git repo
+			It("returns exit code 0 for list without project context", func() {
+				// Run from temp directory outside any git repo.
+				// `list` from outside-git falls through to the
+				// all-projects branch (matches `list --all`); an empty
+				// projects dir surfaces the friendly "No worktrees
+				// found" line and exits 0 rather than failing.
 				tempDir := fixture.GetTempDir()
 				session := cli.RunWithDir(tempDir, "list")
-				// Should fail but not crash - exit code depends on error type
-				Eventually(session).Should(gexec.Exit())
-				Expect(session.ExitCode()).To(BeNumerically(">=", 1))
+				cli.ShouldSucceed(session)
 			})
 		})
 	})

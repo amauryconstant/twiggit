@@ -1,2 +1,3 @@
 Error: branch name format is invalid
-Hint: Use only alphanumeric characters, dots, hyphens, and underscores
+  op=Validation field=BranchName value=invalid@branch
+  hint: Use only alphanumeric characters, dots, hyphens, and underscores

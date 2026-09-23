@@ -2,7 +2,6 @@ package output_test
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,8 +92,8 @@ func TestRenderTable_NilIOSRendersWithoutError(t *testing.T) {
 	require.NoError(t, output.RenderTable(&buf, []string{"a"}, [][]string{{"b"}}, nil))
 
 	out := buf.String()
-	assert.True(t, strings.Contains(out, "a"))
-	assert.True(t, strings.Contains(out, "b"))
+	assert.Contains(t, out, "a")
+	assert.Contains(t, out, "b")
 }
 
 func TestRenderTable_WritesTrailingNewline(t *testing.T) {

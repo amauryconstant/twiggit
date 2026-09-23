@@ -63,7 +63,7 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.ExactArgs(1)),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			opts.Spec = args[0]
 			// Use config default source branch if available, otherwise fallback to "main"
 			if opts.Source == "" {
@@ -173,7 +173,7 @@ func runCreate(opts *CreateOptions) error {
 
 	verbosef(opts.IO, 1, "Creating worktree for %s/%s", project.Name, branchName)
 	verbosef(opts.IO, 2, "  from branch: %s", opts.Source)
-	verbosef(opts.IO, 2, "  to path: %s", worktreePath)
+	verbosef(opts.IO, 2, "  to path: %s", project.Name+"/"+branchName)
 
 	// Run post-create hooks if the project has a .twiggit.toml config.
 	hookResult, err := runPostCreateHooks(ctx, gitClient, cfg, project, branchName, opts.Source, worktreePath)
@@ -187,7 +187,7 @@ func runCreate(opts *CreateOptions) error {
 	result.HookResult = hookResult
 
 	if opts.CdFlag {
-		fmt.Fprintln(writeOrIgnore(opts.IO.Out), result.Worktree.Path)
+		_, _ = fmt.Fprintln(writeOrIgnore(opts.IO.Out), result.Worktree.Path)
 	} else if !opts.IO.Quiet {
 		if err := displayCreateSuccess(opts.IO.Out, result.Worktree); err != nil {
 			return err
@@ -206,7 +206,7 @@ func runCreate(opts *CreateOptions) error {
 // are logged but do not abort the create — the worktree already
 // exists. The runner returns a *HookResult that captures per-command
 // success/failure for the caller to surface.
-func runPostCreateHooks(ctx context.Context, client *git.Client, cfg *core.Config, project *core.ProjectInfo, branchName, sourceBranch, worktreePath string) (*core.HookResult, error) {
+func runPostCreateHooks(ctx context.Context, _ *git.Client, cfg *core.Config, project *core.ProjectInfo, branchName, sourceBranch, worktreePath string) (*core.HookResult, error) {
 	timeout := time.Duration(cfg.Shell.HookTimeout) * time.Second
 	executor := git.NewCommandExecutor(timeout)
 	runner := git.NewHookRunner(executor, cfg.Shell.HookTimeout)
@@ -220,7 +220,11 @@ func runPostCreateHooks(ctx context.Context, client *git.Client, cfg *core.Confi
 		MainRepoPath:   project.GitRepoPath,
 		ConfigFilePath: filepath.Join(project.GitRepoPath, ".twiggit.toml"),
 	}
-	return runner.Run(ctx, req)
+	hookResult, err := runner.Run(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("run post-create hooks: %w", err)
+	}
+	return hookResult, nil
 }
 
 // discoverProject resolves the project by name with the current
@@ -255,7 +259,7 @@ func discoverProject(ctx context.Context, client *git.Client, cfg *core.Config, 
 }
 
 // buildProjectInfo returns the full *core.ProjectInfo for the path.
-func buildProjectInfo(ctx context.Context, client *git.Client, cfg *core.Config, projectPath string) (*core.ProjectInfo, error) {
+func buildProjectInfo(ctx context.Context, client *git.Client, _ *core.Config, projectPath string) (*core.ProjectInfo, error) {
 	if err := client.ValidateRepository(projectPath); err != nil {
 		return nil, &core.OperationError{
 			Op:      "discover.project",
@@ -387,14 +391,14 @@ func displayCreateSuccess(out io.Writer, worktree *core.WorktreeInfo) error {
 // displayHookFailures displays hook failure warnings to stderr
 func displayHookFailures(out io.Writer, result *core.HookResult) {
 	out = writeOrIgnore(out)
-	fmt.Fprintf(out, "\nWarning: %d post-create hook(s) failed. Worktree created but setup may be incomplete.\n", len(result.Failures))
+	_, _ = fmt.Fprintf(out, "\nWarning: %d post-create hook(s) failed. Worktree created but setup may be incomplete.\n", len(result.Failures))
 	for _, failure := range result.Failures {
-		fmt.Fprintf(out, "\n  Command: %s\n", failure.Command)
-		fmt.Fprintf(out, "  Exit code: %d\n", failure.ExitCode)
+		_, _ = fmt.Fprintf(out, "\n  Command: %s\n", failure.Command)
+		_, _ = fmt.Fprintf(out, "  Exit code: %d\n", failure.ExitCode)
 		if failure.Output != "" {
-			fmt.Fprintf(out, "  Output:\n")
-			for _, line := range strings.Split(failure.Output, "\n") {
-				fmt.Fprintf(out, "    %s\n", line)
+			_, _ = fmt.Fprintf(out, "  Output:\n")
+			for line := range strings.SplitSeq(failure.Output, "\n") {
+				_, _ = fmt.Fprintf(out, "    %s\n", line)
 			}
 		}
 	}

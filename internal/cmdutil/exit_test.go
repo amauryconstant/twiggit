@@ -26,11 +26,13 @@ func TestExitCodeFor_UsageErrorReturnsExitUsage(t *testing.T) {
 	t.Parallel()
 
 	t.Run("direct", func(t *testing.T) {
+		t.Parallel()
 		err := &core.UsageError{Message: "missing flag"}
 		assert.Equal(t, cmdutil.ExitUsage, cmdutil.ExitCodeFor(err))
 	})
 
 	t.Run("wrapped", func(t *testing.T) {
+		t.Parallel()
 		wrapped := fmt.Errorf("cmd: %w", &core.UsageError{Message: "bad arg"})
 		assert.Equal(t, cmdutil.ExitUsage, cmdutil.ExitCodeFor(wrapped))
 	})
@@ -59,6 +61,7 @@ func TestExitCode_String(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.want, func(t *testing.T) {
+			t.Parallel()
 			assert.Equal(t, tc.want, tc.code.String())
 		})
 	}

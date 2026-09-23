@@ -39,7 +39,10 @@ type JSONFormatter struct{}
 func (JSONFormatter) Write(w io.Writer, data any) error {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
-	return enc.Encode(data)
+	if err := enc.Encode(data); err != nil {
+		return fmt.Errorf("encode json: %w", err)
+	}
+	return nil
 }
 
 // JSONLinesFormatter encodes one JSON object per line, no
@@ -55,11 +58,14 @@ func (JSONLinesFormatter) Write(w io.Writer, data any) error {
 	enc.SetEscapeHTML(false)
 	v := reflect.ValueOf(data)
 	if v.Kind() != reflect.Slice || v.Type().Elem().Kind() == reflect.Uint8 {
-		return enc.Encode(data)
+		if err := enc.Encode(data); err != nil {
+			return fmt.Errorf("encode json: %w", err)
+		}
+		return nil
 	}
 	for i := range v.Len() {
 		if err := enc.Encode(v.Index(i).Interface()); err != nil {
-			return err
+			return fmt.Errorf("encode json line %d: %w", i, err)
 		}
 	}
 	return nil
@@ -92,12 +98,14 @@ type PlainFormatter struct{}
 func (PlainFormatter) Write(w io.Writer, data any) error {
 	v := reflect.ValueOf(data)
 	if v.Kind() != reflect.Slice {
-		_, err := fmt.Fprintln(w, fmt.Sprint(data))
-		return err
+		if _, err := fmt.Fprintln(w, fmt.Sprint(data)); err != nil {
+			return fmt.Errorf("write plain: %w", err)
+		}
+		return nil
 	}
 	for i := range v.Len() {
 		if _, err := fmt.Fprintln(w, fmt.Sprint(v.Index(i).Interface())); err != nil {
-			return err
+			return fmt.Errorf("write plain line %d: %w", i, err)
 		}
 	}
 	return nil

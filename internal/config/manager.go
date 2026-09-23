@@ -123,12 +123,12 @@ type osRootProvider struct {
 func newOsRootProvider(path string) (*osRootProvider, error) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("resolve absolute path: %w", err)
 	}
 	dir := filepath.Dir(absPath)
 	root, err := os.OpenRoot(dir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("open config root: %w", err)
 	}
 	return &osRootProvider{
 		path: absPath,
@@ -139,8 +139,12 @@ func newOsRootProvider(path string) (*osRootProvider, error) {
 
 // ReadBytes satisfies koanf.Provider.
 func (p *osRootProvider) ReadBytes() ([]byte, error) {
-	defer p.root.Close()
-	return p.root.ReadFile(p.base)
+	defer func() { _ = p.root.Close() }()
+	data, err := p.root.ReadFile(p.base)
+	if err != nil {
+		return nil, fmt.Errorf("read config file: %w", err)
+	}
+	return data, nil
 }
 
 // Read returns an explicit error; koanf uses ReadBytes when a Parser is supplied.

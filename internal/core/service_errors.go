@@ -8,7 +8,7 @@ package core
 // distinguishing context that the previous per-type fields held.
 
 // NewServiceError demoted: returns *ValidationError.
-func NewServiceError(service, operation, message string, err error) *ValidationError {
+func NewServiceError(service, operation, message string, _ error) *ValidationError {
 	return &ValidationError{
 		Op:      service,
 		Entity:  operation,
@@ -17,7 +17,7 @@ func NewServiceError(service, operation, message string, err error) *ValidationE
 }
 
 // NewWorktreeServiceError demoted: returns *ValidationError.
-func NewWorktreeServiceError(worktreePath, branchName, operation, message string, err error) *ValidationError {
+func NewWorktreeServiceError(worktreePath, branchName, _, message string, err error) *ValidationError {
 	ve := &ValidationError{
 		Op:      "worktree.service",
 		Entity:  worktreePath,
@@ -33,7 +33,7 @@ func NewWorktreeServiceError(worktreePath, branchName, operation, message string
 }
 
 // NewProjectServiceError demoted: returns *ValidationError.
-func NewProjectServiceError(projectName, projectPath, operation, message string, err error) *ValidationError {
+func NewProjectServiceError(projectName, projectPath, _, message string, _ error) *ValidationError {
 	ve := &ValidationError{
 		Op:      "project.service",
 		Message: message,
@@ -47,7 +47,7 @@ func NewProjectServiceError(projectName, projectPath, operation, message string,
 }
 
 // NewNavigationServiceError demoted: returns *ValidationError.
-func NewNavigationServiceError(target, context, operation, message string, err error) *ValidationError {
+func NewNavigationServiceError(target, context, _, message string, _ error) *ValidationError {
 	return &ValidationError{
 		Op:      "navigation.service",
 		Entity:  target,
@@ -57,7 +57,7 @@ func NewNavigationServiceError(target, context, operation, message string, err e
 }
 
 // NewResolutionError demoted: returns *ValidationError.
-func NewResolutionError(target, context, message string, suggestions []string, err error) *ValidationError {
+func NewResolutionError(target, context, message string, suggestions []string, _ error) *ValidationError {
 	return &ValidationError{
 		Op:          "resolution",
 		Entity:      target,
@@ -68,7 +68,7 @@ func NewResolutionError(target, context, message string, suggestions []string, e
 }
 
 // NewConflictError demoted: returns *ValidationError.
-func NewConflictError(resource, identifier, operation, message string, err error) *ValidationError {
+func NewConflictError(resource, identifier, _, message string, _ error) *ValidationError {
 	return &ValidationError{
 		Op:      "conflict",
 		Entity:  resource,

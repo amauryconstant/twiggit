@@ -1,3 +1,5 @@
+// Package version exposes build-time version metadata injected via
+// GoReleaser ldflags; the String helper formats it for CLI output.
 package version
 
 // Version holds the version string, injected at build time by GoReleaser.

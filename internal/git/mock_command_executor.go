@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/stretchr/testify/mock"
@@ -20,17 +21,33 @@ func NewMockCommandExecutor() *MockCommandExecutor {
 // Execute executes the mock command
 func (m *MockCommandExecutor) Execute(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
 	resultArgs := m.Called(ctx, dir, cmd, args)
-	if resultArgs.Get(0) == nil {
-		return nil, resultArgs.Error(1)
+	if mockErr := resultArgs.Error(1); mockErr != nil {
+		return nil, fmt.Errorf("mock execute: %w", mockErr)
 	}
-	return resultArgs.Get(0).(*CommandResult), resultArgs.Error(1)
+	raw := resultArgs.Get(0)
+	if raw == nil {
+		return nil, nil
+	}
+	result, ok := raw.(*CommandResult)
+	if !ok {
+		return nil, fmt.Errorf("mock execute: unexpected return type %T", raw)
+	}
+	return result, nil
 }
 
 // ExecuteWithTimeout executes the mock command with timeout
 func (m *MockCommandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd string, timeout time.Duration, args ...string) (*CommandResult, error) {
 	resultArgs := m.Called(ctx, dir, cmd, timeout, args)
-	if resultArgs.Get(0) == nil {
-		return nil, resultArgs.Error(1)
+	if mockErr := resultArgs.Error(1); mockErr != nil {
+		return nil, fmt.Errorf("mock execute with timeout: %w", mockErr)
 	}
-	return resultArgs.Get(0).(*CommandResult), resultArgs.Error(1)
+	raw := resultArgs.Get(0)
+	if raw == nil {
+		return nil, nil
+	}
+	result, ok := raw.(*CommandResult)
+	if !ok {
+		return nil, fmt.Errorf("mock execute with timeout: unexpected return type %T", raw)
+	}
+	return result, nil
 }

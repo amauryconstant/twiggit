@@ -90,4 +90,4 @@ type ResolutionSuggestion struct {
 }
 
 // SuggestionOption is a functional option for configuring resolution suggestions
-type SuggestionOption func(interface{})
+type SuggestionOption func(any)

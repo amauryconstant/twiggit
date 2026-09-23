@@ -64,7 +64,7 @@ func HandleCLIErrorWithCommand(cmd *cobra.Command, err error) ExitCode {
 	// pflag-wrapped usage failures do not stack with the structured
 	// formatter's multi-line hints.
 	if IsCobraUsageError(err) {
-		fmt.Fprintf(ios.ErrOut, "Error: %s\n", err.Error())
+		_, _ = fmt.Fprintf(ios.ErrOut, "Error: %s\n", err.Error())
 		return ExitCodeUsage
 	}
 

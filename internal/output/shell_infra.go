@@ -169,8 +169,8 @@ func removeWrapperBlock(content string) string {
 }
 
 func removeBlock(content, beginDelimiter, endDelimiter string) string {
-	beginIdx := strings.Index(content, beginDelimiter)
-	if beginIdx == -1 {
+	before, _, ok := strings.Cut(content, beginDelimiter)
+	if !ok {
 		return content
 	}
 
@@ -179,7 +179,7 @@ func removeBlock(content, beginDelimiter, endDelimiter string) string {
 		return content
 	}
 
-	newlineBefore := strings.LastIndex(content[:beginIdx], "\n")
+	newlineBefore := strings.LastIndex(before, "\n")
 	if newlineBefore == -1 {
 		newlineBefore = 0
 	} else {

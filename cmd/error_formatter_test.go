@@ -86,7 +86,7 @@ func TestErrorFormatter_FormatShellSubtypes(t *testing.T) {
 		{"ShellNotInstalledError", core.NewShellNotInstalledError("bash", "ctx", nil), "shell wrapper not installed"},
 		{"ShellInvalidTypeError", core.NewShellInvalidTypeError("powershell", "ctx", nil), "invalid shell type"},
 		{"ShellInferenceError", core.NewShellInferenceError("fish", "ctx", nil), "could not infer shell type"},
-		{"ShellDetectionError", core.NewShellDetectionError("ctx", nil), "shell detection failed"},
+		{"ShellDetectionError", core.NewShellDetectionError("ctx", nil), "shell auto-detection failed"},
 		{"ShellWrapperError installation", core.NewShellWrapperError("bash", "installation", "ctx", nil), "wrapper installation failed"},
 		{"ShellWrapperError generation", core.NewShellWrapperError("bash", "generation", "ctx", nil), "wrapper generation failed"},
 		{"ShellConfigError", core.NewShellConfigError("/home/u/.bashrc", "ctx", nil), "config file error"},

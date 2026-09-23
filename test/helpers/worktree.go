@@ -133,8 +133,8 @@ func (h *WorktreeTestHelper) parseWorktreeList(output string) ([]WorktreeInfo, e
 	var worktrees []WorktreeInfo
 	var currentWorktree *WorktreeInfo
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -155,12 +155,12 @@ func (h *WorktreeTestHelper) parseWorktreeList(output string) ([]WorktreeInfo, e
 				Path: absPath,
 			}
 		} else if currentWorktree != nil {
-			if strings.HasPrefix(line, "HEAD ") {
-				currentWorktree.Commit = strings.TrimPrefix(line, "HEAD ")
-			} else if strings.HasPrefix(line, "branch ") {
-				branchRef := strings.TrimPrefix(line, "branch ")
-				if strings.HasPrefix(branchRef, "refs/heads/") {
-					currentWorktree.Branch = strings.TrimPrefix(branchRef, "refs/heads/")
+			if after, ok := strings.CutPrefix(line, "HEAD "); ok {
+				currentWorktree.Commit = after
+			} else if after, ok := strings.CutPrefix(line, "branch "); ok {
+				branchRef := after
+				if after, ok := strings.CutPrefix(branchRef, "refs/heads/"); ok {
+					currentWorktree.Branch = after
 				} else {
 					currentWorktree.Branch = branchRef
 				}
@@ -189,10 +189,10 @@ func findRepoPath(worktreePath string) string {
 				if !info.IsDir() {
 					// This is a worktree, read the .git file to find the main repo
 					if content, err := os.ReadFile(gitPath); err == nil {
-						lines := strings.Split(string(content), "\n")
-						for _, line := range lines {
-							if strings.HasPrefix(line, "gitdir:") {
-								gitdir := strings.TrimSpace(strings.TrimPrefix(line, "gitdir:"))
+						lines := strings.SplitSeq(string(content), "\n")
+						for line := range lines {
+							if after, ok := strings.CutPrefix(line, "gitdir:"); ok {
+								gitdir := strings.TrimSpace(after)
 								// The .git file contains path like: gitdir: /path/to/main/.git/worktrees/branch
 								// We need to extract the main repo path
 								if strings.Contains(gitdir, "/.git/worktrees/") {

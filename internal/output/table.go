@@ -1,6 +1,7 @@
 package output
 
 import (
+	"fmt"
 	"io"
 
 	"charm.land/lipgloss/v2"
@@ -36,11 +37,12 @@ func RenderTable(w io.Writer, headers []string, rows [][]string, ios *iostreams.
 		return nil
 	}
 	if _, err := io.WriteString(w, out); err != nil {
-		return err
+		return fmt.Errorf("write table: %w", err)
 	}
 	if !endsWithNewline(out) {
-		_, err := io.WriteString(w, "\n")
-		return err
+		if _, err := io.WriteString(w, "\n"); err != nil {
+			return fmt.Errorf("write table newline: %w", err)
+		}
 	}
 	return nil
 }
@@ -55,7 +57,7 @@ func normalizeRows(headers []string, rows [][]string) [][]string {
 	out := make([][]string, len(rows))
 	for i, row := range rows {
 		r := make([]string, cols)
-		for j := 0; j < cols; j++ {
+		for j := range cols {
 			if j < len(row) {
 				r[j] = row[j]
 			}

@@ -36,7 +36,7 @@ func TestAddPersistentFlags_DefaultsAreZeroValues(t *testing.T) {
 	opts := &cmdutil.GlobalOptions{}
 	cmdutil.AddPersistentFlags(cmd, opts)
 
-	assert.Equal(t, "", opts.Output)
+	assert.Empty(t, opts.Output)
 	assert.False(t, opts.Quiet)
 	assert.Equal(t, 0, opts.Verbose)
 	assert.False(t, opts.IsVerbose())

@@ -127,16 +127,28 @@ func TestNewFormatter_KnownNames(t *testing.T) {
 		format string
 		assert func(t *testing.T, f output.Formatter)
 	}{
-		{"json", output.FormatJSON, func(t *testing.T, f output.Formatter) { _, ok := f.(output.JSONFormatter); assert.True(t, ok) }},
-		{"jsonl", output.FormatJSONL, func(t *testing.T, f output.Formatter) { _, ok := f.(output.JSONLinesFormatter); assert.True(t, ok) }},
-		{"plain", output.FormatPlain, func(t *testing.T, f output.Formatter) { _, ok := f.(output.PlainFormatter); assert.True(t, ok) }},
+		{"json", output.FormatJSON, func(t *testing.T, f output.Formatter) {
+			t.Helper()
+			_, ok := f.(output.JSONFormatter)
+			assert.True(t, ok)
+		}},
+		{"jsonl", output.FormatJSONL, func(t *testing.T, f output.Formatter) {
+			t.Helper()
+			_, ok := f.(output.JSONLinesFormatter)
+			assert.True(t, ok)
+		}},
+		{"plain", output.FormatPlain, func(t *testing.T, f output.Formatter) {
+			t.Helper()
+			_, ok := f.(output.PlainFormatter)
+			assert.True(t, ok)
+		}},
 		{"table", output.FormatTable, func(t *testing.T, f output.Formatter) {
+			t.Helper()
 			_, ok := f.(output.TableFormatter)
 			assert.True(t, ok)
 		}},
 	}
 	for _, tc := range cases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 			f := output.NewFormatter(tc.format)

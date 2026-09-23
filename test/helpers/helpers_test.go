@@ -262,7 +262,7 @@ func TestPerformanceTestHelper_BenchmarkFunction(t *testing.T) {
 	helper := NewPerformanceTestHelper(t)
 
 	// Test benchmarking a function
-	result, err := helper.BenchmarkFunction(10, func() interface{} {
+	result, err := helper.BenchmarkFunction(10, func() any {
 		// Simulate some work and return a result
 		sum := 0
 		for i := range 100 {
@@ -282,7 +282,7 @@ func TestPerformanceTestHelper_FunctionalComposition(t *testing.T) {
 	helper := NewPerformanceTestHelper(t)
 
 	// Test functional composition
-	result, err := helper.WithIterations(5).WithWarmup(true).BenchmarkFunction(5, func() interface{} {
+	result, err := helper.WithIterations(5).WithWarmup(true).BenchmarkFunction(5, func() any {
 		return 42
 	})
 

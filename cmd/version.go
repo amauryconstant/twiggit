@@ -42,7 +42,7 @@ func NewCmdVersion(f *cmdutil.Factory, runF func(*VersionOptions) error) *cobra.
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.NoArgs),
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			if runF != nil {
 				return runF(opts)
 			}
@@ -63,5 +63,8 @@ func runVersion(opts *VersionOptions) error {
 		version = "dev"
 	}
 	_, err := fmt.Fprintf(opts.IO.Out, "twiggit %s\n", version)
-	return err
+	if err != nil {
+		return fmt.Errorf("write version: %w", err)
+	}
+	return nil
 }

@@ -60,7 +60,7 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.NoArgs),
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			out := ""
 			if opts.GlobalOptions != nil {
 				out = opts.GlobalOptions.Output
@@ -147,7 +147,10 @@ func runList(opts *ListOptions) error {
 
 // listWorktrees returns the slice of *core.WorktreeInfo matching the
 // list request. When listAll is set every discovered project is
-// queried; otherwise the current context's project is used.
+// queried; otherwise the current context's project is used. When the
+// caller has no project context, plain `list` falls through to the
+// all-projects branch so an empty projects directory produces the
+// friendly "No worktrees found" line (matches `list --all`).
 func listWorktrees(ctx context.Context, client *git.Client, cfg *core.Config, currentCtx *core.Context, listAll bool) ([]*core.WorktreeInfo, error) {
 	if listAll {
 		return listAllProjectsWorktrees(ctx, client, cfg)

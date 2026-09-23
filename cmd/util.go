@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"fmt"
 	"io"
 
@@ -35,19 +34,8 @@ func isQuiet(cmd *cobra.Command) bool {
 
 // activeVerboseLevel mirrors the running --verbose count.
 // NewCmd* functions install the Factory's *GlobalOptions value via
-// root's PersistentPreRunE; tests that drive runX directly can call
-// setActiveVerboseLevel for the duration of the test (t.Cleanup
-// restores). Zero is the silent default.
+// root's PersistentPreRunE. Zero is the silent default.
 var activeVerboseLevel int
-
-// setActiveVerboseLevel pins the verbose count. Returns a restore
-// function for t.Cleanup-style usage. The active count gates every
-// direct ios.Verbosef call wrapped by verbosef below.
-func setActiveVerboseLevel(level int) func() {
-	prev := activeVerboseLevel
-	activeVerboseLevel = level
-	return func() { activeVerboseLevel = prev }
-}
 
 // verbosef is the verbose-output gate used by every command. It
 // honours both the iostreams-supplied --quiet/--verbose gates and
@@ -88,7 +76,7 @@ func (p *ProgressReporter) Report(format string, args ...any) {
 	if p.quiet {
 		return
 	}
-	fmt.Fprintf(writeOrIgnore(p.out), format+"\n", args...)
+	_, _ = fmt.Fprintf(writeOrIgnore(p.out), format+"\n", args...)
 }
 
 // ReportProgress outputs progress for bulk operations
@@ -96,7 +84,7 @@ func (p *ProgressReporter) ReportProgress(current, total int, item string) {
 	if p.quiet {
 		return
 	}
-	fmt.Fprintf(writeOrIgnore(p.out), "[%d/%d] Processing %s\n", current, total, item)
+	_, _ = fmt.Fprintf(writeOrIgnore(p.out), "[%d/%d] Processing %s\n", current, total, item)
 }
 
 // ignoreWriter wraps an io.Writer so its Write always reports success.
@@ -132,11 +120,4 @@ func wrapArgsValidator(v cobra.PositionalArgs) cobra.PositionalArgs {
 		}
 		return nil
 	}
-}
-
-// resolveNavigationTarget is kept as a small helper used by tests that
-// exercise the cd-style resolution flow. The actual cd command no
-// longer uses it — see executeCD in cmd/cd.go.
-func resolveNavigationTarget(_ context.Context, _ *CommandConfig, _ string) (*core.Context, *core.ResolutionResult, error) {
-	return nil, nil, fmt.Errorf("resolveNavigationTarget: moved to executeCD")
 }

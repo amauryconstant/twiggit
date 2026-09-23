@@ -60,7 +60,7 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.ExactArgs(1)),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			opts.Target = args[0]
 			if runF != nil {
 				return runF(opts)
@@ -83,6 +83,8 @@ Examples:
 // runDelete implements the orchestration previously in
 // navigationService + worktreeService.DeleteWorktree + worktreeService.GetWorktreeStatus.
 // It composes the context detector, resolver, and Client directly.
+//
+//nolint:gocyclo // orchestration function: branching reflects CLI safety checks (status, merged-only, idempotent not-found), not duplicated logic.
 func runDelete(opts *DeleteOptions) error {
 	ctx := opts.Ctx
 
@@ -128,24 +130,42 @@ func runDelete(opts *DeleteOptions) error {
 
 	worktreePath := resolution.ResolvedPath
 
+	// Resolve the project path (the git repo root) used to issue
+	// git worktree commands. From a worktree or project context
+	// currentCtx.Path already is the project. From outside-git
+	// currentCtx.Path is the CWD which is not a project, so we
+	// fall back to ProjectsDirectory/ProjectName based on the
+	// resolved identifier; cross-project references like
+	// "test/feature-1" still resolve to the right project.
+	projectPath := currentCtx.Path
+	if projectPath == "" || currentCtx.Type == core.ContextOutsideGit {
+		if resolution.ProjectName != "" {
+			projectPath = filepath.Join(cfg.ProjectsDirectory, resolution.ProjectName)
+		}
+	}
+
+	// navTarget returns the project path for -C navigation when the
+	// deletion leaves the user stranded inside the deleted worktree.
+	navTarget := func() string {
+		return getDeleteNavigationTarget(currentCtx, cfg.ProjectsDirectory, worktreePath)
+	}
+
 	// Status safety check
 	if !opts.Force {
 		status, err := getWorktreeStatus(ctx, gitClient, worktreePath)
 		if err != nil {
 			if errors.Is(err, core.ErrWorktreeNotFound) {
+				// Idempotent: the desired post-state (worktree gone)
+				// is already true. Emit the navigation target only
+				// when the caller is inside the deleted worktree;
+				// outside-git callers asked for deletion by explicit
+				// reference and stay in place, so nothing is printed.
 				if opts.ChangeDir {
-					nav := getDeleteNavigationTarget(currentCtx, worktreePath)
-					if nav != "" {
-						fmt.Fprintln(writeOrIgnore(opts.IO.Out), nav)
+					if nav := navTarget(); nav != "" {
+						_, _ = fmt.Fprintln(writeOrIgnore(opts.IO.Out), nav)
 					}
-				} else {
-					fmt.Fprintf(writeOrIgnore(opts.IO.Out), "Deleted worktree: %s (already removed)\n", worktreePath)
 				}
-				return &core.OperationError{
-					Op:      "delete.worktree",
-					Entity:  worktreePath,
-					Message: "worktree not found",
-				}
+				return nil
 			}
 			return fmt.Errorf("failed to check worktree status: %w", err)
 		}
@@ -156,7 +176,7 @@ func runDelete(opts *DeleteOptions) error {
 
 	// merged-only check
 	if opts.MergedOnly {
-		wtInfo, err := clientGetWorktreeByPath(ctx, gitClient, currentCtx.Path, worktreePath)
+		wtInfo, err := clientGetWorktreeByPath(ctx, gitClient, projectPath, worktreePath)
 		if err != nil {
 			return fmt.Errorf("failed to get worktree info: %w", err)
 		}
@@ -171,19 +191,20 @@ func runDelete(opts *DeleteOptions) error {
 
 	verbosef(opts.IO, 1, "Deleting worktree at %s", worktreePath)
 	verbosef(opts.IO, 2, "  project: %s", currentCtx.ProjectName)
+	verbosef(opts.IO, 2, "  branch: %s", resolution.BranchName)
 	verbosef(opts.IO, 2, "  force: %t", opts.Force)
 
-	if err := gitClient.DeleteWorktree(ctx, currentCtx.Path, worktreePath, opts.Force); err != nil {
+	if err := gitClient.DeleteWorktree(ctx, projectPath, worktreePath, opts.Force); err != nil {
 		return fmt.Errorf("failed to delete worktree: %w", err)
 	}
 
 	if opts.ChangeDir {
-		nav := getDeleteNavigationTarget(currentCtx, worktreePath)
+		nav := navTarget()
 		if nav != "" {
-			fmt.Fprintln(writeOrIgnore(opts.IO.Out), nav)
+			_, _ = fmt.Fprintln(writeOrIgnore(opts.IO.Out), nav)
 		}
 	} else if !opts.IO.Quiet {
-		fmt.Fprintf(writeOrIgnore(opts.IO.Out), "Deleted worktree: %s\n", worktreePath)
+		_, _ = fmt.Fprintf(writeOrIgnore(opts.IO.Out), "Deleted worktree: %s\n", worktreePath)
 	}
 
 	return nil
@@ -262,10 +283,12 @@ func clientGetWorktreeByPath(ctx context.Context, client *git.Client, projectPat
 }
 
 // getDeleteNavigationTarget returns the project path for navigation
-// when the deleted worktree was a ContextWorktree.
-func getDeleteNavigationTarget(currentCtx *core.Context, _ string) string {
+// when the deleted worktree was a ContextWorktree. The worktree path
+// is unused: navigation targets the project root so the shell wrapper
+// can cd the user out of the just-deleted worktree.
+func getDeleteNavigationTarget(currentCtx *core.Context, projectsDir, _ string) string {
 	if currentCtx.Type == core.ContextWorktree {
-		return currentCtx.Path
+		return filepath.Join(projectsDir, currentCtx.ProjectName)
 	}
 	return ""
 }

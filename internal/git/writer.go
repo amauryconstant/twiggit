@@ -29,12 +29,17 @@ type cliClient struct {
 	defaultTimeout time.Duration
 }
 
+// CLIClient is the public type alias for the write-side git client
+// produced by NewCLIClient. Mirrors the ContextDetector / ContextResolver
+// pattern so external callers receive an exported type.
+type CLIClient = cliClient
+
 // NewCLIClient creates the write-half of the git Client. The executor
 // must be non-nil; timeoutSeconds defaults to 30s when omitted.
 //
 // In production callers pass the executor returned by NewCommandExecutor.
 // Tests inject a MockCommandExecutor to assert call args.
-func NewCLIClient(executor CommandExecutor, timeoutSeconds ...int) *cliClient {
+func NewCLIClient(executor CommandExecutor, timeoutSeconds ...int) *CLIClient {
 	timeout := defaultCLITimeout
 	if len(timeoutSeconds) > 0 {
 		timeout = time.Duration(timeoutSeconds[0]) * time.Second
@@ -298,8 +303,8 @@ func (c *cliClient) parseWorktreeList(output string) ([]core.WorktreeInfo, error
 	var worktrees []core.WorktreeInfo
 	var currentWorktree *core.WorktreeInfo
 
-	lines := strings.Split(output, "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(output, "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

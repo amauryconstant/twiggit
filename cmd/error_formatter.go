@@ -51,18 +51,21 @@ func NewErrorFormatter() *ErrorFormatter {
 
 // NewErrorFormatterWithOptions creates a new error formatter with options.
 //
-// Dispatch order: ValidationError → NotFoundError → OperationError.
-// OperationError formats dispatch on Op for resource-specific hints;
-// ValidationError renders suggestions and (legacy) field context;
-// NotFoundError renders the per-resource hint from hintFor.
+// Dispatch order: OperationError → NotFoundError → ValidationError.
+// OperationError is checked first so a wrapper that embeds a
+// ValidationError in its Cause still renders via the wrapper's own
+// Message + Op context. NotFoundError catches the four canonical
+// not-found sentinels before falling through to ValidationError,
+// which renders suggestions and (legacy) field context for leaf
+// validation failures.
 func NewErrorFormatterWithOptions(quiet bool) *ErrorFormatter {
 	formatter := &ErrorFormatter{
 		quiet: quiet,
 	}
 
-	formatter.register(isValidationError, formatValidationError)
-	formatter.register(isNotFoundError, formatNotFoundError)
 	formatter.register(isOperationError, formatOperationError)
+	formatter.register(isNotFoundError, formatNotFoundError)
+	formatter.register(isValidationError, formatValidationError)
 
 	return formatter
 }
@@ -161,9 +164,11 @@ func formatOperationError(err error) string {
 		return ""
 	}
 	output := fmt.Sprintf("Error: %s\n", oe.Error())
+	var outputSb164 strings.Builder
 	for _, suggestion := range oe.Suggestions {
-		output += fmt.Sprintf("Hint: %s\n", suggestion)
+		outputSb164.WriteString(fmt.Sprintf("Hint: %s\n", suggestion))
 	}
+	output += outputSb164.String()
 	if hint := hintFor(err); hint != "" {
 		output += fmt.Sprintf("Hint: %s\n", hint)
 	}

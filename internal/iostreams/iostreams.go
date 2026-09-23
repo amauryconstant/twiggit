@@ -37,9 +37,9 @@ type IOStreams struct {
 // via golang.org/x/term; colorEnabled is on only when stdout is
 // a TTY and NO_COLOR is unset.
 func System() *IOStreams {
-	stdoutFD := int(os.Stdout.Fd())
-	stderrFD := int(os.Stderr.Fd())
-	stdinFD := int(os.Stdin.Fd())
+	stdoutFD := int(os.Stdout.Fd()) // #nosec G115 -- file descriptors bounded by OS limit
+	stderrFD := int(os.Stderr.Fd()) // #nosec G115 -- file descriptors bounded by OS limit
+	stdinFD := int(os.Stdin.Fd())   // #nosec G115 -- file descriptors bounded by OS limit
 	stdoutTTY := term.IsTerminal(stdoutFD)
 	stderrTTY := term.IsTerminal(stderrFD)
 	stdinTTY := term.IsTerminal(stdinFD)
@@ -104,7 +104,7 @@ func (s *IOStreams) Verbosef(format string, args ...any) {
 		return
 	}
 	line := s.styles.Dim(fmt.Sprintf(format, args...))
-	fmt.Fprintln(s.ErrOut, line)
+	_, _ = fmt.Fprintln(s.ErrOut, line)
 }
 
 // SetColorEnabled forces the color gate on or off. Test-only

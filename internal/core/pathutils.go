@@ -6,6 +6,10 @@ import (
 	"strings"
 )
 
+// ExtractProjectFromWorktreePath returns the project segment of
+// worktreePath when it lives under worktreesDir (e.g. <worktreesDir>/<project>/<branch>).
+// Returns an empty string and nil error when the path is not under
+// worktreesDir, or a wrapped error when filepath.Rel fails.
 func ExtractProjectFromWorktreePath(worktreePath, worktreesDir string) (string, error) {
 	cleanedWorktreesDir := filepath.Clean(worktreesDir)
 	if !strings.HasPrefix(worktreePath, cleanedWorktreesDir+string(filepath.Separator)) {
@@ -25,6 +29,10 @@ func ExtractProjectFromWorktreePath(worktreePath, worktreesDir string) (string, 
 	return parts[0], nil
 }
 
+// NormalizePath cleans path, resolves it to an absolute path, and
+// follows symlinks when possible. When symlink resolution fails it
+// falls back to the absolute form and returns nil error so callers
+// see a usable path even on broken-symlink scenarios.
 func NormalizePath(path string) (string, error) {
 	cleaned := filepath.Clean(path)
 
@@ -41,6 +49,10 @@ func NormalizePath(path string) (string, error) {
 	return resolved, nil
 }
 
+// IsPathUnder reports whether target is the same path as, or sits
+// beneath, base after symlink and absolute-path normalisation. Empty
+// base or target yields an error so callers can distinguish "outside
+// the tree" from "misconfigured input".
 func IsPathUnder(base, target string) (bool, error) {
 	if base == "" && target == "" {
 		return true, nil

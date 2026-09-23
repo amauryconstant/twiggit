@@ -66,7 +66,7 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if opts.ConfigFile != "" && !opts.Install {
 				return core.NewUsageError("--config requires --install", nil)
 			}
@@ -125,7 +125,7 @@ func runInitStdout(opts *InitOptions) error {
 		return fmt.Errorf("failed to generate wrapper: %w", err)
 	}
 
-	fmt.Fprint(writeOrIgnore(opts.IO.Out), wrapper)
+	_, _ = fmt.Fprint(writeOrIgnore(opts.IO.Out), wrapper)
 	return nil
 }
 
@@ -227,23 +227,23 @@ func isAlreadyInstalled(err error) bool {
 func displayInitResults(out io.Writer, result *core.SetupShellResult) error {
 	out = writeOrIgnore(out)
 	if result.IsSkipped {
-		fmt.Fprintf(out, "Shell wrapper already installed for %s\n", result.ShellType)
-		fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
-		fmt.Fprintf(out, "Use --force to reinstall\n")
+		_, _ = fmt.Fprintf(out, "Shell wrapper already installed for %s\n", result.ShellType)
+		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
+		_, _ = fmt.Fprintf(out, "Use --force to reinstall\n")
 		return nil
 	}
 
 	if result.IsInstalled {
-		fmt.Fprintf(out, "Shell wrapper installed for %s\n", result.ShellType)
-		fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
+		_, _ = fmt.Fprintf(out, "Shell wrapper installed for %s\n", result.ShellType)
+		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
 		if _, err := os.Stat(result.ConfigFile); err == nil {
-			fmt.Fprintf(out, "\nTo activate the wrapper:\n")
-			fmt.Fprintf(out, "  1. Restart your shell, or\n")
-			fmt.Fprintf(out, "  2. Run: source %s\n", result.ConfigFile)
+			_, _ = fmt.Fprintf(out, "\nTo activate the wrapper:\n")
+			_, _ = fmt.Fprintf(out, "  1. Restart your shell, or\n")
+			_, _ = fmt.Fprintf(out, "  2. Run: source %s\n", result.ConfigFile)
 		}
-		fmt.Fprintf(out, "\nUsage:\n")
-		fmt.Fprintf(out, "  twiggit cd <branch>     # Change to worktree\n")
-		fmt.Fprintf(out, "  builtin cd <path>       # Use shell built-in cd\n")
+		_, _ = fmt.Fprintf(out, "\nUsage:\n")
+		_, _ = fmt.Fprintf(out, "  twiggit cd <branch>     # Change to worktree\n")
+		_, _ = fmt.Fprintf(out, "  builtin cd <path>       # Use shell built-in cd\n")
 	}
 
 	return nil

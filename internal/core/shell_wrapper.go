@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// ShellWrapper renders the eval-safe shell wrapper script for the
+// given shellType. The output is intended for `eval "$(twiggit init
+// <shell>)"` style activation, with timestamp and shell markers
+// substituted in place of the template placeholders.
 func ShellWrapper(shellType ShellType) (string, error) {
 	template, err := wrapperTemplate(shellType)
 	if err != nil {

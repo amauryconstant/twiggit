@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSentinels_Messages(t *testing.T) {
@@ -57,7 +58,7 @@ func TestShellNotInstalledError_OpAndUnwrap(t *testing.T) {
 func TestShellInvalidTypeError_Op(t *testing.T) {
 	err := NewShellInvalidTypeError("powershell", "unsupported shell", nil)
 	assert.Equal(t, "shell.invalid_type", err.Op)
-	assert.NoError(t, err.Unwrap())
+	require.NoError(t, err.Unwrap())
 	msg := err.Error()
 	assert.Contains(t, msg, "invalid shell type")
 	assert.Contains(t, msg, "powershell")
@@ -78,7 +79,7 @@ func TestShellInferenceError_OpAndUnwrap(t *testing.T) {
 func TestShellDetectionError_Op(t *testing.T) {
 	err := NewShellDetectionError("SHELL env unset", nil)
 	assert.Equal(t, "shell.detection", err.Op)
-	assert.NoError(t, err.Unwrap())
+	require.NoError(t, err.Unwrap())
 	msg := err.Error()
 	assert.Contains(t, msg, "shell.detection")
 	assert.Contains(t, msg, "SHELL env unset")

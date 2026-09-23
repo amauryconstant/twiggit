@@ -86,11 +86,13 @@ func TestFactory_InitTouchesEveryLazyField(t *testing.T) {
 	t.Parallel()
 
 	t.Run("happy path", func(t *testing.T) {
+		t.Parallel()
 		f := cmdutil.NewFactory()
 		assert.NoError(t, f.Init())
 	})
 
 	t.Run("config failure surfaces", func(t *testing.T) {
+		t.Parallel()
 		f := cmdutil.NewFactory()
 		f.Config = func() (*core.Config, error) { return nil, errors.New("config broken") }
 

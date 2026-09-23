@@ -1,5 +1,4 @@
 //go:build e2e
-// +build e2e
 
 package e2e
 
@@ -208,13 +207,6 @@ func generateDiff(expected, actual string) string {
 	}
 
 	return buf.String()
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 // sanitizeOutput replaces temporary paths and branch names with stable placeholders

@@ -115,7 +115,7 @@ func (e *NotFoundError) Error() string {
 	if e.Name != "" {
 		return fmt.Sprintf("%s %q not found", e.Entity, e.Name)
 	}
-	return fmt.Sprintf("%s not found", e.Entity)
+	return e.Entity + " not found"
 }
 
 // Unwrap returns nil: NotFoundError is terminal.

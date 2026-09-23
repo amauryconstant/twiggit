@@ -21,15 +21,14 @@ import (
 // exists for the error-handler path where the cmd is the only handle.
 type iosContextKey struct{}
 
-// setIOStreams attaches ios to cmd's context. main.go calls this
+// SetIOStreams attaches ios to cmd's context. main.go calls this
 // once when building the root command; subcommands inherit the same
 // context through cobra's PersistentPreRunE / RunE plumbing.
 //
 // Returns the receiver for fluent composition with NewRootCommand.
 //
-// Exported as SetIOStreams so cmd/root.go's PersistentPreRunE can
-// stash the Factory-supplied IOStreams on cmd before the first
-// subcommand runs.
+// Exported so cmd/root.go's PersistentPreRunE can stash the
+// Factory-supplied IOStreams on cmd before the first subcommand runs.
 func SetIOStreams(cmd *cobra.Command, ios *iostreams.IOStreams) *cobra.Command {
 	ctx := cmd.Context()
 	if ctx == nil {

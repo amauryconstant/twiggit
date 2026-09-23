@@ -13,7 +13,7 @@ type BenchmarkResult struct {
 	AvgDuration   time.Duration `json:"avg_duration"`
 	MinDuration   time.Duration `json:"min_duration"`
 	MaxDuration   time.Duration `json:"max_duration"`
-	LastResult    interface{}   `json:"last_result,omitempty"`
+	LastResult    any           `json:"last_result,omitempty"`
 }
 
 // PerformanceTestHelper provides functional performance testing utilities
@@ -55,7 +55,7 @@ func (h *PerformanceTestHelper) MeasureFunction(fn func()) (time.Duration, error
 }
 
 // BenchmarkFunction benchmarks a function over multiple iterations
-func (h *PerformanceTestHelper) BenchmarkFunction(iterations int, fn func() interface{}) (*BenchmarkResult, error) {
+func (h *PerformanceTestHelper) BenchmarkFunction(iterations int, fn func() any) (*BenchmarkResult, error) {
 	if iterations <= 0 {
 		iterations = h.iterations
 	}

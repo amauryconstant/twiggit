@@ -77,7 +77,7 @@ func (r *HookRunner) Run(ctx context.Context, req *core.HookRunRequest) (*core.H
 		return noOpResult(req), nil
 	}
 
-	return r.executeCommands(ctx, req, definition.Commands)
+	return r.executeCommands(ctx, req, definition.Commands), nil
 }
 
 func noOpResult(req *core.HookRunRequest) *core.HookResult {
@@ -107,7 +107,7 @@ func (r *HookRunner) readHookConfig(path string) (*core.HookConfig, error) {
 	return hookConfig.Hooks, nil
 }
 
-func (r *HookRunner) executeCommands(ctx context.Context, req *core.HookRunRequest, commands []string) (*core.HookResult, error) {
+func (r *HookRunner) executeCommands(ctx context.Context, req *core.HookRunRequest, commands []string) *core.HookResult {
 	result := &core.HookResult{
 		HookType:     req.HookType,
 		HasExecuted:  true,
@@ -147,7 +147,7 @@ func (r *HookRunner) executeCommands(ctx context.Context, req *core.HookRunReque
 		}
 	}
 
-	return result, nil
+	return result
 }
 
 func (r *HookRunner) buildEnvExports(req *core.HookRunRequest) string {

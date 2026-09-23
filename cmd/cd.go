@@ -56,7 +56,7 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.Target = args[0]
 			}
@@ -130,14 +130,14 @@ func runCd(opts *CdOptions) error {
 			return &core.OperationError{
 				Op:      "cd.worktree",
 				Entity:  target,
-				Message: "worktree not found",
+				Message: fmt.Sprintf("worktree not found for target '%s'", target),
 				Cause:   validateErr,
 			}
 		}
 		return &core.OperationError{
 			Op:      "cd.worktree",
 			Entity:  target,
-			Message: "project not found",
+			Message: fmt.Sprintf("project not found for target '%s'", target),
 			Cause:   validateErr,
 		}
 	}

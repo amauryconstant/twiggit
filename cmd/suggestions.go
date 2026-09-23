@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"sort"
 	"time"
@@ -97,19 +98,19 @@ func actionBranchesForProject(projectName string, f *CommandConfig) carapace.Act
 }
 
 // listProjects returns the project names discovered under cfg.ProjectsDirectory.
-func listProjects(ctx context.Context, f *CommandConfig) ([]string, error) {
+func listProjects(_ context.Context, f *CommandConfig) ([]string, error) {
 	cfg, err := f.Config()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load config: %w", err)
 	}
 	gitClient, err := f.GitClient()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init git client: %w", err)
 	}
 	finder := git.NewRepoFinder(gitClient)
 	gitDirs, err := finder.FindGitRepositories(cfg.ProjectsDirectory)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("find git repositories: %w", err)
 	}
 	projects := make([]string, 0, len(gitDirs))
 	for _, gd := range gitDirs {
@@ -125,11 +126,11 @@ func listProjects(ctx context.Context, f *CommandConfig) ([]string, error) {
 func listBranchesFromContext(ctx context.Context, f *CommandConfig) ([]string, error) {
 	cfg, err := f.Config()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load config: %w", err)
 	}
 	gitClient, err := f.GitClient()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init git client: %w", err)
 	}
 	projectPath := pickProjectPath(ctx, f, cfg)
 	if projectPath == "" {
@@ -137,7 +138,7 @@ func listBranchesFromContext(ctx context.Context, f *CommandConfig) ([]string, e
 	}
 	branches, err := gitClient.ListBranches(ctx, projectPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list branches: %w", err)
 	}
 	out := make([]string, 0, len(branches))
 	for _, b := range branches {
@@ -151,16 +152,16 @@ func listBranchesFromContext(ctx context.Context, f *CommandConfig) ([]string, e
 func listBranchesForProject(ctx context.Context, f *CommandConfig, projectName string) ([]string, error) {
 	cfg, err := f.Config()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load config: %w", err)
 	}
 	gitClient, err := f.GitClient()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("init git client: %w", err)
 	}
 	projectPath := filepath.Join(cfg.ProjectsDirectory, filepath.Base(projectName))
 	branches, err := gitClient.ListBranches(ctx, projectPath)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("list branches: %w", err)
 	}
 	out := make([]string, 0, len(branches))
 	for _, b := range branches {

@@ -104,11 +104,6 @@ func containsPathTraversal(s string) bool {
 	return false
 }
 
-// buildWorktreePath builds the path to a worktree for a given project and branch
-func buildWorktreePath(worktreesDir, project, branch string) string {
-	return filepath.Join(worktreesDir, project, branch)
-}
-
 // resolveMainIdentifier resolves "main" to the project root path
 func (cr *contextResolver) resolveMainIdentifier(ctx *core.Context) (*core.ResolutionResult, error) {
 	if containsPathTraversal(ctx.ProjectName) {
@@ -160,22 +155,6 @@ func (cr *contextResolver) resolveWorktreePath(ctx *core.Context, identifier str
 	}, nil
 }
 
-// buildProjectPath builds the path to a project directory
-func buildProjectPath(projectsDir, project string) string {
-	return filepath.Join(projectsDir, project)
-}
-
-// filterSuggestions filters suggestions based on a partial string match
-func filterSuggestions(suggestions []string, partial string) []string {
-	result := make([]string, 0, len(suggestions))
-	for _, suggestion := range suggestions {
-		if strings.HasPrefix(suggestion, partial) {
-			result = append(result, suggestion)
-		}
-	}
-	return result
-}
-
 type contextResolver struct {
 	config     *core.Config
 	goGit      *Client
@@ -188,7 +167,7 @@ type contextResolver struct {
 type ContextResolver = contextResolver
 
 // NewContextResolver creates a new context resolver.
-func NewContextResolver(cfg *core.Config, goGit *Client, cli *Client) *contextResolver {
+func NewContextResolver(cfg *core.Config, goGit *Client, cli *Client) *ContextResolver {
 	return &contextResolver{
 		config:     cfg,
 		goGit:      goGit,
@@ -270,7 +249,7 @@ func worktreeExists(path string) bool {
 	if err != nil {
 		return false
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	_, err = root.Stat(base)
 	return !errors.Is(err, os.ErrNotExist)
 }

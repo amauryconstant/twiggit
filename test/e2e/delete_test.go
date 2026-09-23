@@ -1,5 +1,4 @@
 //go:build e2e
-// +build e2e
 
 // Package e2e provides end-to-end tests for twiggit delete command.
 // Tests validate worktree deletion with force, keep-branch, and merged-only flags.

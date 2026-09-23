@@ -57,7 +57,7 @@ func NewShellDetectionError(context string, err error) *OperationError {
 	return &OperationError{
 		Op:      "shell.detection",
 		Field:   context,
-		Message: "shell detection failed",
+		Message: "shell auto-detection failed",
 		Cause:   err,
 	}
 }

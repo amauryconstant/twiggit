@@ -1,3 +1,4 @@
+// Command twiggit is the worktree-management CLI entry point.
 package main
 
 import (
@@ -47,16 +48,18 @@ func main() {
 	rootCmd.SetContext(ctx)
 
 	if err := rootCmd.Execute(); err != nil {
-		exitCode := signalAwareExitCode(ctx, err)
+		ios := factory.IOStreams
+		exitCode := cmdutil.ExitCodeFor(err)
+		if errors.Is(ctx.Err(), context.Canceled) {
+			exitCode = cmdutil.ExitError
+		}
+		if exitCode == cmdutil.ExitUsage {
+			_, _ = fmt.Fprintf(ios.ErrOut, "Error: %s\n", err.Error())
+		} else {
+			output.FormatError(ios.ErrOut, err, ios)
+		}
 		if exitCode != 0 {
 			os.Exit(int(exitCode))
 		}
 	}
-}
-
-func signalAwareExitCode(ctx context.Context, err error) cmdutil.ExitCode {
-	if errors.Is(ctx.Err(), context.Canceled) {
-		return cmdutil.ExitError
-	}
-	return cmdutil.ExitCodeFor(err)
 }

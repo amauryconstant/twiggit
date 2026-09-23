@@ -34,7 +34,7 @@ func NewGitWorktreeError(worktreePath, branchName, message string, err error) *O
 // chain; this constructor retains the legacy signature for source
 // compatibility but the rich context is no longer carried on the
 // OperationError directly.
-func NewGitCommandError(command string, args []string, exitCode int, stdout, stderr, message string, err error) *OperationError {
+func NewGitCommandError(command string, args []string, exitCode int, _, _, message string, err error) *OperationError {
 	msg := command
 	if len(args) > 0 {
 		msg += " " + strings.Join(args, " ")

@@ -1,2 +1,3 @@
-Error: worktree not found for target '/tmp/fixtures/worktrees/test-project/non-existent-worktree' (context: /tmp/fixtures/projects/test-project)
-Hint: Use 'twiggit list' to see available navigation targets
+Error: invalid git repository
+  op=status.worktree entity=/tmp/fixtures/worktrees/test-project/non-existent-worktree
+  cause: git git.repository: not a valid git repository
