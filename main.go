@@ -1,13 +1,18 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
 	"runtime/debug"
+	"syscall"
 
 	"twiggit/cmd"
 	"twiggit/internal/cmdutil"
+	"twiggit/internal/output"
 )
 
 func main() {
@@ -16,6 +21,9 @@ func main() {
 		slogLevel = slog.LevelDebug
 	}
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slogLevel})))
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	defer func() {
 		if r := recover(); r != nil {
@@ -30,13 +38,25 @@ func main() {
 
 	factory := cmdutil.NewFactory()
 	if err := factory.Init(); err != nil {
-		os.Exit(int(cmd.HandleCLIError(err)))
+		output.FormatError(os.Stderr, err, nil)
+		os.Exit(int(cmdutil.ExitCodeFor(err)))
 	}
+	factory.Context = ctx
 
 	rootCmd := cmd.NewRootCommand(factory)
+	rootCmd.SetContext(ctx)
 
 	if err := rootCmd.Execute(); err != nil {
-		exitCode := cmd.HandleCLIErrorWithCommand(rootCmd, err)
-		os.Exit(int(exitCode))
+		exitCode := signalAwareExitCode(ctx, err)
+		if exitCode != 0 {
+			os.Exit(int(exitCode))
+		}
 	}
+}
+
+func signalAwareExitCode(ctx context.Context, err error) cmdutil.ExitCode {
+	if errors.Is(ctx.Err(), context.Canceled) {
+		return cmdutil.ExitError
+	}
+	return cmdutil.ExitCodeFor(err)
 }
