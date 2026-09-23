@@ -17,12 +17,12 @@ import (
 // ValidationError in its Cause still renders via the wrapper's own
 // Message + Op context.
 //
-//	1. core.OperationError  (runtime wrapper, dispatched first so it
-//	   catches shell/navigation/git wrappers before their inner
-//	   ValidationError gets a chance to match)
-//	2. core.UsageError      (invocation-level usage failure)
-//	3. core.NotFoundError   (resource missing)
-//	4. core.ValidationError (leaf argument / input validation)
+//  1. core.OperationError  (runtime wrapper, dispatched first so it
+//     catches shell/navigation/git wrappers before their inner
+//     ValidationError gets a chance to match)
+//  2. core.UsageError      (invocation-level usage failure)
+//  3. core.NotFoundError   (resource missing)
+//  4. core.ValidationError (leaf argument / input validation)
 //
 // Anything else falls through to a one-line "Error: <msg>"
 // rendering. When TWIGGIT_DEBUG is set the full error chain is
