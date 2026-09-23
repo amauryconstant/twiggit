@@ -136,10 +136,10 @@ func runDelete(opts *DeleteOptions) error {
 				if opts.ChangeDir {
 					nav := getDeleteNavigationTarget(currentCtx, worktreePath)
 					if nav != "" {
-						_, _ = fmt.Fprintln(opts.IO.Out, nav)
+						fmt.Fprintln(writeOrIgnore(opts.IO.Out), nav)
 					}
 				} else {
-					_, _ = fmt.Fprintf(opts.IO.Out, "Deleted worktree: %s (already removed)\n", worktreePath)
+					fmt.Fprintf(writeOrIgnore(opts.IO.Out), "Deleted worktree: %s (already removed)\n", worktreePath)
 				}
 				return &core.OperationError{
 					Op:      "delete.worktree",
@@ -180,10 +180,10 @@ func runDelete(opts *DeleteOptions) error {
 	if opts.ChangeDir {
 		nav := getDeleteNavigationTarget(currentCtx, worktreePath)
 		if nav != "" {
-			_, _ = fmt.Fprintln(opts.IO.Out, nav)
+			fmt.Fprintln(writeOrIgnore(opts.IO.Out), nav)
 		}
 	} else if !opts.IO.Quiet {
-		_, _ = fmt.Fprintf(opts.IO.Out, "Deleted worktree: %s\n", worktreePath)
+		fmt.Fprintf(writeOrIgnore(opts.IO.Out), "Deleted worktree: %s\n", worktreePath)
 	}
 
 	return nil

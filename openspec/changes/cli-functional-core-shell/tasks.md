@@ -88,48 +88,48 @@
 
 ## 9. Hook runner migration
 
-- [ ] 9.1 Move `internal/infrastructure/hook_runner.go` to `internal/git/hook_runner.go`; verify by `go build ./internal/git/` clean.
-- [ ] 9.2 Update `domain.*` → `core.*` references in `internal/git/hook_runner.go`; verify by `go test ./internal/git/...` passes.
-- [ ] 9.3 Update `git-hook-runner` spec delta path references; verify by `openspec validate cli-functional-core-shell --strict --json` zero issues.
+- [x] 9.1 Move `internal/infrastructure/hook_runner.go` to `internal/git/hook_runner.go`; verify by `go build ./internal/git/` clean.
+- [x] 9.2 Update `domain.*` → `core.*` references in `internal/git/hook_runner.go`; verify by `go test ./internal/git/...` passes.
+- [x] 9.3 Update `git-hook-runner` spec delta path references; verify by `openspec validate cli-functional-core-shell --strict --json` zero issues.
 
 ## 10. lipgloss + iostreams + output packages
 
-- [ ] 10.1 Add `github.com/charmbracelet/lipgloss` to `go.mod` (pin version at apply time); verify by `go mod tidy` succeeds.
-- [ ] 10.2 Create `internal/iostreams/iostreams.go` with `IOStreams` struct (including `colorEnabled`, `isStdoutTTY`, `isStderrTTY`, `Quiet`, `Logger` fields) + `System()` and `Test()` constructors + TTY detection + `NO_COLOR` env handling; verify by `go build ./internal/iostreams/` clean.
-- [ ] 10.3 Create `internal/iostreams/styles.go` using lipgloss for header / success / error / hint styles (identity-rendering when `colorEnabled == false`); verify by `go test ./internal/iostreams/...` passes.
-- [ ] 10.4 Create `internal/output/formatter.go` with single-method `Formatter` interface + `JSONFormatter` / `JSONLinesFormatter` / `TableFormatter` / `PlainFormatter` implementations + registry; verify by `go test ./internal/output/...` passes.
-- [ ] 10.5 Create `internal/output/errors.go` with `FormatError(w, err, ios)` dispatch via `errors.As` on `core.ValidationError`, `core.NotFoundError`, `core.OperationError`, `core.UsageError`; `OperationError.Suggestions` render after the message; `TWIGGIT_DEBUG=1` reveals the full chain; verify by `go test ./internal/output/...` passes.
-- [ ] 10.6 Create `internal/output/table.go` using lipgloss for table rendering; verify by `go test ./internal/output/...` passes.
-- [ ] 10.7 Create `internal/output/wrapper.go` with `output.ComposeWrapper(template, core.ShellType)`; verify by `go test ./internal/output/...` passes.
+- [x] 10.1 Add `github.com/charmbracelet/lipgloss` to `go.mod` (pin version at apply time); verify by `go mod tidy` succeeds.
+- [x] 10.2 Create `internal/iostreams/iostreams.go` with `IOStreams` struct (including `colorEnabled`, `isStdoutTTY`, `isStderrTTY`, `Quiet`, `Logger` fields) + `System()` and `Test()` constructors + TTY detection + `NO_COLOR` env handling; verify by `go build ./internal/iostreams/` clean.
+- [x] 10.3 Create `internal/iostreams/styles.go` using lipgloss for header / success / error / hint styles (identity-rendering when `colorEnabled == false`); verify by `go test ./internal/iostreams/...` passes.
+- [x] 10.4 Create `internal/output/formatter.go` with single-method `Formatter` interface + `JSONFormatter` / `JSONLinesFormatter` / `TableFormatter` / `PlainFormatter` implementations + registry; verify by `go test ./internal/output/...` passes.
+- [x] 10.5 Create `internal/output/errors.go` with `FormatError(w, err, ios)` dispatch via `errors.As` on `core.ValidationError`, `core.NotFoundError`, `core.OperationError`, `core.UsageError`; `OperationError.Suggestions` render after the message; `TWIGGIT_DEBUG=1` reveals the full chain; verify by `go test ./internal/output/...` passes.
+- [x] 10.6 Create `internal/output/table.go` using lipgloss for table rendering; verify by `go test ./internal/output/...` passes.
+- [x] 10.7 Create `internal/output/wrapper.go` with `output.ComposeWrapper(template, core.ShellType)`; verify by `go test ./internal/output/...` passes.
 
 ## 11. cmdutil + Factory + ExitCodeFor
 
-- [ ] 11.1 Create `internal/cmdutil/factory.go` with lazy `func() T` fields + `sync.OnceValue`-cached config + `Init()` step; verify by `go test ./internal/cmdutil/...` passes.
-- [ ] 11.2 Create `internal/cmdutil/exit.go` with `type ExitCode int` + `ExitOK`/`ExitError`/`ExitUsage` constants + `ExitCodeFor(err error) ExitCode`; verify by `go test ./internal/cmdutil/...` passes.
-- [ ] 11.3 Create `internal/cmdutil/json_flags.go` with shared `--output` / `--quiet` / `--verbose` flag helpers; verify by `go test ./internal/cmdutil/...` passes.
-- [ ] 11.4 Create `internal/cmdutil/hook_runner_iface.go` with the consumer-side `HookRunner` interface (`Run(ctx, *core.HookRunRequest) (*core.HookResult, error)`); verify by `go build ./internal/cmdutil/` clean.
-- [ ] 11.5 Add `cli-factory`, `cli-iostreams`, `cli-output`, `cli-exit-codes`, `core-errors`, `core-types`, `core-paths`, `git-config`, `git-client`, `git-context-resolver`, `git-hook-runner`, `git-shell-detect` spec delta path references; verify by `openspec validate cli-functional-core-shell --strict --json` zero issues.
+- [x] 11.1 Create `internal/cmdutil/factory.go` with lazy `func() T` fields + `sync.OnceValue`-cached config + `Init()` step; verify by `go test ./internal/cmdutil/...` passes.
+- [x] 11.2 Create `internal/cmdutil/exit.go` with `type ExitCode int` + `ExitOK`/`ExitError`/`ExitUsage` constants + `ExitCodeFor(err error) ExitCode`; verify by `go test ./internal/cmdutil/...` passes.
+- [x] 11.3 Create `internal/cmdutil/global_flags.go` with shared `--output` / `--quiet` / `--verbose` flag helpers; verify by `go test ./internal/cmdutil/...` passes.
+- [x] 11.4 Create `internal/cmdutil/hook_runner_iface.go` with the consumer-side `HookRunner` interface (`Run(ctx, *core.HookRunRequest) (*core.HookResult, error)`); verify by `go build ./internal/cmdutil/` clean.
+- [x] 11.5 Add `cli-factory`, `cli-iostreams`, `cli-output`, `cli-exit-codes`, `core-errors`, `core-types`, `core-paths`, `git-config`, `git-client`, `git-context-resolver`, `git-hook-runner`, `git-shell-detect` spec delta path references; verify by `openspec validate cli-functional-core-shell --strict --json` zero issues.
 
 ## 12. Delete legacy packages
 
-- [ ] 12.1 Verify no remaining import of `twiggit/internal/application` anywhere in the repo; verify by `rg 'twiggit/internal/application' --type go` returns no matches.
-- [ ] 12.2 Verify no remaining import of `twiggit/internal/service` anywhere in the repo; verify by `rg 'twiggit/internal/service' --type go` returns no matches.
-- [ ] 12.3 Verify no remaining import of `twiggit/internal/infrastructure` anywhere in the repo; verify by `rg 'twiggit/internal/infrastructure' --type go` returns no matches.
-- [ ] 12.4 Delete `internal/application/`, `internal/service/`, `internal/infrastructure/` directories; verify by `ls internal/application internal/service internal/infrastructure` reports no such file or directory.
-- [ ] 12.5 Run full build + test suite; verify by `go build ./... && go test ./...` exits 0.
+- [x] 12.1 Verify no remaining import of `twiggit/internal/application` anywhere in the repo; verify by `rg 'twiggit/internal/application' --type go` returns no matches.
+- [x] 12.2 Verify no remaining import of `twiggit/internal/service` anywhere in the repo; verify by `rg 'twiggit/internal/service' --type go` returns no matches.
+- [x] 12.3 Verify no remaining import of `twiggit/internal/infrastructure` anywhere in the repo; verify by `rg 'twiggit/internal/infrastructure' --type go` returns no matches.
+- [x] 12.4 Delete `internal/application/`, `internal/service/`, `internal/infrastructure/` directories; verify by `ls internal/application internal/service internal/infrastructure` reports no such file or directory.
+- [x] 12.5 Run full build + test suite; verify by `go build ./... && go test ./...` exits 0.
 
 ## 13. cmd/ refactor (per command)
 
-- [ ] 13.1 Refactor `cmd/list.go` to `Options` struct + `NewCmdList(f, runF)` + `runList(opts)`; verify by `go test ./cmd/...` passes and e2e tests for `list` still pass.
-- [ ] 13.2 Refactor `cmd/create.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `create` still pass.
-- [ ] 13.3 Refactor `cmd/delete.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `delete` still pass.
-- [ ] 13.4 Refactor `cmd/prune.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `prune` still pass.
-- [ ] 13.5 Refactor `cmd/cd.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `cd` still pass.
-- [ ] 13.6 Refactor `cmd/init.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `init` still pass.
-- [ ] 13.7 Refactor `cmd/version.go` and `cmd/_carapace.go` to the same pattern; verify by `go test ./cmd/...` passes.
-- [ ] 13.8 Route all output through `iostreams.IOStreams` (no more direct `os.Stdout`/`os.Stderr`); verify by `rg 'os\.Stdout|os\.Stderr' cmd/` returns no matches outside `main.go`.
-- [ ] 13.9 Route all error formatting through `output.FormatError`; verify by `rg 'cli/error' cmd/` returns no matches.
-- [ ] 13.10 Add unit tests for `runList`, `runCreate`, `runDelete`, `runPrune`, `runCd`, `runInit` (testable via direct call); verify by `go test ./cmd/...` passes.
+- [x] 13.1 Refactor `cmd/list.go` to `Options` struct + `NewCmdList(f, runF)` + `runList(opts)`; verify by `go test ./cmd/...` passes and e2e tests for `list` still pass.
+- [x] 13.2 Refactor `cmd/create.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `create` still pass.
+- [x] 13.3 Refactor `cmd/delete.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `delete` still pass.
+- [x] 13.4 Refactor `cmd/prune.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `prune` still pass.
+- [x] 13.5 Refactor `cmd/cd.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `cd` still pass.
+- [x] 13.6 Refactor `cmd/init.go` to the same pattern; verify by `go test ./cmd/...` passes and e2e tests for `init` still pass.
+- [x] 13.7 Refactor `cmd/version.go` and `cmd/completion.go` to the same pattern; verify by `go test ./cmd/...` passes.
+- [x] 13.8 Route all output through `iostreams.IOStreams` (no more direct `os.Stdout`/`os.Stderr`); verify by `rg 'os\.Stdout|os\.Stderr' cmd/` returns no matches outside `main.go`.
+- [x] 13.9 Route all error formatting through `output.FormatError`; verify by `rg 'cli/error' cmd/` returns no matches.
+- [x] 13.10 Add unit tests for `runList`, `runCreate`, `runDelete`, `runPrune`, `runCd`, `runInit` (testable via direct call); verify by `go test ./cmd/...` passes.
 
 ## 14. main.go rewrite
 
@@ -151,15 +151,15 @@
 
 ## 16. Modernization sweep (final pass)
 
-- [ ] 16.1 Apply `os.IsNotExist` → `errors.Is(err, os.ErrNotExist)` across all new and migrated files; verify by `rg 'os\.IsNotExist' --type go` returns no matches.
-- [ ] 16.2 Apply `strings.HasPrefix + TrimPrefix` → `strings.CutPrefix` across all new and migrated files; verify by `rg 'HasPrefix.*TrimPrefix' --type go` returns no matches.
-- [ ] 16.3 Apply linear-scan → `slices.Contains` / `slices.Clone` across all new and migrated files; verify by `rg 'for _, .* := range .* { if .* == .* {' --type go` returns no matches.
-- [ ] 16.4 Apply `for i := 0; i < N; i++` → `for i := range N` across all new and migrated files; verify by `rg 'for i := 0; i < .*; i\+\+' --type go` returns no matches.
-- [ ] 16.5 Apply swallowed-error → `slog.Error` pattern across all new and migrated files; verify by `rg '_, _ = ' --type go` returns no matches.
-- [ ] 16.6 Run `gofmt -s -w` and `goimports -w` across all touched files; verify by `gofmt -l ./...` returns no matches.
-- [ ] 16.7 Run `go vet ./...`; verify by zero findings.
-- [ ] 16.8 Apply `sync.Once` blocks → `sync.OnceValue(func() (T, error))` / `sync.OnceFunc(func() T)` in migrated files; verify by `rg 'sync\.Once\b' internal/ --type go` returns no matches outside legacy packages.
-- [ ] 16.9 Wire `slog` setup through the Factory's lazy logger (not per-call `slog.Default()`); verify by `rg 'slog\.Default' internal/cmd internal/core --type go` returns no matches.
+- [x] 16.1 Apply `os.IsNotExist` → `errors.Is(err, os.ErrNotExist)` across all new and migrated files; verify by `rg 'os\.IsNotExist' --type go` returns no matches.
+- [x] 16.2 Apply `strings.HasPrefix + TrimPrefix` → `strings.CutPrefix` across all new and migrated files; verify by `rg 'HasPrefix.*TrimPrefix' --type go` returns no matches.
+- [x] 16.3 Apply linear-scan → `slices.Contains` / `slices.Clone` across all new and migrated files; verify by `rg 'for _, .* := range .* { if .* == .* {' --type go` returns no matches.
+- [x] 16.4 Apply `for i := 0; i < N; i++` → `for i := range N` across all new and migrated files; verify by `rg 'for i := 0; i < .*; i\+\+' --type go` returns no matches.
+- [x] 16.5 Apply swallowed-error → `slog.Error` pattern across all new and migrated files; verify by `rg '_, _ = ' --type go` returns no matches.
+- [x] 16.6 Run `gofmt -s -w` and `goimports -w` across all touched files; verify by `gofmt -l ./...` returns no matches.
+- [x] 16.7 Run `go vet ./...`; verify by zero findings.
+- [x] 16.8 Apply `sync.Once` blocks → `sync.OnceValue(func() (T, error))` / `sync.OnceFunc(func() T)` in migrated files; verify by `rg 'sync\.Once\b' internal/ --type go` returns no matches outside legacy packages.
+- [x] 16.9 Wire `slog` setup through the Factory's lazy logger (not per-call `slog.Default()`); verify by `rg 'slog\.Default' internal/cmd internal/core --type go` returns no matches.
 
 ## 17. Verification
 

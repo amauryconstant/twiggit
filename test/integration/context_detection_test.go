@@ -8,10 +8,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestContextDetector_Integration(t *testing.T) {

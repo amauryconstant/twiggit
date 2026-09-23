@@ -122,7 +122,7 @@ func TestWorktreeTestHelper_ListWorktrees(t *testing.T) {
 
 	helper := NewWorktreeTestHelper()
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		branchName := "list-test-" + strings.ToLower(time.Now().Format("20060102150405")) + string(rune('a'+i))
 		worktreePath := filepath.Join(t.TempDir(), branchName)
 		err := helper.CreateWorktree(repoPath, worktreePath, branchName)

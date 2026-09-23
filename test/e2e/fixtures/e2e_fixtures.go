@@ -173,7 +173,7 @@ func (f *E2ETestFixture) Build() string {
 // removeWorktreeWithRetry removes a worktree with retry logic and force flag
 func (f *E2ETestFixture) removeWorktreeWithRetry(worktreePath, mainRepoPath string) error {
 	maxRetries := 3
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		result, err := f.gitExecutor.Execute(
 			context.Background(),
 			mainRepoPath,

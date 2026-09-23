@@ -13,8 +13,9 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/pelletier/go-toml"
 	"twiggit/internal/core"
+
+	"github.com/pelletier/go-toml"
 )
 
 // ConfigHelper provides configuration management utilities for E2E tests

@@ -72,7 +72,7 @@ func (h *PerformanceTestHelper) BenchmarkFunction(iterations int, fn func() inte
 
 	// Run benchmark iterations
 	var totalDuration time.Duration
-	for i := 0; i < iterations; i++ {
+	for range iterations {
 		start := time.Now()
 		fnResult := fn()
 		duration := time.Since(start)

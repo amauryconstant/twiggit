@@ -43,11 +43,15 @@ func NewStyles(colorEnabled bool) *Styles {
 		}
 	}
 	return &Styles{
-		Error:   func(s string) string { return lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true).Render(s) },
-		Success: func(s string) string { return lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render(s) },
-		Hint:    func(s string) string { return lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(s) },
-		Header:  func(s string) string { return lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true).Render(s) },
-		Dim:     func(s string) string { return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(s) },
+		Error: func(s string) string { return lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true).Render(s) },
+		Success: func(s string) string {
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true).Render(s)
+		},
+		Hint: func(s string) string { return lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(s) },
+		Header: func(s string) string {
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Bold(true).Render(s)
+		},
+		Dim: func(s string) string { return lipgloss.NewStyle().Foreground(lipgloss.Color("8")).Render(s) },
 	}
 }
 

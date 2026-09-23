@@ -101,7 +101,7 @@ func (s *ConcurrentTestSuite) TestConcurrentListOperations() {
 	projectPath := s.createTestProject("test-project")
 
 	// Create some worktrees first using git CLI
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		branchName := fmt.Sprintf("feature-%d", i)
 		worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", branchName)
 
@@ -124,7 +124,7 @@ func (s *ConcurrentTestSuite) TestConcurrentListOperations() {
 	var wg sync.WaitGroup
 	errChan := make(chan error, 10)
 
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -159,7 +159,7 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateOperations() {
 	var wg sync.WaitGroup
 	errChan := make(chan error, 5)
 
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		wg.Add(1)
 		go func(idx int) {
 			defer wg.Done()
@@ -325,7 +325,7 @@ func (s *ConcurrentTestSuite) TestConcurrentPruneWhileList() {
 	projectPath := s.createTestProject("test-project")
 
 	// Create and merge some worktrees
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		branchName := fmt.Sprintf("prunable-%d", i)
 		worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", branchName)
 
@@ -359,7 +359,7 @@ func (s *ConcurrentTestSuite) TestConcurrentPruneWhileList() {
 	errChan := make(chan error, 6)
 
 	// List operations
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -379,7 +379,7 @@ func (s *ConcurrentTestSuite) TestConcurrentPruneWhileList() {
 	}
 
 	// Prune operations
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()

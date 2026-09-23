@@ -187,7 +187,7 @@ func runCreate(opts *CreateOptions) error {
 	result.HookResult = hookResult
 
 	if opts.CdFlag {
-		_, _ = fmt.Fprintln(opts.IO.Out, result.Worktree.Path)
+		fmt.Fprintln(writeOrIgnore(opts.IO.Out), result.Worktree.Path)
 	} else if !opts.IO.Quiet {
 		if err := displayCreateSuccess(opts.IO.Out, result.Worktree); err != nil {
 			return err
@@ -386,14 +386,15 @@ func displayCreateSuccess(out io.Writer, worktree *core.WorktreeInfo) error {
 
 // displayHookFailures displays hook failure warnings to stderr
 func displayHookFailures(out io.Writer, result *core.HookResult) {
-	_, _ = fmt.Fprintf(out, "\nWarning: %d post-create hook(s) failed. Worktree created but setup may be incomplete.\n", len(result.Failures))
+	out = writeOrIgnore(out)
+	fmt.Fprintf(out, "\nWarning: %d post-create hook(s) failed. Worktree created but setup may be incomplete.\n", len(result.Failures))
 	for _, failure := range result.Failures {
-		_, _ = fmt.Fprintf(out, "\n  Command: %s\n", failure.Command)
-		_, _ = fmt.Fprintf(out, "  Exit code: %d\n", failure.ExitCode)
+		fmt.Fprintf(out, "\n  Command: %s\n", failure.Command)
+		fmt.Fprintf(out, "  Exit code: %d\n", failure.ExitCode)
 		if failure.Output != "" {
-			_, _ = fmt.Fprintf(out, "  Output:\n")
+			fmt.Fprintf(out, "  Output:\n")
 			for _, line := range strings.Split(failure.Output, "\n") {
-				_, _ = fmt.Fprintf(out, "    %s\n", line)
+				fmt.Fprintf(out, "    %s\n", line)
 			}
 		}
 	}

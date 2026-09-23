@@ -67,11 +67,11 @@ func TestOperationError_Unwrap(t *testing.T) {
 // walks to its canonical NotFound sentinel via errors.Is.
 func TestErrSentinels_WalkThroughWraps(t *testing.T) {
 	tests := []struct {
-		name          string
-		err           error
-		ownSentinel   error
-		otherA        error
-		otherB        error
+		name        string
+		err         error
+		ownSentinel error
+		otherA      error
+		otherB      error
 	}{
 		{
 			name:        "NewGitRepositoryError → ErrGitRepoNotFound",

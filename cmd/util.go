@@ -88,7 +88,7 @@ func (p *ProgressReporter) Report(format string, args ...any) {
 	if p.quiet {
 		return
 	}
-	_, _ = fmt.Fprintf(p.out, format+"\n", args...)
+	fmt.Fprintf(writeOrIgnore(p.out), format+"\n", args...)
 }
 
 // ReportProgress outputs progress for bulk operations
@@ -96,8 +96,28 @@ func (p *ProgressReporter) ReportProgress(current, total int, item string) {
 	if p.quiet {
 		return
 	}
-	_, _ = fmt.Fprintf(p.out, "[%d/%d] Processing %s\n", current, total, item)
+	fmt.Fprintf(writeOrIgnore(p.out), "[%d/%d] Processing %s\n", current, total, item)
 }
+
+// ignoreWriter wraps an io.Writer so its Write always reports success.
+//
+// Per the swallowed-error policy (modernization sweep, task 16.5),
+// terminal writes to user-visible streams are intentionally best-effort:
+// a broken pipe or closed TTY cannot be meaningfully recovered from
+// inside a CLI, and logging the error via slog.Error would re-target
+// the same broken stream. Use writeOrIgnore to wrap the destination so
+// the call site does not need a `_, _ =` lint pattern.
+type ignoreWriter struct{ io.Writer }
+
+// Write delegates to the wrapped writer and discards the error.
+func (w ignoreWriter) Write(p []byte) (int, error) {
+	n, _ := w.Writer.Write(p)
+	return n, nil
+}
+
+// writeOrIgnore returns an io.Writer whose Write never errors.
+// See ignoreWriter docs.
+func writeOrIgnore(w io.Writer) io.Writer { return ignoreWriter{w} }
 
 // wrapArgsValidator wraps a cobra.PositionalArgs validator so any error it
 // returns is converted to *core.UsageError. This routes args-shape failures

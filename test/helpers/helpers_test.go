@@ -249,7 +249,7 @@ func TestPerformanceTestHelper_MeasureFunction(t *testing.T) {
 	// Test measuring a simple function
 	duration, err := helper.MeasureFunction(func() {
 		// Simulate some work
-		for i := 0; i < 1000; i++ {
+		for i := range 1000 {
 			_ = i * i
 		}
 	})
@@ -265,7 +265,7 @@ func TestPerformanceTestHelper_BenchmarkFunction(t *testing.T) {
 	result, err := helper.BenchmarkFunction(10, func() interface{} {
 		// Simulate some work and return a result
 		sum := 0
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			sum += i
 		}
 		return sum
@@ -298,7 +298,7 @@ func TestPerformanceTestHelper_MemoryUsage(t *testing.T) {
 	before, after, err := helper.MeasureMemoryUsage(func() {
 		// Simple function that doesn't allocate much
 		sum := 0
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			sum += i
 		}
 		_ = sum
@@ -424,7 +424,7 @@ func TestPerformanceTestHelper_MeasureFunctionWithMemory(t *testing.T) {
 
 	duration, beforeMem, afterMem, err := helper.MeasureFunctionWithMemory(func() {
 		sum := 0
-		for i := 0; i < 100; i++ {
+		for i := range 100 {
 			sum += i
 		}
 		_ = sum

@@ -84,7 +84,7 @@ func generateDiff(expected, actual string) string {
 
 	maxLines := max(len(expectedLines), len(actualLines))
 
-	for i := 0; i < maxLines; i++ {
+	for i := range maxLines {
 		expectedLine := ""
 		actualLine := ""
 

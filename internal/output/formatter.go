@@ -22,10 +22,10 @@ type Formatter interface {
 // values yield a nil Formatter so the caller can fall through to
 // human-readable rendering.
 const (
-	FormatJSON   = "json"
-	FormatJSONL  = "jsonl"
-	FormatTable  = "table"
-	FormatPlain  = "plain"
+	FormatJSON  = "json"
+	FormatJSONL = "jsonl"
+	FormatTable = "table"
+	FormatPlain = "plain"
 )
 
 // JSONFormatter encodes data as a single JSON object using

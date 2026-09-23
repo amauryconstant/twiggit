@@ -140,7 +140,7 @@ func runPrune(opts *PruneOptions) error {
 			SpecificWorktree: opts.SpecificWorktree,
 		}
 		reporter.Report("Previewing prune operation...")
-		previewResult, err := runPruneWalk(ctx, gitClient, cfg, previewReq, currentCtx)
+		previewResult, err := runPruneWalk(ctx, gitClient, opts.IO.Logger, cfg, previewReq, currentCtx)
 		if err != nil {
 			return fmt.Errorf("prune preview failed: %w", err)
 		}
@@ -151,7 +151,7 @@ func runPrune(opts *PruneOptions) error {
 			return err
 		}
 		if !confirmed {
-			_, _ = fmt.Fprintln(opts.IO.ErrOut, "Prune cancelled.")
+			fmt.Fprintln(writeOrIgnore(opts.IO.ErrOut), "Prune cancelled.")
 			return nil
 		}
 	}
@@ -168,7 +168,7 @@ func runPrune(opts *PruneOptions) error {
 		DryRun:           opts.DryRun,
 		SpecificWorktree: opts.SpecificWorktree,
 	}
-	result, err := runPruneWalk(ctx, gitClient, cfg, req, currentCtx)
+	result, err := runPruneWalk(ctx, gitClient, opts.IO.Logger, cfg, req, currentCtx)
 	if err != nil {
 		return fmt.Errorf("prune failed: %w", err)
 	}
@@ -180,7 +180,7 @@ func runPrune(opts *PruneOptions) error {
 	}
 
 	if result.NavigationPath != "" {
-		_, _ = fmt.Fprintln(opts.IO.Out, result.NavigationPath)
+		fmt.Fprintln(writeOrIgnore(opts.IO.Out), result.NavigationPath)
 	}
 
 	return nil
@@ -190,7 +190,7 @@ func runPrune(opts *PruneOptions) error {
 // result. It encapsulates the per-project iteration that previously
 // lived in worktreeService.pruneProjectWorktrees + checkWorktreeSkip +
 // deleteWorktreeAndBranch.
-func runPruneWalk(ctx context.Context, client *git.Client, cfg *core.Config, req *core.PruneWorktreesRequest, currentCtx *core.Context) (*core.PruneWorktreesResult, error) {
+func runPruneWalk(ctx context.Context, client *git.Client, logger *slog.Logger, cfg *core.Config, req *core.PruneWorktreesRequest, currentCtx *core.Context) (*core.PruneWorktreesResult, error) {
 	result := &core.PruneWorktreesResult{
 		DeletedWorktrees: []*core.PruneWorktreeResult{},
 		SkippedWorktrees: []*core.PruneWorktreeResult{},
@@ -214,7 +214,7 @@ func runPruneWalk(ctx context.Context, client *git.Client, cfg *core.Config, req
 	cwd, _ := os.Getwd()
 
 	for _, project := range projects {
-		pruneProject(ctx, client, cfg, req, project, result, singleTarget, cwd)
+		pruneProject(ctx, client, logger, cfg, req, project, result, singleTarget, cwd)
 	}
 
 	if len(result.DeletedWorktrees) == 1 && req.SpecificWorktree != "" {
@@ -290,7 +290,7 @@ func resolvePruneProjects(ctx context.Context, client *git.Client, cfg *core.Con
 
 // pruneProject iterates a single project's worktrees and applies the
 // prune logic.
-func pruneProject(ctx context.Context, client *git.Client, cfg *core.Config, req *core.PruneWorktreesRequest, project *core.ProjectInfo, result *core.PruneWorktreesResult, singleTarget, cwd string) {
+func pruneProject(ctx context.Context, client *git.Client, logger *slog.Logger, cfg *core.Config, req *core.PruneWorktreesRequest, project *core.ProjectInfo, result *core.PruneWorktreesResult, singleTarget, cwd string) {
 	worktrees, err := client.ListWorktrees(ctx, project.GitRepoPath)
 	if err != nil {
 		return
@@ -317,7 +317,7 @@ func pruneProject(ctx context.Context, client *git.Client, cfg *core.Config, req
 			continue
 		}
 
-		deleteWorktreeAndBranch(ctx, client, project, wt, req, entry, result)
+		deleteWorktreeAndBranch(ctx, client, logger, project, wt, req, entry, result)
 	}
 }
 
@@ -377,7 +377,7 @@ func addSkippedPrune(result *core.PruneWorktreesResult, entry *core.PruneWorktre
 }
 
 // deleteWorktreeAndBranch performs the actual delete + optional branch removal.
-func deleteWorktreeAndBranch(ctx context.Context, client *git.Client, project *core.ProjectInfo, wt core.WorktreeInfo, req *core.PruneWorktreesRequest, entry *core.PruneWorktreeResult, result *core.PruneWorktreesResult) {
+func deleteWorktreeAndBranch(ctx context.Context, client *git.Client, logger *slog.Logger, project *core.ProjectInfo, wt core.WorktreeInfo, req *core.PruneWorktreesRequest, entry *core.PruneWorktreeResult, result *core.PruneWorktreesResult) {
 	if err := client.DeleteWorktree(ctx, project.GitRepoPath, wt.Path, req.Force); err != nil {
 		entry.Error = err
 		result.SkippedWorktrees = append(result.SkippedWorktrees, entry)
@@ -391,7 +391,7 @@ func deleteWorktreeAndBranch(ctx context.Context, client *git.Client, project *c
 
 	if req.DeleteBranches {
 		if err := client.PruneWorktrees(ctx, project.GitRepoPath); err != nil {
-			slog.Default().Error("prune worktrees failed", "error", err, "repo_path", project.GitRepoPath)
+			logger.Error("prune worktrees failed", "error", err, "repo_path", project.GitRepoPath)
 		}
 		if err := client.DeleteBranch(ctx, project.GitRepoPath, wt.Branch); err != nil {
 			entry.Error = fmt.Errorf("worktree deleted but branch deletion failed: %w", err)
@@ -408,7 +408,7 @@ func confirmBulkPrune(ios *iostreams.IOStreams) (bool, error) {
 	if ios == nil {
 		return false, fmt.Errorf("confirmBulkPrune: nil IOStreams")
 	}
-	_, _ = fmt.Fprint(ios.ErrOut, "This will prune merged worktrees across all projects. Continue? (y/n): ")
+	fmt.Fprint(writeOrIgnore(ios.ErrOut), "This will prune merged worktrees across all projects. Continue? (y/n): ")
 	reader := bufio.NewReader(ios.In)
 	response, err := reader.ReadString('\n')
 	if err != nil {
@@ -423,53 +423,53 @@ func outputPruneResults(ios *iostreams.IOStreams, result *core.PruneWorktreesRes
 	if ios == nil {
 		return
 	}
-	errOut := ios.ErrOut
+	errOut := writeOrIgnore(ios.ErrOut)
 
 	if dryRun {
-		_, _ = fmt.Fprintln(errOut, "Dry run - no changes made:")
+		fmt.Fprintln(errOut, "Dry run - no changes made:")
 	}
 
 	if len(result.DeletedWorktrees) > 0 {
 		if dryRun {
-			_, _ = fmt.Fprintf(errOut, "\nWould delete %d worktree(s):\n", len(result.DeletedWorktrees))
+			fmt.Fprintf(errOut, "\nWould delete %d worktree(s):\n", len(result.DeletedWorktrees))
 		} else {
-			_, _ = fmt.Fprintf(errOut, "\nDeleted %d worktree(s):\n", len(result.DeletedWorktrees))
+			fmt.Fprintf(errOut, "\nDeleted %d worktree(s):\n", len(result.DeletedWorktrees))
 		}
 		for _, wt := range result.DeletedWorktrees {
-			_, _ = fmt.Fprintf(errOut, "  %s (%s/%s)\n", wt.WorktreePath, wt.ProjectName, wt.BranchName)
+			fmt.Fprintf(errOut, "  %s (%s/%s)\n", wt.WorktreePath, wt.ProjectName, wt.BranchName)
 			if wt.BranchDeleted {
-				_, _ = fmt.Fprintf(errOut, "    branch deleted: %s\n", wt.BranchName)
+				fmt.Fprintf(errOut, "    branch deleted: %s\n", wt.BranchName)
 			}
 			if wt.Error != nil {
-				_, _ = fmt.Fprintf(errOut, "    warning: %v\n", wt.Error)
+				fmt.Fprintf(errOut, "    warning: %v\n", wt.Error)
 			}
 		}
 	}
 
 	if len(result.UnmergedSkipped) > 0 {
-		_, _ = fmt.Fprintf(errOut, "\nSkipped %d unmerged worktree(s):\n", len(result.UnmergedSkipped))
+		fmt.Fprintf(errOut, "\nSkipped %d unmerged worktree(s):\n", len(result.UnmergedSkipped))
 		for _, wt := range result.UnmergedSkipped {
-			_, _ = fmt.Fprintf(errOut, "  %s/%s\n", wt.ProjectName, wt.BranchName)
+			fmt.Fprintf(errOut, "  %s/%s\n", wt.ProjectName, wt.BranchName)
 		}
 	}
 
 	if len(result.ProtectedSkipped) > 0 {
-		_, _ = fmt.Fprintf(errOut, "\nSkipped %d protected branch(es):\n", len(result.ProtectedSkipped))
+		fmt.Fprintf(errOut, "\nSkipped %d protected branch(es):\n", len(result.ProtectedSkipped))
 		for _, wt := range result.ProtectedSkipped {
-			_, _ = fmt.Fprintf(errOut, "  %s/%s\n", wt.ProjectName, wt.BranchName)
+			fmt.Fprintf(errOut, "  %s/%s\n", wt.ProjectName, wt.BranchName)
 		}
 	}
 
 	if len(result.SkippedWorktrees) > 0 {
-		_, _ = fmt.Fprintf(errOut, "\nSkipped %d worktree(s):\n", len(result.SkippedWorktrees))
+		fmt.Fprintf(errOut, "\nSkipped %d worktree(s):\n", len(result.SkippedWorktrees))
 		for _, wt := range result.SkippedWorktrees {
-			_, _ = fmt.Fprintf(errOut, "  %s/%s: %s\n", wt.ProjectName, wt.BranchName, wt.SkipReason)
+			fmt.Fprintf(errOut, "  %s/%s: %s\n", wt.ProjectName, wt.BranchName, wt.SkipReason)
 		}
 	}
 
-	_, _ = fmt.Fprintf(errOut, "\nSummary: %d deleted, %d skipped", result.TotalDeleted, result.TotalSkipped)
+	fmt.Fprintf(errOut, "\nSummary: %d deleted, %d skipped", result.TotalDeleted, result.TotalSkipped)
 	if result.TotalBranchesDeleted > 0 {
-		_, _ = fmt.Fprintf(errOut, ", %d branches deleted", result.TotalBranchesDeleted)
+		fmt.Fprintf(errOut, ", %d branches deleted", result.TotalBranchesDeleted)
 	}
-	_, _ = fmt.Fprintln(errOut)
+	fmt.Fprintln(errOut)
 }

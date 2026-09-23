@@ -59,7 +59,7 @@ func (h *GitTestHelper) CreateRepoWithCommits(commitCount int) string {
 			return err
 		}
 
-		for i := 0; i < count; i++ {
+		for i := range count {
 			filename := filepath.Join(repoPath, "file.txt")
 			content := []byte(fmt.Sprintf("Content %d\n", i))
 

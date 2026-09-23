@@ -125,7 +125,7 @@ func runInitStdout(opts *InitOptions) error {
 		return fmt.Errorf("failed to generate wrapper: %w", err)
 	}
 
-	_, _ = fmt.Fprint(opts.IO.Out, wrapper)
+	fmt.Fprint(writeOrIgnore(opts.IO.Out), wrapper)
 	return nil
 }
 
@@ -225,24 +225,25 @@ func isAlreadyInstalled(err error) bool {
 
 // displayInitResults outputs installation results (for install mode only)
 func displayInitResults(out io.Writer, result *core.SetupShellResult) error {
+	out = writeOrIgnore(out)
 	if result.IsSkipped {
-		_, _ = fmt.Fprintf(out, "Shell wrapper already installed for %s\n", result.ShellType)
-		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
-		_, _ = fmt.Fprintf(out, "Use --force to reinstall\n")
+		fmt.Fprintf(out, "Shell wrapper already installed for %s\n", result.ShellType)
+		fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
+		fmt.Fprintf(out, "Use --force to reinstall\n")
 		return nil
 	}
 
 	if result.IsInstalled {
-		_, _ = fmt.Fprintf(out, "Shell wrapper installed for %s\n", result.ShellType)
-		_, _ = fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
+		fmt.Fprintf(out, "Shell wrapper installed for %s\n", result.ShellType)
+		fmt.Fprintf(out, "Config file: %s\n", result.ConfigFile)
 		if _, err := os.Stat(result.ConfigFile); err == nil {
-			_, _ = fmt.Fprintf(out, "\nTo activate the wrapper:\n")
-			_, _ = fmt.Fprintf(out, "  1. Restart your shell, or\n")
-			_, _ = fmt.Fprintf(out, "  2. Run: source %s\n", result.ConfigFile)
+			fmt.Fprintf(out, "\nTo activate the wrapper:\n")
+			fmt.Fprintf(out, "  1. Restart your shell, or\n")
+			fmt.Fprintf(out, "  2. Run: source %s\n", result.ConfigFile)
 		}
-		_, _ = fmt.Fprintf(out, "\nUsage:\n")
-		_, _ = fmt.Fprintf(out, "  twiggit cd <branch>     # Change to worktree\n")
-		_, _ = fmt.Fprintf(out, "  builtin cd <path>       # Use shell built-in cd\n")
+		fmt.Fprintf(out, "\nUsage:\n")
+		fmt.Fprintf(out, "  twiggit cd <branch>     # Change to worktree\n")
+		fmt.Fprintf(out, "  builtin cd <path>       # Use shell built-in cd\n")
 	}
 
 	return nil

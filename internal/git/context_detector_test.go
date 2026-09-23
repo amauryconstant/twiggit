@@ -122,7 +122,7 @@ func TestContextDetector_DetectContext(t *testing.T) {
 			var config *core.Config
 			if tc.expectedType == core.ContextWorktree {
 				baseDir := dir
-				for i := 0; i < 3; i++ {
+				for range 3 {
 					baseDir = filepath.Dir(baseDir)
 				}
 				config = &core.Config{
