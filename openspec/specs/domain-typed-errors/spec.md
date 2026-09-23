@@ -12,43 +12,16 @@ hints without coupling to wrapper internals.
 
 ### Requirement: Error type taxonomy
 
-The domain layer SHALL define the following error types with the given
-constructors. All types that wrap a cause SHALL implement both
-`Unwrap() error` returning the `Err error` field and `Is(target error)
-bool` participating in `errors.Is` walks against the appropriate
-per-resource NotFound sentinel described in the Sentinel catalog
-requirement. `ValidationError` SHALL implement `Unwrap() error`
-returning `nil` (terminal). All field names for the wrapped cause SHALL
-be `Err` (not `Cause`).
+The `core` package SHALL define exactly four error types: `ValidationError`, `NotFoundError`, `OperationError`, `UsageError`. The previous 20-type taxonomy (the seven shell subtypes, `NavigationServiceError`, `ResolutionError`, `ConfigError`, `ServiceError`, `WorktreeServiceError`, `ProjectServiceError`, `ContextDetectionError`, `GitRepositoryError`, `GitWorktreeError`, `GitCommandError`, `ConflictError`) is removed. I/O-adapter-specific constructors live in their adapter package (`internal/git/errors.go`) as `git.ExternalError`-shaped wrappers; `output.FormatError` walks them via `errors.As` to a `*core.OperationError`. Constructors uniformly use `core.NewXxxError` for the four core types only.
 
-| Type | Constructor | Per-resource NotFound sentinel |
-|---|---|---|
-| `ValidationError` | `NewValidationError(request, field, value, message)` | — |
-| `GitRepositoryError` | `NewGitRepositoryError(path, message, err)` | `ErrGitRepoNotFound` |
-| `GitWorktreeError` | `NewGitWorktreeError(worktreePath, branchName, message, err)` | `ErrWorktreeNotFound` |
-| `GitCommandError` | `NewGitCommandError(cmd, args, exitCode, stdout, stderr, msg, err)` | — |
-| `ConfigError` | `NewConfigError(path, message, err)` | — |
-| `ContextDetectionError` | `NewContextDetectionError(path, message, err)` | — |
-| `ServiceError` | `NewServiceError(service, operation, message, err)` | — |
-| `WorktreeServiceError` | `NewWorktreeServiceError(worktreePath, branchName, op, msg, err)` | `ErrWorktreeNotFound` |
-| `ProjectServiceError` | `NewProjectServiceError(projectName, projectPath, op, msg, err)` | `ErrProjectNotFound` |
-| `NavigationServiceError` | `NewNavigationServiceError(target, ctx, op, msg, err)` | `ErrResolutionNotFound` |
-| `ResolutionError` | `NewResolutionError(target, ctx, msg, suggestions, err)` | `ErrResolutionNotFound` |
-| `ConflictError` | `NewConflictError(resource, identifier, operation, message, err)` | — |
-| `ShellAlreadyInstalledError` | `NewShellAlreadyInstalledError(shellType, context, err)` | — |
-| `ShellNotInstalledError` | `NewShellNotInstalledError(shellType, context, err)` | — |
-| `ShellInvalidTypeError` | `NewShellInvalidTypeError(shellType, context, err)` | — |
-| `ShellInferenceError` | `NewShellInferenceError(shellType, context, err)` | — |
-| `ShellDetectionError` | `NewShellDetectionError(context, err)` | — |
-| `ShellWrapperError` | `NewShellWrapperError(shellType, op, context, err)` | — |
-| `ShellConfigError` | `NewShellConfigError(path, context, err)` | — |
-| `UsageError` | `NewUsageError(message, err)` or `UsageWrap(err)` | `ErrUsageFlag` |
+| Core type | Constructor | Carries | Unwrap |
+|---|---|---|---|
+| `ValidationError` | `core.NewValidationError(field, value, message)` | `Field`, `Value`, `Message`, `Suggestions []string` | `nil` |
+| `NotFoundError` | `core.NewNotFoundError(entity, name)` | `Entity`, `Name` | `nil` |
+| `OperationError` | `core.NewOperationError(op, message, cause)` | `Op`, `Message`, `Cause`, `Suggestions []string` | `Cause` |
+| `UsageError` | `core.NewUsageError(message)` | `Message` | `nil` |
 
-Constructors and sentinels retain their existing names. Constructors
-uniformly use the `NewXxxError` style and sentinels uniformly use the
-`ErrXxx` style per the `golang-naming` skill rule that reserves the
-`Error` suffix for error types and the `Err` prefix for sentinel
-error variables.
+`OperationError` carries `Suggestions` (added in this change). `UsageError` carries no `Err` field. The previous builder methods `WithSuggestions` / `WithContext` and getters `Request()` / `Detail()` / `Context()` are removed.
 
 #### Scenario: Definition holds
 
@@ -56,50 +29,114 @@ error variables.
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
 
+#### Scenario: I/O error walks to *core.OperationError
+
+- **WHEN** the error chain is `git.NewRepoError(path, msg, io.EOF)` which returns `*git.ExternalError` with an embedded `*core.OperationError`
+- **THEN** `errors.As(err, &*core.OperationError{})` returns `true`
+
+#### Scenario: ValidationError carries no Err field
+
+- **WHEN** a validator returns `&core.ValidationError{Field: "BranchName", Value: "feat..bad", Message: "must not contain '..'"}`
+- **THEN** the struct has no `Err` field and `errors.Unwrap(verr)` returns `nil`
+
+#### Scenario: UsageError carries no Err field
+
+- **WHEN** a usage-error site returns `&core.UsageError{Message: "unknown --output value"}`
+- **THEN** the struct has no `Err` field and `errors.Unwrap(uerr)` returns `nil`
+
+### Requirement: Is method participation
+
+`core.NotFoundError` SHALL implement an `Is(target error) bool` method that returns true if and only if `target` equals one of the four NotFound sentinels. The method SHALL return false for any other target, including unrelated core sentinels. Implementations SHALL NOT rely on string equality or substring matching against `Error()`. The previous `WorktreeServiceError`, `ShellAlreadyInstalledError`, `UsageError` `Is()` methods (each matching its own per-type sentinel) are removed; only `NotFoundError` retains `Is()`.
+
+#### Scenario: WorktreeServiceError matches its sentinel
+
+- **WHEN** a `core.NotFoundError` with `Entity = "worktree"` and `Name = "feat/missing"` is constructed (the worktree case replaces the previous WorktreeServiceError.Is method)
+- **THEN** `errors.Is(err, core.ErrWorktreeNotFound)` SHALL return true
+- **AND** `errors.Is(err, core.ErrProjectNotFound)` SHALL return false
+
+#### Scenario: Shell subtype matches its sentinel
+
+- **WHEN** shell-detect errors use `*core.OperationError` with `Op = "shell.detect"` or `Op = "shell.probe"` (the previous `ShellAlreadyInstalledError.Is` per-type sentinel is removed; all shell-detect errors walk through the generic OperationError)
+- **THEN** `errors.Is(err, core.ErrGitRepoNotFound)` SHALL return false
+- **AND** `errors.As(err, &*core.OperationError{})` SHALL return true with the appropriate `Op`
+
+#### Scenario: UsageError matches its sentinel
+
+- **WHEN** a `core.UsageError` is constructed (no `Err` field; replaces the previous UsageError.Is method)
+- **THEN** `errors.As(err, &*core.UsageError{})` SHALL return true (dispatch is via `errors.As`, not via a sentinel `errors.Is`)
+- **AND** `errors.As(err, &*core.NotFoundError{})` SHALL return false
+
+#### Scenario: OperationError does not match NotFound sentinels
+
+- **WHEN** the error is `core.NewOperationError("git.open", msg, io.EOF)`
+- **THEN** `errors.Is(err, core.ErrGitRepoNotFound)` SHALL return false
+
+### Requirement: Shell subtypes share a common base
+
+The previous seven shell error subtypes (`ShellAlreadyInstalledError`, `ShellNotInstalledError`, `ShellInvalidTypeError`, `ShellInferenceError`, `ShellDetectionError`, `ShellWrapperError`, `ShellConfigError`) are removed. The `core.ShellType` type lives in `internal/core/shell_detect.go` (pure derivation). Filesystem probing of shell config files (formerly `os.Stat` calls in the shell-detect path) moves to `internal/git/shell_detect.go`. The `composeWrapper` renderer moves to `internal/output/wrapper.go` as `output.ComposeWrapper`. No `core.ShellError` interface SHALL be introduced.
+
+#### Scenario: ShellAlreadyInstalledError format
+
+- **WHEN** shell-detect errors render via their `Error()` method (the previous `ShellAlreadyInstalledError` type is removed; shell errors are now `*core.OperationError` with `Op = "shell.detect"` or `Op = "shell.probe"`)
+- **THEN** the rendered text SHALL identify the shell type and the failure state
+- **AND** SHALL NOT include any emoji or decoration
+
+#### Scenario: No ShellError interface
+
+- **WHEN** the `core` package is compiled
+- **THEN** the package SHALL NOT contain any of the seven shell error subtypes
+- **AND** SHALL NOT contain a `ShellError` interface
+
+### Requirement: ValidationError terminal chain
+
+`core.ValidationError` SHALL NOT carry an `Err` field. It SHALL implement `Unwrap() error` returning `nil`. The `Error()` string SHALL be lowercase, contain no emoji, and SHALL NOT embed a `💡` glyph. The previous immutable builder methods `WithSuggestions([]string) *ValidationError` and `WithContext(string) *ValidationError` are removed; `Suggestions` is a struct field set at construction. The previous getters `Request()`, `Detail()`, and the deprecated `Context()` are removed; callers use `Field()`, `Value()`, `Message()`, and `Suggestions()` only.
+
+#### Scenario: Detail() returns the contextual explanation
+
+- **WHEN** a caller invokes `e.Detail()` on a `*core.ValidationError`
+- **THEN** the call SHALL fail to compile (Detail() is removed; callers migrate to `e.Message()` or `e.Suggestions()`)
+
+#### Scenario: Context() getter no longer exists
+
+- **WHEN** the `core` package is compiled
+- **THEN** `(*ValidationError).Context()` SHALL NOT be defined
+- **AND** any caller that referenced `e.Context()` SHALL fail to compile until migrated to `e.Suggestions()` (the previous `Context()` rename to `Detail()` is reversed: the getter is removed entirely)
+
+#### Scenario: Unwrap returns nil
+
+- **WHEN** `Unwrap()` is called on any `core.ValidationError` instance
+- **THEN** the result SHALL be `nil`
+
+#### Scenario: Plain text rendering
+
+- **WHEN** `core.ValidationError.Error()` is called
+- **THEN** the returned string SHALL contain no `💡` character
+- **AND** SHALL contain no trailing punctuation
+- **AND** SHALL be entirely lowercase
+
 ### Requirement: NotFound detection
 
-Not-found detection SHALL be expressed as `errors.Is(err,
-domain.ErrXNotFound)` against the per-resource sentinel associated
-with each wrapper type (see the Error type taxonomy requirement). The
-substring-based `IsNotFound() bool` method on `GitRepositoryError`,
-`GitWorktreeError`, and `WorktreeServiceError` SHALL be removed. The
-four NotFound sentinels (`ErrGitRepoNotFound`, `ErrWorktreeNotFound`,
-`ErrProjectNotFound`, `ErrResolutionNotFound`) all map to the same
-exit code; per-resource distinction is exposed via the formatter's
-Actionable hints requirement, not via per-resource exit codes.
+Not-found detection SHALL be expressed as `errors.Is(err, core.ErrXNotFound)` against the per-resource sentinel associated with `*core.NotFoundError`. The `NotFoundError` type SHALL implement `Is(target error) bool` returning `true` if and only if `target` is one of: `ErrGitRepoNotFound`, `ErrWorktreeNotFound`, `ErrProjectNotFound`, `ErrResolutionNotFound`. The previous substring-based `IsNotFound() bool` method on `GitRepositoryError`, `GitWorktreeError`, and `WorktreeServiceError` is removed. The four NotFound sentinels all map to `ExitError` (1); per-resource distinction is exposed via the per-resource NotFound hints requirement in `cli-error-formatting`, not via per-resource exit codes.
 
 #### Scenario: NotFound dispatch
 
-- **WHEN** the cmd-side error formatter sees an error whose
-  `errors.Is(err, domain.ErrWorktreeNotFound)` returns true (via
-  `errors.Is` walk through the chain)
-- **THEN** the system SHALL exit with code `ExitCodeError` (1) (per
-  the 3-code canonical exit-code mapping)
-- **AND** the formatter SHALL append the worktree-specific hint per
-  the `cli-error-formatting` Actionable hints requirement
+- **WHEN** the cmd-side error formatter sees an error whose `errors.Is(err, core.ErrWorktreeNotFound)` returns true
+- **THEN** the system SHALL exit with code `ExitError` (1)
+- **AND** the formatter SHALL append the worktree-specific hint per the `cli-error-formatting` Actionable hints requirement
 
 ### Requirement: Cause-chain support
 
-Every domain error that wraps another error SHALL implement `Unwrap()`
-returning its `Err` field. Errors SHALL participate in
-`errors.Is` and `errors.As` walks through that chain.
-Wrappers whose wrapping layer has a per-resource NotFound sentinel
-SHALL additionally implement `Is(target error) bool` matching only that
-sentinel so the sentinel is visible through wrapping.
+Every core error that wraps another error SHALL implement `Unwrap() error` returning the cause. `OperationError` wraps via the `Cause` field; `errors.Is` and `errors.As` walks SHALL reach the underlying cause through that chain. `ValidationError`, `NotFoundError`, and `UsageError` implement `Unwrap() error { return nil }` (terminal errors).
 
 #### Scenario: errors.As across wrap
 
-- **WHEN** a service wraps a `GitRepositoryError` inside a
-  `WorktreeServiceError`
-- **THEN** `errors.As(err, &*domain.GitRepositoryError{})` SHALL succeed
+- **WHEN** a service wraps a `git.NewRepoError(...)` (returning `*git.ExternalError` with embedded `*core.OperationError`) inside a `core.OperationError`
+- **THEN** `errors.As(err, &*core.OperationError{})` SHALL succeed
 
 #### Scenario: errors.Is through wrap
 
-- **WHEN** an error of type `WorktreeServiceError` carries a populated
-  `Err` field
-- **AND** the `Err` chain reaches `ErrWorktreeNotFound`
-- **THEN** `errors.Is(err, domain.ErrWorktreeNotFound)` SHALL return
-  true regardless of whether `Err` is nil
+- **WHEN** an error of type `core.NotFoundError` carries `Entity = "worktree"` and `Name = "feat/missing"`
+- **THEN** `errors.Is(err, core.ErrWorktreeNotFound)` SHALL return true
 
 ### Requirement: Exit-code mapping (canonical)
 
@@ -107,20 +144,11 @@ The canonical exit-code mapping SHALL be exactly:
 
 | Code | Constant | Trigger |
 |---|---|---|
-| 0 | `ExitCodeSuccess` | Clean exit |
-| 1 | `ExitCodeError` | Unclassified error, runtime failure, or recovered panic |
-| 2 | `ExitCodeUsage` | Cobra usage error (invalid syntax or args) typed via `errors.As` against `*domain.UsageError` (or `errors.Is(err, domain.ErrUsageFlag)`). The cmd layer wraps both classes of cobra error in `*domain.UsageError` before they reach `GetExitCodeForError`: flag-parse errors via `cmd.SetFlagErrorFunc`, and args-validator errors (e.g., `cobra.ExactArgs(n)` mismatches) via the `wrapArgsValidator` helper applied to each command's `Args:` field. Cobra's own `*cobra.FlagError` and `cobra.ErrSubCommandRequired` therefore never reach `GetExitCodeForError` unwrapped. |
+| 0 | `ExitOK` | Clean exit |
+| 1 | `ExitError` | Unclassified error, runtime failure, or recovered panic |
+| 2 | `ExitUsage` | Cobra usage error (invalid syntax or args) typed via `errors.As` against `*core.UsageError` |
 
-The cmd layer (`cli-error-formatting`) SHALL NOT define additional
-exit-code constants. `GetExitCodeForError` SHALL dispatch first via
-`errors.As` / `errors.Is` against the typed usage-error sentinels above,
-returning `ExitCodeUsage`; otherwise returning `ExitCodeError` (1) for
-any non-nil error and `ExitCodeSuccess` (0) for nil. Per-resource
-discrimination happens at the formatter hint layer (`cli-error-formatting`
-Actionable hints requirement), not via per-resource exit codes. The
-cmd-internal `UsageError` type marks errors emitted after flag
-parsing (e.g., "init --config requires --install")
-so they dispatch to `ExitCodeUsage` through the same typed walk.
+The cmd layer (`cli-error-formatting`) SHALL NOT define additional exit-code constants. `cmdutil.ExitCodeFor` SHALL dispatch first via `errors.As` against `*core.UsageError`, returning `ExitUsage`; otherwise returning `ExitError` (1) for any non-nil error and `ExitOK` (0) for nil. Per-resource discrimination happens at the formatter hint layer (`cli-error-formatting` Actionable hints requirement), not via per-resource exit codes. The previous `domain.ErrUsageFlag` sentinel is removed; the previous exit-code dispatch helper is replaced by `cmdutil.ExitCodeFor`.
 
 #### Scenario: Definition holds
 
@@ -130,135 +158,19 @@ so they dispatch to `ExitCodeUsage` through the same typed walk.
 
 ### Requirement: Sentinel catalog
 
-The domain layer SHALL export the following sentinel errors as package
-variables of type `error`. Each sentinel's `Error()` message SHALL be
-`"domain: <resource> <state>"`. Callers SHALL identify these sentinels
-exclusively through `errors.Is` and SHALL NOT compare sentinel values
-via `==` or string equality.
+The `core` package SHALL export the following sentinel errors as package variables of type `error`:
 
 | Sentinel | Message |
 |---|---|
-| `ErrGitRepoNotFound` | `"domain: git repository not found"` |
-| `ErrWorktreeNotFound` | `"domain: worktree not found"` |
-| `ErrProjectNotFound` | `"domain: project not found"` |
-| `ErrResolutionNotFound` | `"domain: resolution target not found"` |
-| `ErrShellAlreadyInstalled` | `"domain: shell wrapper already installed"` |
-| `ErrShellNotInstalled` | `"domain: shell wrapper not installed"` |
-| `ErrInvalidShellType` | `"domain: invalid shell type"` |
-| `ErrShellInferenceFailed` | `"domain: could not infer shell type"` |
-| `ErrShellDetectionFailed` | `"domain: shell detection failed"` |
-| `ErrWrapperGeneration` | `"domain: wrapper generation failed"` |
-| `ErrWrapperInstallation` | `"domain: wrapper installation failed"` |
-| `ErrConfigFileNotFound` | `"domain: config file not found"` |
-| `ErrUsageFlag` | `"domain: usage flag error"` |
+| `ErrGitRepoNotFound` | `"core: git repository not found"` |
+| `ErrWorktreeNotFound` | `"core: worktree not found"` |
+| `ErrProjectNotFound` | `"core: project not found"` |
+| `ErrResolutionNotFound` | `"core: resolution target not found"` |
+
+The previous 9 sentinels (`ErrShellAlreadyInstalled`, `ErrShellNotInstalled`, `ErrInvalidShellType`, `ErrShellInferenceFailed`, `ErrShellDetectionFailed`, `ErrWrapperGeneration`, `ErrWrapperInstallation`, `ErrConfigFileNotFound`, `ErrUsageFlag`) are removed. Each sentinel's `Error()` message SHALL be `"core: <resource> <state>"`. Callers SHALL identify these sentinels exclusively through `errors.Is`.
 
 #### Scenario: Sentinel catalog is exported and stable
 
-- **WHEN** a caller imports the domain package
-- **THEN** the sentinel identifiers and their messages SHALL match the
-  table above exactly
-- **AND** no sentinel SHALL be unexported, renamed, or repurposed
-  without a capability-level spec change
-
-### Requirement: Is method participation
-
-Each error type whose wrapping layer maps to a NotFound sentinel SHALL
-implement an `Is(target error) bool` method that returns true if and
-only if `target` equals the type's per-resource sentinel. The method
-SHALL return false for any other target, including unrelated domain
-sentinels. Implementations SHALL NOT rely on string equality or
-substring matching against `Error()`.
-
-#### Scenario: WorktreeServiceError matches its sentinel
-
-- **WHEN** a `WorktreeServiceError` is constructed with a populated
-  `Err` chain reaching `ErrWorktreeNotFound`
-- **THEN** `errors.Is(worktreeErr, domain.ErrWorktreeNotFound)` SHALL
-  return true
-- **AND** `errors.Is(worktreeErr, domain.ErrProjectNotFound)` SHALL
-  return false
-
-#### Scenario: Shell subtype matches its sentinel
-
-- **WHEN** a `ShellAlreadyInstalledError` is constructed with an
-  `Err` chain that is nil
-- **THEN** `errors.Is(shellErr, domain.ErrShellAlreadyInstalled)` SHALL
-  return true
-- **AND** `errors.Is(shellErr, domain.ErrShellNotInstalled)` SHALL
-  return false
-
-#### Scenario: UsageError matches its sentinel
-
-- **WHEN** a `UsageError` is constructed (with or without an `Err`
-  cause)
-- **THEN** `errors.Is(usageErr, domain.ErrUsageFlag)` SHALL return true
-- **AND** `errors.Is(usageErr, domain.ErrWorktreeNotFound)` SHALL
-  return false
-
-### Requirement: Shell subtypes share a common base
-
-The domain layer SHALL define seven shell error subtypes listed in the
-Error type taxonomy requirement. Each subtype SHALL embed a private
-`shellErrorBase` value carrying `ShellType`, `Context`, and `Err`
-fields, SHALL implement `Unwrap() error` returning the `Err` field,
-and SHALL implement `Is(target error) bool` returning true exactly
-when the target is the subtype's own sentinel. No `domain.ShellError`
-interface SHALL be introduced.
-
-#### Scenario: ShellAlreadyInstalledError format
-
-- **WHEN** a `ShellAlreadyInstalledError` is rendered via its
-  `Error()` method
-- **THEN** the result SHALL identify the shell type and the
-  already-installed state
-- **AND** SHALL NOT include the sentinel string code or any emoji or
-  decoration
-
-#### Scenario: No ShellError interface
-
-- **WHEN** the domain package is compiled
-- **THEN** the package SHALL NOT contain an exported interface named
-  `ShellError`
-
-### Requirement: ValidationError terminal chain
-
-`ValidationError` SHALL NOT carry an `Err` field. It SHALL implement
-`Unwrap() error` returning `nil`. The `Error()` string SHALL be
-lowercase, contain no emoji, and SHALL NOT embed a `💡` glyph.
-
-`ValidationError` SHALL support immutable builder methods:
-
-- `WithSuggestions([]string) *ValidationError`
-- `WithContext(string) *ValidationError`
-
-Getters SHALL be: `Field()`, `Value()`, `Message()`, `Request()`,
-`Suggestions()`, and `Detail()` (the prior `Context()` getter is
-renamed to `Detail()` to avoid collision with the `domain.Context`
-type at call sites that pass both).
-
-#### Scenario: Detail() returns the contextual explanation
-
-- **WHEN** a caller invokes `e.Detail()` on a `*ValidationError`
-- **THEN** it SHALL return the same string that the prior
-  `e.Context()` getter returned
-- **AND** it SHALL NOT collide with the `domain.Context` type when
-  the caller writes `e.Detail()` next to a `*domain.Context`
-  argument in the same scope
-
-#### Scenario: Context() getter no longer exists
-
-- **WHEN** the domain package is compiled
-- **THEN** `(*ValidationError).Context()` SHALL NOT be defined
-- **AND** any caller that referenced `e.Context()` SHALL fail to
-  compile until migrated to `e.Detail()`
-
-#### Scenario: Unwrap returns nil
-
-- **WHEN** `Unwrap()` is called on any `ValidationError` instance
-- **THEN** the result SHALL be `nil`
-
-#### Scenario: Plain text rendering
-
-- **WHEN** `ValidationError.Error()` is called
-- **THEN** the returned string SHALL contain no `💡` character
-- **AND** SHALL contain no trailing punctuation
+- **WHEN** a caller imports the `core` package
+- **THEN** the sentinel identifiers and their messages SHALL match the table above exactly
+- **AND** no sentinel SHALL be unexported, renamed, or repurposed without a capability-level spec change

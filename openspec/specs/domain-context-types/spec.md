@@ -10,7 +10,7 @@ this spec owns the type surface.
 
 ### Requirement: `ContextType` enum
 
-The system SHALL define `ContextType` with constants:
+The `core` package SHALL define `ContextType` with constants:
 
 | Constant | String | Meaning |
 |---|---|---|
@@ -19,43 +19,32 @@ The system SHALL define `ContextType` with constants:
 | `ContextWorktree` | `worktree` | Inside a worktree (subdirectory under `Worktrees/`) |
 | `ContextOutsideGit` | `outside-git` | Not in any git repository |
 
-`String()` SHALL return the lowercased name.
+`String()` SHALL return the lowercased constant name. The previous `domain.ContextType` is removed; the package qualifier is `core` for every call site.
 
+#### Scenario: String() returns lowercased name
 
+- **WHEN** the value is `core.ContextProject`
+- **THEN** `String()` returns `"project"`
 
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: `Context` struct
 
-The system SHALL define:
-
-```go
-type Context struct {
-    Type        ContextType
-    ProjectName string
-    BranchName  string  // only for ContextWorktree
-    Path        string  // absolute path to context root
-    Explanation string  // human-readable explanation of detection
-}
-```
+The `core` package SHALL define `core.Context` with the same field surface as the previous `domain.Context`. The previous `domain.Context` is removed; the package qualifier is `core`.
 
 #### Scenario: Project context
 
 - **WHEN** user is inside `~/Projects/myapp/`
-- **THEN** `Context` SHALL have `Type = ContextProject`,
-  `ProjectName = "myapp"`, `BranchName = ""`,
-  `Path = ~/Projects/myapp`, and an explanation like
-  "project 'myapp' detected via .git directory"
+- **THEN** `Context` SHALL have `Type = ContextProject`, `ProjectName = "myapp"`, `BranchName = ""`, `Path = ~/Projects/myapp`, and an explanation like "project 'myapp' detected via .git directory"
 
 #### Scenario: Worktree context
 
 - **WHEN** user is inside `~/Worktrees/myapp/feature/`
-- **THEN** `Context` SHALL have `Type = ContextWorktree`,
-  `ProjectName = "myapp"`, `BranchName = "feature"`,
-  `Path = ~/Worktrees/myapp/feature`
+- **THEN** `Context` SHALL have `Type = ContextWorktree`, `ProjectName = "myapp"`, `BranchName = "feature"`, `Path = ~/Worktrees/myapp/feature`
 
 #### Scenario: Outside git
 
@@ -65,98 +54,63 @@ type Context struct {
 
 ### Requirement: `PathType` enum
 
-The system SHALL define `PathType` with constants
-`PathTypeUnknown`, `PathTypeProject`, `PathTypeWorktree`,
-`PathTypeInvalid`. The `iota` zero value SHALL be `PathTypeUnknown`
-so that an uninitialized `PathType` variable is detectable as
-invalid. `String()` SHALL return `"unknown"`, `"project"`,
-`"worktree"`, `"invalid"` respectively.
+The `core` package SHALL define `PathType` with constants `PathTypeUnknown`, `PathTypeProject`, `PathTypeWorktree`, `PathTypeInvalid`. The `iota` zero value SHALL be `PathTypeUnknown`. `String()` SHALL return `"unknown"`, `"project"`, `"worktree"`, `"invalid"` respectively. The previous `domain.PathType` is removed.
 
 #### Scenario: Zero-value PathType is Unknown
 
-- **WHEN** a `PathType` variable is declared without explicit
-  initialization
+- **WHEN** a `core.PathType` variable is declared without explicit initialization
 - **THEN** `var p PathType` SHALL equal `PathTypeUnknown`
 - **AND** `p.String()` SHALL return `"unknown"`
 
 #### Scenario: Existing constants retain their strings
 
-- **WHEN** `PathTypeProject`, `PathTypeWorktree`, `PathTypeInvalid`
-  are rendered via `String()`
-- **THEN** the result SHALL equal `"project"`, `"worktree"`,
-  `"invalid"` respectively
+- **WHEN** `PathTypeProject`, `PathTypeWorktree`, `PathTypeInvalid` are rendered via `String()`
+- **THEN** the result SHALL equal `"project"`, `"worktree"`, `"invalid"` respectively
 
 #### Scenario: Numeric shift documented for callers
 
-- **WHEN** downstream code compares `PathType` against an integer
-  literal
-- **THEN** the comparison SHALL use the named constant
-  (`domain.PathTypeProject`, etc.) rather than the underlying integer
-  value, because the integer values shift with the addition of
-  `PathTypeUnknown = 0`
+- **WHEN** downstream code compares `PathType` against an integer literal
+- **THEN** the comparison SHALL use the named constant (`core.PathTypeProject`, etc.) rather than the underlying integer value, because the integer values shift with the addition of `PathTypeUnknown = 0`
 
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: `ResolutionResult` struct
 
-The system SHALL provide a `ResolutionResult` struct with the
-following shape:
+The `core` package SHALL provide a `ResolutionResult` struct with the same field surface as the previous `domain.ResolutionResult`. The previous `domain.ResolutionResult` is removed.
 
-```go
-type ResolutionResult struct {
-    ResolvedPath string
-    Type         PathType
-    ProjectName  string
-    BranchName   string
-    Explanation  string
-}
-```
+#### Scenario: ResolutionResult fields carry resolver output
 
-
+- **WHEN** the context resolver returns a populated `*core.ResolutionResult`
+- **THEN** every field SHALL carry the resolver's value
 
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: `ResolutionSuggestion` struct (live fields)
 
-```go
-type ResolutionSuggestion struct {
-    Text        string   // displayed in completion menu
-    Description string   // shown as the secondary line
-    Type        PathType
-    ProjectName string
-    BranchName  string
-    IsCurrent   bool     // populated for current-worktree sorting/prioritizing
-    IsDirty     bool     // populated for the "modified" indicator
-    // The following fields exist in the struct but are NOT populated anywhere
-    // in the current codebase. See openspec/dead-code.md.
-    Remote      string
-    StyleHint   string
-}
-```
-
-The `Remote` and `StyleHint` fields are kept on the struct to avoid
-breaking future consumers but SHALL be treated as zero-valued until a
-caller populates them.
-
-
+The `core` package SHALL provide `ResolutionSuggestion` with the same field surface as the previous `domain.ResolutionSuggestion`. The `Remote` and `StyleHint` fields are kept on the struct to avoid breaking future consumers but SHALL be treated as zero-valued until a caller populates them. The previous `domain.ResolutionSuggestion` is removed.
 
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: `SuggestionOption`
 
-`SuggestionOption` SHALL be a functional option applied to suggestion
-generation. The built-in `WithExistingOnly()` SHALL filter suggestions
-to materialized worktrees (no remote-only branches, no stale entries).
+`core.SuggestionOption` SHALL be a functional option applied to suggestion generation. The built-in `core.WithExistingOnly()` SHALL filter suggestions to materialized worktrees (no remote-only branches, no stale entries). The previous `domain.SuggestionOption` and `domain.WithExistingOnly()` are removed.
 
+#### Scenario: WithExistingOnly filters remote-only branches
+
+- **WHEN** suggestion generation runs with `core.WithExistingOnly()` applied and the candidates include both local-worktree branches and remote-only branches
+- **THEN** the returned suggestions SHALL include only the local-worktree branches
 
 #### Scenario: Definition holds
 
