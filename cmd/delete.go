@@ -189,10 +189,10 @@ func runDelete(opts *DeleteOptions) error {
 		}
 	}
 
-	verbosef(opts.IO, 1, "Deleting worktree at %s", worktreePath)
-	verbosef(opts.IO, 2, "  project: %s", currentCtx.ProjectName)
-	verbosef(opts.IO, 2, "  branch: %s", resolution.BranchName)
-	verbosef(opts.IO, 2, "  force: %t", opts.Force)
+	verbosef(opts.IO, "Deleting worktree at %s", worktreePath)
+	verbosef(opts.IO, "project: %s", currentCtx.ProjectName)
+	verbosef(opts.IO, "branch: %s", resolution.BranchName)
+	verbosef(opts.IO, "force: %t", opts.Force)
 
 	if err := gitClient.DeleteWorktree(ctx, projectPath, worktreePath, opts.Force); err != nil {
 		return fmt.Errorf("failed to delete worktree: %w", err)

@@ -163,9 +163,9 @@ func runInitInstall(opts *InitOptions) error {
 				ConfigFile:  configFile,
 				Message:     "Shell wrapper already installed",
 			}
-			verbosef(opts.IO, 1, "Setting up shell wrapper")
-			verbosef(opts.IO, 2, "  shell type: %s", result.ShellType)
-			verbosef(opts.IO, 2, "  config file: %s", result.ConfigFile)
+			verbosef(opts.IO, "Setting up shell wrapper")
+			verbosef(opts.IO, "shell type: %s", result.ShellType)
+			verbosef(opts.IO, "config file: %s", result.ConfigFile)
 			return displayInitResults(opts.IO.Out, result)
 		}
 	}
@@ -196,9 +196,9 @@ func runInitInstall(opts *InitOptions) error {
 		Message:     "Shell wrapper installed successfully",
 	}
 
-	verbosef(opts.IO, 1, "Setting up shell wrapper")
-	verbosef(opts.IO, 2, "  shell type: %s", result.ShellType)
-	verbosef(opts.IO, 2, "  config file: %s", result.ConfigFile)
+	verbosef(opts.IO, "Setting up shell wrapper")
+	verbosef(opts.IO, "shell type: %s", result.ShellType)
+	verbosef(opts.IO, "config file: %s", result.ConfigFile)
 
 	return displayInitResults(opts.IO.Out, result)
 }

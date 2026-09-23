@@ -91,11 +91,12 @@ This change is the consolidation that lands the skill's recommendation, collapse
 
 ### 5. `output.Formatter` interface for `--output` flag
 
-**Choice:** A `Formatter` interface with `FormatJSON(w io.Writer, v any) error` and `FormatTable(w io.Writer, headers []string, rows [][]string) error` plus a registry keyed on `--output` value (`json` | `table` | `plain`). Default (no flag) falls through to `table` for list commands, `plain` for everything else.
+**Choice:** A single-method `Formatter` interface — `Write(w io.Writer, data any) error` — with concrete implementations for `json`, `jsonl`, `table`, and `plain` (see Q2 decision). The `--output` flag selects the formatter; an empty or unknown value yields a nil Formatter so the command falls through to its human-readable default.
 
-**Rationale:** The current `cli-output-formats` spec already commits to json/table; the Formatter interface makes it enforceable as a single point of extension. The `plain` value is the new addition (no formatting, raw human-readable rendering) and lets scripts opt out of pretty-printing without re-parsing table borders.
+**Rationale:** The single-method contract is the minimum surface a renderer needs (a writer and a payload), keeps each implementation trivially testable, and lets the registry stay a flat `switch` over the four format names. The `jsonl` value is the new addition (one JSON object per line, no surrounding brackets) and lets streaming consumers parse output line-by-line.
 
 **Alternatives considered:**
+- Two-method `FormatJSON` + `FormatTable` interface (the original sketch) → rejected; the additional methods forced every implementation to learn two shapes, and `jsonl` could not slot in cleanly.
 - String-based dispatch in each command (`switch output { case "json": …`) → rejected; scatters the logic; impossible to test.
 - A `Renderable` interface per command (each command knows its own schema) → rejected; doubles the implementation surface; doesn't compose with the `--output` flag the user sees.
 
@@ -139,15 +140,17 @@ func (e *UsageError) Unwrap() error { return nil }   // typed-nil-safe per golan
 - One flat `Error` type with `Kind` enum → rejected; loses `errors.As` typed-walk contract that `cli-error-formatting` relies on.
 - `UsageError.Err` for cobra-wrapped usage errors → rejected; skill says UsageError is terminal. Cobra wrap uses `core.NewUsageError("wrapped: " + cobraErr.Error())` instead.
 
-### 8. `cmdutil.ExitCodeFor` (0/1/2 contract)
+### 8. `cmdutil.ExitCodeFor` (0/1/2 contract) + signal bypass
 
-**Choice:** `func ExitCodeFor(err error) int` returning `ExitOK` (0), `ExitError` (1), `ExitUsage` (2). Dispatch order: `errors.As(err, &*core.UsageError{})` → `ExitUsage`; non-nil → `ExitError`; nil → `ExitOK`. Same logic as `GetExitCodeForError` in `cli-error-formatting`; new names; new location.
+**Choice:** `func ExitCodeFor(err error) ExitCode` returning `ExitOK` (0), `ExitError` (1), `ExitUsage` (2). Dispatch order: `errors.As(err, &*core.UsageError{})` → `ExitUsage`; non-nil → `ExitError`; nil → `ExitOK`. Signal cancellation (SIGINT/SIGTERM) **bypasses** `ExitCodeFor`: `main.go` checks `ctx.Err()` immediately after `rootCmd.Execute()` and calls `os.Exit(130)` for SIGINT or `os.Exit(143)` for SIGTERM before the formatter runs. This matches the `cli-exit-codes` and `cli-error-formatting` MODIFIED requirements and the `golang-cli-architecture` "Context and Signal Handling" rule (the `128+N` convention for `os.Exit` on signal-terminated processes).
 
-**Rationale:** The skill recommends the symbolic names; the new package owns the helper. The contract is preserved (same numbers, same dispatch order), so scripts that key on exit codes are unaffected.
+**Rationale:** The skill recommends the symbolic names; the new package owns the helper. The contract is preserved (same numbers, same dispatch order) for non-signal exits, so scripts that key on exit codes are unaffected. Signals are a separate channel because a long-running command cancelled mid-flight should not be misclassified as a generic runtime failure: shell automation relies on 130/143 to distinguish user-initiated cancellation from bugs.
 
 **Alternatives considered:**
 - Keep names `ExitCodeSuccess`/`ExitCodeError`/`ExitCodeUsage` → rejected; the skill uses `ExitOK`/`ExitError`/`ExitUsage`; convention wins.
 - Move the helper into `core/` → rejected; `core/` must stay pure (no exit-code constants tied to `os.Exit`).
+- Map SIGINT/SIGTERM to `ExitError` (1) and skip 130/143 → rejected; contradicts `cli-exit-codes` MODIFIED and the `golang-cli-architecture` skill's signal-handling rule. Scripts that detect cancellation by exit code (`$? -eq 130`) would misfire.
+- Run `output.FormatError` first, then `os.Exit(130)` → rejected; the formatter MUST NOT be invoked for signal-cancelled runs (per `cli-error-formatting` requirement: "the formatter SHALL NOT be invoked for signal-cancelled runs").
 
 ### 9. `cmd/<command>.go` pattern (Options + runF)
 
@@ -161,24 +164,27 @@ func (e *UsageError) Unwrap() error { return nil }   // typed-nil-safe per golan
 
 ### 10. `main.go` composition root
 
-**Choice:** ~50 lines: `func main()` calls `f := cmdutil.NewFactory(ioStreams)`, defers panic recovery that prints to `ioStreams.Stderr` and exits 1, sets up `signal.NotifyContext` for SIGINT/SIGTERM cancellation that propagates into cobra via `cmd.SetContext(ctx)`, then executes `cmd.NewRootCmd(f).Execute()`. Exit code is `cmdutil.ExitCodeFor(err)`. The root command SHALL set `SilenceErrors: true` and `SilenceUsage: true` so error formatting and exit-code mapping stay in `main.go`.
+**Choice:** ~70 lines: `func main()` calls `f := cmdutil.NewFactory()` (Factory init has its own error path that prints via `output.FormatError(os.Stderr, err, nil)` and exits), defers panic recovery that prints "Internal error: <panic value>" to `os.Stderr` and exits 1 (writes to `os.Stderr` directly because the deferred recover runs before the Factory — and therefore `IOStreams` — is constructed), sets up `signal.NotifyContext` for SIGINT/SIGTERM cancellation that propagates into cobra via `cmd.SetContext(ctx)`, then executes `cmd.NewRootCommand(f).Execute()`. Exit code is `cmdutil.ExitCodeFor(err)`, with signal cancellation taking precedence: if `ctx.Err() != nil` after Execute returns, main calls `os.Exit(130)` (SIGINT) or `os.Exit(143)` (SIGTERM) directly without running the formatter. The root command SHALL set `SilenceErrors: true` and `SilenceUsage: true` so error formatting and exit-code mapping stay in `main.go`. The composition root receives `*cmdutil.Factory`; `cmd.CommandConfig` is a type alias for `*cmdutil.Factory` so callers that historically referenced `CommandConfig` compile unchanged.
 
-**Rationale:** The skill's "thin main" recommendation. All real logic lives in `cmd/` and `core/`; `main.go` is just wiring.
+**Rationale:** The skill's "thin main" recommendation. All real logic lives in `cmd/` and `core/`; `main.go` is just wiring. The `os.Stderr` choice for panic output is forced by ordering: the deferred recover must not dereference a Factory that may not have been built yet; once it has, every other call site goes through `iostreams.IOStreams`.
 
 **Alternatives considered:**
 - Keep `main.go` doing config loading and validation → rejected; the entry point should be a dispatcher, not a loader.
 - Add a separate `internal/cli/` package for main → rejected; unnecessary indirection for a single function.
+- Move signal-bypass logic into `cmdutil.ExitCodeFor` → rejected; `ExitCodeFor` is a pure dispatcher over error types; signal context is an orchestration concern that lives at the composition root.
+- Print the panic via `ios.Stderr` → rejected; the Factory may not exist when the deferred recover fires; an `os.Stderr` write is the only safe choice.
 
 ### 11. lipgloss dependency
 
-**Choice:** Add `github.com/charmbracelet/lipgloss` to `go.mod`. Pin version deferred to apply time per Q5.
+**Choice:** Add `charm.land/lipgloss/v2` to `go.mod` and pin to the latest stable v2 release (`v2.0.6` at apply time per task 15.6; bump via `go get charm.land/lipgloss/v2@latest` and `go mod tidy`). The v2 module path (`charm.land/lipgloss/v2`) is the current upstream location; the legacy `github.com/charmbracelet/lipgloss` import path remains pinned in design for historical reasons but is not used at apply time.
 
-**Rationale:** lipgloss is the de-facto Go CLI style renderer; `internal/iostreams/styles.go` and `internal/output/table.go` need it. Tier 2 depguard allows it only in those two packages (`internal/output/**`, `internal/iostreams/**`), nowhere else.
+**Rationale:** lipgloss is the de-facto Go CLI style renderer; `internal/iostreams/styles.go` and `internal/output/table.go` need it. Tier 2 depguard allows it only in those two packages (`internal/output/**`, `internal/iostreams/**`), nowhere else; the depguard allow-list references the v2 path so the rule is consistent with the actual import.
 
 **Alternatives considered:**
 - Use `fatih/color` → rejected; terminal-only, no style composition.
 - Use `pterm` → rejected; heavy dependency footprint; overlaps with lipgloss.
 - Skip styling entirely → rejected; degrades UX of table output and error hints.
+- Pin the legacy `github.com/charmbracelet/lipgloss` path (v1) → rejected; v2 ships active development; the v2 path is the supported import location.
 
 ### 12. Strict Tier 2 depguard
 

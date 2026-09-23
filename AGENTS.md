@@ -4,33 +4,48 @@ Pragmatic git worktree management tool with focus on rebase workflows.
 
 ## Architecture
 
+Tier 2 layout (`golang-cli-architecture`): one functional core, one composition root,
+and I/O adapters grouped by resource. The five-layer convention that pre-dates
+`cli-functional-core-shell` is fully retired; the old `internal/{application,service,infrastructure,domain}/`
+directories no longer exist.
+
 ```mermaid
 graph TB
+    main[main.go]
     subgraph cmd
-        C[Cobra Commands]
+        C[Cobra Commands<br/>Options + runF]
     end
-    subgraph application
-        I[Interfaces]
-    end
-    subgraph service
-        S[Implementations]
-    end
-    subgraph infrastructure
-        G[GitClient]
-        X[Config/Shell]
-        H[HookRunner]
-    end
-    subgraph domain
-        D[Entities/Errors]
-    end
-    C --> I
-    I -.->|implements| S
-    S --> G
-    S --> X
-    S --> H
-    S --> D
-    G --> D
+    main -->|factory| C
+    C --> core
+    C --> cmdutil
+    C --> output
+    C --> iostreams
+    C --> git
+    C --> config
+    git --> core
+    config --> core
+    output --> core
+    output --> iostreams
+    cmdutil --> core
+    core
 ```
+
+| Package | Role | Imports |
+|---------|------|---------|
+| `internal/core/` | Pure functional core: value objects, errors, validation, rules. No I/O. | stdlib, `github.com/samber/lo` |
+| `internal/git/` | Git I/O adapter: client, reader, writer, hook runner, context resolver, shell probing. | stdlib, `lo`, `go-git`, `koanf`, `twiggit/internal/core` |
+| `internal/config/` | koanf-backed config loader + XDG resolution. | stdlib, `koanf`, `twiggit/internal/core` |
+| `internal/output/` | Formatter registry, error renderer, table writer, shell wrapper. | stdlib, `charm.land/lipgloss/v2`, `twiggit/internal/core`, `twiggit/internal/iostreams` |
+| `internal/iostreams/` | TTY detection, IOStreams struct, lipgloss styles. | stdlib, `charm.land/lipgloss/v2`, `lo`, `golang.org/x/term` |
+| `internal/cmdutil/` | `Factory` (lazy init), `ExitCodeFor`, persistent flags, `HookRunner` consumer interface. | stdlib, `lo`, `twiggit/internal/core`, `twiggit/internal/iostreams` |
+| `internal/version/` | Build-time version injection. | stdlib |
+| `cmd/` | Cobra command tree (`list`, `create`, `delete`, `prune`, `cd`, `init`, `_carapace`, `version`). | everything above + `twiggit/cmd` |
+| `main.go` | Composition root: Factory init, signal context, panic recover, cobra dispatch, exit-code mapping. | `twiggit/cmd`, `twiggit/internal/cmdutil`, `twiggit/internal/output` |
+
+**Dependency rules are enforced by `.golangci.yml` depguard**; see
+`openspec/changes/cli-functional-core-shell/design.md` for the rationale and
+`openspec/changes/cli-functional-core-shell/proposal.md` §Lint for the rule
+allow/deny lists.
 
 ## Essential Commands
 
@@ -194,19 +209,23 @@ graph TB
 | Tests | Written AFTER implementation (per config.yaml) |
 | Progress | `openspec status --change <name> --json` |
 | Artifacts | See `openspec/config.yaml` rules section |
-| Spec categories | `cli-` / `application-` / `domain-` / `infrastructure-` / `testing-` (see below) |
+| Spec categories | `cli-` / `core-` / `git-` / `testing-` (see below) |
 
 ## OpenSpec Spec Organization
 
-Specs live under `openspec/specs/<category>-<name>/spec.md`. The 6 category prefixes map to source-tree layers:
+Specs live under `openspec/specs/<category>-<name>/spec.md`. After `cli-functional-core-shell` lands, the prefixes map to source-tree layers as:
 
 | Prefix | Layer | Owner |
 | ------ | ----- | ----- |
-| `cli-` | `cmd/` | Cobra command specs |
-| `application-` | `internal/application/` | Service interfaces and contracts |
-| `domain-` | `internal/domain/` | Types, errors, validation rules |
-| `infrastructure-` | `internal/infrastructure/` | Git client, resolver, config, hooks, paths, shell-detect, release |
+| `cli-` | `cmd/` + `internal/cmdutil/` | Cobra command specs, Factory, IOStreams, exit codes, output, error formatting |
+| `core-` | `internal/core/` | Value objects, errors, validation, path utilities, shell types |
+| `git-` | `internal/git/` + `internal/config/` | Git client, resolver, hooks, shell-detect, config loading |
 | `testing-` | `test/` | Test organization and patterns |
+
+The legacy `application-`, `domain-`, `infrastructure-` prefixes persist in
+`openspec/changes/*/specs/` only for changes that MODIFIED existing legacy
+specs; the new-prefix ownership above is canonical for net-new specs. See
+`openspec/config.yaml` for the full mapping and `openspec/changes/cli-functional-core-shell/proposal.md` §Non-goals for the deferred rename.
 
 **Layout**: one folder per spec, single `spec.md` inside. Use `# Capability:` + `## Purpose` + `## Requirements` headers.
 
@@ -247,10 +266,6 @@ NotFound distinction is preserved in the formatter's hint layer.
 | ---- | ------- |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, testing, and contribution guide |
 | [cmd/AGENTS.md](cmd/AGENTS.md) | CLI commands, Cobra patterns, command specs |
-| [internal/application/AGENTS.md](internal/application/AGENTS.md) | Interface definitions |
-| [internal/service/AGENTS.md](internal/service/AGENTS.md) | Service patterns, error handling |
-| [internal/domain/AGENTS.md](internal/domain/AGENTS.md) | Domain model, context types, error types |
-| [internal/infrastructure/AGENTS.md](internal/infrastructure/AGENTS.md) | Git client routing, config |
 | [internal/version/AGENTS.md](internal/version/AGENTS.md) | Build-time version injection pattern |
 | [test/AGENTS.md](test/AGENTS.md) | Test organization, quality requirements |
 | [test/mocks/AGENTS.md](test/mocks/AGENTS.md) | Mock patterns, testify/mock usage |

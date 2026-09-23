@@ -48,11 +48,20 @@ func main() {
 	rootCmd.SetContext(ctx)
 
 	if err := rootCmd.Execute(); err != nil {
+		// Signal cancellation (SIGINT/SIGTERM) bypasses the error
+		// formatter and ExitCodeFor per cli-exit-codes and
+		// cli-error-formatting specs: the binary exits 130 (SIGINT)
+		// or 143 (SIGTERM) directly. The formatter MUST NOT run for
+		// signal-cancelled invocations.
+		if ctx.Err() != nil {
+			if errors.Is(ctx.Err(), context.Canceled) {
+				os.Exit(130)
+			}
+			os.Exit(143)
+		}
+
 		ios := factory.IOStreams
 		exitCode := cmdutil.ExitCodeFor(err)
-		if errors.Is(ctx.Err(), context.Canceled) {
-			exitCode = cmdutil.ExitError
-		}
 		if exitCode == cmdutil.ExitUsage {
 			_, _ = fmt.Fprintf(ios.ErrOut, "Error: %s\n", err.Error())
 		} else {

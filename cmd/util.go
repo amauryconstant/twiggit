@@ -32,22 +32,15 @@ func isQuiet(cmd *cobra.Command) bool {
 	return iosFromCmd(cmd).Quiet
 }
 
-// activeVerboseLevel mirrors the running --verbose count.
-// NewCmd* functions install the Factory's *GlobalOptions value via
-// root's PersistentPreRunE. Zero is the silent default.
-var activeVerboseLevel int
-
-// verbosef is the verbose-output gate used by every command. It
-// honours both the iostreams-supplied --quiet/--verbose gates and
-// the level-aware count installed by root.PersistentPreRunE.
-// -v sets activeVerboseLevel = 1; -vv sets it = 2. With no flag
-// set, verbosef is a no-op. When ios is nil the call is silently
-// dropped.
-func verbosef(ios *iostreams.IOStreams, level int, format string, args ...any) {
+// verbosef is the verbose-output gate used by every command. It is
+// a thin wrapper around iostreams.IOStreams.Verbosef that tolerates
+// a nil ios for early-startup call sites and keeps the call shape
+// short. Per cli-verbose-output, the previous two-level
+// (-v / -vv) distinction is collapsed into a single boolean Verbose
+// flag: -vv is treated as -v and the level-2 indentation prefix is
+// removed from message strings.
+func verbosef(ios *iostreams.IOStreams, format string, args ...any) {
 	if ios == nil {
-		return
-	}
-	if level > activeVerboseLevel {
 		return
 	}
 	ios.Verbosef(format, args...)

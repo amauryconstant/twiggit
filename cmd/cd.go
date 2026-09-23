@@ -121,9 +121,9 @@ func runCd(opts *CdOptions) error {
 		return fmt.Errorf("failed to resolve path for %s: %w", target, err)
 	}
 
-	verbosef(opts.IO, 1, "Navigating to worktree")
-	verbosef(opts.IO, 2, "  target: %s", target)
-	verbosef(opts.IO, 2, "  worktree path: %s", result.ResolvedPath)
+	verbosef(opts.IO, "Navigating to worktree")
+	verbosef(opts.IO, "target: %s", target)
+	verbosef(opts.IO, "worktree path: %s", result.ResolvedPath)
 
 	if validateErr := validatePath(result.ResolvedPath); validateErr != nil {
 		if result.Type == core.PathTypeWorktree {

@@ -171,9 +171,9 @@ func runCreate(opts *CreateOptions) error {
 		Worktree: &core.WorktreeInfo{Path: worktreePath, Branch: branchName},
 	}
 
-	verbosef(opts.IO, 1, "Creating worktree for %s/%s", project.Name, branchName)
-	verbosef(opts.IO, 2, "  from branch: %s", opts.Source)
-	verbosef(opts.IO, 2, "  to path: %s", project.Name+"/"+branchName)
+	verbosef(opts.IO, "Creating worktree for %s/%s", project.Name, branchName)
+	verbosef(opts.IO, "from branch: %s", opts.Source)
+	verbosef(opts.IO, "to path: %s", project.Name+"/"+branchName)
 
 	// Run post-create hooks if the project has a .twiggit.toml config.
 	hookResult, err := runPostCreateHooks(ctx, gitClient, cfg, project, branchName, opts.Source, worktreePath)

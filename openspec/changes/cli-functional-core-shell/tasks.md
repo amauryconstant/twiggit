@@ -133,21 +133,21 @@
 
 ## 14. main.go rewrite
 
-- [ ] 14.1 Replace `main.go` with composition root: `cmdutil.NewFactory` + `signal.NotifyContext` + cobra `Execute` + `cmdutil.ExitCodeFor`; verify by `go build ./...` clean.
-- [ ] 14.2 Add panic-recover deferred function that prints "Internal error: <panic value>" to `ioStreams.Stderr` and exits 1; when `TWIGGIT_DEBUG=1` is set, append the full stack trace.
-- [ ] 14.3 Wire `signal.NotifyContext` cancellation into cobra via `cmd.SetContext(ctx)`; verify by sending SIGINT to the binary during a long-running command and confirming clean exit with code 130.
-- [ ] 14.4 Verify exit-code propagation: `cmdutil.ExitCodeFor(err)` is the only path for non-signal exits; `os.Exit(130)`/`os.Exit(143)` only on signal path; verify by `rg 'os\.Exit' main.go` returns no matches outside the panic-recover and the signal-handler exit.
-- [ ] 14.5 Verify the spec `cli-main-entry-point` MODIFIED delta now matches the new composition root; `openspec show cli-main-entry-point --type spec --json --no-scenarios` returns the updated requirement text.
+- [x] 14.1 Replace `main.go` with composition root: `cmdutil.NewFactory` + `signal.NotifyContext` + cobra `Execute` + `cmdutil.ExitCodeFor`; verify by `go build ./...` clean.
+- [x] 14.2 Add panic-recover deferred function that prints "Internal error: <panic value>" to `ioStreams.Stderr` and exits 1; when `TWIGGIT_DEBUG=1` is set, append the full stack trace. (Implementation writes to `os.Stderr` directly because the recover runs before `cmdutil.NewFactory()`; rationale captured in main.go.)
+- [x] 14.3 Wire `signal.NotifyContext` cancellation into cobra via `cmd.SetContext(ctx)`; verify by sending SIGINT to the binary during a long-running command and confirming clean exit with code 130.
+- [x] 14.4 Verify exit-code propagation: `cmdutil.ExitCodeFor(err)` is the only path for non-signal exits; `os.Exit(130)`/`os.Exit(143)` only on signal path; verify by `rg 'os\.Exit' main.go` returns no matches outside the panic-recover and the signal-handler exit.
+- [x] 14.5 Verify the spec `cli-main-entry-point` MODIFIED delta now matches the new composition root; `openspec show cli-main-entry-point --type spec --json --no-scenarios` returns the updated requirement text.
 
 ## 15. Depguard + lint config
 
-- [ ] 15.1 Replace `.golangci.yml` depguard block with Tier 2 rules per proposal §Lint (6 rule sets); verify by reading the resulting file.
-- [ ] 15.2 Drop `gocognit` from the linters list; verify by `rg 'gocognit' .golangci.yml` returns no matches.
-- [ ] 15.3 Keep `nolintlint` (`require-explanation: true, require-specific: true`) and `errcheck.check-type-assertions: true`; verify by reading the linters section.
-- [ ] 15.4 Add depguard rules to forbid `os.Stdout`/`os.Stderr` in `cmd/`; verify by `rg 'os\.Stdout|os\.Stderr' cmd/` returns no matches outside `main.go`.
-- [ ] 15.5 Run `golangci-lint run` (v2.6.0+); enable the `modernize` linter; verify by zero new findings (existing findings from prior changes still allowed).
-- [ ] 15.6 Pin lipgloss version in `go.mod` (Q5 deferred item); verify by `go mod tidy` and reading `go.mod`.
-- [ ] 15.7 Update `.pre-commit-config.yaml` if `golangci-lint` invocation changed; verify by `pre-commit run --all-files` clean.
+- [x] 15.1 Replace `.golangci.yml` depguard block with Tier 2 rules per proposal §Lint (5 rule sets: core, git, config, output, iostreams; `cmd/` layer constraints enforced via `deny:` entries inside each rule); verify by reading the resulting file.
+- [x] 15.2 Drop `gocognit` from the linters list; verify by `rg 'gocognit' .golangci.yml` returns no matches.
+- [x] 15.3 Keep `nolintlint` (`require-explanation: true, require-specific: true`) and `errcheck.check-type-assertions: true`; verify by reading the linters section.
+- [x] 15.4 Add depguard rules to forbid `os.Stdout`/`os.Stderr` in `cmd/`; verify by `rg 'os\.Stdout|os\.Stderr' cmd/` returns no matches outside `main.go`.
+- [x] 15.5 Run `golangci-lint run` (v2.6.0+); enable the `modernize` linter; verify by zero new findings (existing findings from prior changes still allowed).
+- [x] 15.6 Pin lipgloss version in `go.mod` (Q5 deferred item); verify by `go mod tidy` and reading `go.mod`. (Pinned to `charm.land/lipgloss/v2 v2.0.6` per design §11 apply-time addendum.)
+- [x] 15.7 Update `.pre-commit-config.yaml` if `golangci-lint` invocation changed; verify by `pre-commit run --all-files` clean. (No invocation change needed: pre-commit runs `golangci-lint run` and the v2 config in `.golangci.yml` is picked up automatically.)
 
 ## 16. Modernization sweep (final pass)
 

@@ -118,13 +118,13 @@ func runList(opts *ListOptions) error {
 		return fmt.Errorf("failed to list worktrees: %w", err)
 	}
 
-	verbosef(opts.IO, 1, "Listing worktrees")
+	verbosef(opts.IO, "Listing worktrees")
 	if opts.All {
-		verbosef(opts.IO, 2, "  repository: all projects")
-		verbosef(opts.IO, 2, "  including main worktree: false")
+		verbosef(opts.IO, "repository: all projects")
+		verbosef(opts.IO, "including main worktree: false")
 	} else if currentCtx.ProjectName != "" {
-		verbosef(opts.IO, 2, "  project: %s", currentCtx.ProjectName)
-		verbosef(opts.IO, 2, "  including main worktree: false")
+		verbosef(opts.IO, "project: %s", currentCtx.ProjectName)
+		verbosef(opts.IO, "including main worktree: false")
 	}
 
 	format := ""
