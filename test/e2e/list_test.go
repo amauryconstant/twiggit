@@ -128,14 +128,14 @@ var _ = Describe("list command", func() {
 		}
 	})
 
-	It("shows level 2 verbose output with -vv flag", func() {
+	It("shows verbose output with -vv flag", func() {
 		fixture.CreateWorktreeSetup("test")
 
 		session := ctxHelper.FromProjectDir("test", "list", "-vv")
 		cli.ShouldSucceed(session)
 		cli.ShouldVerboseOutput(session, "Listing worktrees")
-		cli.ShouldVerboseOutput(session, "  project: test")
-		cli.ShouldVerboseOutput(session, "  including main worktree: false")
+		cli.ShouldVerboseOutput(session, "project: test")
+		cli.ShouldVerboseOutput(session, "including main worktree: false")
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())

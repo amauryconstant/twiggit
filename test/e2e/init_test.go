@@ -245,14 +245,14 @@ var _ = Describe("init command", func() {
 		cli.ShouldVerboseOutput(session, "Setting up shell wrapper")
 	})
 
-	It("shows level 2 verbose output with -vv flag in install mode", func() {
+	It("shows verbose output with -vv flag in install mode", func() {
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
 		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
 
 		session := cli.Run("init", "bash", "--install", "--config", bashrcPath, "-vv")
 		cli.ShouldSucceed(session)
 		cli.ShouldVerboseOutput(session, "Setting up shell wrapper")
-		cli.ShouldVerboseOutput(session, "  shell type: bash")
+		cli.ShouldVerboseOutput(session, "shell type: bash")
 	})
 
 	It("shows no verbose output by default in install mode", func() {

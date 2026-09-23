@@ -79,16 +79,16 @@ session := cli.Run("create", "feature-1")
 cli.ShouldSucceed(session)
 cli.ShouldNotHaveVerboseOutput(session)
 
-// Test level 1 verbose output
+// Test verbose output with -v
 session := cli.Run("create", "feature-1", "-v")
 cli.ShouldSucceed(session)
 cli.ShouldVerboseOutput(session, "Creating worktree")
 
-// Test level 2 verbose output
+// Test verbose output with -vv (-vv is equivalent to -v; no level distinction)
 session := cli.Run("create", "feature-1", "-vv")
 cli.ShouldSucceed(session)
 cli.ShouldVerboseOutput(session, "Creating worktree")
-cli.ShouldVerboseOutput(session, "  from branch: main")
+cli.ShouldVerboseOutput(session, "from branch: main")
 ```
 
 **Helper Methods:**

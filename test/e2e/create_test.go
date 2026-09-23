@@ -105,7 +105,7 @@ var _ = Describe("create command", func() {
 		Expect(worktreePath).To(BeADirectory())
 	})
 
-	It("shows level 2 verbose output with -vv flag", func() {
+	It("shows verbose output with -vv flag", func() {
 		fixture.SetupSingleProject("test-project")
 
 		testID := fixture.GetTestID()
@@ -115,8 +115,8 @@ var _ = Describe("create command", func() {
 		cli.ShouldSucceed(session)
 		cli.ShouldOutput(session, branchName)
 		cli.ShouldVerboseOutput(session, "Creating worktree for test-project/"+branchName)
-		cli.ShouldVerboseOutput(session, "  from branch: main")
-		cli.ShouldVerboseOutput(session, "  to path: test-project/"+branchName)
+		cli.ShouldVerboseOutput(session, "from branch: main")
+		cli.ShouldVerboseOutput(session, "to path: test-project/"+branchName)
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())

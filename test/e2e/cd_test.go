@@ -121,13 +121,13 @@ var _ = Describe("cd command", func() {
 		}
 	})
 
-	It("shows level 2 verbose output with -vv flag", func() {
+	It("shows verbose output with -vv flag", func() {
 		result := fixture.CreateWorktreeSetup("test")
 
 		session := ctxHelper.FromProjectDir("test", "cd", result.Feature1Branch, "-vv")
 		Eventually(session).Should(gexec.Exit(0))
 		cli.ShouldVerboseOutput(session, "Navigating to worktree")
-		cli.ShouldVerboseOutput(session, "  target: "+result.Feature1Branch)
+		cli.ShouldVerboseOutput(session, "target: "+result.Feature1Branch)
 
 		if session.ExitCode() != 0 {
 			GinkgoT().Log(fixture.Inspect())
