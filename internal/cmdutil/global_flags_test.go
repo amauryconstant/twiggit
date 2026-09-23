@@ -38,7 +38,8 @@ func TestAddPersistentFlags_DefaultsAreZeroValues(t *testing.T) {
 
 	assert.Equal(t, "", opts.Output)
 	assert.False(t, opts.Quiet)
-	assert.False(t, opts.Verbose)
+	assert.Equal(t, 0, opts.Verbose)
+	assert.False(t, opts.IsVerbose())
 }
 
 // TestAddPersistentFlags_BindsValuesToOpts confirms the cobra binding
@@ -53,11 +54,12 @@ func TestAddPersistentFlags_BindsValuesToOpts(t *testing.T) {
 
 	require.NoError(t, cmd.PersistentFlags().Set("output", "json"))
 	require.NoError(t, cmd.PersistentFlags().Set("quiet", "true"))
-	require.NoError(t, cmd.PersistentFlags().Set("verbose", "true"))
+	require.NoError(t, cmd.PersistentFlags().Set("verbose", "1"))
 
 	assert.Equal(t, "json", opts.Output)
 	assert.True(t, opts.Quiet)
-	assert.True(t, opts.Verbose)
+	assert.Equal(t, 1, opts.Verbose)
+	assert.True(t, opts.IsVerbose())
 }
 
 // TestAddPersistentFlags_QuietAndVerboseArePersistent confirms the

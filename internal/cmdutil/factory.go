@@ -1,6 +1,7 @@
 package cmdutil
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -23,11 +24,12 @@ import (
 // config (GitClient, Logger) reaches it through f.Config(), so the
 // config file is parsed exactly once per binary invocation.
 //
-// Construction populates IOStreams, AppVersion, and Executable eagerly
-// (they are cheap and never fail). The expensive fields (Config,
-// GitClient, Logger) are sync.OnceValue / sync.OnceFunc wrappers that
-// run on first call. Init touches each lazy field so initialization
-// failures surface before any command body executes.
+// Construction populates IOStreams, Context, AppVersion, and
+// Executable eagerly (they are cheap and never fail). The expensive
+// fields (Config, GitClient, Logger) are sync.OnceValue /
+// sync.OnceFunc wrappers that run on first call. Init touches each
+// lazy field so initialization failures surface before any command
+// body executes.
 //
 // Customizing for tests: assign new functions to the fields before the
 // first call (or before Init). Once cached, the result is pinned for
@@ -36,6 +38,12 @@ type Factory struct {
 	// IOStreams is the terminal I/O surface. Populated by NewFactory
 	// from iostreams.System(); tests may swap in iostreams.Test().
 	IOStreams *iostreams.IOStreams
+
+	// Context is the application context. main.go sets it to the
+	// signal.NotifyContext result so SIGINT / SIGTERM cancel every
+	// long-running command; tests pass t.Context(). Subcommand RunE
+	// closures read this through opts.Ctx.
+	Context context.Context
 
 	// AppVersion is the build-time injected version string.
 	AppVersion string
@@ -58,6 +66,17 @@ type Factory struct {
 	// sync.OnceFunc-cached; first call wires a text handler that
 	// discards writes so debug logs do not leak into the user stream.
 	Logger func() *slog.Logger
+
+	// GlobalOptions is the backing struct for the persistent
+	// --output / --quiet / --verbose flags defined on the root
+	// cobra command. Shared by reference with every subcommand so
+	// the bound cobra flag pointers mutate one struct rather than
+	// being copied per subcommand.
+	//
+	// main.go populates this via NewRootCommand before cmd.Execute
+	// runs; tests construct Factory literals and assign a fresh
+	// pointer themselves.
+	GlobalOptions *GlobalOptions
 }
 
 // NewFactory returns a Factory wired with the system IOStreams, the
@@ -68,9 +87,15 @@ type Factory struct {
 // NewFactory never errors: all failures are deferred to the first call
 // to a lazy field (or to Init). Tests that need to short-circuit a
 // failure assign a replacement function before calling the field.
+//
+// Context is set to context.Background() by default; main.go
+// replaces it with the signal.NotifyContext result so SIGINT /
+// SIGTERM propagate to long-running commands. Tests pass
+// t.Context() or a cancellable context directly.
 func NewFactory() *Factory {
 	f := &Factory{
 		IOStreams:  iostreams.System(),
+		Context:    context.Background(),
 		AppVersion: version.Version,
 		Executable: executableName(),
 	}

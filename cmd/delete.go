@@ -10,13 +10,39 @@ import (
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
+	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+	"twiggit/internal/iostreams"
 )
 
-// NewDeleteCommand creates a new delete command
-func NewDeleteCommand(f *CommandConfig) *cobra.Command {
-	var force, mergedOnly, changeDir bool
+// DeleteOptions captures every input to runDelete.
+type DeleteOptions struct {
+	IO            *iostreams.IOStreams
+	Config        func() (*core.Config, error)
+	GitClient     func() (*git.Client, error)
+	Ctx           context.Context
+	GlobalOptions *cmdutil.GlobalOptions
+
+	// Per-command fields.
+	Target     string
+	Force      bool
+	MergedOnly bool
+	ChangeDir  bool
+}
+
+// NewCmdDelete creates a new delete command.
+//
+// runF is the optional override used by tests; pass nil to install
+// the default runDelete body.
+func NewCmdDelete(f *cmdutil.Factory, runF func(*DeleteOptions) error) *cobra.Command {
+	opts := &DeleteOptions{
+		IO:            f.IOStreams,
+		Config:        f.Config,
+		GitClient:     f.GitClient,
+		Ctx:           f.Context,
+		GlobalOptions: f.GlobalOptions,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "delete <project>/<branch> | <worktree-path>",
@@ -34,14 +60,18 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.ExactArgs(1)),
-		RunE: func(c *cobra.Command, args []string) error {
-			return executeDelete(c, f, args[0], force, mergedOnly, changeDir)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Target = args[0]
+			if runF != nil {
+				return runF(opts)
+			}
+			return runDelete(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion even with uncommitted changes")
-	cmd.Flags().BoolVarP(&mergedOnly, "merged-only", "m", false, "Only delete if branch is merged")
-	cmd.Flags().BoolVarP(&changeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Force deletion even with uncommitted changes")
+	cmd.Flags().BoolVarP(&opts.MergedOnly, "merged-only", "m", false, "Only delete if branch is merged")
+	cmd.Flags().BoolVarP(&opts.ChangeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
 
 	carapace.Gen(cmd).PositionalCompletion(
 		actionWorktreeTarget(f, git.WithExistingOnly()),
@@ -50,18 +80,18 @@ Examples:
 	return cmd
 }
 
-// executeDelete implements the orchestration previously in
+// runDelete implements the orchestration previously in
 // navigationService + worktreeService.DeleteWorktree + worktreeService.GetWorktreeStatus.
 // It composes the context detector, resolver, and Client directly.
-func executeDelete(c *cobra.Command, f *CommandConfig, target string, force, mergedOnly, changeDir bool) error {
-	ctx := context.Background()
+func runDelete(opts *DeleteOptions) error {
+	ctx := opts.Ctx
 
-	cfg, err := f.Config()
+	cfg, err := opts.Config()
 	if err != nil {
 		return fmt.Errorf("config load failed: %w", err)
 	}
 
-	gitClient, err := f.GitClient()
+	gitClient, err := opts.GitClient()
 	if err != nil {
 		return fmt.Errorf("git client init failed: %w", err)
 	}
@@ -83,9 +113,9 @@ func executeDelete(c *cobra.Command, f *CommandConfig, target string, force, mer
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
-	resolution, err := resolver.ResolveIdentifier(currentCtx, target)
+	resolution, err := resolver.ResolveIdentifier(currentCtx, opts.Target)
 	if err != nil {
-		return fmt.Errorf("failed to resolve target %s: %w", target, err)
+		return fmt.Errorf("failed to resolve target %s: %w", opts.Target, err)
 	}
 
 	if resolution.Type == core.PathTypeInvalid {
@@ -93,23 +123,23 @@ func executeDelete(c *cobra.Command, f *CommandConfig, target string, force, mer
 	}
 
 	if resolution.Type == core.PathTypeWorktree && resolution.ResolvedPath == "" {
-		return core.NewOpValidationError("executeDelete", "ResolvedPath", "", "resolved path cannot be empty")
+		return core.NewOpValidationError("runDelete", "ResolvedPath", "", "resolved path cannot be empty")
 	}
 
 	worktreePath := resolution.ResolvedPath
 
 	// Status safety check
-	if !force {
+	if !opts.Force {
 		status, err := getWorktreeStatus(ctx, gitClient, worktreePath)
 		if err != nil {
 			if errors.Is(err, core.ErrWorktreeNotFound) {
-				if changeDir {
+				if opts.ChangeDir {
 					nav := getDeleteNavigationTarget(currentCtx, worktreePath)
 					if nav != "" {
-						_, _ = fmt.Fprintln(c.OutOrStdout(), nav)
+						_, _ = fmt.Fprintln(opts.IO.Out, nav)
 					}
 				} else {
-					_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s (already removed)\n", worktreePath)
+					_, _ = fmt.Fprintf(opts.IO.Out, "Deleted worktree: %s (already removed)\n", worktreePath)
 				}
 				return &core.OperationError{
 					Op:      "delete.worktree",
@@ -125,7 +155,7 @@ func executeDelete(c *cobra.Command, f *CommandConfig, target string, force, mer
 	}
 
 	// merged-only check
-	if mergedOnly {
+	if opts.MergedOnly {
 		wtInfo, err := clientGetWorktreeByPath(ctx, gitClient, currentCtx.Path, worktreePath)
 		if err != nil {
 			return fmt.Errorf("failed to get worktree info: %w", err)
@@ -139,21 +169,21 @@ func executeDelete(c *cobra.Command, f *CommandConfig, target string, force, mer
 		}
 	}
 
-	logv(c, 1, "Deleting worktree at %s", worktreePath)
-	logv(c, 2, "  project: %s", currentCtx.ProjectName)
-	logv(c, 2, "  force: %t", force)
+	verbosef(opts.IO, 1, "Deleting worktree at %s", worktreePath)
+	verbosef(opts.IO, 2, "  project: %s", currentCtx.ProjectName)
+	verbosef(opts.IO, 2, "  force: %t", opts.Force)
 
-	if err := gitClient.DeleteWorktree(ctx, currentCtx.Path, worktreePath, force); err != nil {
+	if err := gitClient.DeleteWorktree(ctx, currentCtx.Path, worktreePath, opts.Force); err != nil {
 		return fmt.Errorf("failed to delete worktree: %w", err)
 	}
 
-	if changeDir {
+	if opts.ChangeDir {
 		nav := getDeleteNavigationTarget(currentCtx, worktreePath)
 		if nav != "" {
-			_, _ = fmt.Fprintln(c.OutOrStdout(), nav)
+			_, _ = fmt.Fprintln(opts.IO.Out, nav)
 		}
-	} else if !isQuiet(c) {
-		_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s\n", worktreePath)
+	} else if !opts.IO.Quiet {
+		_, _ = fmt.Fprintf(opts.IO.Out, "Deleted worktree: %s\n", worktreePath)
 	}
 
 	return nil

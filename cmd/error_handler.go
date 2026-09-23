@@ -3,10 +3,11 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
+
 	"twiggit/internal/core"
+	"twiggit/internal/output"
 )
 
 // ExitCode defines the exit codes used by the application.
@@ -43,27 +44,36 @@ const (
 	ErrorCategoryGeneric
 )
 
-// HandleCLIError is a pure function that maps errors to CLI output and returns exit code
+// HandleCLIError is a pure function that maps errors to CLI output and returns exit code.
+// It writes through the system IOStreams so non-root callers (early
+// startup failures, pre-cobra errors) still see formatted output.
 func HandleCLIError(err error) ExitCode {
 	return HandleCLIErrorWithCommand(nil, err)
 }
 
-// HandleCLIErrorWithCommand maps errors to CLI output and returns exit code, respecting quiet mode from command
+// HandleCLIErrorWithCommand maps errors to CLI output and returns exit code.
+// Formatting runs through output.FormatError so colour, hints, and the
+// TWIGGIT_DEBUG chain dump all funnel through the same renderer used
+// by main.go. The iostreams.IOStreams is recovered from cmd's
+// context via cmdutil.IOStreamsFromCmd; see cmd/util.go:iosFromCmd for
+// the lookup helper.
 func HandleCLIErrorWithCommand(cmd *cobra.Command, err error) ExitCode {
+	ios := iosFromCmd(cmd)
+
+	// Usage errors get a clean "Error: <message>" line so cobra's
+	// pflag-wrapped usage failures do not stack with the structured
+	// formatter's multi-line hints.
 	if IsCobraUsageError(err) {
-		fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
+		fmt.Fprintf(ios.ErrOut, "Error: %s\n", err.Error())
 		return ExitCodeUsage
 	}
 
-	quiet := false
-	if cmd != nil {
-		quiet = isQuiet(cmd)
+	quiet := isQuiet(cmd)
+	if quiet {
+		ios.Quiet = true
 	}
 
-	formatter := NewErrorFormatterWithOptions(quiet)
-	formattedError := formatter.Format(err)
-	fmt.Fprint(os.Stderr, formattedError)
-
+	output.FormatError(ios.ErrOut, err, ios)
 	return GetExitCodeForError(err)
 }
 

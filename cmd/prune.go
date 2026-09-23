@@ -13,13 +13,41 @@ import (
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
+	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+	"twiggit/internal/iostreams"
 )
 
-// NewPruneCommand creates a new prune command for deleting merged worktrees.
-func NewPruneCommand(f *CommandConfig) *cobra.Command {
-	var force, yes, deleteBranches, allProjects, dryRun bool
+// PruneOptions captures every input to runPrune.
+type PruneOptions struct {
+	IO            *iostreams.IOStreams
+	Config        func() (*core.Config, error)
+	GitClient     func() (*git.Client, error)
+	Ctx           context.Context
+	GlobalOptions *cmdutil.GlobalOptions
+
+	// Per-command fields.
+	Force            bool
+	Yes              bool
+	DeleteBranches   bool
+	AllProjects      bool
+	DryRun           bool
+	SpecificWorktree string
+}
+
+// NewCmdPrune creates a new prune command.
+//
+// runF is the optional override used by tests; pass nil to install
+// the default runPrune body.
+func NewCmdPrune(f *cmdutil.Factory, runF func(*PruneOptions) error) *cobra.Command {
+	opts := &PruneOptions{
+		IO:            f.IOStreams,
+		Config:        f.Config,
+		GitClient:     f.GitClient,
+		Ctx:           f.Context,
+		GlobalOptions: f.GlobalOptions,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "prune [project/branch]",
@@ -45,20 +73,22 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
-		RunE: func(c *cobra.Command, args []string) error {
-			var specificWorktree string
+		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				specificWorktree = args[0]
+				opts.SpecificWorktree = args[0]
 			}
-			return executePrune(c, f, force, yes, deleteBranches, allProjects, dryRun, specificWorktree)
+			if runF != nil {
+				return runF(opts)
+			}
+			return runPrune(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "Force deletion even with uncommitted changes")
-	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "Auto-confirm prompts (keeps safety checks)")
-	cmd.Flags().BoolVarP(&deleteBranches, "delete-branches", "d", false, "Delete branches after worktree removal")
-	cmd.Flags().BoolVarP(&allProjects, "all", "a", false, "Prune across all projects")
-	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Preview only, no actual deletion")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Force deletion even with uncommitted changes")
+	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Auto-confirm prompts (keeps safety checks)")
+	cmd.Flags().BoolVarP(&opts.DeleteBranches, "delete-branches", "d", false, "Delete branches after worktree removal")
+	cmd.Flags().BoolVarP(&opts.AllProjects, "all", "a", false, "Prune across all projects")
+	cmd.Flags().BoolVarP(&opts.DryRun, "dry-run", "n", false, "Preview only, no actual deletion")
 
 	carapace.Gen(cmd).PositionalCompletion(
 		actionWorktreeTarget(f, git.WithExistingOnly()),
@@ -67,19 +97,18 @@ Examples:
 	return cmd
 }
 
-// executePrune implements the orchestration previously in
-// worktreeService.PruneMergedWorktrees. After slice 9 the worktree
+// runPrune performs the prune walk. After slice 9 the worktree
 // iteration, skip logic, branch deletion, and result aggregation all
 // live in cmd/.
-func executePrune(c *cobra.Command, f *CommandConfig, force, yes, deleteBranches, allProjects, dryRun bool, specificWorktree string) error {
-	ctx := context.Background()
+func runPrune(opts *PruneOptions) error {
+	ctx := opts.Ctx
 
-	cfg, err := f.Config()
+	cfg, err := opts.Config()
 	if err != nil {
 		return fmt.Errorf("config load failed: %w", err)
 	}
 
-	gitClient, err := f.GitClient()
+	gitClient, err := opts.GitClient()
 	if err != nil {
 		return fmt.Errorf("git client init failed: %w", err)
 	}
@@ -99,70 +128,69 @@ func executePrune(c *cobra.Command, f *CommandConfig, force, yes, deleteBranches
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
-	quiet := isQuiet(c)
-	reporter := NewProgressReporter(quiet, c.ErrOrStderr())
+	reporter := NewProgressReporter(opts.IO)
 
-	if allProjects && !force && !yes && !dryRun {
+	if opts.AllProjects && !opts.Force && !opts.Yes && !opts.DryRun {
 		previewReq := &core.PruneWorktreesRequest{
 			Context:          currentCtx,
-			Force:            force,
-			DeleteBranches:   deleteBranches,
-			AllProjects:      allProjects,
+			Force:            opts.Force,
+			DeleteBranches:   opts.DeleteBranches,
+			AllProjects:      opts.AllProjects,
 			DryRun:           true,
-			SpecificWorktree: specificWorktree,
+			SpecificWorktree: opts.SpecificWorktree,
 		}
 		reporter.Report("Previewing prune operation...")
-		previewResult, err := runPrune(ctx, gitClient, cfg, previewReq, currentCtx)
+		previewResult, err := runPruneWalk(ctx, gitClient, cfg, previewReq, currentCtx)
 		if err != nil {
 			return fmt.Errorf("prune preview failed: %w", err)
 		}
-		outputPruneResults(c, previewResult, true)
+		outputPruneResults(opts.IO, previewResult, true)
 
-		confirmed, err := confirmBulkPrune(c)
+		confirmed, err := confirmBulkPrune(opts.IO)
 		if err != nil {
 			return err
 		}
 		if !confirmed {
-			_, _ = fmt.Fprintln(c.ErrOrStderr(), "Prune cancelled.")
+			_, _ = fmt.Fprintln(opts.IO.ErrOut, "Prune cancelled.")
 			return nil
 		}
 	}
 
-	if allProjects || specificWorktree == "" {
+	if opts.AllProjects || opts.SpecificWorktree == "" {
 		reporter.Report("Pruning merged worktrees...")
 	}
 
 	req := &core.PruneWorktreesRequest{
 		Context:          currentCtx,
-		Force:            force,
-		DeleteBranches:   deleteBranches,
-		AllProjects:      allProjects,
-		DryRun:           dryRun,
-		SpecificWorktree: specificWorktree,
+		Force:            opts.Force,
+		DeleteBranches:   opts.DeleteBranches,
+		AllProjects:      opts.AllProjects,
+		DryRun:           opts.DryRun,
+		SpecificWorktree: opts.SpecificWorktree,
 	}
-	result, err := runPrune(ctx, gitClient, cfg, req, currentCtx)
+	result, err := runPruneWalk(ctx, gitClient, cfg, req, currentCtx)
 	if err != nil {
 		return fmt.Errorf("prune failed: %w", err)
 	}
 
-	outputPruneResults(c, result, dryRun)
+	outputPruneResults(opts.IO, result, opts.DryRun)
 
-	if allProjects || specificWorktree == "" {
+	if opts.AllProjects || opts.SpecificWorktree == "" {
 		reporter.Report("Prune complete")
 	}
 
 	if result.NavigationPath != "" {
-		_, _ = fmt.Fprintln(c.OutOrStdout(), result.NavigationPath)
+		_, _ = fmt.Fprintln(opts.IO.Out, result.NavigationPath)
 	}
 
 	return nil
 }
 
-// runPrune performs the prune walk and returns the aggregated result.
-// It encapsulates the per-project iteration that previously lived in
-// worktreeService.pruneProjectWorktrees + checkWorktreeSkip +
+// runPruneWalk performs the prune walk and returns the aggregated
+// result. It encapsulates the per-project iteration that previously
+// lived in worktreeService.pruneProjectWorktrees + checkWorktreeSkip +
 // deleteWorktreeAndBranch.
-func runPrune(ctx context.Context, client *git.Client, cfg *core.Config, req *core.PruneWorktreesRequest, currentCtx *core.Context) (*core.PruneWorktreesResult, error) {
+func runPruneWalk(ctx context.Context, client *git.Client, cfg *core.Config, req *core.PruneWorktreesRequest, currentCtx *core.Context) (*core.PruneWorktreesResult, error) {
 	result := &core.PruneWorktreesResult{
 		DeletedWorktrees: []*core.PruneWorktreeResult{},
 		SkippedWorktrees: []*core.PruneWorktreeResult{},
@@ -374,10 +402,14 @@ func deleteWorktreeAndBranch(ctx context.Context, client *git.Client, project *c
 	}
 }
 
-// confirmBulkPrune prompts on stderr for a y/n confirmation.
-func confirmBulkPrune(c *cobra.Command) (bool, error) {
-	_, _ = fmt.Fprint(c.ErrOrStderr(), "This will prune merged worktrees across all projects. Continue? (y/n): ")
-	reader := bufio.NewReader(os.Stdin)
+// confirmBulkPrune prompts on stderr for a y/n confirmation. Reads
+// from ios.In so test helpers can supply canned input.
+func confirmBulkPrune(ios *iostreams.IOStreams) (bool, error) {
+	if ios == nil {
+		return false, fmt.Errorf("confirmBulkPrune: nil IOStreams")
+	}
+	_, _ = fmt.Fprint(ios.ErrOut, "This will prune merged worktrees across all projects. Continue? (y/n): ")
+	reader := bufio.NewReader(ios.In)
 	response, err := reader.ReadString('\n')
 	if err != nil {
 		return false, fmt.Errorf("failed to read confirmation: %w", err)
@@ -387,8 +419,11 @@ func confirmBulkPrune(c *cobra.Command) (bool, error) {
 }
 
 // outputPruneResults formats the aggregated prune result for the user.
-func outputPruneResults(c *cobra.Command, result *core.PruneWorktreesResult, dryRun bool) {
-	errOut := c.OutOrStderr()
+func outputPruneResults(ios *iostreams.IOStreams, result *core.PruneWorktreesResult, dryRun bool) {
+	if ios == nil {
+		return
+	}
+	errOut := ios.ErrOut
 
 	if dryRun {
 		_, _ = fmt.Fprintln(errOut, "Dry run - no changes made:")

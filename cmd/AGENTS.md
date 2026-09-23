@@ -189,7 +189,7 @@ Navigation: Single worktree prune outputs project directory path; bulk prune out
 
 ## Verbose Output
 
-Commands use `logv()` helper function for verbose output. See `cmd/util.go`.
+Commands use `verbosef()` helper function for verbose output. See `cmd/util.go`.
 
 **Verbosity levels:**
 - `-v`: Level 1 - High-level operation flow
@@ -201,13 +201,13 @@ Commands use `logv()` helper function for verbose output. See `cmd/util.go`.
 - Level 2 details indented with "  " prefix
 - All verbose output goes to stderr, normal output to stdout
 
-**logv() usage:**
+**verbosef() usage:**
 ```go
 import "twiggit/cmd"
 
-logv(cmd, 1, "Creating worktree for %s/%s", project, branch)
-logv(cmd, 2, "  from branch: %s", source)
-logv(cmd, 2, "  to path: %s", path)
+verbosef(ios, 1, "Creating worktree for %s/%s", project, branch)
+verbosef(ios, 2, "  from branch: %s", source)
+verbosef(ios, 2, "  to path: %s", path)
 ```
 
 **When to use level 1:**

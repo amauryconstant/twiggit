@@ -18,8 +18,14 @@ type CommandConfig = cmdutil.Factory
 // NewRootCommand creates a new root command with the given factory.
 //
 // Every subcommand receives the same Factory pointer so they all share
-// the cached Config and GitClient fields.
+// the cached Config and GitClient fields. The IOStreams and the
+// persistent --output / --quiet / --verbose flags are bound on the
+// root and stashed on cmd's context so error_handler.go and
+// completion helpers can recover them via cmdutil.IOStreamsFromCmd.
 func NewRootCommand(f *CommandConfig) *cobra.Command {
+	globalOpts := &cmdutil.GlobalOptions{}
+	f.GlobalOptions = globalOpts
+
 	cmd := &cobra.Command{
 		Use:   "twiggit",
 		Short: "A pragmatic tool for managing git worktrees",
@@ -28,10 +34,21 @@ It provides context-aware operations for creating, listing, navigating, and dele
 across multiple projects.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			if f == nil {
 				return core.NewUsageError("cmd: factory not provided", nil)
 			}
+			// Stash IOStreams on cmd's context so error paths and
+			// completion helpers can recover them without carrying
+			// the Factory reference through every signature.
+			cmdutil.SetIOStreams(cmd, f.IOStreams)
+			// Mirror the persistent --output / --quiet / --verbose
+			// flags onto the IOStreams gates so Verbosef and the
+			// quiet-aware formatter honour the user-supplied values.
+			globalOpts.ApplyToIOS(f.IOStreams)
+			// Wire the level-aware verbosef gate so -v / -vv callers
+			// emit at the requested detail.
+			activeVerboseLevel = globalOpts.Verbose
 			return nil
 		},
 	}
@@ -42,20 +59,17 @@ across multiple projects.`,
 		return core.UsageWrap(err)
 	})
 
-	// Add persistent verbose flag
-	cmd.PersistentFlags().CountP("verbose", "v", "Increase verbosity (can be used multiple times: -v, -vv)")
-
-	// Add persistent quiet flag
-	cmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
+	// Persistent --output / --quiet / --verbose (slice 10 contract).
+	cmdutil.AddPersistentFlags(cmd, globalOpts)
 
 	// Add subcommands
-	cmd.AddCommand(NewListCommand(f))
-	cmd.AddCommand(NewCreateCommand(f))
-	cmd.AddCommand(NewDeleteCommand(f))
-	cmd.AddCommand(NewPruneCommand(f))
-	cmd.AddCommand(NewCDCommand(f))
-	cmd.AddCommand(NewInitCmd(f))
-	cmd.AddCommand(NewVersionCommand(f))
+	cmd.AddCommand(NewCmdList(f, nil))
+	cmd.AddCommand(NewCmdCreate(f, nil))
+	cmd.AddCommand(NewCmdDelete(f, nil))
+	cmd.AddCommand(NewCmdPrune(f, nil))
+	cmd.AddCommand(NewCmdCd(f, nil))
+	cmd.AddCommand(NewCmdInit(f, nil))
+	cmd.AddCommand(NewCmdVersion(f, nil))
 
 	carapace.Gen(cmd)
 

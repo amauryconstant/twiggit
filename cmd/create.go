@@ -12,14 +12,42 @@ import (
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
+	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+	"twiggit/internal/iostreams"
 )
 
-// NewCreateCommand creates a new create command
-func NewCreateCommand(f *CommandConfig) *cobra.Command {
-	var source string
-	var cdFlag bool
+// CreateOptions captures every input to runCreate.
+// RunE populates it from cobra flags + Factory; runCreate body reads
+// a single value struct rather than juggling *cobra.Command, args,
+// and Factory references.
+type CreateOptions struct {
+	IO            *iostreams.IOStreams
+	Config        func() (*core.Config, error)
+	GitClient     func() (*git.Client, error)
+	Ctx           context.Context
+	GlobalOptions *cmdutil.GlobalOptions
+	HookRunner    cmdutil.HookRunner
+
+	// Per-command fields.
+	Spec   string
+	Source string
+	CdFlag bool
+}
+
+// NewCmdCreate creates a new create command.
+//
+// runF is the optional override used by tests; pass nil to install
+// the default runCreate body.
+func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
+	opts := &CreateOptions{
+		IO:            f.IOStreams,
+		Config:        f.Config,
+		GitClient:     f.GitClient,
+		Ctx:           f.Context,
+		GlobalOptions: f.GlobalOptions,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "create <project>/<branch> | <branch>",
@@ -32,22 +60,28 @@ Examples:
   twiggit create myproject/feature/my-feature    Create for specific project
   twiggit create feature --source develop       Create from specific source branch
   twiggit create feature -C                     Create and output path for shell`,
-		Args: wrapArgsValidator(cobra.ExactArgs(1)),
+		SilenceUsage:  true,
+		SilenceErrors: true,
+		Args:          wrapArgsValidator(cobra.ExactArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return executeCreate(cmd, f, args[0], source, cdFlag)
+			opts.Spec = args[0]
+			// Use config default source branch if available, otherwise fallback to "main"
+			if opts.Source == "" {
+				if cfg, cerr := opts.Config(); cerr == nil && cfg.DefaultSourceBranch != "" {
+					opts.Source = cfg.DefaultSourceBranch
+				} else {
+					opts.Source = "main"
+				}
+			}
+			if runF != nil {
+				return runF(opts)
+			}
+			return runCreate(opts)
 		},
 	}
 
-	// Use config default source branch if available, otherwise fallback to "main"
-	defaultSource := "main"
-	if cfg, err := f.Config(); err == nil && cfg.DefaultSourceBranch != "" {
-		defaultSource = cfg.DefaultSourceBranch
-	}
-	cmd.Flags().StringVar(&source, "source", defaultSource, "Source branch to create from")
-	cmd.Flags().BoolVarP(&cdFlag, "cd", "C", false, "Output worktree path to stdout (for shell wrapper)")
-
-	cmd.SilenceUsage = true
-	cmd.SilenceErrors = true
+	cmd.Flags().StringVar(&opts.Source, "source", "", "Source branch to create from")
+	cmd.Flags().BoolVarP(&opts.CdFlag, "cd", "C", false, "Output worktree path to stdout (for shell wrapper)")
 
 	carapace.Gen(cmd).PositionalCompletion(actionWorktreeTarget(f))
 	carapace.Gen(cmd).FlagCompletion(map[string]carapace.Action{
@@ -57,19 +91,19 @@ Examples:
 	return cmd
 }
 
-// executeCreate implements the orchestration that previously lived in
-// worktreeService.CreateWorktree + projectService.DiscoverProject +
-// hookRunner.Run. After slice 9 the orchestration lives in cmd/, with
-// concrete git and core types composing the steps.
-func executeCreate(cmd *cobra.Command, f *CommandConfig, spec, source string, cdFlag bool) error {
-	ctx := context.Background()
+// runCreate composes the git context detector, resolver, and Client
+// to materialise a new worktree. After slice 10 the orchestration
+// lives in cmd/ directly; the concrete git and core types own the
+// per-step work.
+func runCreate(opts *CreateOptions) error {
+	ctx := opts.Ctx
 
-	cfg, err := f.Config()
+	cfg, err := opts.Config()
 	if err != nil {
 		return fmt.Errorf("config load failed: %w", err)
 	}
 
-	gitClient, err := f.GitClient()
+	gitClient, err := opts.GitClient()
 	if err != nil {
 		return fmt.Errorf("git client init failed: %w", err)
 	}
@@ -79,7 +113,7 @@ func executeCreate(cmd *cobra.Command, f *CommandConfig, spec, source string, cd
 		return fmt.Errorf("context detector init failed: %w", err)
 	}
 
-	branchName := extractBranchNameForValidation(spec)
+	branchName := extractBranchNameForValidation(opts.Spec)
 	branchValidation := core.ValidateBranchName(branchName)
 	if branchValidation.IsError() {
 		return branchValidation.Error
@@ -95,7 +129,7 @@ func executeCreate(cmd *cobra.Command, f *CommandConfig, spec, source string, cd
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
-	projectName, branchName, err := parseProjectBranch(spec, currentCtx)
+	projectName, branchName, err := parseProjectBranch(opts.Spec, currentCtx)
 	if err != nil {
 		return err
 	}
@@ -106,12 +140,12 @@ func executeCreate(cmd *cobra.Command, f *CommandConfig, spec, source string, cd
 	}
 
 	// Validate source branch exists before creating worktree
-	sourceBranchExists, err := gitClient.BranchExists(ctx, project.GitRepoPath, source)
+	sourceBranchExists, err := gitClient.BranchExists(ctx, project.GitRepoPath, opts.Source)
 	if err != nil {
-		return core.NewOpValidationError("CreateWorktreeRequest", "source", source, "failed to check if source branch exists: "+err.Error())
+		return core.NewOpValidationError("CreateWorktreeRequest", "source", opts.Source, "failed to check if source branch exists: "+err.Error())
 	}
 	if !sourceBranchExists {
-		return core.NewOpValidationError("CreateWorktreeRequest", "source", source, fmt.Sprintf("source branch '%s' does not exist", source))
+		return core.NewOpValidationError("CreateWorktreeRequest", "source", opts.Source, fmt.Sprintf("source branch '%s' does not exist", opts.Source))
 	}
 
 	worktreePath := calculateWorktreePath(cfg, project.Name, branchName)
@@ -124,7 +158,7 @@ func executeCreate(cmd *cobra.Command, f *CommandConfig, spec, source string, cd
 		return fmt.Errorf("failed to create worktree parent directory: %w", err)
 	}
 
-	if err := gitClient.CreateWorktree(ctx, project.GitRepoPath, branchName, source, worktreePath); err != nil {
+	if err := gitClient.CreateWorktree(ctx, project.GitRepoPath, branchName, opts.Source, worktreePath); err != nil {
 		return &core.OperationError{
 			Op:      "create.worktree",
 			Entity:  worktreePath,
@@ -137,14 +171,14 @@ func executeCreate(cmd *cobra.Command, f *CommandConfig, spec, source string, cd
 		Worktree: &core.WorktreeInfo{Path: worktreePath, Branch: branchName},
 	}
 
-	logv(cmd, 1, "Creating worktree for %s/%s", project.Name, branchName)
-	logv(cmd, 2, "  from branch: %s", source)
-	logv(cmd, 2, "  to path: %s", worktreePath)
+	verbosef(opts.IO, 1, "Creating worktree for %s/%s", project.Name, branchName)
+	verbosef(opts.IO, 2, "  from branch: %s", opts.Source)
+	verbosef(opts.IO, 2, "  to path: %s", worktreePath)
 
 	// Run post-create hooks if the project has a .twiggit.toml config.
-	hookResult, err := runPostCreateHooks(ctx, gitClient, cfg, project, branchName, source, worktreePath)
+	hookResult, err := runPostCreateHooks(ctx, gitClient, cfg, project, branchName, opts.Source, worktreePath)
 	if err != nil {
-		f.Logger().Error("hook execution failed",
+		opts.IO.Logger.Error("hook execution failed",
 			"error", err,
 			"worktree_path", worktreePath,
 			"hook_type", string(core.HookPostCreate),
@@ -152,16 +186,16 @@ func executeCreate(cmd *cobra.Command, f *CommandConfig, spec, source string, cd
 	}
 	result.HookResult = hookResult
 
-	if cdFlag {
-		_, _ = fmt.Fprintln(cmd.OutOrStdout(), result.Worktree.Path)
-	} else if !isQuiet(cmd) {
-		if err := displayCreateSuccess(cmd.OutOrStdout(), result.Worktree); err != nil {
+	if opts.CdFlag {
+		_, _ = fmt.Fprintln(opts.IO.Out, result.Worktree.Path)
+	} else if !opts.IO.Quiet {
+		if err := displayCreateSuccess(opts.IO.Out, result.Worktree); err != nil {
 			return err
 		}
 	}
 
 	if result.HookResult != nil && !result.HookResult.IsSuccessful {
-		displayHookFailures(cmd.ErrOrStderr(), result.HookResult)
+		displayHookFailures(opts.IO.ErrOut, result.HookResult)
 	}
 
 	return nil
@@ -323,7 +357,7 @@ func parseProjectBranch(spec string, ctx *core.Context) (string, string, error) 
 		return projectName, parts[1], nil
 	}
 
-	if ctx.ProjectName != "" {
+	if ctx != nil && ctx.ProjectName != "" {
 		return ctx.ProjectName, spec, nil
 	}
 

@@ -9,14 +9,42 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+	"twiggit/internal/iostreams"
 )
 
-// NewListCommand creates a new list command
-func NewListCommand(f *CommandConfig) *cobra.Command {
-	var all bool
-	var output string
+// ListOptions captures every input to the runList entry point.
+// RunE populates it from the cobra flag system + Factory so the
+// runList body reads a single value-type struct instead of juggling
+// *cobra.Command, args, and Factory references.
+type ListOptions struct {
+	IO            *iostreams.IOStreams
+	Config        func() (*core.Config, error)
+	GitClient     func() (*git.Client, error)
+	Ctx           context.Context
+	GlobalOptions *cmdutil.GlobalOptions
+
+	// Per-command flag fields.
+	All bool
+}
+
+// NewCmdList creates a new list command.
+//
+// runF is the optional override used by tests; pass nil to install
+// the default runList body. The persistent --output / --quiet /
+// --verbose flags are inherited from the root cobra command via
+// cmdutil.AddPersistentFlags; runList reads them off
+// opts.GlobalOptions.
+func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Command {
+	opts := &ListOptions{
+		IO:            f.IOStreams,
+		Config:        f.Config,
+		GitClient:     f.GitClient,
+		Ctx:           f.Context,
+		GlobalOptions: f.GlobalOptions,
+	}
 
 	cmd := &cobra.Command{
 		Use:     "list",
@@ -33,33 +61,39 @@ Examples:
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if output != "" && output != "text" && output != "json" {
-				return fmt.Errorf("invalid output format '%s': must be 'text' or 'json'", output)
+			out := ""
+			if opts.GlobalOptions != nil {
+				out = opts.GlobalOptions.Output
 			}
-			return executeList(cmd, f, all, output)
+			if out != "" && out != "text" && out != "json" {
+				return fmt.Errorf("invalid output format '%s': must be 'text' or 'json'", out)
+			}
+			if runF != nil {
+				return runF(opts)
+			}
+			return runList(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&all, "all", "a", false, "List worktrees from all projects")
-	cmd.Flags().StringVarP(&output, "output", "o", "text", "Output format (text or json)")
+	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "List worktrees from all projects")
 
 	return cmd
 }
 
-// executeList implements the orchestration that previously lived in
+// runList implements the orchestration that previously lived in
 // worktreeService.ListWorktrees + projectService.ListProjectSummaries.
 // It composes the git context detector, RepoFinder, and composite
 // Client (which embeds the read- and write-side halves) directly so
 // no service-layer indirection is required.
-func executeList(cmd *cobra.Command, f *CommandConfig, all bool, output string) error {
-	ctx := context.Background()
+func runList(opts *ListOptions) error {
+	ctx := opts.Ctx
 
-	cfg, err := f.Config()
+	cfg, err := opts.Config()
 	if err != nil {
 		return fmt.Errorf("config load failed: %w", err)
 	}
 
-	gitClient, err := f.GitClient()
+	gitClient, err := opts.GitClient()
 	if err != nil {
 		return fmt.Errorf("git client init failed: %w", err)
 	}
@@ -79,26 +113,32 @@ func executeList(cmd *cobra.Command, f *CommandConfig, all bool, output string) 
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
-	worktrees, err := listWorktrees(ctx, gitClient, cfg, currentCtx, all)
+	worktrees, err := listWorktrees(ctx, gitClient, cfg, currentCtx, opts.All)
 	if err != nil {
 		return fmt.Errorf("failed to list worktrees: %w", err)
 	}
 
-	logv(cmd, 1, "Listing worktrees")
-	if all {
-		logv(cmd, 2, "  repository: all projects")
+	verbosef(opts.IO, 1, "Listing worktrees")
+	if opts.All {
+		verbosef(opts.IO, 2, "  repository: all projects")
+		verbosef(opts.IO, 2, "  including main worktree: false")
 	} else if currentCtx.ProjectName != "" {
-		logv(cmd, 2, "  project: %s", currentCtx.ProjectName)
+		verbosef(opts.IO, 2, "  project: %s", currentCtx.ProjectName)
+		verbosef(opts.IO, 2, "  including main worktree: false")
 	}
 
+	format := ""
+	if opts.GlobalOptions != nil {
+		format = opts.GlobalOptions.Output
+	}
 	var formatter OutputFormatter
-	if output == "json" {
+	if format == "json" {
 		formatter = &JSONFormatter{}
 	} else {
 		formatter = &TextFormatter{}
 	}
 
-	if err := displayWorktrees(cmd.OutOrStdout(), worktrees, formatter); err != nil {
+	if err := displayWorktrees(opts.IO.Out, worktrees, formatter); err != nil {
 		return err
 	}
 

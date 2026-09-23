@@ -10,12 +10,37 @@ import (
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
+	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+	"twiggit/internal/iostreams"
 )
 
-// NewCDCommand creates a new cd command
-func NewCDCommand(f *CommandConfig) *cobra.Command {
+// CdOptions captures every input to runCd.
+type CdOptions struct {
+	IO            *iostreams.IOStreams
+	Config        func() (*core.Config, error)
+	GitClient     func() (*git.Client, error)
+	Ctx           context.Context
+	GlobalOptions *cmdutil.GlobalOptions
+
+	// Per-command field.
+	Target string
+}
+
+// NewCmdCd creates a new cd command.
+//
+// runF is the optional override used by tests; pass nil to install
+// the default runCd body.
+func NewCmdCd(f *cmdutil.Factory, runF func(*CdOptions) error) *cobra.Command {
+	opts := &CdOptions{
+		IO:            f.IOStreams,
+		Config:        f.Config,
+		GitClient:     f.GitClient,
+		Ctx:           f.Context,
+		GlobalOptions: f.GlobalOptions,
+	}
+
 	cmd := &cobra.Command{
 		Use:   "cd <project|project/branch>",
 		Short: "Change directory to a worktree",
@@ -32,11 +57,13 @@ Examples:
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			target := ""
 			if len(args) > 0 {
-				target = args[0]
+				opts.Target = args[0]
 			}
-			return executeCD(cmd, f, target)
+			if runF != nil {
+				return runF(opts)
+			}
+			return runCd(opts)
 		},
 	}
 
@@ -45,18 +72,16 @@ Examples:
 	return cmd
 }
 
-// executeCD implements the orchestration previously in navigationService.ResolvePath
-// and navigationService.ValidatePath. It composes the context
-// detector and resolver directly.
-func executeCD(cmd *cobra.Command, f *CommandConfig, target string) error {
-	_ = context.Background()
-
-	cfg, err := f.Config()
+// runCd implements the orchestration previously in
+// navigationService.ResolvePath and navigationService.ValidatePath.
+// It composes the context detector and resolver directly.
+func runCd(opts *CdOptions) error {
+	cfg, err := opts.Config()
 	if err != nil {
 		return fmt.Errorf("config load failed: %w", err)
 	}
 
-	gitClient, err := f.GitClient()
+	gitClient, err := opts.GitClient()
 	if err != nil {
 		return fmt.Errorf("git client init failed: %w", err)
 	}
@@ -77,6 +102,8 @@ func executeCD(cmd *cobra.Command, f *CommandConfig, target string) error {
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
+	target := opts.Target
+
 	// Context-aware default target.
 	if target == "" {
 		switch currentCtx.Type {
@@ -94,9 +121,9 @@ func executeCD(cmd *cobra.Command, f *CommandConfig, target string) error {
 		return fmt.Errorf("failed to resolve path for %s: %w", target, err)
 	}
 
-	logv(cmd, 1, "Navigating to worktree")
-	logv(cmd, 2, "  target: %s", target)
-	logv(cmd, 2, "  worktree path: %s", result.ResolvedPath)
+	verbosef(opts.IO, 1, "Navigating to worktree")
+	verbosef(opts.IO, 2, "  target: %s", target)
+	verbosef(opts.IO, 2, "  worktree path: %s", result.ResolvedPath)
 
 	if validateErr := validatePath(result.ResolvedPath); validateErr != nil {
 		if result.Type == core.PathTypeWorktree {
@@ -115,7 +142,7 @@ func executeCD(cmd *cobra.Command, f *CommandConfig, target string) error {
 		}
 	}
 
-	if _, err := fmt.Fprintln(cmd.OutOrStdout(), result.ResolvedPath); err != nil {
+	if _, err := fmt.Fprintln(opts.IO.Out, result.ResolvedPath); err != nil {
 		return fmt.Errorf("failed to output path: %w", err)
 	}
 	return nil

@@ -64,6 +64,13 @@ type Client struct {
 // options. Cache defaults to enabled, size 25. Use WithCacheSize and
 // WithCacheDisabled to override.
 //
+// NewClient also wires the cliClient's write-side executor to a
+// process-backed CommandExecutor with defaultCLITimeout. Without
+// this wiring the cliClient would panic on first write call (its
+// executor field would be nil); the previous slice-9 cut removed
+// the service-layer glue that constructed both halves separately
+// and exposed this requirement on the production path.
+//
 // NewClient is the canonical entry point for the git package and is
 // the lazy field on cmdutil.Factory.GitClient.
 func NewClient(opts ...ClientOption) (*Client, error) {
@@ -80,12 +87,15 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		return nil, fmt.Errorf("create git LRU cache: %w", err)
 	}
 
+	executor := NewCommandExecutor(defaultCLITimeout)
+
 	return &Client{
 		reader: &reader{
 			cache:        cache,
 			cacheEnabled: cfg.cacheEnabled,
 		},
 		cliClient: &cliClient{
+			executor:       executor,
 			defaultTimeout: defaultCLITimeout,
 		},
 	}, nil
@@ -99,12 +109,15 @@ func newClientWithCacheFactory(size int, enabled bool, factory goGitCacheFactory
 		return nil, err
 	}
 
+	executor := NewCommandExecutor(defaultCLITimeout)
+
 	return &Client{
 		reader: &reader{
 			cache:        cache,
 			cacheEnabled: enabled,
 		},
 		cliClient: &cliClient{
+			executor:       executor,
 			defaultTimeout: defaultCLITimeout,
 		},
 	}, nil

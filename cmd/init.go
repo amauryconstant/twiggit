@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -9,15 +10,40 @@ import (
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
+	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+	"twiggit/internal/iostreams"
 	"twiggit/internal/output"
 )
 
-// NewInitCmd creates a new init command
-func NewInitCmd(f *CommandConfig) *cobra.Command {
-	var install, force bool
-	var configFile string
+// InitOptions captures every input to the init run paths.
+type InitOptions struct {
+	IO            *iostreams.IOStreams
+	Config        func() (*core.Config, error)
+	GitClient     func() (*git.Client, error)
+	Ctx           context.Context
+	GlobalOptions *cmdutil.GlobalOptions
+
+	// Per-command fields.
+	ShellType  core.ShellType
+	Install    bool
+	Force      bool
+	ConfigFile string
+}
+
+// NewCmdInit creates a new init command.
+//
+// runF is the optional override used by tests; pass nil to install
+// the default init body.
+func NewCmdInit(f *cmdutil.Factory, runF func(*InitOptions) error) *cobra.Command {
+	opts := &InitOptions{
+		IO:            f.IOStreams,
+		Config:        f.Config,
+		GitClient:     f.GitClient,
+		Ctx:           f.Context,
+		GlobalOptions: f.GlobalOptions,
+	}
 
 	cmd := &cobra.Command{
 		Use:   "init [shell]",
@@ -41,28 +67,27 @@ Examples:
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if configFile != "" && !install {
+			if opts.ConfigFile != "" && !opts.Install {
 				return core.NewUsageError("--config requires --install", nil)
 			}
-			if force && !install {
+			if opts.Force && !opts.Install {
 				return core.NewUsageError("--force requires --install", nil)
 			}
 
-			var shellType core.ShellType
 			if len(args) > 0 {
-				shellType = core.ShellType(args[0])
+				opts.ShellType = core.ShellType(args[0])
 			}
 
-			if install {
-				return runInitInstall(cmd, f, shellType, configFile, force)
+			if runF != nil {
+				return runF(opts)
 			}
-			return runInitStdout(cmd, f, shellType)
+			return runInit(opts)
 		},
 	}
 
-	cmd.Flags().BoolVarP(&install, "install", "i", false, "install wrapper to shell config file")
-	cmd.Flags().StringVarP(&configFile, "config", "c", "", "custom config file path (requires --install)")
-	cmd.Flags().BoolVarP(&force, "force", "f", false, "force reinstall even if already installed (requires --install)")
+	cmd.Flags().BoolVarP(&opts.Install, "install", "i", false, "install wrapper to shell config file")
+	cmd.Flags().StringVarP(&opts.ConfigFile, "config", "c", "", "custom config file path (requires --install)")
+	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "force reinstall even if already installed (requires --install)")
 
 	carapace.Gen(cmd).PositionalCompletion(
 		carapace.ActionValues("bash", "zsh", "fish"),
@@ -71,22 +96,28 @@ Examples:
 	return cmd
 }
 
+// runInit dispatches to either stdout-print or file-install mode
+// based on the --install flag.
+func runInit(opts *InitOptions) error {
+	if opts.Install {
+		return runInitInstall(opts)
+	}
+	return runInitStdout(opts)
+}
+
 // runInitStdout writes the shell wrapper to stdout (default behavior).
 // After slice 9 the wrapper comes from core.ShellWrapper rather than
 // shellService.GenerateWrapper.
-func runInitStdout(cmd *cobra.Command, f *CommandConfig, shellType core.ShellType) error {
-	if shellType == "" {
-		detected, err := git.DetectShellFromEnv()
-		if err != nil {
-			return fmt.Errorf("shell auto-detection failed: %w", err)
-		}
-		shellType = detected
+func runInitStdout(opts *InitOptions) error {
+	shellType, err := resolveShellType(opts)
+	if err != nil {
+		return err
 	}
 
 	if !core.IsValidShellType(shellType) {
-		err := core.NewOpValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type")
-		err.Suggestions = []string{"Supported shells: bash, zsh, fish"}
-		return err
+		verr := core.NewOpValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type")
+		verr.Suggestions = []string{"Supported shells: bash, zsh, fish"}
+		return verr
 	}
 
 	wrapper, err := core.ShellWrapper(shellType)
@@ -94,28 +125,26 @@ func runInitStdout(cmd *cobra.Command, f *CommandConfig, shellType core.ShellTyp
 		return fmt.Errorf("failed to generate wrapper: %w", err)
 	}
 
-	_, _ = fmt.Fprint(cmd.OutOrStdout(), wrapper)
+	_, _ = fmt.Fprint(opts.IO.Out, wrapper)
 	return nil
 }
 
 // runInitInstall installs the wrapper to a shell config file. After
 // slice 9 the orchestration lives in cmd/ with output.InstallWrapper
 // providing the file-write side.
-func runInitInstall(cmd *cobra.Command, f *CommandConfig, shellType core.ShellType, configFile string, force bool) error {
-	if shellType == "" {
-		detected, err := git.DetectShellFromEnv()
-		if err != nil {
-			return fmt.Errorf("shell auto-detection failed: %w", err)
-		}
-		shellType = detected
-	}
-
-	if !core.IsValidShellType(shellType) {
-		err := core.NewOpValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type")
-		err.Suggestions = []string{"Supported shells: bash, zsh, fish"}
+func runInitInstall(opts *InitOptions) error {
+	shellType, err := resolveShellType(opts)
+	if err != nil {
 		return err
 	}
 
+	if !core.IsValidShellType(shellType) {
+		verr := core.NewOpValidationError("ShellInit", "shellType", string(shellType), "unsupported shell type")
+		verr.Suggestions = []string{"Supported shells: bash, zsh, fish"}
+		return verr
+	}
+
+	configFile := opts.ConfigFile
 	if configFile == "" {
 		detected, err := output.DetectConfigFile(shellType)
 		if err != nil {
@@ -125,7 +154,7 @@ func runInitInstall(cmd *cobra.Command, f *CommandConfig, shellType core.ShellTy
 	}
 
 	// Skip when already installed and not forcing reinstall.
-	if !force {
+	if !opts.Force {
 		if err := output.ValidateInstallation(shellType, configFile); err == nil {
 			result := &core.SetupShellResult{
 				ShellType:   shellType,
@@ -134,10 +163,10 @@ func runInitInstall(cmd *cobra.Command, f *CommandConfig, shellType core.ShellTy
 				ConfigFile:  configFile,
 				Message:     "Shell wrapper already installed",
 			}
-			logv(cmd, 1, "Setting up shell wrapper")
-			logv(cmd, 2, "  shell type: %s", result.ShellType)
-			logv(cmd, 2, "  config file: %s", result.ConfigFile)
-			return displayInitResults(cmd.OutOrStdout(), result)
+			verbosef(opts.IO, 1, "Setting up shell wrapper")
+			verbosef(opts.IO, 2, "  shell type: %s", result.ShellType)
+			verbosef(opts.IO, 2, "  config file: %s", result.ConfigFile)
+			return displayInitResults(opts.IO.Out, result)
 		}
 	}
 
@@ -146,7 +175,7 @@ func runInitInstall(cmd *cobra.Command, f *CommandConfig, shellType core.ShellTy
 		return fmt.Errorf("failed to generate wrapper: %w", err)
 	}
 
-	if err := output.InstallWrapper(shellType, wrapper, configFile, force); err != nil {
+	if err := output.InstallWrapper(shellType, wrapper, configFile, opts.Force); err != nil {
 		if isAlreadyInstalled(err) {
 			result := &core.SetupShellResult{
 				ShellType:   shellType,
@@ -155,7 +184,7 @@ func runInitInstall(cmd *cobra.Command, f *CommandConfig, shellType core.ShellTy
 				ConfigFile:  configFile,
 				Message:     "Shell wrapper already installed",
 			}
-			return displayInitResults(cmd.OutOrStdout(), result)
+			return displayInitResults(opts.IO.Out, result)
 		}
 		return fmt.Errorf("failed to install wrapper: %w", err)
 	}
@@ -167,11 +196,24 @@ func runInitInstall(cmd *cobra.Command, f *CommandConfig, shellType core.ShellTy
 		Message:     "Shell wrapper installed successfully",
 	}
 
-	logv(cmd, 1, "Setting up shell wrapper")
-	logv(cmd, 2, "  shell type: %s", result.ShellType)
-	logv(cmd, 2, "  config file: %s", result.ConfigFile)
+	verbosef(opts.IO, 1, "Setting up shell wrapper")
+	verbosef(opts.IO, 2, "  shell type: %s", result.ShellType)
+	verbosef(opts.IO, 2, "  config file: %s", result.ConfigFile)
 
-	return displayInitResults(cmd.OutOrStdout(), result)
+	return displayInitResults(opts.IO.Out, result)
+}
+
+// resolveShellType returns the user-supplied shell type or auto-
+// detects from $SHELL when empty.
+func resolveShellType(opts *InitOptions) (core.ShellType, error) {
+	if opts.ShellType != "" {
+		return opts.ShellType, nil
+	}
+	detected, err := git.DetectShellFromEnv()
+	if err != nil {
+		return "", fmt.Errorf("shell auto-detection failed: %w", err)
+	}
+	return detected, nil
 }
 
 // isAlreadyInstalled reports whether err is the typed shell-already-installed

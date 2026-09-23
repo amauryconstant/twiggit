@@ -4,48 +4,83 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
+	"twiggit/internal/iostreams"
 )
 
-// isQuiet checks if quiet mode is enabled
-func isQuiet(cmd *cobra.Command) bool {
-	quiet, _ := cmd.Flags().GetBool("quiet")
-	return quiet
+// iosFromCmd returns the *iostreams.IOStreams associated with cmd.
+// Thin wrapper around cmdutil.IOStreamsFromCmd so error_handler.go and
+// any local helper can share one lookup path.
+func iosFromCmd(cmd *cobra.Command) *iostreams.IOStreams {
+	return cmdutil.IOStreamsFromCmd(cmd)
 }
 
-func logv(cmd *cobra.Command, level int, format string, args ...any) {
-	verbosity, _ := cmd.Flags().GetCount("verbose")
+// isQuiet is kept as a small accessor for run paths that need the
+// persistent --quiet flag before opts is fully populated. Prefers the
+// flag value when present; falls back to ios.Quiet.
+func isQuiet(cmd *cobra.Command) bool {
+	if cmd == nil {
+		return false
+	}
+	if cmd.Flags().Lookup("quiet") != nil {
+		q, _ := cmd.Flags().GetBool("quiet")
+		return q
+	}
+	return iosFromCmd(cmd).Quiet
+}
 
-	if verbosity < level {
+// activeVerboseLevel mirrors the running --verbose count.
+// NewCmd* functions install the Factory's *GlobalOptions value via
+// root's PersistentPreRunE; tests that drive runX directly can call
+// setActiveVerboseLevel for the duration of the test (t.Cleanup
+// restores). Zero is the silent default.
+var activeVerboseLevel int
+
+// setActiveVerboseLevel pins the verbose count. Returns a restore
+// function for t.Cleanup-style usage. The active count gates every
+// direct ios.Verbosef call wrapped by verbosef below.
+func setActiveVerboseLevel(level int) func() {
+	prev := activeVerboseLevel
+	activeVerboseLevel = level
+	return func() { activeVerboseLevel = prev }
+}
+
+// verbosef is the verbose-output gate used by every command. It
+// honours both the iostreams-supplied --quiet/--verbose gates and
+// the level-aware count installed by root.PersistentPreRunE.
+// -v sets activeVerboseLevel = 1; -vv sets it = 2. With no flag
+// set, verbosef is a no-op. When ios is nil the call is silently
+// dropped.
+func verbosef(ios *iostreams.IOStreams, level int, format string, args ...any) {
+	if ios == nil {
 		return
 	}
-
-	prefix := ""
-	if level > 1 {
-		prefix = "  "
+	if level > activeVerboseLevel {
+		return
 	}
-
-	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(os.Stderr, "%s%s\n", prefix, msg)
+	ios.Verbosef(format, args...)
 }
 
-// ProgressReporter provides progress feedback for bulk operations
+// ProgressReporter provides progress feedback for bulk operations.
+// It honours the iostreams.Quiet gate rather than reading the flag
+// directly so the constructor composes cleanly with the test-only
+// iostreams.Test() helper.
 type ProgressReporter struct {
 	quiet bool
 	out   io.Writer
 }
 
-// NewProgressReporter creates a new progress reporter
-func NewProgressReporter(quiet bool, out io.Writer) *ProgressReporter {
-	return &ProgressReporter{
-		quiet: quiet,
-		out:   out,
+// NewProgressReporter creates a new progress reporter; pass ios to
+// inherit its Quiet flag and ErrOut writer.
+func NewProgressReporter(ios *iostreams.IOStreams) *ProgressReporter {
+	if ios == nil {
+		return &ProgressReporter{quiet: false, out: io.Discard}
 	}
+	return &ProgressReporter{quiet: ios.Quiet, out: ios.ErrOut}
 }
 
 // Report outputs a progress message if not in quiet mode
@@ -85,6 +120,3 @@ func wrapArgsValidator(v cobra.PositionalArgs) cobra.PositionalArgs {
 func resolveNavigationTarget(_ context.Context, _ *CommandConfig, _ string) (*core.Context, *core.ResolutionResult, error) {
 	return nil, nil, fmt.Errorf("resolveNavigationTarget: moved to executeCD")
 }
-
-// keep filepath import live for any helpers that may use it.
-var _ = filepath.Abs
