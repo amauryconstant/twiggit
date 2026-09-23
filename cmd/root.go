@@ -42,11 +42,11 @@ across multiple projects.`,
 			// completion helpers can recover them without carrying
 			// the Factory reference through every signature.
 			cmdutil.SetIOStreams(cmd, f.IOStreams)
-		// Mirror the persistent --output / --quiet / --verbose
-		// flags onto the IOStreams gates so Verbosef and the
-		// quiet-aware formatter honour the user-supplied values.
-		globalOpts.ApplyToIOS(f.IOStreams)
-		return nil
+			// Mirror the persistent --output / --quiet / --verbose
+			// flags onto the IOStreams gates so Verbosef and the
+			// quiet-aware formatter honour the user-supplied values.
+			globalOpts.ApplyToIOS(f.IOStreams)
+			return nil
 		},
 	}
 

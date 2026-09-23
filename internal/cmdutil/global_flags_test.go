@@ -80,3 +80,31 @@ func TestAddPersistentFlags_QuietAndVerboseArePersistent(t *testing.T) {
 	assert.NotNil(t, child.InheritedFlags().Lookup("quiet"))
 	assert.NotNil(t, child.InheritedFlags().Lookup("verbose"))
 }
+
+// TestAddPersistentFlags_VerboseCountCollapse confirms the previous
+// two-level (-v / -vv) scheme is collapsed: any non-zero count
+// reports IsVerbose() == true, per cli-verbose-output "Level 2
+// output" and "the previous two-level scheme is removed".
+func TestAddPersistentFlags_VerboseCountCollapse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		count int
+		want  bool
+	}{
+		{"zero is silent", 0, false},
+		{"one -v is verbose", 1, true},
+		{"two -vv is verbose", 2, true},
+		{"three is verbose", 3, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := assert.New(t)
+
+			opts := &cmdutil.GlobalOptions{Verbose: tt.count}
+			is.Equal(tt.want, opts.IsVerbose())
+		})
+	}
+}

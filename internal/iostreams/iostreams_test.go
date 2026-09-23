@@ -83,6 +83,39 @@ func TestVerbosef_AppendsTrailingNewline(t *testing.T) {
 	assert.True(t, bytes.HasSuffix(errOut.Bytes(), []byte("\n")))
 }
 
+// TestVerbosef_OmitsDebugPrefix asserts the rendered line carries no
+// "DEBUG:" or "[VERBOSE]" prefix per cli-verbose-output ("No debug
+// prefix"). Color is off in Test() so Dim renders as identity and the
+// raw string is what hits ErrOut.
+func TestVerbosef_OmitsDebugPrefix(t *testing.T) {
+	t.Parallel()
+
+	ios, _, _, errOut := iostreams.Test()
+	ios.Verbose = true
+
+	ios.Verbosef("cloning %s into %s", "origin", "feature-branch")
+
+	rendered := errOut.String()
+	assert.Contains(t, rendered, "cloning origin into feature-branch")
+	assert.NotContains(t, rendered, "DEBUG:")
+	assert.NotContains(t, rendered, "[VERBOSE]")
+}
+
+// TestIsInteractive_TestDefaultIsFalse asserts the predicate returns
+// false when any of colorEnabled / isStdoutTTY / isStdinTTY is off,
+// matching cli-iostreams "IsInteractive (stdout AND stdin TTY)".
+// Test() forces all three to false, so the row this test pins is the
+// production path's worst case; System() probes the real FDs at
+// runtime and the all-true row is covered by the source-level
+// definition.
+func TestIsInteractive_TestDefaultIsFalse(t *testing.T) {
+	t.Parallel()
+
+	ios, _, _, _ := iostreams.Test()
+
+	assert.False(t, ios.IsInteractive())
+}
+
 func TestColorEnabled_ToggleViaAccessor(t *testing.T) {
 	t.Parallel()
 

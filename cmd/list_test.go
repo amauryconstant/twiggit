@@ -134,5 +134,29 @@ func TestList_OutputsNoWorktreesEmptyProjects(t *testing.T) {
 		"empty projects dir must surface a friendly 'No worktrees found' line; got %q", written)
 }
 
+// TestList_DefaultOutputFallsThroughToPlain pins cli-output-formats
+// "default empty --output = plain". With no --output flag the run body
+// must render human-readable text, not JSON or table borders.
+func TestList_DefaultOutputFallsThroughToPlain(t *testing.T) {
+	projects := t.TempDir()
+	worktrees := t.TempDir()
+
+	t.Chdir(t.TempDir())
+
+	opts, ios := listTestOpts(t, projects, worktrees)
+
+	require.NoError(t, runList(opts))
+
+	written := iosStdoutBytes(t, ios)
+	// plain text has no JSON or table markers; assert the absence of
+	// both so a future refactor that accidentally wires a JSON or
+	// table formatter into the empty-flag path is caught.
+	assert.NotContains(t, written, "{", "empty --output must not render JSON")
+	assert.NotContains(t, written, "[", "empty --output must not render JSON arrays")
+	assert.NotContains(t, written, "│", "empty --output must not render table borders")
+	assert.Contains(t, written, "No worktrees found",
+		"empty --output must still surface the human-readable empty-state message")
+}
+
 // keep strings import referenced for future tests without noise.
 var _ = strings.Contains
