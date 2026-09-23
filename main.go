@@ -3,7 +3,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -53,11 +52,8 @@ func main() {
 		// cli-error-formatting specs: the binary exits 130 (SIGINT)
 		// or 143 (SIGTERM) directly. The formatter MUST NOT run for
 		// signal-cancelled invocations.
-		if ctx.Err() != nil {
-			if errors.Is(ctx.Err(), context.Canceled) {
-				os.Exit(130)
-			}
-			os.Exit(143)
+		if code, ok := cmdutil.SignalExitCode(ctx); ok {
+			os.Exit(code)
 		}
 
 		ios := factory.IOStreams
