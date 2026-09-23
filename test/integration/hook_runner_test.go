@@ -11,15 +11,13 @@ import (
 
 	"github.com/stretchr/testify/suite"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
-	"twiggit/internal/infrastructure"
 )
 
 type HookRunnerIntegrationSuite struct {
 	suite.Suite
-	runner    application.HookRunner
+	runner    *git.HookRunner
 	tempDir   string
 	configDir string
 }
@@ -33,7 +31,7 @@ func (s *HookRunnerIntegrationSuite) SetupTest() {
 	s.configDir = s.T().TempDir()
 
 	executor := git.NewCommandExecutor(30 * time.Second)
-	s.runner = infrastructure.NewHookRunner(executor)
+	s.runner = git.NewHookRunner(executor)
 }
 
 func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_ExecutesEchoCommand() {
@@ -45,7 +43,7 @@ commands = ["echo hello"]
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
@@ -72,7 +70,7 @@ commands = [
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
@@ -99,7 +97,7 @@ commands = [
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
@@ -124,7 +122,7 @@ commands = ["printenv TWIGGIT_PROJECT_NAME"]
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ProjectName:    "test-project",
@@ -151,7 +149,7 @@ commands = ["touch marker.txt"]
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
@@ -168,7 +166,7 @@ commands = ["touch marker.txt"]
 }
 
 func (s *HookRunnerIntegrationSuite) TestRun_NoConfigFile_ReturnsNotExecuted() {
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: filepath.Join(s.configDir, "nonexistent.toml"),
@@ -190,7 +188,7 @@ key = "value"
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	s.Require().NoError(err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,

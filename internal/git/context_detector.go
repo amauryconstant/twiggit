@@ -12,7 +12,6 @@ import (
 
 	lru "github.com/hashicorp/golang-lru/v2"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
 )
 
@@ -40,12 +39,17 @@ type contextDetector struct {
 	ttl    time.Duration
 }
 
+// ContextDetector is the public type for git context detection.
+// cmd/run functions construct it via NewContextDetector and call
+// DetectContext directly; no separate interface is published.
+type ContextDetector = contextDetector
+
 // NewContextDetector creates a new context detector backed by an LRU cache.
-func NewContextDetector(cfg *core.Config) (application.ContextDetector, error) {
+func NewContextDetector(cfg *core.Config) (*contextDetector, error) {
 	return newContextDetectorWithCacheFactory(cfg, defaultContextDetectorCacheFactory)
 }
 
-func newContextDetectorWithCacheFactory(cfg *core.Config, factory contextDetectorCacheFactory) (application.ContextDetector, error) {
+func newContextDetectorWithCacheFactory(cfg *core.Config, factory contextDetectorCacheFactory) (*contextDetector, error) {
 	ttl := parseTTL(cfg.ContextDetection.CacheTTL, 5*time.Second)
 	cache, err := factory(contextDetectorCacheSize)
 	if err != nil {

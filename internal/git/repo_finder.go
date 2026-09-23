@@ -7,19 +7,26 @@ import (
 	"path/filepath"
 	"slices"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
 )
 
+// RepoValidator is the minimal contract RepoFinder needs: a single
+// ValidateRepository method. *Client satisfies it implicitly through
+// its embedded *reader. Tests inject a mock to drive the validation
+// branch without standing up a real go-git repo.
+type RepoValidator interface {
+	ValidateRepository(path string) error
+}
+
 // RepoFinder discovers git repositories within a directory tree.
 type RepoFinder struct {
-	goGit application.GoGitClient
+	goGit RepoValidator
 }
 
 // NewRepoFinder constructs a RepoFinder. goGit may be nil; when nil
 // the finder accepts every subdirectory as a candidate without
 // validating it against go-git.
-func NewRepoFinder(goGit application.GoGitClient) *RepoFinder {
+func NewRepoFinder(goGit RepoValidator) *RepoFinder {
 	return &RepoFinder{goGit: goGit}
 }
 
@@ -59,6 +66,3 @@ func (f *RepoFinder) FindGitRepositories(dir string) ([]core.GitDir, error) {
 
 	return slices.Clone(repos), nil
 }
-
-// Compile-time assertion: RepoFinder satisfies application.RepoLocator.
-var _ application.RepoLocator = (*RepoFinder)(nil)

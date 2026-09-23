@@ -10,7 +10,6 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 	lru "github.com/hashicorp/golang-lru/v2"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
 )
 
@@ -19,17 +18,12 @@ import (
 // GetCommitInfo, GetRepositoryInfo, ValidateRepository). It owns the
 // LRU cache that keeps go-git Repository handles hot.
 //
-// reader is an internal collaborator of Client. It satisfies
-// application.GoGitClient so the legacy services can still consume it
-// directly during the slice 13 refactor.
+// reader is an internal collaborator of Client; consumers interact
+// with the read-side methods through the embedded *Client.
 type reader struct {
 	cache        *lru.Cache[string, *git.Repository]
 	cacheEnabled bool
 }
-
-// Compile-time assertion: reader satisfies application.GoGitClient.
-// Lives in slice 4; removed in the interface-segregation change.
-var _ application.GoGitClient = (*reader)(nil)
 
 // goGitCacheFactory builds an LRU cache. Indirected so tests can inject
 // failure modes for cache allocator coverage.

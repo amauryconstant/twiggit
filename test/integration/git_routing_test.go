@@ -13,7 +13,6 @@ import (
 
 	"twiggit/internal/core"
 	"twiggit/internal/git"
-	"twiggit/test/mocks"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -110,12 +109,12 @@ func TestDeterministicRouting_Integration(t *testing.T) {
 	})
 
 	t.Run("NoFallbackLogic", func(t *testing.T) {
-		mockGoGit := mocks.NewMockGoGitClient()
-		mockGoGit.On("ListBranches", mock.Anything, mock.AnythingOfType("string")).Return([]core.BranchInfo(nil), assert.AnError)
-
-		_, err := mockGoGit.ListBranches(context.Background(), repoPath)
-		require.Error(t, err)
-
-		assert.ErrorIs(t, err, assert.AnError)
+		// Slice 9 removed the GoGitClient/CLIClient interface split;
+		// the composite Client surfaces ListBranches directly. The
+		// "no fallback" guarantee is exercised by the real composite
+		// client above (ValidateRepository + GetRepositoryInfo).
+		// This test stays as a placeholder so the routing-test suite
+		// continues to compile; slice 10 will add a true routing
+		// assertion when the per-command Options pattern lands.
 	})
 }

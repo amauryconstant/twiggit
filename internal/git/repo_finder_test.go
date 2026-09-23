@@ -5,11 +5,22 @@ import (
 	"path/filepath"
 	"testing"
 
-	"twiggit/test/mocks"
-
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+// mockRepoValidator is a testify mock that satisfies the RepoValidator
+// interface declared in repo_finder.go. It is colocated with the test
+// (rather than in test/mocks) to avoid an import cycle between the
+// internal/git package and the test/mocks package.
+type mockRepoValidator struct {
+	mock.Mock
+}
+
+func (m *mockRepoValidator) ValidateRepository(path string) error {
+	return m.Called(path).Error(0)
+}
 
 func TestRepoFinder_FindGitRepositories(t *testing.T) {
 	t.Run("non_existent_directory_returns_empty", func(t *testing.T) {
@@ -67,7 +78,7 @@ func TestRepoFinder_FindGitRepositories(t *testing.T) {
 		require.NoError(t, os.MkdirAll(filepath.Join(testDir, "valid-repo"), 0755))
 		require.NoError(t, os.MkdirAll(filepath.Join(testDir, "invalid-repo"), 0755))
 
-		mockClient := mocks.NewMockGoGitClient()
+		mockClient := &mockRepoValidator{}
 		mockClient.On("ValidateRepository", filepath.Join(testDir, "valid-repo")).Return(nil)
 		mockClient.On("ValidateRepository", filepath.Join(testDir, "invalid-repo")).Return(os.ErrNotExist)
 		t.Cleanup(func() {

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
 )
 
@@ -23,16 +22,12 @@ const defaultCLITimeout = 30 * time.Second
 // through the CLI because go-git does not support them; branch
 // mutations are CLI-only for the same reason.
 //
-// cliClient is an internal collaborator of Client. It satisfies
-// application.CLIClient so the legacy services can still consume it
-// directly during the slice 13 refactor.
+// cliClient is an internal collaborator of Client; consumers interact
+// with write-side methods through the embedded *Client.
 type cliClient struct {
 	executor       CommandExecutor
 	defaultTimeout time.Duration
 }
-
-// Compile-time assertion: cliClient satisfies application.CLIClient.
-var _ application.CLIClient = (*cliClient)(nil)
 
 // NewCLIClient creates the write-half of the git Client. The executor
 // must be non-nil; timeoutSeconds defaults to 30s when omitted.

@@ -11,11 +11,12 @@ import (
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/v2"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
 )
 
-var _ application.ConfigManager = (*koanfConfigManager)(nil)
+// Manager is the canonical configuration manager. cmdutil.Factory.Config
+// constructs it via NewManager and calls Load to retrieve *core.Config.
+type Manager = koanfConfigManager
 
 // Pure functions extracted from ConfigManager
 
@@ -153,7 +154,7 @@ type koanfConfigManager struct {
 }
 
 // NewManager creates a new configuration manager backed by koanf.
-func NewManager() application.ConfigManager {
+func NewManager() *Manager {
 	return &koanfConfigManager{
 		ko: koanf.New("."),
 	}

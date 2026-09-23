@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
 )
 
@@ -179,13 +178,17 @@ func filterSuggestions(suggestions []string, partial string) []string {
 
 type contextResolver struct {
 	config     *core.Config
-	goGit      application.GoGitClient
-	cli        application.CLIClient
+	goGit      *Client
+	cli        *Client
 	repoFinder *RepoFinder
 }
 
+// ContextResolver is the public type alias for git context resolution.
+// cmd/run functions construct it via NewContextResolver.
+type ContextResolver = contextResolver
+
 // NewContextResolver creates a new context resolver.
-func NewContextResolver(cfg *core.Config, goGit application.GoGitClient, cli application.CLIClient) application.ContextResolver {
+func NewContextResolver(cfg *core.Config, goGit *Client, cli *Client) *contextResolver {
 	return &contextResolver{
 		config:     cfg,
 		goGit:      goGit,

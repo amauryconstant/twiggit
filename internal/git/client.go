@@ -12,8 +12,6 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	lru "github.com/hashicorp/golang-lru/v2"
-
-	"twiggit/internal/application"
 )
 
 // defaultCacheSize is the size used when WithCacheSize is omitted.
@@ -55,31 +53,19 @@ func WithCacheDisabled() ClientOption {
 // Client is the composite git I/O surface. It embeds *reader and
 // *cliClient so read methods (OpenRepository, ListBranches, ...) and
 // write methods (CreateWorktree, DeleteWorktree, ...) are promoted to
-// the top-level type.
-//
-// Client satisfies application.GoGitClient and application.CLIClient
-// through its embedded halves, so it can be passed where either role
-// interface is expected. After slice 13, services consume Client
-// directly; for slice 4 callers may continue passing it as the role
-// interface.
+// the top-level type. cmd/ consumes *Client directly through the
+// cmdutil.Factory; no role-interface wrapper is required.
 type Client struct {
 	*reader
 	*cliClient
 }
 
-// Compile-time assertions: Client satisfies both role interfaces.
-var (
-	_ application.GoGitClient = (*Client)(nil)
-	_ application.CLIClient   = (*Client)(nil)
-)
-
 // NewClient constructs the composite git Client with the supplied
 // options. Cache defaults to enabled, size 25. Use WithCacheSize and
 // WithCacheDisabled to override.
 //
-// NewClient is the canonical entry point for the git package.
-// Services that previously took application.GoGitClient can keep doing
-// so by passing the *Client returned here.
+// NewClient is the canonical entry point for the git package and is
+// the lazy field on cmdutil.Factory.GitClient.
 func NewClient(opts ...ClientOption) (*Client, error) {
 	cfg := clientConfig{
 		cacheSize:    defaultCacheSize,

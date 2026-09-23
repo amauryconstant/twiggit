@@ -1,4 +1,4 @@
-package infrastructure
+package git
 
 import (
 	"context"
@@ -11,14 +11,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
-	"twiggit/internal/git"
 )
 
-func setupHookRunnerTest(t *testing.T) (application.HookRunner, *git.MockCommandExecutor, string) {
+func setupHookRunnerTest(t *testing.T) (*HookRunner, *MockCommandExecutor, string) {
 	t.Helper()
-	mockExec := git.NewMockCommandExecutor()
+	mockExec := NewMockCommandExecutor()
 	runner := NewHookRunner(mockExec)
 	tempDir := t.TempDir()
 	return runner, mockExec, tempDir
@@ -27,7 +25,7 @@ func setupHookRunnerTest(t *testing.T) (application.HookRunner, *git.MockCommand
 func TestHookRunner_Run_NoConfigFile_ReturnsNotExecuted(t *testing.T) {
 	runner, _, _ := setupHookRunnerTest(t)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   "/tmp/worktree",
 		ConfigFilePath: "/nonexistent/.twiggit.toml",
@@ -48,7 +46,7 @@ func TestHookRunner_Run_EmptyConfigFile_ReturnsNotExecuted(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(""), 0644)
 	require.NoError(t, err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -75,9 +73,9 @@ commands = ["mise trust", "npm install"]
 
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
-	).Return(&git.CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Twice()
+	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Twice()
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ProjectName:    "test-project",
@@ -109,17 +107,17 @@ commands = ["mise trust", "npm install", "echo done"]
 
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
-	).Return(&git.CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
+	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
 
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
-	).Return(&git.CommandResult{ExitCode: 1, Stdout: "npm error", Stderr: ""}, nil).Once()
+	).Return(&CommandResult{ExitCode: 1, Stdout: "npm error", Stderr: ""}, nil).Once()
 
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
-	).Return(&git.CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
+	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -146,7 +144,7 @@ commands = ["mise trust"]
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -169,7 +167,7 @@ func TestHookRunner_Run_MissingCommandsArray_ReturnsNotExecuted(t *testing.T) {
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -193,7 +191,7 @@ commands = []
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
 	require.NoError(t, err)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   tempDir,
 		ConfigFilePath: configPath,
@@ -222,9 +220,9 @@ commands = ["echo test"]
 		mock.Anything, "/worktree/path", "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
 	).Run(func(args mock.Arguments) {
 		capturedArgs = args.Get(4).([]string)
-	}).Return(&git.CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil)
+	}).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil)
 
-	req := &application.HookRunRequest{
+	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
 		WorktreePath:   "/worktree/path",
 		ProjectName:    "my-project",

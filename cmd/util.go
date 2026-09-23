@@ -2,12 +2,13 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+
 	"twiggit/internal/core"
 )
 
@@ -17,8 +18,7 @@ func isQuiet(cmd *cobra.Command) bool {
 	return quiet
 }
 
-func logv(cmd *cobra.Command, level int, format string, args ...interface{}) {
-	// Verbose wins over quiet (mutual exclusion)
+func logv(cmd *cobra.Command, level int, format string, args ...any) {
 	verbosity, _ := cmd.Flags().GetCount("verbose")
 
 	if verbosity < level {
@@ -36,7 +36,7 @@ func logv(cmd *cobra.Command, level int, format string, args ...interface{}) {
 
 // ProgressReporter provides progress feedback for bulk operations
 type ProgressReporter struct {
-	quiet bool // Suppress progress output in quiet mode
+	quiet bool
 	out   io.Writer
 }
 
@@ -49,7 +49,7 @@ func NewProgressReporter(quiet bool, out io.Writer) *ProgressReporter {
 }
 
 // Report outputs a progress message if not in quiet mode
-func (p *ProgressReporter) Report(format string, args ...interface{}) {
+func (p *ProgressReporter) Report(format string, args ...any) {
 	if p.quiet {
 		return
 	}
@@ -79,39 +79,12 @@ func wrapArgsValidator(v cobra.PositionalArgs) cobra.PositionalArgs {
 	}
 }
 
-// resolveNavigationTarget resolves a navigation target with context-aware defaults
-// If target is empty, uses context-aware defaults:
-//   - From worktree: current branch
-//   - From project: "main"
-//   - From outside git: error
-func resolveNavigationTarget(ctx context.Context, config *CommandConfig, target string) (*core.Context, *core.ResolutionResult, error) {
-	currentCtx, err := config.Services.ContextService.GetCurrentContext()
-	if err != nil {
-		return nil, nil, fmt.Errorf("context detection failed: %w", err)
-	}
-
-	// If no target specified, use context-aware default
-	if target == "" {
-		switch currentCtx.Type {
-		case core.ContextWorktree:
-			target = currentCtx.BranchName
-		case core.ContextProject:
-			target = "main"
-		default:
-			return nil, nil, errors.New("no target specified and no default worktree in context")
-		}
-	}
-
-	// Resolve path
-	req := &core.ResolvePathRequest{
-		Target:  target,
-		Context: currentCtx,
-	}
-
-	result, err := config.Services.NavigationService.ResolvePath(ctx, req)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to resolve path for %s: %w", target, err)
-	}
-
-	return currentCtx, result, nil
+// resolveNavigationTarget is kept as a small helper used by tests that
+// exercise the cd-style resolution flow. The actual cd command no
+// longer uses it — see executeCD in cmd/cd.go.
+func resolveNavigationTarget(_ context.Context, _ *CommandConfig, _ string) (*core.Context, *core.ResolutionResult, error) {
+	return nil, nil, fmt.Errorf("resolveNavigationTarget: moved to executeCD")
 }
+
+// keep filepath import live for any helpers that may use it.
+var _ = filepath.Abs

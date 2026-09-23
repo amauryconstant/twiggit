@@ -7,13 +7,11 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
-	"twiggit/internal/service"
 )
 
 func TestContextDetector_Integration(t *testing.T) {
@@ -238,13 +236,10 @@ func TestContextService_Integration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create real git service for integration testing
-	executor := git.NewCommandExecutor(30 * time.Second)
-	goGitClient, err := git.NewClient()
+	gitClient, err := git.NewClient()
 	require.NoError(t, err)
-	cliClient := git.NewCLIClient(executor, 30)
 
-	resolver := git.NewContextResolver(config, goGitClient, cliClient)
-	contextService := service.NewContextService(detector, resolver)
+	resolver := git.NewContextResolver(config, gitClient, gitClient)
 
 	// Change to the repository directory
 	originalWd, err := os.Getwd()
@@ -254,21 +249,21 @@ func TestContextService_Integration(t *testing.T) {
 	}()
 	require.NoError(t, os.Chdir(repoDir))
 
-	// Test getting current context
-	ctx, err := contextService.GetCurrentContext()
+	// Test getting current context directly via the detector.
+	ctx, err := detector.DetectContext(repoDir)
 	require.NoError(t, err)
 	assert.Equal(t, core.ContextProject, ctx.Type)
 	assert.Equal(t, "service-test", ctx.ProjectName)
 
-	// Test resolving identifier from current context
-	result, err := contextService.ResolveIdentifier("main")
+	// Test resolving identifier from current context via the resolver.
+	result, err := resolver.ResolveIdentifier(ctx, "main")
 	require.NoError(t, err)
 	assert.Equal(t, core.PathTypeProject, result.Type)
 	assert.Equal(t, "service-test", result.ProjectName)
 	assert.Equal(t, repoDir, result.ResolvedPath)
 
-	// Test getting completion suggestions
-	suggestions, err := contextService.GetCompletionSuggestions("m")
+	// Test getting completion suggestions via the resolver.
+	suggestions, err := resolver.GetResolutionSuggestions(ctx, "m")
 	require.NoError(t, err)
 	assert.NotEmpty(t, suggestions)
 	// Check that "main" is among the suggestions

@@ -1,4 +1,4 @@
-package infrastructure
+package git
 
 import (
 	"context"
@@ -13,31 +13,34 @@ import (
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 
-	"twiggit/internal/application"
 	"twiggit/internal/core"
-	"twiggit/internal/git"
 )
 
-var _ application.HookRunner = (*hookRunner)(nil)
+// *HookRunner satisfies the consumer-side HookRunner interface declared
+// in cmdutil implicitly (Run signature matches). We don't add an
+// explicit assertion here because it would create an import cycle:
+// cmdutil already imports git for Factory.GitClient.
 
-type hookRunner struct {
-	executor       git.CommandExecutor
+// HookRunner executes post-create hooks from .twiggit.toml configs.
+type HookRunner struct {
+	executor       CommandExecutor
 	defaultTimeout time.Duration
 }
 
 // NewHookRunner creates a new HookRunner for executing post-create hooks
-func NewHookRunner(executor git.CommandExecutor, hookTimeoutSeconds ...int) application.HookRunner {
+func NewHookRunner(executor CommandExecutor, hookTimeoutSeconds ...int) *HookRunner {
 	defaultTimeout := 30 * time.Second
 	if len(hookTimeoutSeconds) > 0 {
 		defaultTimeout = time.Duration(hookTimeoutSeconds[0]) * time.Second
 	}
-	return &hookRunner{
+	return &HookRunner{
 		executor:       executor,
 		defaultTimeout: defaultTimeout,
 	}
 }
 
-func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (*core.HookResult, error) {
+// Run executes hooks of the specified type with the given request context
+func (r *HookRunner) Run(ctx context.Context, req *core.HookRunRequest) (*core.HookResult, error) {
 	if req.ConfigFilePath == "" {
 		return noOpResult(req), nil
 	}
@@ -77,7 +80,7 @@ func (r *hookRunner) Run(ctx context.Context, req *application.HookRunRequest) (
 	return r.executeCommands(ctx, req, definition.Commands)
 }
 
-func noOpResult(req *application.HookRunRequest) *core.HookResult {
+func noOpResult(req *core.HookRunRequest) *core.HookResult {
 	return &core.HookResult{
 		HookType:     req.HookType,
 		HasExecuted:  false,
@@ -86,7 +89,7 @@ func noOpResult(req *application.HookRunRequest) *core.HookResult {
 	}
 }
 
-func (r *hookRunner) readHookConfig(path string) (*core.HookConfig, error) {
+func (r *HookRunner) readHookConfig(path string) (*core.HookConfig, error) {
 	k := koanf.New(".")
 
 	if err := k.Load(file.Provider(path), toml.Parser()); err != nil {
@@ -104,7 +107,7 @@ func (r *hookRunner) readHookConfig(path string) (*core.HookConfig, error) {
 	return hookConfig.Hooks, nil
 }
 
-func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookRunRequest, commands []string) (*core.HookResult, error) {
+func (r *HookRunner) executeCommands(ctx context.Context, req *core.HookRunRequest, commands []string) (*core.HookResult, error) {
 	result := &core.HookResult{
 		HookType:     req.HookType,
 		HasExecuted:  true,
@@ -147,7 +150,7 @@ func (r *hookRunner) executeCommands(ctx context.Context, req *application.HookR
 	return result, nil
 }
 
-func (r *hookRunner) buildEnvExports(req *application.HookRunRequest) string {
+func (r *HookRunner) buildEnvExports(req *core.HookRunRequest) string {
 	var exports strings.Builder
 	if req.WorktreePath != "" {
 		exports.WriteString(fmt.Sprintf("export TWIGGIT_WORKTREE_PATH=%q; ", req.WorktreePath))

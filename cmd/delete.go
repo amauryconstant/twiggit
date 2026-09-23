@@ -4,15 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"time"
 
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
+
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 )
 
 // NewDeleteCommand creates a new delete command
-func NewDeleteCommand(config *CommandConfig) *cobra.Command {
+func NewDeleteCommand(f *CommandConfig) *cobra.Command {
 	var force, mergedOnly, changeDir bool
 
 	cmd := &cobra.Command{
@@ -32,7 +35,7 @@ Examples:
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.ExactArgs(1)),
 		RunE: func(c *cobra.Command, args []string) error {
-			return executeDelete(c, config, args[0], force, mergedOnly, changeDir)
+			return executeDelete(c, f, args[0], force, mergedOnly, changeDir)
 		},
 	}
 
@@ -41,152 +44,198 @@ Examples:
 	cmd.Flags().BoolVarP(&changeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
 
 	carapace.Gen(cmd).PositionalCompletion(
-		actionWorktreeTarget(config, git.WithExistingOnly()),
+		actionWorktreeTarget(f, git.WithExistingOnly()),
 	)
 
 	return cmd
 }
 
-func executeDelete(c *cobra.Command, config *CommandConfig, target string, force, mergedOnly, changeDir bool) error {
+// executeDelete implements the orchestration previously in
+// navigationService + worktreeService.DeleteWorktree + worktreeService.GetWorktreeStatus.
+// It composes the context detector, resolver, and Client directly.
+func executeDelete(c *cobra.Command, f *CommandConfig, target string, force, mergedOnly, changeDir bool) error {
 	ctx := context.Background()
 
-	currentCtx, worktreePath, err := resolveWorktreeTarget(config, target)
+	cfg, err := f.Config()
 	if err != nil {
-		return err
+		return fmt.Errorf("config load failed: %w", err)
 	}
 
-	err = validateWorktreeStatus(ctx, config, c, worktreePath, force, changeDir, currentCtx)
+	gitClient, err := f.GitClient()
 	if err != nil {
-		return err
+		return fmt.Errorf("git client init failed: %w", err)
 	}
 
-	err = validateMergedOnly(ctx, config, worktreePath, mergedOnly, currentCtx)
+	detector, err := git.NewContextDetector(cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("context detector init failed: %w", err)
 	}
 
-	return deleteWorktree(ctx, config, c, worktreePath, force, changeDir, currentCtx)
-}
+	resolver := git.NewContextResolver(cfg, gitClient, gitClient)
 
-func resolveWorktreeTarget(config *CommandConfig, target string) (*core.Context, string, error) {
-	currentCtx, err := config.Services.ContextService.GetCurrentContext()
+	wd, err := filepath.Abs(".")
 	if err != nil {
-		return nil, "", fmt.Errorf("context detection failed: %w", err)
+		return fmt.Errorf("get working directory: %w", err)
 	}
 
-	resolution, err := config.Services.ContextService.ResolveIdentifier(target)
+	currentCtx, err := detector.DetectContext(wd)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to resolve target %s: %w", target, err)
+		return fmt.Errorf("context detection failed: %w", err)
+	}
+
+	resolution, err := resolver.ResolveIdentifier(currentCtx, target)
+	if err != nil {
+		return fmt.Errorf("failed to resolve target %s: %w", target, err)
 	}
 
 	if resolution.Type == core.PathTypeInvalid {
-		return nil, "", fmt.Errorf("invalid target format: %s", resolution.Explanation)
+		return fmt.Errorf("invalid target format: %s", resolution.Explanation)
 	}
 
-	// Validate ResolvedPath is non-empty when Type indicates a worktree path was resolved
 	if resolution.Type == core.PathTypeWorktree && resolution.ResolvedPath == "" {
-		return nil, "", core.NewOpValidationError("resolveWorktreeTarget", "ResolvedPath", "", "resolved path cannot be empty")
+		return core.NewOpValidationError("executeDelete", "ResolvedPath", "", "resolved path cannot be empty")
 	}
 
-	return currentCtx, resolution.ResolvedPath, nil
-}
+	worktreePath := resolution.ResolvedPath
 
-func validateWorktreeStatus(ctx context.Context, config *CommandConfig, c *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *core.Context) error {
-	if force {
-		return nil
-	}
-
-	status, err := config.Services.WorktreeService.GetWorktreeStatus(ctx, worktreePath)
-	if err != nil {
-		if errors.Is(err, core.ErrWorktreeNotFound) {
-			if changeDir {
-				navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
-				if navigationTarget != "" {
-					_, _ = fmt.Fprintln(c.OutOrStdout(), navigationTarget)
+	// Status safety check
+	if !force {
+		status, err := getWorktreeStatus(ctx, gitClient, worktreePath)
+		if err != nil {
+			if errors.Is(err, core.ErrWorktreeNotFound) {
+				if changeDir {
+					nav := getDeleteNavigationTarget(currentCtx, worktreePath)
+					if nav != "" {
+						_, _ = fmt.Fprintln(c.OutOrStdout(), nav)
+					}
+				} else {
+					_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s (already removed)\n", worktreePath)
 				}
-			} else {
-				_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s (already removed)\n", worktreePath)
+				return &core.OperationError{
+					Op:      "delete.worktree",
+					Entity:  worktreePath,
+					Message: "worktree not found",
+				}
 			}
-			return core.NewNavigationServiceError(worktreePath, currentCtx.Path, "DeleteWorktree", "worktree not found", nil)
+			return fmt.Errorf("failed to check worktree status: %w", err)
 		}
-		return fmt.Errorf("failed to check worktree status: %w", err)
-	}
-
-	if !status.IsClean {
-		return errors.New("worktree has uncommitted changes (use --force to override)")
-	}
-
-	return nil
-}
-
-func validateMergedOnly(ctx context.Context, config *CommandConfig, worktreePath string, mergedOnly bool, currentCtx *core.Context) error {
-	if !mergedOnly {
-		return nil
-	}
-
-	worktreeInfo, err := config.Services.WorktreeService.GetWorktreeByPath(ctx, currentCtx.Path, worktreePath)
-	if err != nil {
-		return fmt.Errorf("failed to get worktree info: %w", err)
-	}
-
-	isMerged, err := config.Services.WorktreeService.IsBranchMerged(ctx, worktreePath, worktreeInfo.Branch)
-	if err != nil {
-		return fmt.Errorf("failed to check if branch '%s' is merged: %w", worktreeInfo.Branch, err)
-	}
-
-	if !isMerged {
-		return fmt.Errorf("branch '%s' is not merged (cannot delete with --merged-only)", worktreeInfo.Branch)
-	}
-
-	return nil
-}
-
-func getDeleteNavigationTarget(ctx context.Context, config *CommandConfig, _ string, currentCtx *core.Context) string {
-	if currentCtx.Type == core.ContextWorktree {
-		req := &core.ResolvePathRequest{
-			Target:  "main",
-			Context: currentCtx,
-		}
-		resolution, err := config.Services.NavigationService.ResolvePath(ctx, req)
-		if err == nil && resolution.ResolvedPath != "" {
-			return resolution.ResolvedPath
+		if !status.IsClean {
+			return errors.New("worktree has uncommitted changes (use --force to override)")
 		}
 	}
-	return ""
-}
 
-func deleteWorktree(ctx context.Context, config *CommandConfig, c *cobra.Command, worktreePath string, force, changeDir bool, currentCtx *core.Context) error {
+	// merged-only check
+	if mergedOnly {
+		wtInfo, err := clientGetWorktreeByPath(ctx, gitClient, currentCtx.Path, worktreePath)
+		if err != nil {
+			return fmt.Errorf("failed to get worktree info: %w", err)
+		}
+		merged, err := gitClient.IsBranchMerged(ctx, worktreePath, wtInfo.Branch)
+		if err != nil {
+			return fmt.Errorf("failed to check if branch '%s' is merged: %w", wtInfo.Branch, err)
+		}
+		if !merged {
+			return fmt.Errorf("branch '%s' is not merged (cannot delete with --merged-only)", wtInfo.Branch)
+		}
+	}
+
 	logv(c, 1, "Deleting worktree at %s", worktreePath)
-
 	logv(c, 2, "  project: %s", currentCtx.ProjectName)
-
-	worktreeInfo, _ := config.Services.WorktreeService.GetWorktreeByPath(ctx, currentCtx.Path, worktreePath)
-	if worktreeInfo != nil {
-		logv(c, 2, "  branch: %s", worktreeInfo.Branch)
-	}
 	logv(c, 2, "  force: %t", force)
 
-	req := &core.DeleteWorktreeRequest{
-		WorktreePath: worktreePath,
-		Force:        force,
-		Context:      currentCtx,
-	}
-
-	err := config.Services.WorktreeService.DeleteWorktree(ctx, req)
-	if err != nil {
+	if err := gitClient.DeleteWorktree(ctx, currentCtx.Path, worktreePath, force); err != nil {
 		return fmt.Errorf("failed to delete worktree: %w", err)
 	}
 
 	if changeDir {
-		// Always output path for -C flag (even in quiet mode) - task 3.6
-		navigationTarget := getDeleteNavigationTarget(ctx, config, worktreePath, currentCtx)
-		if navigationTarget != "" {
-			_, _ = fmt.Fprintln(c.OutOrStdout(), navigationTarget)
+		nav := getDeleteNavigationTarget(currentCtx, worktreePath)
+		if nav != "" {
+			_, _ = fmt.Fprintln(c.OutOrStdout(), nav)
 		}
 	} else if !isQuiet(c) {
-		// Suppress success message in quiet mode - task 3.4
 		_, _ = fmt.Fprintf(c.OutOrStdout(), "Deleted worktree: %s\n", worktreePath)
 	}
 
 	return nil
+}
+
+// getWorktreeStatus mirrors worktreeService.GetWorktreeStatus.
+func getWorktreeStatus(ctx context.Context, client *git.Client, worktreePath string) (*core.WorktreeStatus, error) {
+	if worktreePath == "" {
+		return nil, core.NewOpValidationError("GetWorktreeStatus", "worktreePath", "", "worktree path cannot be empty")
+	}
+	if err := client.ValidateRepository(worktreePath); err != nil {
+		return nil, &core.OperationError{
+			Op:      "status.worktree",
+			Entity:  worktreePath,
+			Message: "invalid git repository",
+			Cause:   err,
+		}
+	}
+
+	repoStatus, err := client.GetRepositoryStatus(ctx, worktreePath)
+	if err != nil {
+		return nil, &core.OperationError{
+			Op:      "status.worktree",
+			Entity:  worktreePath,
+			Message: "failed to get repository status",
+			Cause:   err,
+		}
+	}
+
+	branchStatus := "up-to-date"
+	if repoStatus.Ahead > 0 && repoStatus.Behind > 0 {
+		branchStatus = "diverged"
+	} else if repoStatus.Ahead > 0 {
+		branchStatus = "ahead"
+	} else if repoStatus.Behind > 0 {
+		branchStatus = "behind"
+	}
+
+	return &core.WorktreeStatus{
+		RepositoryStatus:      &repoStatus,
+		LastChecked:           now(),
+		IsClean:               repoStatus.IsClean,
+		HasUncommittedChanges: !repoStatus.IsClean,
+		BranchStatus:          branchStatus,
+	}, nil
+}
+
+// now returns the current time. Pulled into a helper so future slices
+// can stub it without rewriting the call sites.
+func now() time.Time {
+	return time.Now()
+}
+
+// clientGetWorktreeByPath returns the worktree info for worktreePath
+// under projectPath, or a NotFound sentinel.
+func clientGetWorktreeByPath(ctx context.Context, client *git.Client, projectPath, worktreePath string) (*core.WorktreeInfo, error) {
+	worktrees, err := client.ListWorktrees(ctx, projectPath)
+	if err != nil {
+		return nil, &core.OperationError{
+			Op:      "delete.worktree",
+			Entity:  worktreePath,
+			Message: "failed to list worktrees",
+			Cause:   err,
+		}
+	}
+	for i := range worktrees {
+		if worktrees[i].Path == worktreePath {
+			return &worktrees[i], nil
+		}
+	}
+	return nil, &core.OperationError{
+		Op:      "delete.worktree",
+		Entity:  worktreePath,
+		Message: "worktree not found",
+	}
+}
+
+// getDeleteNavigationTarget returns the project path for navigation
+// when the deleted worktree was a ContextWorktree.
+func getDeleteNavigationTarget(currentCtx *core.Context, _ string) string {
+	if currentCtx.Type == core.ContextWorktree {
+		return currentCtx.Path
+	}
+	return ""
 }

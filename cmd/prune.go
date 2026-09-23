@@ -4,17 +4,21 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
+
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 )
 
 // NewPruneCommand creates a new prune command for deleting merged worktrees.
-func NewPruneCommand(config *CommandConfig) *cobra.Command {
+func NewPruneCommand(f *CommandConfig) *cobra.Command {
 	var force, yes, deleteBranches, allProjects, dryRun bool
 
 	cmd := &cobra.Command{
@@ -46,7 +50,7 @@ Examples:
 			if len(args) > 0 {
 				specificWorktree = args[0]
 			}
-			return executePrune(c, config, force, yes, deleteBranches, allProjects, dryRun, specificWorktree)
+			return executePrune(c, f, force, yes, deleteBranches, allProjects, dryRun, specificWorktree)
 		},
 	}
 
@@ -57,46 +61,63 @@ Examples:
 	cmd.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Preview only, no actual deletion")
 
 	carapace.Gen(cmd).PositionalCompletion(
-		actionWorktreeTarget(config, git.WithExistingOnly()),
+		actionWorktreeTarget(f, git.WithExistingOnly()),
 	)
 
 	return cmd
 }
 
-func executePrune(c *cobra.Command, config *CommandConfig, force, yes, deleteBranches, allProjects, dryRun bool, specificWorktree string) error {
+// executePrune implements the orchestration previously in
+// worktreeService.PruneMergedWorktrees. After slice 9 the worktree
+// iteration, skip logic, branch deletion, and result aggregation all
+// live in cmd/.
+func executePrune(c *cobra.Command, f *CommandConfig, force, yes, deleteBranches, allProjects, dryRun bool, specificWorktree string) error {
 	ctx := context.Background()
 
-	currentCtx, err := config.Services.ContextService.GetCurrentContext()
+	cfg, err := f.Config()
+	if err != nil {
+		return fmt.Errorf("config load failed: %w", err)
+	}
+
+	gitClient, err := f.GitClient()
+	if err != nil {
+		return fmt.Errorf("git client init failed: %w", err)
+	}
+
+	detector, err := git.NewContextDetector(cfg)
+	if err != nil {
+		return fmt.Errorf("context detector init failed: %w", err)
+	}
+
+	wd, err := filepath.Abs(".")
+	if err != nil {
+		return fmt.Errorf("get working directory: %w", err)
+	}
+
+	currentCtx, err := detector.DetectContext(wd)
 	if err != nil {
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 
-	// Build the base request
-	req := &core.PruneWorktreesRequest{
-		Context:          currentCtx,
-		Force:            force,
-		DeleteBranches:   deleteBranches,
-		AllProjects:      allProjects,
-		SpecificWorktree: specificWorktree,
-	}
-
-	// Create progress reporter for bulk operations
 	quiet := isQuiet(c)
 	reporter := NewProgressReporter(quiet, c.ErrOrStderr())
 
-	// If confirmation needed, show preview first then ask
 	if allProjects && !force && !yes && !dryRun {
-		// Do dry-run first to show preview
-		previewReq := *req
-		previewReq.DryRun = true
+		previewReq := &core.PruneWorktreesRequest{
+			Context:          currentCtx,
+			Force:            force,
+			DeleteBranches:   deleteBranches,
+			AllProjects:      allProjects,
+			DryRun:           true,
+			SpecificWorktree: specificWorktree,
+		}
 		reporter.Report("Previewing prune operation...")
-		previewResult, err := config.Services.WorktreeService.PruneMergedWorktrees(ctx, &previewReq)
+		previewResult, err := runPrune(ctx, gitClient, cfg, previewReq, currentCtx)
 		if err != nil {
 			return fmt.Errorf("prune preview failed: %w", err)
 		}
 		outputPruneResults(c, previewResult, true)
 
-		// Now ask for confirmation
 		confirmed, err := confirmBulkPrune(c)
 		if err != nil {
 			return err
@@ -107,20 +128,25 @@ func executePrune(c *cobra.Command, config *CommandConfig, force, yes, deleteBra
 		}
 	}
 
-	// Report start of bulk operation
 	if allProjects || specificWorktree == "" {
 		reporter.Report("Pruning merged worktrees...")
 	}
 
-	req.DryRun = dryRun
-	result, err := config.Services.WorktreeService.PruneMergedWorktrees(ctx, req)
+	req := &core.PruneWorktreesRequest{
+		Context:          currentCtx,
+		Force:            force,
+		DeleteBranches:   deleteBranches,
+		AllProjects:      allProjects,
+		DryRun:           dryRun,
+		SpecificWorktree: specificWorktree,
+	}
+	result, err := runPrune(ctx, gitClient, cfg, req, currentCtx)
 	if err != nil {
 		return fmt.Errorf("prune failed: %w", err)
 	}
 
 	outputPruneResults(c, result, dryRun)
 
-	// Report completion of bulk operation
 	if allProjects || specificWorktree == "" {
 		reporter.Report("Prune complete")
 	}
@@ -132,6 +158,223 @@ func executePrune(c *cobra.Command, config *CommandConfig, force, yes, deleteBra
 	return nil
 }
 
+// runPrune performs the prune walk and returns the aggregated result.
+// It encapsulates the per-project iteration that previously lived in
+// worktreeService.pruneProjectWorktrees + checkWorktreeSkip +
+// deleteWorktreeAndBranch.
+func runPrune(ctx context.Context, client *git.Client, cfg *core.Config, req *core.PruneWorktreesRequest, currentCtx *core.Context) (*core.PruneWorktreesResult, error) {
+	result := &core.PruneWorktreesResult{
+		DeletedWorktrees: []*core.PruneWorktreeResult{},
+		SkippedWorktrees: []*core.PruneWorktreeResult{},
+		ProtectedSkipped: []*core.PruneWorktreeResult{},
+		UnmergedSkipped:  []*core.PruneWorktreeResult{},
+	}
+
+	projects, err := resolvePruneProjects(ctx, client, cfg, req, currentCtx)
+	if err != nil {
+		return nil, err
+	}
+
+	singleTarget := ""
+	if req.SpecificWorktree != "" {
+		parts := strings.Split(req.SpecificWorktree, "/")
+		if len(parts) == 2 {
+			singleTarget = parts[1]
+		}
+	}
+
+	cwd, _ := os.Getwd()
+
+	for _, project := range projects {
+		pruneProject(ctx, client, cfg, req, project, result, singleTarget, cwd)
+	}
+
+	if len(result.DeletedWorktrees) == 1 && req.SpecificWorktree != "" {
+		projectName := strings.Split(req.SpecificWorktree, "/")[0]
+		projectPath := filepath.Join(cfg.ProjectsDirectory, projectName)
+		if _, statErr := os.Stat(projectPath); statErr == nil {
+			result.NavigationPath = projectPath
+		}
+	}
+
+	return result, nil
+}
+
+// resolvePruneProjects returns the list of projects to prune based on
+// the request flags. Mirrors the project-resolution branch of
+// worktreeService.PruneMergedWorktrees.
+func resolvePruneProjects(ctx context.Context, client *git.Client, cfg *core.Config, req *core.PruneWorktreesRequest, currentCtx *core.Context) ([]*core.ProjectInfo, error) {
+	if req.AllProjects {
+		finder := git.NewRepoFinder(client)
+		gitDirs, err := finder.FindGitRepositories(cfg.ProjectsDirectory)
+		if err != nil {
+			return nil, &core.OperationError{
+				Op:      "prune.projects",
+				Entity:  cfg.ProjectsDirectory,
+				Message: "failed to list projects",
+				Cause:   err,
+			}
+		}
+		projects := make([]*core.ProjectInfo, len(gitDirs))
+		for i, gitDir := range gitDirs {
+			mainRepo := gitDir.Path
+			if resolved := core.FindMainRepoByTraversal(gitDir.Path); resolved != "" {
+				mainRepo = resolved
+			}
+			projects[i] = &core.ProjectInfo{
+				Name:        filepath.Base(mainRepo),
+				Path:        gitDir.Path,
+				GitRepoPath: mainRepo,
+			}
+		}
+		return projects, nil
+	}
+
+	if req.SpecificWorktree != "" {
+		parts := strings.Split(req.SpecificWorktree, "/")
+		if len(parts) != 2 {
+			return nil, core.NewOpValidationError("PruneWorktreesRequest", "SpecificWorktree", req.SpecificWorktree, "must be in format project/branch")
+		}
+		project, err := discoverProject(ctx, client, cfg, parts[0], currentCtx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve project: %w", err)
+		}
+		return []*core.ProjectInfo{project}, nil
+	}
+
+	projectName := req.ProjectName
+	if projectName == "" && currentCtx != nil {
+		projectName = currentCtx.ProjectName
+	}
+	if projectName == "" {
+		project, err := discoverProject(ctx, client, cfg, "", currentCtx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve project from context: %w", err)
+		}
+		return []*core.ProjectInfo{project}, nil
+	}
+	project, err := discoverProject(ctx, client, cfg, projectName, currentCtx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve project: %w", err)
+	}
+	return []*core.ProjectInfo{project}, nil
+}
+
+// pruneProject iterates a single project's worktrees and applies the
+// prune logic.
+func pruneProject(ctx context.Context, client *git.Client, cfg *core.Config, req *core.PruneWorktreesRequest, project *core.ProjectInfo, result *core.PruneWorktreesResult, singleTarget, cwd string) {
+	worktrees, err := client.ListWorktrees(ctx, project.GitRepoPath)
+	if err != nil {
+		return
+	}
+
+	for _, wt := range worktrees {
+		if wt.Path == project.GitRepoPath {
+			continue
+		}
+
+		if singleTarget != "" && wt.Branch != singleTarget {
+			continue
+		}
+
+		entry := &core.PruneWorktreeResult{
+			ProjectName:  project.Name,
+			WorktreePath: wt.Path,
+			BranchName:   wt.Branch,
+			Deleted:      false,
+		}
+
+		if skip := checkWorktreeSkip(ctx, client, cfg, wt, project, cwd, req); skip != nil {
+			addSkippedPrune(result, entry, skip)
+			continue
+		}
+
+		deleteWorktreeAndBranch(ctx, client, project, wt, req, entry, result)
+	}
+}
+
+type pruneSkipResult struct {
+	reason   string
+	err      error
+	category string
+}
+
+// checkWorktreeSkip encodes the prune-skip decision tree.
+func checkWorktreeSkip(ctx context.Context, client *git.Client, cfg *core.Config, wt core.WorktreeInfo, project *core.ProjectInfo, cwd string, req *core.PruneWorktreesRequest) *pruneSkipResult {
+	if cwd != "" && (strings.HasPrefix(cwd, wt.Path+string(filepath.Separator)) || cwd == wt.Path) {
+		return &pruneSkipResult{reason: "cannot prune current worktree", category: "current"}
+	}
+	if slices.Contains(cfg.Validation.ProtectedBranches, wt.Branch) {
+		return &pruneSkipResult{reason: "protected branch", category: "protected"}
+	}
+
+	merged, err := client.IsBranchMerged(ctx, project.GitRepoPath, wt.Branch)
+	if err != nil {
+		return &pruneSkipResult{reason: "failed to check merge status", err: err, category: "skipped"}
+	}
+	if !merged {
+		return &pruneSkipResult{reason: "branch not merged", category: "unmerged"}
+	}
+
+	if !req.Force && !req.DryRun {
+		status, err := client.GetRepositoryStatus(ctx, wt.Path)
+		if err == nil && !status.IsClean {
+			return &pruneSkipResult{reason: "uncommitted changes (use --force to override)", category: "skipped"}
+		}
+	}
+
+	if req.DryRun {
+		return &pruneSkipResult{reason: "dry run", category: "skipped"}
+	}
+
+	return nil
+}
+
+// addSkippedPrune records the skip in the appropriate bucket.
+func addSkippedPrune(result *core.PruneWorktreesResult, entry *core.PruneWorktreeResult, skip *pruneSkipResult) {
+	entry.SkipReason = skip.reason
+	entry.Error = skip.err
+
+	switch skip.category {
+	case "current":
+		result.CurrentWorktreeSkipped = append(result.CurrentWorktreeSkipped, entry)
+	case "protected":
+		result.ProtectedSkipped = append(result.ProtectedSkipped, entry)
+	case "unmerged":
+		result.UnmergedSkipped = append(result.UnmergedSkipped, entry)
+	default:
+		result.SkippedWorktrees = append(result.SkippedWorktrees, entry)
+	}
+	result.TotalSkipped++
+}
+
+// deleteWorktreeAndBranch performs the actual delete + optional branch removal.
+func deleteWorktreeAndBranch(ctx context.Context, client *git.Client, project *core.ProjectInfo, wt core.WorktreeInfo, req *core.PruneWorktreesRequest, entry *core.PruneWorktreeResult, result *core.PruneWorktreesResult) {
+	if err := client.DeleteWorktree(ctx, project.GitRepoPath, wt.Path, req.Force); err != nil {
+		entry.Error = err
+		result.SkippedWorktrees = append(result.SkippedWorktrees, entry)
+		result.TotalSkipped++
+		return
+	}
+
+	entry.Deleted = true
+	result.DeletedWorktrees = append(result.DeletedWorktrees, entry)
+	result.TotalDeleted++
+
+	if req.DeleteBranches {
+		if err := client.PruneWorktrees(ctx, project.GitRepoPath); err != nil {
+			slog.Default().Error("prune worktrees failed", "error", err, "repo_path", project.GitRepoPath)
+		}
+		if err := client.DeleteBranch(ctx, project.GitRepoPath, wt.Branch); err != nil {
+			entry.Error = fmt.Errorf("worktree deleted but branch deletion failed: %w", err)
+		} else {
+			entry.BranchDeleted = true
+			result.TotalBranchesDeleted++
+		}
+	}
+}
+
+// confirmBulkPrune prompts on stderr for a y/n confirmation.
 func confirmBulkPrune(c *cobra.Command) (bool, error) {
 	_, _ = fmt.Fprint(c.ErrOrStderr(), "This will prune merged worktrees across all projects. Continue? (y/n): ")
 	reader := bufio.NewReader(os.Stdin)
@@ -143,6 +386,7 @@ func confirmBulkPrune(c *cobra.Command) (bool, error) {
 	return response == "y" || response == "yes", nil
 }
 
+// outputPruneResults formats the aggregated prune result for the user.
 func outputPruneResults(c *cobra.Command, result *core.PruneWorktreesResult, dryRun bool) {
 	errOut := c.OutOrStderr()
 

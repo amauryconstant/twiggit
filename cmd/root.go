@@ -1,32 +1,25 @@
 package cmd
 
 import (
-	"errors"
-
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 
-	"twiggit/internal/application"
+	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 )
 
-// CommandConfig holds the configuration for CLI commands
-type CommandConfig struct {
-	Services *ServiceContainer
-	Config   *core.Config
-}
+// CommandConfig is the configuration handle every command constructor
+// receives. After slice 9 it is an alias for the cmdutil.Factory: the
+// composition root (main.go) builds a Factory once and passes it to
+// every command, so runX functions can lazy-resolve git client,
+// config, IO streams, and logger without service-layer indirection.
+type CommandConfig = cmdutil.Factory
 
-// ServiceContainer holds all service dependencies for commands
-type ServiceContainer struct {
-	WorktreeService   application.WorktreeService
-	ProjectService    application.ProjectService
-	NavigationService application.NavigationService
-	ContextService    application.ContextService
-	ShellService      application.ShellService
-}
-
-// NewRootCommand creates a new root command with the given configuration
-func NewRootCommand(config *CommandConfig) *cobra.Command {
+// NewRootCommand creates a new root command with the given factory.
+//
+// Every subcommand receives the same Factory pointer so they all share
+// the cached Config and GitClient fields.
+func NewRootCommand(f *CommandConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "twiggit",
 		Short: "A pragmatic tool for managing git worktrees",
@@ -36,8 +29,8 @@ across multiple projects.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
-			if config == nil || config.Config == nil {
-				return errors.New("cmd: configuration not loaded")
+			if f == nil {
+				return core.NewUsageError("cmd: factory not provided", nil)
 			}
 			return nil
 		},
@@ -56,13 +49,13 @@ across multiple projects.`,
 	cmd.PersistentFlags().BoolP("quiet", "q", false, "Suppress non-essential output")
 
 	// Add subcommands
-	cmd.AddCommand(NewListCommand(config))
-	cmd.AddCommand(NewCreateCommand(config))
-	cmd.AddCommand(NewDeleteCommand(config))
-	cmd.AddCommand(NewPruneCommand(config))
-	cmd.AddCommand(NewCDCommand(config))
-	cmd.AddCommand(NewInitCmd(config))
-	cmd.AddCommand(NewVersionCommand(config))
+	cmd.AddCommand(NewListCommand(f))
+	cmd.AddCommand(NewCreateCommand(f))
+	cmd.AddCommand(NewDeleteCommand(f))
+	cmd.AddCommand(NewPruneCommand(f))
+	cmd.AddCommand(NewCDCommand(f))
+	cmd.AddCommand(NewInitCmd(f))
+	cmd.AddCommand(NewVersionCommand(f))
 
 	carapace.Gen(cmd)
 
