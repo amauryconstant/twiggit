@@ -38,7 +38,7 @@ func (r *reader) OpenRepository(path string) (*git.Repository, error) {
 	// Normalize path
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		return nil, NewRepoError("git.repository", "failed to get absolute path", err)
+		return nil, NewRepoError("open", "failed to get absolute path", err)
 	}
 
 	// Check cache first
@@ -49,7 +49,7 @@ func (r *reader) OpenRepository(path string) (*git.Repository, error) {
 	// Open repository
 	repo, err := git.PlainOpen(absPath)
 	if err != nil {
-		return nil, NewRepoError("git.repository", "failed to open git repository", err)
+		return nil, NewRepoError("open", "failed to open git repository", err)
 	}
 
 	// Cache the repository
@@ -67,7 +67,7 @@ func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.Branch
 
 	branches, err := repo.Branches()
 	if err != nil {
-		return nil, NewRepoError("git.repository", "failed to list branches", err)
+		return nil, NewRepoError("list-branches", "failed to list branches", err)
 	}
 
 	branchInfos := make([]core.BranchInfo, 0)
@@ -75,7 +75,7 @@ func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.Branch
 	// Get current branch reference
 	headRef, err := repo.Head()
 	if err != nil {
-		return nil, NewRepoError("git.repository", "failed to get HEAD reference", err)
+		return nil, NewRepoError("list-branches", "failed to get HEAD reference", err)
 	}
 
 	err = branches.ForEach(func(ref *plumbing.Reference) error {
@@ -107,7 +107,7 @@ func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.Branch
 	})
 
 	if err != nil {
-		return nil, NewRepoError("git.repository", "failed to iterate branches", err)
+		return nil, NewRepoError("list-branches", "failed to iterate branches", err)
 	}
 
 	return branchInfos, nil
@@ -127,7 +127,7 @@ func (r *reader) BranchExists(_ context.Context, repoPath, branchName string) (b
 		return false, nil
 	}
 	if err != nil {
-		return false, NewRepoError("git.repository", "failed to check branch "+branchName, err)
+		return false, NewRepoError("branch-exists", "failed to check branch "+branchName, err)
 	}
 
 	return true, nil
@@ -143,13 +143,13 @@ func (r *reader) GetRepositoryStatus(_ context.Context, repoPath string) (core.R
 	// Get worktree
 	worktree, err := repo.Worktree()
 	if err != nil {
-		return core.RepositoryStatus{}, NewRepoError("git.repository", "failed to get worktree", err)
+		return core.RepositoryStatus{}, NewRepoError("status", "failed to get worktree", err)
 	}
 
 	// Get status
 	status, err := worktree.Status()
 	if err != nil {
-		return core.RepositoryStatus{}, NewRepoError("git.repository", "failed to get repository status", err)
+		return core.RepositoryStatus{}, NewRepoError("status", "failed to get repository status", err)
 	}
 
 	// Workaround for go-git worktree issue:
@@ -209,7 +209,7 @@ func (r *reader) GetRepositoryStatus(_ context.Context, repoPath string) (core.R
 func (r *reader) ValidateRepository(path string) error {
 	_, err := git.PlainOpen(path)
 	if err != nil {
-		return NewRepoError("git.repository", "not a valid git repository", err)
+		return NewRepoError("validate", "not a valid git repository", err)
 	}
 	return nil
 }
@@ -265,7 +265,7 @@ func (r *reader) ListRemotes(_ context.Context, repoPath string) ([]core.RemoteI
 
 	remotes, err := repo.Remotes()
 	if err != nil {
-		return nil, NewRepoError("git.repository", "failed to list remotes", err)
+		return nil, NewRepoError("list-remotes", "failed to list remotes", err)
 	}
 
 	remoteInfos := make([]core.RemoteInfo, 0, len(remotes))
@@ -300,7 +300,7 @@ func (r *reader) GetCommitInfo(_ context.Context, repoPath, commitHash string) (
 	// Get commit object
 	commit, err := repo.CommitObject(hash)
 	if err != nil {
-		return nil, NewRepoError("git.repository", "failed to get commit "+commitHash, err)
+		return nil, NewRepoError("commit-info", "failed to get commit "+commitHash, err)
 	}
 
 	hashStr := commit.Hash.String()

@@ -106,19 +106,19 @@ func buildWorktreeRemoveArgs(worktreePath string, force bool) []string {
 func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error {
 	// Validate inputs
 	if repoPath == "" {
-		return NewWorktreeError("git.worktree", "repository path cannot be empty", nil)
+		return NewWorktreeError("create", "repository path cannot be empty", nil)
 	}
 	if branchName == "" {
-		return NewWorktreeError("git.worktree", "branch name cannot be empty", nil)
+		return NewWorktreeError("create", "branch name cannot be empty", nil)
 	}
 	if worktreePath == "" {
-		return NewWorktreeError("git.worktree", "worktree path cannot be empty", nil)
+		return NewWorktreeError("create", "worktree path cannot be empty", nil)
 	}
 
 	// Check if branch already exists
 	branchExists, err := c.branchExists(ctx, repoPath, branchName)
 	if err != nil {
-		return NewWorktreeError("git.worktree", "failed to check if branch exists", err)
+		return NewWorktreeError("create", "failed to check if branch exists", err)
 	}
 
 	// Build command arguments using pure function
@@ -127,24 +127,24 @@ func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, so
 	// Execute command
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.defaultTimeout, args...)
 	if err != nil {
-		return NewWorktreeError("git.worktree", "failed to create worktree", err)
+		return NewWorktreeError("create", "failed to create worktree", err)
 	}
 	if result == nil {
-		return NewWorktreeError("git.worktree", "command executor returned nil result for worktree create", nil)
+		return NewWorktreeError("create", "command executor returned nil result for worktree create", nil)
 	}
 
 	if result.ExitCode != 0 {
-		return NewWorktreeError("git.worktree", "git worktree add failed: "+result.Stderr, nil)
+		return NewWorktreeError("create", "git worktree add failed: "+result.Stderr, nil)
 	}
 
 	parentDir := filepath.Dir(worktreePath)
 	root, err := os.OpenRoot(parentDir)
 	if err != nil {
-		return NewWorktreeError("git.worktree", "git worktree add succeeded but parent directory not accessible", err)
+		return NewWorktreeError("create", "git worktree add succeeded but parent directory not accessible", err)
 	}
 	defer root.Close() //nolint:errcheck // read-only filesystem stat cleanup, no actionable error
 	if _, err := root.Stat(filepath.Base(worktreePath)); err != nil {
-		return NewWorktreeError("git.worktree", "git worktree add succeeded but worktree directory not found", err)
+		return NewWorktreeError("create", "git worktree add succeeded but worktree directory not found", err)
 	}
 
 	return nil
@@ -154,10 +154,10 @@ func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, so
 func (c *cliClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error {
 	// Validate inputs
 	if repoPath == "" {
-		return NewWorktreeError("git.worktree", "repository path cannot be empty", nil)
+		return NewWorktreeError("delete", "repository path cannot be empty", nil)
 	}
 	if worktreePath == "" {
-		return NewWorktreeError("git.worktree", "worktree path cannot be empty", nil)
+		return NewWorktreeError("delete", "worktree path cannot be empty", nil)
 	}
 
 	// For idempotency, we'll try to delete directly and handle "not found" errors
@@ -169,10 +169,10 @@ func (c *cliClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath s
 	// Execute command
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.defaultTimeout, args...)
 	if err != nil {
-		return NewWorktreeError("git.worktree", "failed to delete worktree", err)
+		return NewWorktreeError("delete", "failed to delete worktree", err)
 	}
 	if result == nil {
-		return NewWorktreeError("git.worktree", "command executor returned nil result for worktree delete", nil)
+		return NewWorktreeError("delete", "command executor returned nil result for worktree delete", nil)
 	}
 
 	if result.ExitCode != 0 {
@@ -180,7 +180,7 @@ func (c *cliClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath s
 		if strings.Contains(result.Stderr, "not found") || strings.Contains(result.Stderr, "does not exist") {
 			return nil // No-op if already deleted
 		}
-		return NewWorktreeError("git.worktree", "git worktree remove failed: "+result.Stderr, nil)
+		return NewWorktreeError("delete", "git worktree remove failed: "+result.Stderr, nil)
 	}
 
 	return nil
@@ -190,20 +190,20 @@ func (c *cliClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath s
 func (c *cliClient) ListWorktrees(ctx context.Context, repoPath string) ([]core.WorktreeInfo, error) {
 	// Validate input
 	if repoPath == "" {
-		return nil, NewWorktreeError("git.worktree", "repository path cannot be empty", nil)
+		return nil, NewWorktreeError("list", "repository path cannot be empty", nil)
 	}
 
 	// Execute git worktree list command
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.defaultTimeout, "worktree", "list", "--porcelain")
 	if err != nil {
-		return nil, NewWorktreeError("git.worktree", "failed to list worktrees", err)
+		return nil, NewWorktreeError("list", "failed to list worktrees", err)
 	}
 	if result == nil {
-		return nil, NewWorktreeError("git.worktree", "command executor returned nil result for worktree list", nil)
+		return nil, NewWorktreeError("list", "command executor returned nil result for worktree list", nil)
 	}
 
 	if result.ExitCode != 0 {
-		return nil, NewWorktreeError("git.worktree", "git worktree list failed: "+result.Stderr, nil)
+		return nil, NewWorktreeError("list", "git worktree list failed: "+result.Stderr, nil)
 	}
 
 	// Parse output
@@ -214,20 +214,20 @@ func (c *cliClient) ListWorktrees(ctx context.Context, repoPath string) ([]core.
 func (c *cliClient) PruneWorktrees(ctx context.Context, repoPath string) error {
 	// Validate input
 	if repoPath == "" {
-		return NewWorktreeError("git.worktree", "repository path cannot be empty", nil)
+		return NewWorktreeError("prune", "repository path cannot be empty", nil)
 	}
 
 	// Execute git worktree prune command
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.defaultTimeout, "worktree", "prune")
 	if err != nil {
-		return NewWorktreeError("git.worktree", "failed to prune worktrees", err)
+		return NewWorktreeError("prune", "failed to prune worktrees", err)
 	}
 	if result == nil {
-		return NewWorktreeError("git.worktree", "command executor returned nil result for worktree prune", nil)
+		return NewWorktreeError("prune", "command executor returned nil result for worktree prune", nil)
 	}
 
 	if result.ExitCode != 0 {
-		return NewWorktreeError("git.worktree", "git worktree prune failed: "+result.Stderr, nil)
+		return NewWorktreeError("prune", "git worktree prune failed: "+result.Stderr, nil)
 	}
 
 	return nil
@@ -236,25 +236,25 @@ func (c *cliClient) PruneWorktrees(ctx context.Context, repoPath string) error {
 // DeleteBranch deletes a branch using git CLI (handles worktree-referenced branches)
 func (c *cliClient) DeleteBranch(ctx context.Context, repoPath, branchName string) error {
 	if repoPath == "" {
-		return NewWorktreeError("git.worktree", "repository path cannot be empty", nil)
+		return NewBranchError("delete", "repository path cannot be empty", nil)
 	}
 	if branchName == "" {
-		return NewWorktreeError("git.worktree", "branch name cannot be empty", nil)
+		return NewBranchError("delete", "branch name cannot be empty", nil)
 	}
 
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.defaultTimeout, "branch", "-D", branchName)
 	if err != nil {
-		return NewWorktreeError("git.worktree", "failed to delete branch", err)
+		return NewBranchError("delete", "failed to delete branch", err)
 	}
 	if result == nil {
-		return NewWorktreeError("git.worktree", "command executor returned nil result for branch delete", nil)
+		return NewBranchError("delete", "command executor returned nil result for branch delete", nil)
 	}
 
 	if result.ExitCode != 0 {
 		if strings.Contains(result.Stderr, "not found") {
 			return nil
 		}
-		return NewWorktreeError("git.worktree", "git branch -D failed: "+result.Stderr, nil)
+		return NewBranchError("delete", "git branch -D failed: "+result.Stderr, nil)
 	}
 
 	return nil
@@ -264,23 +264,23 @@ func (c *cliClient) DeleteBranch(ctx context.Context, repoPath, branchName strin
 func (c *cliClient) IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error) {
 	// Validate input
 	if repoPath == "" {
-		return false, NewWorktreeError("git.worktree", "repository path cannot be empty", nil)
+		return false, NewBranchError("merged", "repository path cannot be empty", nil)
 	}
 	if branchName == "" {
-		return false, NewWorktreeError("git.worktree", "branch name cannot be empty", nil)
+		return false, NewBranchError("merged", "branch name cannot be empty", nil)
 	}
 
 	// Execute git branch --merged command
 	result, err := c.executor.ExecuteWithTimeout(ctx, repoPath, "git", c.defaultTimeout, "branch", "--merged")
 	if err != nil {
-		return false, NewWorktreeError("git.worktree", "failed to check merged status", err)
+		return false, NewBranchError("merged", "failed to check merged status", err)
 	}
 	if result == nil {
-		return false, NewWorktreeError("git.worktree", "command executor returned nil result for branch merge check", nil)
+		return false, NewBranchError("merged", "command executor returned nil result for branch merge check", nil)
 	}
 
 	if result.ExitCode != 0 {
-		return false, NewWorktreeError("git.worktree", "git branch --merged failed: "+result.Stderr, nil)
+		return false, NewBranchError("merged", "git branch --merged failed: "+result.Stderr, nil)
 	}
 
 	// Check if branch name appears in merged branches output
@@ -360,7 +360,7 @@ func (c *cliClient) branchExists(ctx context.Context, repoPath, branchName strin
 		// populated by createCommandResult, so we can dispatch on result.ExitCode directly.
 		var oe *core.OperationError
 		if !errors.As(err, &oe) {
-			return false, NewRepoError("git.repository", "failed to check branch existence", err)
+			return false, NewRepoError("branch-exists", "failed to check branch existence", err)
 		}
 	}
 
@@ -372,5 +372,5 @@ func (c *cliClient) branchExists(ctx context.Context, repoPath, branchName strin
 	}
 
 	// Any other exit code is an error
-	return false, NewRepoError("git.repository", fmt.Sprintf("git show-ref exited with unexpected code: %d", result.ExitCode), nil)
+	return false, NewRepoError("show-ref", fmt.Sprintf("git show-ref exited with unexpected code: %d", result.ExitCode), nil)
 }

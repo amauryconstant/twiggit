@@ -11,6 +11,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"twiggit/internal/core"
 )
@@ -58,15 +59,21 @@ func (e *ExternalError) Error() string {
 	return fmt.Sprintf("%s %s: %s", e.Tool, e.Operation, e.Message)
 }
 
-// Unwrap returns Cause so errors.Is and errors.As walk to the originating
-// error (typically a go-git plumbing error or *exec.ExitError). The
-// embedded *core.OperationError also implements Unwrap, so the chain
-// visits the operation context as well.
-func (e *ExternalError) Unwrap() error {
-	if e.Cause != nil {
-		return e.Cause
+// Unwrap returns both the embedded *core.OperationError and the underlying
+// Cause so errors.As walks to OperationError first (preserving the Op/
+// Message contract that callers dispatch on) and then to the originating
+// tool error (go-git plumbing error or *exec.ExitError). When only one
+// side is populated, Unwrap returns that side alone.
+func (e *ExternalError) Unwrap() []error {
+	switch {
+	case e.Cause != nil && e.OperationError != nil:
+		return []error{e.OperationError, e.Cause}
+	case e.OperationError != nil:
+		return []error{e.OperationError}
+	case e.Cause != nil:
+		return []error{e.Cause}
 	}
-	return e.OperationError
+	return nil
 }
 
 // Is matches target against the wrapped NotFound sentinels when the
@@ -74,15 +81,20 @@ func (e *ExternalError) Unwrap() error {
 // callers had with the legacy core.NewGitRepositoryError /
 // core.NewGitWorktreeError constructors so errors.Is(err,
 // core.ErrGitRepoNotFound) keeps working across the migration.
+// Uses HasPrefix so dot-concatenated Op values like "git.repository.open"
+// still match the namespace sentinel.
 func (e *ExternalError) Is(target error) bool {
 	if e.Kind != ErrorKindNotFound {
 		return false
 	}
+	if e.OperationError == nil {
+		return false
+	}
 	switch target {
 	case core.ErrGitRepoNotFound:
-		return e.OperationError != nil && e.OperationError.Op == "git.repository"
+		return strings.HasPrefix(e.OperationError.Op, "git.repository")
 	case core.ErrWorktreeNotFound:
-		return e.OperationError != nil && e.OperationError.Op == "git.worktree"
+		return strings.HasPrefix(e.OperationError.Op, "git.worktree")
 	}
 	return false
 }
@@ -108,10 +120,20 @@ func NewCommandError(op, msg string, cause error) *ExternalError {
 	return newExternalError("git.command", op, msg, cause)
 }
 
+// NewBranchError constructs an ExternalError tagged with Op="git.branch.<op>".
+// Used by branch-mutation methods (DeleteBranch, IsBranchMerged). The
+// per-method op is concatenated into the high-level tag so callers can
+// dispatch on the precise operation via errors.As + OperationError.Op.
+func NewBranchError(op, msg string, cause error) *ExternalError {
+	return newExternalError("git.branch", op, msg, cause)
+}
+
 // newExternalError is the shared constructor. tag is the high-level
-// Op identifier (e.g. "git.repository"); op is the public method name;
-// msg and cause flow through unchanged. The embedded *core.OperationError
-// carries the high-level tag for errors.As dispatch.
+// namespace (e.g. "git.worktree"); op is the per-method suffix (e.g.
+// "create"). The embedded *core.OperationError.Op carries the
+// dot-concatenated form "tag.op" so callers can dispatch on the precise
+// operation via errors.As + OperationError.Op. ExternalError.Operation
+// retains the raw per-method suffix for human-readable Error() output.
 func newExternalError(tag, op, msg string, cause error) *ExternalError {
 	return &ExternalError{
 		Tool:      "git",
@@ -120,7 +142,7 @@ func newExternalError(tag, op, msg string, cause error) *ExternalError {
 		Cause:     cause,
 		Kind:      classifyKind(cause),
 		OperationError: &core.OperationError{
-			Op:      tag,
+			Op:      tag + "." + op,
 			Message: msg,
 			Cause:   cause,
 		},

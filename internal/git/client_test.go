@@ -349,3 +349,25 @@ var _ = _DriftCheck{
 	WorktreeWriter:   (*Client)(nil),
 	BranchWriter:     (*Client)(nil),
 }
+
+// TestReadSideFailure_OpIsGitRepository pins git-client R4.S1: read-side
+// failures must surface as *core.OperationError with the dot-concatenated
+// Op namespace "git.repository.<method>" so callers can dispatch on the
+// precise operation.
+func TestReadSideFailure_OpIsGitRepository(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient()
+	require.NoError(t, err)
+
+	_, err = client.OpenRepository("/non/existent/path")
+	require.Error(t, err)
+
+	var oe *core.OperationError
+	require.ErrorAs(t, err, &oe,
+		"read-side failure must be *core.OperationError (errors.As must walk)")
+	assert.Equal(t, "git.repository.open", oe.Op,
+		"OpenRepository Op must follow \"git.repository.<method>\" format")
+	assert.NotEmpty(t, oe.Message)
+	assert.Error(t, oe.Cause, "Cause must wrap underlying go-git error via %w")
+}

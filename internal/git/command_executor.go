@@ -69,13 +69,13 @@ func (e *commandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd strin
 	// Check if command failed to start (e.g., command not found)
 	if err != nil {
 		if _, found := extractExitCode(err); !found {
-			return nil, NewCommandError("git.command", fmt.Sprintf("failed to execute command: %v", err), err)
+			return nil, NewCommandError("execute", fmt.Sprintf("failed to execute command: %v", err), err)
 		}
 	}
 
 	// For non-zero exit codes, return the result with an error (original behavior)
 	if result.ExitCode != 0 {
-		return result, NewCommandError("git.command", "command exited with non-zero status", nil)
+		return result, NewCommandError("non-zero-exit", "command exited with non-zero status", nil)
 	}
 
 	return result, nil

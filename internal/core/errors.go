@@ -68,13 +68,15 @@ func (e *ValidationError) Unwrap() error { return nil }
 
 // Is maps the Operation identifier to one of the four NotFound sentinels.
 // ConflictError / ServiceError / direct NewValidationError do not map.
+// Uses HasPrefix so dot-concatenated Op values (e.g. "git.worktree.create")
+// still match the namespace sentinel.
 func (e *ValidationError) Is(target error) bool {
-	switch e.Op {
-	case "worktree.service", "git.worktree", "WorktreeService":
+	switch {
+	case e.Op == "worktree.service" || strings.HasPrefix(e.Op, "git.worktree") || e.Op == "WorktreeService":
 		return target == ErrWorktreeNotFound
-	case "project.service", "ProjectService":
+	case e.Op == "project.service" || e.Op == "ProjectService":
 		return target == ErrProjectNotFound
-	case "navigation.service", "NavigationService", "resolution", "Resolution":
+	case e.Op == "navigation.service" || e.Op == "NavigationService" || e.Op == "resolution" || e.Op == "Resolution":
 		return target == ErrResolutionNotFound
 	}
 	return false
@@ -175,14 +177,16 @@ func (e *OperationError) Unwrap() error { return e.Cause }
 
 // Is maps the operation identifier to a NotFound sentinel when
 // appropriate. The Cause chain is walked first, then the Op table.
+// Uses HasPrefix so dot-concatenated Op values (e.g. "git.repository.open"
+// or "git.worktree.create") still match the namespace sentinel.
 func (e *OperationError) Is(target error) bool {
 	if errors.Is(e.Cause, target) {
 		return true
 	}
-	switch e.Op {
-	case "git.repository", "GitRepository":
+	switch {
+	case strings.HasPrefix(e.Op, "git.repository") || e.Op == "GitRepository":
 		return target == ErrGitRepoNotFound
-	case "git.worktree", "GitWorktree":
+	case strings.HasPrefix(e.Op, "git.worktree") || e.Op == "GitWorktree":
 		return target == ErrWorktreeNotFound
 	}
 	return false

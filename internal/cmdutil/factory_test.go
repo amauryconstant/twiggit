@@ -10,6 +10,7 @@ import (
 
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
+	"twiggit/internal/git"
 )
 
 // TestNewFactory_ReturnsNonNilWithSystemIOStreams covers the happy
@@ -100,4 +101,90 @@ func TestFactory_InitTouchesEveryLazyField(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "config broken")
 	})
+}
+
+// TestFactory_PerRoleFieldsReturnSameCompositeInstance pins the
+// "per-role fields re-use the composite's cached concrete" contract
+// from core-git R11.S1 / git-client R2.S2. Every per-role lazy field
+// must return the same underlying *git.Client pointer as f.GitClient().
+func TestFactory_PerRoleFieldsReturnSameCompositeInstance(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+	require.NoError(t, f.Init())
+
+	gc, err := f.GitClient()
+	require.NoError(t, err)
+	require.NotNil(t, gc)
+
+	ro, err := f.RepoOpener()
+	require.NoError(t, err)
+	br, err := f.BranchReader()
+	require.NoError(t, err)
+	rr, err := f.RepositoryReader()
+	require.NoError(t, err)
+	rm, err := f.RemoteReader()
+	require.NoError(t, err)
+	wt, err := f.WorktreeWriter()
+	require.NoError(t, err)
+	bw, err := f.BranchWriter()
+	require.NoError(t, err)
+
+	assert.Same(t, gc, ro, "RepoOpener must return same instance as GitClient")
+	assert.Same(t, gc, br, "BranchReader must return same instance as GitClient")
+	assert.Same(t, gc, rr, "RepositoryReader must return same instance as GitClient")
+	assert.Same(t, gc, rm, "RemoteReader must return same instance as GitClient")
+	assert.Same(t, gc, wt, "WorktreeWriter must return same instance as GitClient")
+	assert.Same(t, gc, bw, "BranchWriter must return same instance as GitClient")
+}
+
+// TestFactory_InitTouchesEveryPerRoleField covers core-git R11.S3:
+// Init must invoke each per-role field so construction failures
+// surface during startup rather than at first lazy access.
+func TestFactory_InitTouchesEveryPerRoleField(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	sentinel := errors.New("branch reader init sentinel")
+	f.BranchReader = func() (core.BranchReader, error) { return nil, sentinel }
+
+	err := f.Init()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, sentinel,
+		"Init must touch BranchReader and surface its error via errors.Join")
+}
+
+// TestFactory_PerRoleErrorPropagation covers core-git R12.S1:
+// when the underlying GitClient returns a *git.ExternalError, the
+// per-role field must propagate the error unchanged — no wrap, no
+// log, no mutation. The single-handling rule requires the error to
+// reach the command layer once for the boundary formatter.
+func TestFactory_PerRoleErrorPropagation(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	sentinel := &git.ExternalError{
+		Tool:      "git",
+		Operation: "open",
+		Message:   "boom",
+		Cause:     nil,
+		OperationError: &core.OperationError{
+			Op:      "git.repository",
+			Message: "boom",
+		},
+	}
+	f.GitClient = func() (*git.Client, error) { return nil, sentinel }
+
+	_, err := f.RepoOpener()
+	require.Error(t, err)
+
+	var oe *core.OperationError
+	require.ErrorAs(t, err, &oe,
+		"errors.As must walk to embedded *core.OperationError")
+	assert.Equal(t, "git.repository", oe.Op,
+		"propagated error must preserve the original Op value")
+	assert.Same(t, sentinel, err,
+		"Factory must not wrap the GitClient error")
 }

@@ -172,7 +172,7 @@ func TestCLIClient_CreateWorktree_Failure(t *testing.T) {
 	require.Error(t, err)
 	var worktreeErr *core.OperationError
 	require.ErrorAs(t, err, &worktreeErr)
-	require.Equal(t, "git.worktree", worktreeErr.Op)
+	require.Equal(t, "git.worktree.create", worktreeErr.Op)
 }
 
 func TestCLIClient_DeleteWorktree(t *testing.T) {
@@ -480,4 +480,67 @@ func findWorktree(worktrees []core.WorktreeInfo, path string) *core.WorktreeInfo
 		}
 	}
 	return nil
+}
+
+// TestNewCLIClient_ReturnsWriteSideConcrete pins git-client R3.S1:
+// NewCLIClient returns a non-nil *CLIClient and the composite *Client
+// satisfies both write-side roles (WorktreeWriter, BranchWriter) at the
+// type level. Uses a typed-nil *Client for the interface check so no
+// real git binary is required.
+func TestNewCLIClient_ReturnsWriteSideConcrete(t *testing.T) {
+	t.Parallel()
+
+	executor := NewCommandExecutor(defaultCLITimeout)
+	client := NewCLIClient(executor)
+	require.NotNil(t, client)
+	assert.IsType(t, &CLIClient{}, client)
+
+	// Composite *Client must satisfy both write-side roles via embedded
+	// promotion of *cliClient. Typed-nil pointer is the cheapest way to
+	// ask "does this type implement this interface" without a real repo.
+	var composite *Client
+	assert.Implements(t, (*core.WorktreeWriter)(nil), composite)
+	assert.Implements(t, (*core.BranchWriter)(nil), composite)
+}
+
+// TestWriteSideFailure_OpIsGitWorktree pins git-client R4.S2 for
+// worktree ops: write-side failures must surface as *core.OperationError
+// with the dot-concatenated Op "git.worktree.<method>" so callers can
+// dispatch on the precise operation.
+func TestWriteSideFailure_OpIsGitWorktree(t *testing.T) {
+	t.Parallel()
+
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, mock.Anything, "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(&CommandResult{ExitCode: 1, Stderr: "fatal: not a git repository"}, nil)
+	client := NewCLIClient(mockExecutor)
+
+	err := client.CreateWorktree(context.Background(),
+		"/non/existent/path", "feature", "", "/tmp/wt-feature")
+	require.Error(t, err)
+
+	var oe *core.OperationError
+	require.ErrorAs(t, err, &oe)
+	assert.Equal(t, "git.worktree.create", oe.Op,
+		"worktree-op Op must follow \"git.worktree.<method>\" format")
+}
+
+// TestWriteSideFailure_OpIsGitBranch pins git-client R4.S2 for branch
+// ops: DeleteBranch failures must surface as *core.OperationError with
+// the dot-concatenated Op "git.branch.<method>". Closes the
+// pre-existing misclassification (branch ops were tagged git.worktree).
+func TestWriteSideFailure_OpIsGitBranch(t *testing.T) {
+	t.Parallel()
+
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, mock.Anything, "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(&CommandResult{ExitCode: 1, Stderr: "fatal: not a git repository"}, nil)
+	client := NewCLIClient(mockExecutor)
+
+	err := client.DeleteBranch(context.Background(),
+		"/non/existent/path", "feature")
+	require.Error(t, err)
+
+	var oe *core.OperationError
+	require.ErrorAs(t, err, &oe)
+	assert.Equal(t, "git.branch.delete", oe.Op,
+		"branch-op Op must follow \"git.branch.<method>\" format")
 }
