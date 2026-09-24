@@ -62,6 +62,20 @@ type Factory struct {
 	// here rather than as a confused git-construction failure.
 	GitClient func() (*git.Client, error)
 
+	// Per-role lazy fields. Each returns the cached *git.Client typed as
+	// the requested role (Go interface satisfaction via embedded promotion
+	// on the composite). Bodies route through f.GitClient() so the
+	// sync.OnceValues cache on the composite is the only cache; per-role
+	// fields are additive narrowing for future read-only or write-only
+	// commands. See core-git spec "Factory per-role fields are additive
+	// to composite".
+	RepoOpener       func() (core.RepositoryOpener, error)
+	BranchReader     func() (core.BranchReader, error)
+	RepositoryReader func() (core.RepositoryReader, error)
+	RemoteReader     func() (core.RemoteReader, error)
+	WorktreeWriter   func() (core.WorktreeWriter, error)
+	BranchWriter     func() (core.BranchWriter, error)
+
 	// Logger returns the slog channel used for TWIGGIT_DEBUG output.
 	// sync.OnceFunc-cached; first call wires a text handler that
 	// discards writes so debug logs do not leak into the user stream.
@@ -113,6 +127,49 @@ func NewFactory() *Factory {
 		return git.NewClient()
 	})
 
+	f.RepoOpener = func() (core.RepositoryOpener, error) {
+		c, err := f.GitClient()
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	f.BranchReader = func() (core.BranchReader, error) {
+		c, err := f.GitClient()
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	f.RepositoryReader = func() (core.RepositoryReader, error) {
+		c, err := f.GitClient()
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	f.RemoteReader = func() (core.RemoteReader, error) {
+		c, err := f.GitClient()
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	f.WorktreeWriter = func() (core.WorktreeWriter, error) {
+		c, err := f.GitClient()
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+	f.BranchWriter = func() (core.BranchWriter, error) {
+		c, err := f.GitClient()
+		if err != nil {
+			return nil, err
+		}
+		return c, nil
+	}
+
 	f.Logger = sync.OnceValue(func() *slog.Logger {
 		return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	})
@@ -136,6 +193,24 @@ func (f *Factory) Init() error {
 	}
 	if _, err := f.GitClient(); err != nil {
 		errs = append(errs, fmt.Errorf("cmdutil: git client init: %w", err))
+	}
+	if _, err := f.RepoOpener(); err != nil {
+		errs = append(errs, fmt.Errorf("cmdutil: repo opener init: %w", err))
+	}
+	if _, err := f.BranchReader(); err != nil {
+		errs = append(errs, fmt.Errorf("cmdutil: branch reader init: %w", err))
+	}
+	if _, err := f.RepositoryReader(); err != nil {
+		errs = append(errs, fmt.Errorf("cmdutil: repository reader init: %w", err))
+	}
+	if _, err := f.RemoteReader(); err != nil {
+		errs = append(errs, fmt.Errorf("cmdutil: remote reader init: %w", err))
+	}
+	if _, err := f.WorktreeWriter(); err != nil {
+		errs = append(errs, fmt.Errorf("cmdutil: worktree writer init: %w", err))
+	}
+	if _, err := f.BranchWriter(); err != nil {
+		errs = append(errs, fmt.Errorf("cmdutil: branch writer init: %w", err))
 	}
 	if f.Logger() == nil {
 		errs = append(errs, errors.New("cmdutil: logger init: returned nil"))

@@ -12,6 +12,8 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	lru "github.com/hashicorp/golang-lru/v2"
+
+	"twiggit/internal/core"
 )
 
 // defaultCacheSize is the size used when WithCacheSize is omitted.
@@ -126,3 +128,15 @@ func newClientWithCacheFactory(size int, enabled bool, factory goGitCacheFactory
 // compile-time guard so the lru import is used even if all callers go
 // through the public Client surface.
 var _ = lru.New[string, *git.Repository]
+
+// compile-time role satisfaction. The composite *Client embeds *reader and
+// *cliClient, so its method set is the union of both halves; these checks
+// guard all 14 role methods at once against drift on the unexported concretes.
+var (
+	_ core.RepositoryOpener = (*Client)(nil)
+	_ core.BranchReader     = (*Client)(nil)
+	_ core.RepositoryReader = (*Client)(nil)
+	_ core.RemoteReader     = (*Client)(nil)
+	_ core.WorktreeWriter   = (*Client)(nil)
+	_ core.BranchWriter     = (*Client)(nil)
+)

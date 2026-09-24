@@ -325,3 +325,27 @@ func setupTestRepo(t *testing.T, tempDir string) string {
 
 	return repoPath
 }
+
+// _DriftCheck is a compile-time sentinel: it embeds every role declared in
+// internal/core/git.go against the composite *Client. Renaming or removing
+// any role method on *reader or *cliClient fails the build with a
+// type-mismatch error referencing the affected role. The struct literal
+// below assigns (*Client)(nil) to every embedded interface field, forcing
+// the build to enforce the role surface every time.
+type _DriftCheck struct {
+	core.RepositoryOpener
+	core.BranchReader
+	core.RepositoryReader
+	core.RemoteReader
+	core.WorktreeWriter
+	core.BranchWriter
+}
+
+var _ = _DriftCheck{
+	RepositoryOpener: (*Client)(nil),
+	BranchReader:     (*Client)(nil),
+	RepositoryReader: (*Client)(nil),
+	RemoteReader:     (*Client)(nil),
+	WorktreeWriter:   (*Client)(nil),
+	BranchWriter:     (*Client)(nil),
+}
