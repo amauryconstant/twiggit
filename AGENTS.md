@@ -4,7 +4,7 @@ Pragmatic git worktree management tool with focus on rebase workflows.
 
 ## Architecture
 
-Tier 2 layout (`golang-cli-architecture`): one functional core, one composition root,
+Tier 2 layout (`golang-cli`): one functional core, one composition root,
 and I/O adapters grouped by resource. The five-layer convention that pre-dates
 `cli-functional-core-shell` is fully retired; the old `internal/{application,service,infrastructure,domain}/`
 directories no longer exist.

@@ -27,7 +27,7 @@ The `iostreams.IOStreams` type SHALL be a struct exposing `In io.ReadCloser`, `O
 
 ### Requirement: IsInteractive requires both stdout and stdin TTY
 
-`IOStreams.IsInteractive() bool` SHALL return `true` only when both stdout AND stdin are connected to a terminal. When either is piped or redirected, `IsInteractive()` SHALL return `false`. This matches the destruct-operation flow rule from `golang-cli-architecture`: prompt only when interactive; otherwise require `--force` or `--yes`.
+`IOStreams.IsInteractive() bool` SHALL return `true` only when both stdout AND stdin are connected to a terminal. When either is piped or redirected, `IsInteractive()` SHALL return `false`. This matches the destruct-operation flow rule from `golang-cli`: prompt only when interactive; otherwise require `--force` or `--yes`.
 
 #### Scenario: Interactive shell
 

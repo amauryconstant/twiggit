@@ -2,7 +2,6 @@
 logs/
 trash/
 backups/
-skills/golang-cli-architecture/
 skills/golang-spf13-cobra/
 skills/golang-stretchr-testify/
 skills/golang-testing/

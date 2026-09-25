@@ -69,7 +69,7 @@ When a command exceeds `HookTimeout` seconds, the system SHALL kill the process,
 
 ### Requirement: Compile-time interface check
 
-The runner SHALL satisfy `cmdutil.HookRunner` via `var _ cmdutil.HookRunner = (*HookRunnerImpl)(nil)`. The `cmdutil.HookRunner` interface is declared in `internal/cmdutil/hook_runner_iface.go` as the consumer-side interface (per the `golang-cli-architecture` rule "Interfaces where consumed"). The previous `application.HookRunner` interface is removed.
+The runner SHALL satisfy `cmdutil.HookRunner` via `var _ cmdutil.HookRunner = (*HookRunnerImpl)(nil)`. The `cmdutil.HookRunner` interface is declared in `internal/cmdutil/hook_runner_iface.go` as the consumer-side interface (per the `golang-cli` rule "Interfaces where consumed"). The previous `application.HookRunner` interface is removed.
 
 #### Scenario: Compile-time satisfaction check compiles
 

@@ -1,28 +1,6 @@
 {
   "version": 1,
   "entries": {
-    "golang-cli-architecture": {
-      "source": "/home/amaury/.local/share/skillshare/skills/golang-cli-architecture",
-      "type": "local",
-      "installed_at": "2026-09-19T20:09:39.577898646+02:00",
-      "file_hashes": {
-        "SKILL.md": "sha256:ff953c00c71f9eaa02898460fa61e704f055162bd51cf7590b903cd9dd401af5",
-        "references/01-architecture.md": "sha256:da0344298c1dca3db1ad6b114edee6aa85522e3e6bf404123e95834b77834c25",
-        "references/02-command-ux.md": "sha256:d30d1c26ff60485b5603eb909913f0fd3f72cd8a4f1e84f41304bf9db80ff785",
-        "references/03-input-config.md": "sha256:53f89b4128d425681e76b5ec81f6d2d0739d81c72e88e4bc331270269548a239",
-        "references/04-output.md": "sha256:585356d4b16364f24550b19d9651bf7ef26a84ef4dfecde921f75d5e9b84d95a",
-        "references/05-errors.md": "sha256:8c7307632cd62d6d018a04b7b7760cfb587df2d175fd010cdd4fd59db8f75bbf",
-        "references/06-concurrency.md": "sha256:94bc4f7d2ae8d1ceef7c3e286688e1f349c7d2a210ae56de9eef14cd44d36a30",
-        "references/07-testing.md": "sha256:92a11ed0d38f1fa1e30812dee8cb4577d7e5c76fda92881ad38f77fd52704dd8",
-        "references/08-completion.md": "sha256:f6a350fc1df77c540fd51bf455f1173586597de9fa0e6bac435c21a5aab3f201",
-        "references/09-logging.md": "sha256:3d34dd7f38199d727b732a50710b9029d400cd2184758117631e0a30d52e1926",
-        "references/10-state.md": "sha256:ac0f98d7884ec71ad1262cf36d06642fe7371263e458cdaae5b605f698c20ec1",
-        "references/11-plugins.md": "sha256:eaa12ffc83beed558583bb9c5872a26f8a5af0464542a386b58eada1a43e17cb",
-        "references/12-tui.md": "sha256:f675fc0237cd1689dd749e71cc0da67d9812444ea42f2de044e7ec34b0434447",
-        "references/13-versioning.md": "sha256:fd234f89407d6c2aae19f5a5bb5801d366560fda574f3643b56d4f7a4c4ae302",
-        "references/14-libraries.md": "sha256:909a6d26e4533c68520a73b9b56e5ebb965d759b0fed166b84fcaf17de1a425f"
-      }
-    },
     "golang-code-style": {
       "source": "/home/amaury/.local/share/skillshare/skills/golang-code-style",
       "type": "local",

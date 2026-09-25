@@ -1,6 +1,5 @@
 {
   "managed": {
-    "golang-cli-architecture": "6a39e496dda9fa03483ffa0040b8512415329f9257e74de6e1d38e3e9f9a2a25",
     "golang-code-style": "e20a5a35b5a4406aebdd5cef6d5f64715c62e0fa25f5af6e4972208df08e5378",
     "golang-continuous-integration": "23de494922a1757ac371dd576835bbe5ae67bc17000564e062623f544506a87f",
     "golang-dependency-management": "6ddafcb1acfad152384d7b446ab4eb250693a0a7fccfde9b9437a1500db7f1e5",
@@ -22,7 +21,6 @@
     "golang-troubleshooting": "f4039cd4a5a1d38be8f3855e66feaeedf0bdd96fa56d419ee3d15cf32eccbda7"
   },
   "mtimes": {
-    "golang-cli-architecture": 1789841379403821754,
     "golang-code-style": 1789841380444964709,
     "golang-continuous-integration": 1789841380150279928,
     "golang-dependency-management": 1789841379997682879,
