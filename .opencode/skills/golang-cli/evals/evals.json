@@ -1,0 +1,1760 @@
+[
+  {
+    "id": 1,
+    "name": "minimal-main-and-execute",
+    "description": "main() only exits; run() owns signals, formatting and the exit code; the command tree is built by a constructor",
+    "prompt": "Create the entry point for a Go CLI application called 'deploy' using Cobra. The app should have a root command and a 'push' subcommand. Write main.go and root.go.",
+    "trap": "Model writes main() { if err := rootCmd.Execute(); err != nil { os.Exit(1) } } with a package-level rootCmd and AddCommand in init(): no signal context, deferred cleanup skipped by os.Exit, shared state between tests.",
+    "assertions": [
+      {
+        "id": "1.1",
+        "text": "main() only calls os.Exit(run()) (or equivalent); all deferred cleanup lives in a run() function that returns the exit code"
+      },
+      {
+        "id": "1.2",
+        "text": "run() creates the root context with signal.NotifyContext (os.Interrupt, syscall.SIGTERM) and calls ExecuteContext"
+      },
+      {
+        "id": "1.3",
+        "text": "The root command sets SilenceUsage: true and SilenceErrors: true, and the entry point prints each error exactly once"
+      },
+      {
+        "id": "1.4",
+        "text": "The command tree is built by a constructor function (e.g. NewRootCommand) that adds push via AddCommand — no package-level command variables and no init() registration"
+      },
+      {
+        "id": "1.5",
+        "text": "push's RunE returns errors; the exit code is chosen in run() from the error (usage errors 2, other failures 1)"
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "config-layering",
+    "description": "Config loads defaults -> optional file -> prefixed env with koanf; flags win at the command",
+    "prompt": "I'm building a Go CLI server tool with Cobra. It needs a --port flag (default 3000) that can also be set via the MYSERVER_PORT env var or a config file at ~/.myserver.yaml. Write the configuration setup code.",
+    "trap": "Model reaches for viper with BindPFlag/AutomaticEnv (key lowercasing, global state) and crashes or errors when the config file is absent.",
+    "assertions": [
+      {
+        "id": "2.1",
+        "text": "Uses knadh/koanf (not viper) for a new project, loading providers in an explicit order: defaults, then file, then env"
+      },
+      {
+        "id": "2.2",
+        "text": "A missing config file is not an error: the loader ignores fs.ErrNotExist and falls back to defaults, while other read/parse errors name the file path"
+      },
+      {
+        "id": "2.3",
+        "text": "Env vars are read with the MYSERVER_ prefix and mapped to config keys by trimming the prefix and lowercasing"
+      },
+      {
+        "id": "2.4",
+        "text": "The --port flag wins only when explicitly set (cmd.Flags().Changed(\"port\")) or via koanf's posflag provider loaded last"
+      },
+      {
+        "id": "2.5",
+        "text": "Config loading lives in its own package (e.g. internal/config) returning a typed config struct, loaded once per invocation"
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "lazy-config-in-factory",
+    "description": "Shared config is a lazy Factory field cached with sync.OnceValues instead of eager PersistentPreRunE loading",
+    "prompt": "My Go CLI has a root command and three subcommands (serve, migrate, status). All of them need access to a database DSN from config. Where should I initialize the configuration so all subcommands have access? Write the code.",
+    "trap": "Model loads config eagerly in the root's PersistentPreRunE or cobra.OnInitialize into a package global, so every command (including version/completion/help) fails when the config file is broken, and a child PersistentPreRunE silently disables it.",
+    "assertions": [
+      {
+        "id": "3.1",
+        "text": "A Factory struct created once in main exposes config as a function field (e.g. Config func() (*AppConfig, error)) passed to each command constructor"
+      },
+      {
+        "id": "3.2",
+        "text": "The config function is wrapped in sync.OnceValues (or sync.Once) so the file is read at most once per invocation"
+      },
+      {
+        "id": "3.3",
+        "text": "Config is loaded only when a command calls it inside RunE, so commands that do not need it (version, completion, help) still run with a broken config file"
+      },
+      {
+        "id": "3.4",
+        "text": "Commands call the config field inside RunE and return its error, which the entry point formats once"
+      },
+      {
+        "id": "3.5",
+        "text": "Commands pass the DSN value (not the whole Factory or config loader) into the code that opens the database"
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "stdout-vs-stderr-separation",
+    "description": "Data goes to IOStreams.Out, everything else to IOStreams.ErrOut; errors are returned",
+    "prompt": "Write a Go CLI command 'list-users' using Cobra that fetches users from a database and prints them. It should log progress messages, handle errors, and support being piped to other commands (e.g., `myapp list-users | grep admin`). Write the RunE function.",
+    "trap": "Model prints progress with fmt.Println or log to stdout, corrupting the pipe, and writes through os.Stdout so tests cannot capture output.",
+    "assertions": [
+      {
+        "id": "4.1",
+        "text": "The user list is written to an injected output stream (IOStreams.Out / opts.IO.Out or cmd.OutOrStdout()), never os.Stdout or fmt.Println"
+      },
+      {
+        "id": "4.2",
+        "text": "Progress messages go to stderr through the injected error stream (e.g. opts.IO.ErrOut or a verbose helper), not stdout"
+      },
+      {
+        "id": "4.3",
+        "text": "Progress output is gated behind a verbose flag or TTY check so piped output stays clean by default"
+      },
+      {
+        "id": "4.4",
+        "text": "RunE returns the (wrapped) error instead of printing it and calling os.Exit or log.Fatal"
+      },
+      {
+        "id": "4.5",
+        "text": "Logic lives in a run function taking an options struct with the streams and a lazily obtained DB client, so it is testable without Cobra"
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "version-ldflags-injection",
+    "description": "Version vars injected by full-path ldflags with a debug.ReadBuildInfo fallback and machine-readable output",
+    "prompt": "Add a 'version' command to my Go CLI app that shows the version, git commit, and build date. How should I handle the version string?",
+    "trap": "Model hardcodes a const version or uses a short -X path (main.version for a package that is not main), and prints 'dev' for go install builds.",
+    "assertions": [
+      {
+        "id": "5.1",
+        "text": "Version, Commit and Date are package-level var (not const) in a dedicated package (e.g. internal/version) with placeholder defaults"
+      },
+      {
+        "id": "5.2",
+        "text": "The -ldflags '-X ...' example uses the full import path of the package (e.g. github.com/you/myapp/internal/version.Version)"
+      },
+      {
+        "id": "5.3",
+        "text": "Falls back to runtime/debug.ReadBuildInfo() (module version, vcs.revision, vcs.time) when ldflags were not set, e.g. go install builds"
+      },
+      {
+        "id": "5.4",
+        "text": "The version command supports machine-readable output (--output json) with version, commit, date and Go version"
+      },
+      {
+        "id": "5.5",
+        "text": "The version output includes the Go runtime version (runtime.Version()) and is written to the injected stdout stream"
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "name": "exit-code-conventions",
+    "description": "0/1/2/130 contract: only usage errors exit 2, type carries meaning, one mapping in main",
+    "prompt": "My Go CLI tool needs to report different exit codes for different failure types: invalid arguments, missing config file, network timeout, and successful completion. Write the error handling and exit code logic in main.go.",
+    "trap": "Model invents codes 3, 4, 5 per failure (no convention, rarely tested by scripts) and stores exit codes on error types or calls os.Exit inside handlers.",
+    "assertions": [
+      {
+        "id": "6.1",
+        "text": "Invalid arguments map to exit 2; success is 0; runtime failures (network timeout) map to 1"
+      },
+      {
+        "id": "6.2",
+        "text": "Error types carry meaning (usage, not-found, operation) and a single function (e.g. ExitCodeFor) maps them to codes with errors.As"
+      },
+      {
+        "id": "6.3",
+        "text": "If distinct codes beyond 0/1/2 are offered for automation, they use the sysexits.h range 64-78 rather than arbitrary 3-6"
+      },
+      {
+        "id": "6.4",
+        "text": "Explains that a missing config file falls back to defaults rather than being a failure (only unreadable/invalid config fails)"
+      },
+      {
+        "id": "6.5",
+        "text": "os.Exit is called only in main(), with run() returning the code so deferred cleanup runs; interrupts (SIGINT) exit 130"
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "name": "signal-handling-with-context",
+    "description": "signal.NotifyContext drives graceful shutdown and interrupted runs exit 130",
+    "prompt": "My Go CLI has a long-running 'serve' command that starts an HTTP server. I need graceful shutdown when the user presses Ctrl+C. Write the signal handling code.",
+    "trap": "Model uses a raw signal channel inside the command, forgets SIGTERM or the shutdown timeout, and exits 0 or 1 after an interrupt.",
+    "assertions": [
+      {
+        "id": "7.1",
+        "text": "Uses signal.NotifyContext (os.Interrupt, syscall.SIGTERM) at the entry point and passes the context down via ExecuteContext / cmd.Context()"
+      },
+      {
+        "id": "7.2",
+        "text": "Creates a bounded shutdown context (e.g. 10-30s) and calls srv.Shutdown(ctx), not srv.Close()"
+      },
+      {
+        "id": "7.3",
+        "text": "Treats http.ErrServerClosed as normal shutdown, distinct from real server errors"
+      },
+      {
+        "id": "7.4",
+        "text": "An interrupted run exits 130 (128 + SIGINT) without printing 'context canceled' as an error"
+      },
+      {
+        "id": "7.5",
+        "text": "Calls stop() after the first signal so a second Ctrl-C kills the process immediately (escape hatch for stuck shutdown)"
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "name": "flag-binding-and-constraints",
+    "description": "Required input checked in runX (prompt or usage error), enum errors exit 2, persistent -v",
+    "prompt": "My Go CLI 'deploy' command needs these flags:\n- --env (required, must be one of: dev, staging, prod)\n- --tag (required, the docker image tag)\n- --dry-run and --force (mutually exclusive)\n- --verbose (available on all commands, not just deploy)\n\nWrite the flag setup code using Cobra.",
+    "trap": "Model relies on MarkFlagRequired, whose error is untyped (exits 1 like a runtime failure) and leaves no room for an interactive fallback.",
+    "assertions": [
+      {
+        "id": "8.1",
+        "text": "--verbose is a persistent flag on the root command"
+      },
+      {
+        "id": "8.2",
+        "text": "Required --env/--tag are checked in the run function, returning a typed usage error (exit 2) when missing without an interactive TTY, instead of MarkFlagRequired"
+      },
+      {
+        "id": "8.3",
+        "text": "An invalid --env value returns a typed usage error (exit 2) listing the allowed values"
+      },
+      {
+        "id": "8.4",
+        "text": "--dry-run together with --force is rejected in the run function with a typed usage error (exit 2), since Cobra's flag-group errors are untyped"
+      },
+      {
+        "id": "8.5",
+        "text": "--env registers a completion function suggesting dev, staging, prod with ShellCompDirectiveNoFileComp"
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "name": "argument-validation",
+    "description": "Cobra validators wrapped so argument errors become usage errors (exit 2)",
+    "prompt": "I have three Cobra commands:\n1. 'status' — takes no arguments\n2. 'deploy' — takes exactly one argument (the service name)\n3. 'scale' — takes 2-3 arguments (service, replica count, optional region)\n\nHow should I validate the arguments for each command?",
+    "trap": "Model uses bare cobra validators (or manual len checks) whose errors are untyped, so wrong argument counts exit 1 like runtime failures.",
+    "assertions": [
+      {
+        "id": "9.1",
+        "text": "Uses cobra.NoArgs, cobra.ExactArgs(1) and cobra.RangeArgs(2, 3) on the Args field, not manual len(args) checks in RunE"
+      },
+      {
+        "id": "9.2",
+        "text": "Each validator is wrapped (e.g. cmdutil.UsageArgs(cobra.ExactArgs(1))) so its error becomes a typed usage error"
+      },
+      {
+        "id": "9.3",
+        "text": "Wrong argument counts exit 2, distinct from runtime failures (1)"
+      },
+      {
+        "id": "9.4",
+        "text": "The usage error message points to '<command> --help'"
+      },
+      {
+        "id": "9.5",
+        "text": "Semantic checks on argument values (replica count is a positive integer) happen in the run function or core, returning a validation error (exit 1)"
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "name": "cli-testing-pattern",
+    "description": "runF parse test plus runX table test with test IOStreams",
+    "prompt": "Write tests for a Cobra CLI command 'greet' that takes a --name flag and prints a greeting. Test the default behavior and a custom name. Show the test helper and test function.",
+    "trap": "Model only executes the whole Cobra command with SetOut buffers (or os/exec), coupling every test to flag parsing, and never tests the run logic directly.",
+    "assertions": [
+      {
+        "id": "10.1",
+        "text": "The command constructor accepts a runF func(*GreetOptions) error test seam; a parse-level test captures the options and asserts on parsed flag values"
+      },
+      {
+        "id": "10.2",
+        "text": "A run-level test calls runGreet(opts) directly with an options struct holding test streams (buffers)"
+      },
+      {
+        "id": "10.3",
+        "text": "Tests are table-driven with at least the default and custom-name cases"
+      },
+      {
+        "id": "10.4",
+        "text": "Output is captured from injected buffers (test IOStreams), not by redirecting os.Stdout or running the binary"
+      },
+      {
+        "id": "10.5",
+        "text": "Tests assert both the output string and the returned error"
+      }
+    ]
+  },
+  {
+    "id": 11,
+    "name": "machine-readable-output-format",
+    "description": "--output json|table|plain resolved before work, usage error on unknown format, Tabular adapter in cmd/",
+    "prompt": "My Go CLI command 'list-services' shows running services. I need it to support both human-readable and machine-parseable output for scripting. What's the best approach?",
+    "trap": "Model adds a --json boolean, validates the format only at print time after doing the work, and puts presentation methods on domain types.",
+    "assertions": [
+      {
+        "id": "11.1",
+        "text": "Offers an --output/-o flag with json, table and plain values (not a --json boolean)"
+      },
+      {
+        "id": "11.2",
+        "text": "The formatter is resolved from the flag before any work is done, so a bad value fails fast"
+      },
+      {
+        "id": "11.3",
+        "text": "An unknown format returns a typed usage error (exit 2)"
+      },
+      {
+        "id": "11.4",
+        "text": "Table/plain rendering uses an adapter in the command layer (Header()/Rows()) so domain types stay free of presentation; table uses text/tabwriter"
+      },
+      {
+        "id": "11.5",
+        "text": "plain emits headerless TSV for cut/awk, and JSON is written to the injected stdout writer"
+      }
+    ]
+  },
+  {
+    "id": 12,
+    "name": "shell-completion-setup",
+    "description": "Cobra's default completion command plus dynamic completion funcs in cmd/",
+    "prompt": "Add shell completion support to my Go CLI built with Cobra. I want users to be able to run 'myapp completion bash' to generate a completion script. Also, the --env flag should suggest 'dev', 'staging', 'prod' during tab completion.",
+    "trap": "Model hand-writes a completion command with deprecated cobra.ExactValidArgs, or writes diagnostics to stdout inside completion funcs.",
+    "assertions": [
+      {
+        "id": "12.1",
+        "text": "Relies on Cobra's built-in default completion command (or its Gen*Completion generators) rather than custom scripts"
+      },
+      {
+        "id": "12.2",
+        "text": "Uses RegisterFlagCompletionFunc for --env returning dev, staging, prod"
+      },
+      {
+        "id": "12.3",
+        "text": "Returns cobra.ShellCompDirectiveNoFileComp for values that are not file paths"
+      },
+      {
+        "id": "12.4",
+        "text": "Completion functions print nothing to stdout except candidates and never prompt (diagnostics only under a debug env var)"
+      },
+      {
+        "id": "12.5",
+        "text": "Documents installation via eval \"$(myapp completion zsh)\" (runtime generation keeps completions in sync with the binary)"
+      }
+    ]
+  },
+  {
+    "id": 13,
+    "name": "tier1-small-tool",
+    "description": "A single-job tool uses the Tier 1 appEnv + stdlib flag pattern, not Cobra",
+    "prompt": "Write a small Go command-line tool that reads a list of URLs from a file and prints the HTTP status code of each. It needs a --timeout flag and a --json switch. Keep it production quality.",
+    "trap": "Model scaffolds Cobra with a cmd/ tree, or uses package-level flag variables with flag.Parse() in main, for a one-job tool.",
+    "assertions": [
+      {
+        "id": "13.1",
+        "text": "Uses stdlib flag (flag.NewFlagSet with ContinueOnError) or peterbourgon/ff — no Cobra and no cmd/ directory"
+      },
+      {
+        "id": "13.2",
+        "text": "Parsed flags and the output writers live in a struct (appEnv-style), not package-level variables"
+      },
+      {
+        "id": "13.3",
+        "text": "main() is a one-liner delegating to run(args, stdout, stderr) that returns the exit code"
+      },
+      {
+        "id": "13.4",
+        "text": "Flag parse errors return exit code 2 (help returns 0) and runtime failures return 1"
+      },
+      {
+        "id": "13.5",
+        "text": "run() takes io.Writer parameters so tests call it with buffers"
+      }
+    ]
+  },
+  {
+    "id": 14,
+    "name": "tier2-layout",
+    "description": "8-command tool uses root main.go, flat cmd/, internal/{core,config,output,iostreams,cmdutil,adapter}",
+    "prompt": "I'm starting a Go CLI for managing our internal feature-flag service: about 8 commands (login, list, get, create, update, delete, enable, disable), a shared config file, and an HTTP API client. Propose the project layout and explain where each piece of code goes.",
+    "trap": "Model uses cmd/<app>/main.go plus pkg/, or horizontal handlers/services/models layers.",
+    "assertions": [
+      {
+        "id": "14.1",
+        "text": "main.go at the module root and one file per command in a flat cmd/ directory (not cmd/<app>/main.go)"
+      },
+      {
+        "id": "14.2",
+        "text": "A pure internal/core package holds domain types, validation and semantic errors with no I/O"
+      },
+      {
+        "id": "14.3",
+        "text": "The HTTP client is an adapter package under internal/ (e.g. internal/api) that returns core types"
+      },
+      {
+        "id": "14.4",
+        "text": "Separate internal packages for config loading and for terminal concerns (output formatting, IOStreams)"
+      },
+      {
+        "id": "14.5",
+        "text": "A Factory (e.g. internal/cmdutil) wires shared dependencies into commands; no handlers/services/models layering"
+      }
+    ]
+  },
+  {
+    "id": 15,
+    "name": "tier3-vertical-slices",
+    "description": "26 commands across domains become cmd/<group>/<verb>/ vertical slices",
+    "prompt": "Our Go CLI (Cobra) has grown to 26 commands in a flat cmd/ directory: deploy-create, deploy-rollback, deploy-list, auth-login, auth-logout, auth-status, and so on across 5 domains, with three teams contributing. How should we restructure it?",
+    "trap": "Model keeps hyphenated flat names or proposes horizontal layers (handlers/, services/, models/) so each new command touches several packages.",
+    "assertions": [
+      {
+        "id": "15.1",
+        "text": "Noun-first command groups (myapp deploy create) replace hyphenated flat names"
+      },
+      {
+        "id": "15.2",
+        "text": "One package per command under cmd/<group>/<verb>/ holding its options, run function and tests"
+      },
+      {
+        "id": "15.3",
+        "text": "Group commands only aggregate subcommands and show help when run without one, rejecting unknown subcommands as usage errors"
+      },
+      {
+        "id": "15.4",
+        "text": "Shared concerns stay in internal/ packages (cmdutil, config, output, iostreams) imported by the slices"
+      },
+      {
+        "id": "15.5",
+        "text": "Adds a table-driven exit-code registry and/or a lazy IOStreams field on the Factory as Tier 3 additions"
+      }
+    ]
+  },
+  {
+    "id": 16,
+    "name": "package-extraction-criteria",
+    "description": "Extract packages for I/O boundaries and 5+ related things, not for two helpers",
+    "prompt": "In my Go CLI I have two small helpers, slugify(name) and truncate(s, n), used only by the 'create' command. A teammate wants to move them to a new internal/strutil package 'for reuse'. Also, we have ~7 functions that shell out to docker spread across 4 commands. What would you restructure?",
+    "trap": "Model agrees to the speculative strutil package and leaves docker calls scattered.",
+    "assertions": [
+      {
+        "id": "16.1",
+        "text": "Recommends keeping slugify/truncate beside their only caller"
+      },
+      {
+        "id": "16.2",
+        "text": "Extracts the docker calls into one adapter package (e.g. internal/docker)"
+      },
+      {
+        "id": "16.3",
+        "text": "The docker adapter returns typed values (core types) rather than raw command output"
+      },
+      {
+        "id": "16.4",
+        "text": "Commands reach the adapter through a small consumer-side interface or func field so tests use fakes"
+      },
+      {
+        "id": "16.5",
+        "text": "Justifies extraction by criteria (5+ related functions, an I/O boundary, a distinct external dependency) rather than hypothetical reuse"
+      }
+    ]
+  },
+  {
+    "id": 17,
+    "name": "value-object-extraction",
+    "description": "Duplicated validation becomes a core value object validated on construction",
+    "prompt": "Three of my Go CLI commands (create, rename, checkout) each take a branch name and each has its own copy of the checks: not empty, no spaces, no '..', not 'HEAD'. The copies have drifted. Clean this up.",
+    "trap": "Model extracts a validateBranch(string) error helper and keeps passing raw strings, so unvalidated values still flow through.",
+    "assertions": [
+      {
+        "id": "17.1",
+        "text": "Introduces a type (e.g. BranchName) with a constructor NewBranchName(raw) (BranchName, error) that validates on construction"
+      },
+      {
+        "id": "17.2",
+        "text": "The type lives in the pure core package with no I/O imports"
+      },
+      {
+        "id": "17.3",
+        "text": "Commands call the constructor once while parsing input and pass the typed value on"
+      },
+      {
+        "id": "17.4",
+        "text": "Failures return a typed validation error carrying field, value, message (and optionally suggestions)"
+      },
+      {
+        "id": "17.5",
+        "text": "Rules are covered by table-driven tests over values, with no mocks"
+      }
+    ]
+  },
+  {
+    "id": 18,
+    "name": "command-pattern",
+    "description": "Options struct + NewCmdX(f, runF) + runX with lazy, consumer-side dependencies",
+    "prompt": "Add a 'deploy' command to my Cobra CLI. It takes a service name argument and --env/--tag flags, calls our deploy API client, and prints the resulting deployment ID. Show the command code and how it would be tested.",
+    "trap": "Model puts all logic inside an anonymous RunE closure using package-level clients, testable only end to end.",
+    "assertions": [
+      {
+        "id": "18.1",
+        "text": "An options struct holds the IO streams, context, the API client dependency and parsed flags/args"
+      },
+      {
+        "id": "18.2",
+        "text": "Constructor NewCmdDeploy(f, runF func(*DeployOptions) error) returns the command; RunE calls runF when non-nil, else runDeploy"
+      },
+      {
+        "id": "18.3",
+        "text": "The logic lives in runDeploy(opts), testable without Cobra"
+      },
+      {
+        "id": "18.4",
+        "text": "The client is obtained lazily (a func field filled from the Factory inside RunE), not built when the command is defined"
+      },
+      {
+        "id": "18.5",
+        "text": "The client is typed as a small interface declared in the command file (consumer side) so tests pass a fake"
+      }
+    ]
+  },
+  {
+    "id": 19,
+    "name": "factory-lazy-dependencies",
+    "description": "One Factory with lazy sync.OnceValues fields; commands pass plain values on; no DI framework",
+    "prompt": "Several of my Cobra commands need an HTTP client, the config, and a logger. Right now each command builds them itself. I'd like one place that provides these dependencies. How should I structure it?",
+    "trap": "Model proposes a DI container (wire/fx/samber/do) or a global registry, builds everything eagerly at startup, or passes the container into business logic.",
+    "assertions": [
+      {
+        "id": "19.1",
+        "text": "A Factory struct created once in main and passed to each command constructor"
+      },
+      {
+        "id": "19.2",
+        "text": "Dependencies are function fields, built only when a command calls them"
+      },
+      {
+        "id": "19.3",
+        "text": "sync.OnceValues (or sync.Once) caches each field, so chained dependencies (client needs config) read config once"
+      },
+      {
+        "id": "19.4",
+        "text": "Commands extract concrete values in RunE and pass plain values to business logic; the core never imports the Factory"
+      },
+      {
+        "id": "19.5",
+        "text": "Uses manual wiring rather than a DI framework (wire, fx, dig, samber/do)"
+      }
+    ]
+  },
+  {
+    "id": 20,
+    "name": "iostreams-tty-captured-once",
+    "description": "Terminal state lives in an IOStreams struct detected once, with test constructors for both paths",
+    "prompt": "My CLI decides whether to print colors and tables by calling term.IsTerminal(int(os.Stdout.Fd())) in each command. Some commands also check os.Stdin before prompting. Tests keep printing ANSI codes and I can't test the interactive branch. Fix the design.",
+    "trap": "Model wraps the check in a helper function that still reads os.Stdout, leaving tests unable to control it.",
+    "assertions": [
+      {
+        "id": "20.1",
+        "text": "Introduces a struct holding In, Out and ErrOut streams shared by all commands"
+      },
+      {
+        "id": "20.2",
+        "text": "TTY state is detected once at construction and stored in fields"
+      },
+      {
+        "id": "20.3",
+        "text": "Exposes IsStdoutTTY() and IsInteractive() (stdin and stdout both terminals) methods that commands call"
+      },
+      {
+        "id": "20.4",
+        "text": "A test constructor returns buffers with non-TTY, colorless defaults"
+      },
+      {
+        "id": "20.5",
+        "text": "A test helper (e.g. SetTTY(stdout, stdin bool)) switches to the interactive path so both branches are tested"
+      }
+    ]
+  },
+  {
+    "id": 21,
+    "name": "auth-hook-scope",
+    "description": "Adding a global auth check to a Cobra tree that already has root and group PersistentPreRunE hooks",
+    "prompt": "Every command of my Cobra CLI 'myapp' must require a logged-in token (loaded from the OS keyring). The root command already has a PersistentPreRunE that sets up logging, and the 'admin' command group has its own PersistentPreRunE that checks for an admin role. Add the auth check.",
+    "trap": "A naive check on the root blocks version, completion and 'auth login', and admin's own hook shadows the root's so admin commands lose both logging and auth.",
+    "assertions": [
+      {
+        "id": "21.1",
+        "text": "The auth check also runs for admin subcommands (admin's hook calls the parent's hook, or cobra.EnableTraverseRunHooks is set)"
+      },
+      {
+        "id": "21.2",
+        "text": "version, completion (including Cobra's hidden __complete) and 'auth login' skip the check, via an annotation or an explicit skip list"
+      },
+      {
+        "id": "21.3",
+        "text": "A missing token returns an error carrying a next step (e.g. \"run 'myapp auth login'\"); the hook never calls os.Exit"
+      },
+      {
+        "id": "21.4",
+        "text": "Logging setup still runs, before the auth check"
+      },
+      {
+        "id": "21.5",
+        "text": "A missing token exits 1 (or a sysexits code such as 77), never 2"
+      }
+    ]
+  },
+  {
+    "id": 22,
+    "name": "misuse-exits-2",
+    "description": "Unknown commands, bad flags and wrong args become usage errors exiting 2",
+    "prompt": "When users mistype a subcommand in my Cobra CLI (e.g. `myapp worktree crete`), it prints the help and exits 0, so our CI scripts think it succeeded. Mistyped flags exit 1, same as a real failure. Fix this.",
+    "trap": "Model only adds os.Exit(1) for unknown commands, leaving misuse indistinguishable from runtime failures.",
+    "assertions": [
+      {
+        "id": "22.1",
+        "text": "Misuse (unknown command, unknown flag, bad args) exits 2; runtime failures exit 1"
+      },
+      {
+        "id": "22.2",
+        "text": "root.SetFlagErrorFunc converts flag errors into a typed usage error, inherited by subcommands"
+      },
+      {
+        "id": "22.3",
+        "text": "Root and group commands get an Args validator that turns an unknown subcommand into a typed usage error, plus a RunE that shows help when none is given"
+      },
+      {
+        "id": "22.4",
+        "text": "Positional-argument validators are wrapped so their errors become usage errors"
+      },
+      {
+        "id": "22.5",
+        "text": "Keeps 'Did you mean' suggestions (cmd.SuggestionsFor) in the unknown-command message"
+      },
+      {
+        "id": "22.6",
+        "text": "The code mapping happens once at the entry point via errors.As on the usage error type"
+      }
+    ]
+  },
+  {
+    "id": 23,
+    "name": "factory-bloat",
+    "description": "A bloated Factory moves rarely used dependencies into their commands",
+    "prompt": "Our CLI's Factory struct has grown to 14 fields, some built conditionally (a Kubernetes client only for deploy commands, an S3 client only for backup). Startup got slower and it's hard to follow. What should we do?",
+    "trap": "Model introduces a DI container or splits into several factories passed everywhere.",
+    "assertions": [
+      {
+        "id": "23.1",
+        "text": "Keeps dependencies as lazy function fields so commands that do not use them pay nothing at startup"
+      },
+      {
+        "id": "23.2",
+        "text": "Moves rarely used dependencies (Kubernetes, S3 clients) out of the Factory into the commands that need them"
+      },
+      {
+        "id": "23.3",
+        "text": "Run functions receive plain values or consumer-side interfaces, never the Factory"
+      },
+      {
+        "id": "23.4",
+        "text": "Each remaining lazy field is cached (sync.OnceValues) so shared dependencies are built once"
+      }
+    ]
+  },
+  {
+    "id": 24,
+    "name": "panic-recovery",
+    "description": "run() recovers panics, prints a short fatal line, stack only under MYAPP_DEBUG, exit 1",
+    "prompt": "A nil pointer panic in one of my CLI commands dumps a huge goroutine trace at users. Handle panics gracefully.",
+    "trap": "Model adds recover() inside main() next to os.Exit, or in every command, or swallows the panic with exit 0.",
+    "assertions": [
+      {
+        "id": "24.1",
+        "text": "A deferred recover lives in run(), which returns the exit code to main"
+      },
+      {
+        "id": "24.2",
+        "text": "Prints a one-line 'fatal: <value>' message to stderr"
+      },
+      {
+        "id": "24.3",
+        "text": "Prints the stack trace only when a debug env var (e.g. MYAPP_DEBUG) or --debug is set"
+      },
+      {
+        "id": "24.4",
+        "text": "The recovered panic exits 1"
+      },
+      {
+        "id": "24.5",
+        "text": "Explains that os.Exit skips deferred calls, which is why recovery and cleanup live in run() rather than main()"
+      }
+    ]
+  },
+  {
+    "id": 25,
+    "name": "ctrl-c-exit-130",
+    "description": "Ctrl-C cancels in-flight I/O via cmd.Context() and exits 130 silently",
+    "prompt": "My CLI's 'backup' command uploads files to S3. When I press Ctrl-C, it keeps uploading for a while, then exits with status 1 and prints 'error: context canceled'. Fix it.",
+    "trap": "Model adds a signal handler inside the backup command calling os.Exit, skipping cleanup.",
+    "assertions": [
+      {
+        "id": "25.1",
+        "text": "The entry point creates the context with signal.NotifyContext and runs the tree with ExecuteContext"
+      },
+      {
+        "id": "25.2",
+        "text": "The command passes cmd.Context() into every upload call so in-flight I/O stops"
+      },
+      {
+        "id": "25.3",
+        "text": "run() returns 130 when the context was canceled by a signal"
+      },
+      {
+        "id": "25.4",
+        "text": "The cancellation error is not printed as 'error: context canceled'"
+      },
+      {
+        "id": "25.5",
+        "text": "The command flushes/reports partial progress before returning rather than exiting mid-write"
+      }
+    ]
+  },
+  {
+    "id": 26,
+    "name": "core-rule-without-io",
+    "description": "A business rule takes values; config and git calls move to the shell",
+    "prompt": "Here's my rule for whether a worktree can be deleted:\n\nfunc CanDelete(wt Worktree) error {\n    cfg, _ := config.Load()\n    if slices.Contains(cfg.Protected, wt.Branch) { return errors.New(\"protected\") }\n    out, _ := exec.Command(\"git\", \"-C\", wt.Path, \"status\", \"--porcelain\").Output()\n    if len(out) > 0 { return errors.New(\"dirty\") }\n    return nil\n}\n\nTests are painful. Refactor.",
+    "trap": "Model injects a config loader and a git runner interface into CanDelete, keeping I/O inside the rule and requiring mocks.",
+    "assertions": [
+      {
+        "id": "26.1",
+        "text": "The rule receives the values it needs as parameters (e.g. protected []string and the worktree's dirty state)"
+      },
+      {
+        "id": "26.2",
+        "text": "The git status call moves to an adapter whose result is passed into the rule"
+      },
+      {
+        "id": "26.3",
+        "text": "The rule's package imports no os, os/exec, net or config package"
+      },
+      {
+        "id": "26.4",
+        "text": "The command orchestrates: read config, call the adapter, call the rule, format output"
+      },
+      {
+        "id": "26.5",
+        "text": "The rule is tested with table-driven value cases and no mocks"
+      }
+    ]
+  },
+  {
+    "id": 27,
+    "name": "core-takes-fields-not-config",
+    "description": "Core functions receive config fields, never the config struct",
+    "prompt": "Write a function in internal/core that decides whether a project should be archived, based on its last activity, the archive-after-days setting and the protected-projects list from the user's config (internal/config.AppConfig).",
+    "trap": "Model takes *config.AppConfig as a parameter, making the core import the config package and its file-format dependencies.",
+    "assertions": [
+      {
+        "id": "27.1",
+        "text": "The function takes plain values (threshold duration or days, protected []string) rather than *config.AppConfig"
+      },
+      {
+        "id": "27.2",
+        "text": "internal/core does not import internal/config"
+      },
+      {
+        "id": "27.3",
+        "text": "The calling command reads the config and passes the relevant fields"
+      },
+      {
+        "id": "27.4",
+        "text": "Includes table-driven tests with value inputs"
+      }
+    ]
+  },
+  {
+    "id": 28,
+    "name": "collect-all-validation",
+    "description": "Config validation collects every failure with errors.Join and names the file",
+    "prompt": "My CLI's config file has timeout, default_branch, projects_dir and protected branches. When a user's config has three mistakes, they fix one, rerun, see the next error, and so on. Write the validation.",
+    "trap": "Model keeps returning the first error from a chain of if statements.",
+    "assertions": [
+      {
+        "id": "28.1",
+        "text": "Validation runs after the full merge and collects every failure (errors.Join or a collect-all pipeline mode)"
+      },
+      {
+        "id": "28.2",
+        "text": "Each failure is a typed error naming the field, value and message"
+      },
+      {
+        "id": "28.3",
+        "text": "The combined error is wrapped with the config file path"
+      },
+      {
+        "id": "28.4",
+        "text": "The error printer shows the full joined message so every failure reaches the user"
+      },
+      {
+        "id": "28.5",
+        "text": "Validators are composable functions (a pipeline with stop-first and collect-all modes) reusable for user input"
+      }
+    ]
+  },
+  {
+    "id": 29,
+    "name": "depguard-core-isolation",
+    "description": "golangci-lint v2 depguard rule keeps internal/core free of I/O and the Factory",
+    "prompt": "We have an internal/core package that must stay pure — people keep importing os and our internal/cmdutil into it during code review crunch. How can we enforce it automatically?",
+    "trap": "Model suggests a code-review checklist or a custom go vet analyzer instead of existing linter config.",
+    "assertions": [
+      {
+        "id": "29.1",
+        "text": "Configures golangci-lint's depguard with a rule scoped to internal/core files"
+      },
+      {
+        "id": "29.2",
+        "text": "Allows $gostd (plus github.com/samber/lo) and denies os, net and io/fs with descriptive messages"
+      },
+      {
+        "id": "29.3",
+        "text": "Explicitly denies the internal/cmdutil (Factory) package"
+      },
+      {
+        "id": "29.4",
+        "text": "Uses the golangci-lint v2 config format (version: \"2\", linters.settings)"
+      },
+      {
+        "id": "29.5",
+        "text": "Adds a verification step such as golangci-lint run in CI or a go list check of core imports"
+      }
+    ]
+  },
+  {
+    "id": 30,
+    "name": "thin-core-wrapper",
+    "description": "A wrapper CLI keeps a thin core and one adapter; no formal layers",
+    "prompt": "My Go CLI is basically a friendlier wrapper around kubectl: it validates a few inputs, runs kubectl commands, and reformats their output. A colleague suggests hexagonal architecture with ports, adapters, use cases and repositories. What structure do you recommend?",
+    "trap": "Model endorses full hexagonal/clean architecture with repositories and use-case layers for a wrapper.",
+    "assertions": [
+      {
+        "id": "30.1",
+        "text": "Recommends a thin core (input validation, parsing tool output into types) as the correct result for a wrapper"
+      },
+      {
+        "id": "30.2",
+        "text": "One adapter package wraps kubectl execution and returns core types"
+      },
+      {
+        "id": "30.3",
+        "text": "Keeps the command -> Factory -> core -> formatter shape instead of ports/use-case layers"
+      },
+      {
+        "id": "30.4",
+        "text": "Names when formal layers would pay off (CLI also used as a library, swappable subsystems, complex domain)"
+      }
+    ]
+  },
+  {
+    "id": 31,
+    "name": "semantic-error-types",
+    "description": "Error types carry meaning, not exit codes; one ExitCodeFor maps usage to 2",
+    "prompt": "Design the error types for my Go CLI: bad user input values, missing resources (e.g. unknown project), failed operations (git clone failed), and misuse of the command line. main should turn them into exit codes and friendly messages.",
+    "trap": "Model gives every error type an ExitCode field or maps each category to its own code, and maps bad values to 2.",
+    "assertions": [
+      {
+        "id": "31.1",
+        "text": "Defines semantic types for validation, not-found, operation and usage errors"
+      },
+      {
+        "id": "31.2",
+        "text": "The types carry meaning (field, entity, cause, suggestions) and no exit-code field"
+      },
+      {
+        "id": "31.3",
+        "text": "A single function maps errors to codes with errors.As: usage -> 2, everything else -> 1"
+      },
+      {
+        "id": "31.4",
+        "text": "The operation error carries what, why and next: message, wrapped cause (Unwrap) and suggestions"
+      },
+      {
+        "id": "31.5",
+        "text": "Invalid values map to exit 1; only a malformed invocation maps to 2"
+      }
+    ]
+  },
+  {
+    "id": 32,
+    "name": "format-errors-at-boundary",
+    "description": "Commands return errors; one FormatError at the entry point prints message plus suggestions",
+    "prompt": "My Cobra commands each print their own errors in red (fmt.Fprintf(os.Stderr, red(\"error: %v\"), err)) and then return the error. Sometimes messages appear twice, and the colors show up as garbage in CI logs. Standardize error output.",
+    "trap": "Model builds a shared printError helper that commands keep calling before returning.",
+    "assertions": [
+      {
+        "id": "32.1",
+        "text": "Commands return wrapped errors without printing them"
+      },
+      {
+        "id": "32.2",
+        "text": "One formatting function at the entry point prints 'error: <full message>' to stderr"
+      },
+      {
+        "id": "32.3",
+        "text": "Suggestions from typed errors in the chain (errors.As) print after the message"
+      },
+      {
+        "id": "32.4",
+        "text": "Colors come from a TTY-aware styles object, so non-terminal stderr gets plain text"
+      },
+      {
+        "id": "32.5",
+        "text": "The root sets SilenceErrors and SilenceUsage so Cobra does not print a second copy"
+      }
+    ]
+  },
+  {
+    "id": 33,
+    "name": "adapter-errors",
+    "description": "Adapters wrap with context and return typed external errors instead of logging",
+    "prompt": "Review this function from my CLI's git adapter:\n\nfunc (c *Client) Clone(ctx context.Context, url, dir string) error {\n    if err := c.run(ctx, \"clone\", url, dir); err != nil {\n        log.Printf(\"clone failed: %v\", err)\n        return err\n    }\n    return nil\n}",
+    "trap": "Model keeps the log line and only adds wrapping, so the error prints twice.",
+    "assertions": [
+      {
+        "id": "33.1",
+        "text": "Removes the log call: the error is returned, not logged and returned"
+      },
+      {
+        "id": "33.2",
+        "text": "Wraps with context naming the operation and target (e.g. fmt.Errorf(\"cloning %s: %w\", url, err))"
+      },
+      {
+        "id": "33.3",
+        "text": "Defines an error type beside the adapter (tool, operation, kind such as not-found/timeout/permission, cause)"
+      },
+      {
+        "id": "33.4",
+        "text": "Diagnostic detail goes through the debug logger (slog under --debug) rather than the standard log package"
+      },
+      {
+        "id": "33.5",
+        "text": "Accepts and propagates the context into the command execution (exec.CommandContext)"
+      }
+    ]
+  },
+  {
+    "id": 34,
+    "name": "exit-code-registry",
+    "description": "Tier 3 ExitCodeFor becomes a table; plugin exit codes pass through",
+    "prompt": "Our large Go CLI (40 commands) has an ExitCodeFor function that is now a 60-line chain of errors.As checks, and each team edits it. Plugins also need their own exit codes passed through. Improve this.",
+    "trap": "Model adds an ExitCode() method to every error type or a per-team switch statement.",
+    "assertions": [
+      {
+        "id": "34.1",
+        "text": "Replaces the chain with a table of {match func(error) bool, code} entries walked in order, defaulting to 1"
+      },
+      {
+        "id": "34.2",
+        "text": "Adding a mapping is one table entry"
+      },
+      {
+        "id": "34.3",
+        "text": "A plugin's *exec.ExitError maps to exitErr.ExitCode()"
+      },
+      {
+        "id": "34.4",
+        "text": "Plugin errors are not re-formatted, since the plugin already printed its message"
+      },
+      {
+        "id": "34.5",
+        "text": "The entry point still applies the mapping in exactly one place"
+      }
+    ]
+  },
+  {
+    "id": 35,
+    "name": "actionable-error-message",
+    "description": "User-facing errors name the resource, keep the cause and suggest the next step",
+    "prompt": "Improve the error the user sees when my CLI can't read its config: currently it prints 'error: open failed'.",
+    "trap": "Model rewrites the string to 'failed to open config file' without path, cause or next step.",
+    "assertions": [
+      {
+        "id": "35.1",
+        "text": "The message names the file path involved"
+      },
+      {
+        "id": "35.2",
+        "text": "The underlying cause (e.g. permission denied) is preserved, via %w wrapping or a Cause field exposed through Unwrap"
+      },
+      {
+        "id": "35.3",
+        "text": "A next-step suggestion is carried separately (e.g. a Suggestions field) and printed on its own line"
+      },
+      {
+        "id": "35.4",
+        "text": "Printed once at the boundary to stderr with an 'error:' prefix"
+      },
+      {
+        "id": "35.5",
+        "text": "A missing config file is not reported at all: the loader falls back to defaults"
+      }
+    ]
+  },
+  {
+    "id": 36,
+    "name": "color-and-tty",
+    "description": "Color only on a TTY, NO_COLOR respected, text paired with color",
+    "prompt": "Add colored status output to my CLI's 'status' command: green for healthy, red for failing, yellow for degraded.",
+    "trap": "Model hardcodes ANSI codes or fatih/color unconditionally, so pipes and CI logs get escape codes and meaning is color-only.",
+    "assertions": [
+      {
+        "id": "36.1",
+        "text": "Color is disabled when stdout is not a terminal"
+      },
+      {
+        "id": "36.2",
+        "text": "The NO_COLOR environment variable disables color"
+      },
+      {
+        "id": "36.3",
+        "text": "Each colored state also carries text (healthy/failing/degraded) so meaning survives without color"
+      },
+      {
+        "id": "36.4",
+        "text": "Styles come from a shared styles object (e.g. lipgloss) that becomes identity when color is off"
+      },
+      {
+        "id": "36.5",
+        "text": "Offers a --color=auto|always|never override"
+      }
+    ]
+  },
+  {
+    "id": 37,
+    "name": "stdin-input",
+    "description": "'-' reads stdin; a terminal stdin with no file fails fast with a usage error",
+    "prompt": "My 'import' command reads records from a file path argument. Users also want to pipe data in: `cat data.csv | myapp import`. Implement input handling.",
+    "trap": "Model reads os.Stdin whenever no file is given, so running bare 'myapp import' in a terminal hangs waiting for input.",
+    "assertions": [
+      {
+        "id": "37.1",
+        "text": "'-' (or no file argument) reads from stdin"
+      },
+      {
+        "id": "37.2",
+        "text": "Detects piped stdin (ModeCharDevice check or term.IsTerminal)"
+      },
+      {
+        "id": "37.3",
+        "text": "When no file is given and stdin is a terminal, returns a usage error (exit 2) immediately instead of blocking"
+      },
+      {
+        "id": "37.4",
+        "text": "The error message tells the user how to supply input (pass a file or pipe data on stdin)"
+      }
+    ]
+  },
+  {
+    "id": 40,
+    "name": "config-cache-token-placement",
+    "description": "Placing user settings, a cache and an API token on disk for a Go CLI",
+    "prompt": "My Go CLI 'wt' keeps user settings, a cache of remote branch lists, and the user's API token. Where should each one live? Write the path-resolution code.",
+    "trap": "Putting the token in the config file, or the cache under the config directory.",
+    "assertions": [
+      {
+        "id": "40.1",
+        "text": "Settings live in $XDG_CONFIG_HOME/wt/config.toml (default ~/.config/wt/), and a missing file means defaults, not an error"
+      },
+      {
+        "id": "40.2",
+        "text": "The branch cache lives under $XDG_CACHE_HOME/wt (default ~/.cache/wt/) and is safe to delete"
+      },
+      {
+        "id": "40.3",
+        "text": "The API token is stored in the OS keyring (e.g. zalando/go-keyring), never in config.toml"
+      },
+      {
+        "id": "40.4",
+        "text": "When no keyring is available, the fallback is a file with 0600 permissions plus a warning on stderr"
+      },
+      {
+        "id": "40.5",
+        "text": "Paths resolve through adrg/xdg (or os.UserConfigDir / os.UserCacheDir) rather than hardcoded ~/ paths"
+      }
+    ]
+  },
+  {
+    "id": 41,
+    "name": "config-precedence",
+    "description": "Flags > env > file > defaults; flags win only when Changed; prefixed env",
+    "prompt": "My Go CLI has a --timeout flag, and the timeout can also come from the config file and from the environment. Currently the config file value overrides the flag when both are set. Fix the precedence and show the env var naming.",
+    "trap": "Model copies the flag default into config unconditionally, so an unset flag's default overrides the file and env.",
+    "assertions": [
+      {
+        "id": "41.1",
+        "text": "Precedence is flags > env > config file > defaults"
+      },
+      {
+        "id": "41.2",
+        "text": "Env vars carry the app prefix (e.g. MYAPP_TIMEOUT)"
+      },
+      {
+        "id": "41.3",
+        "text": "The flag overrides config only when explicitly set (cmd.Flags().Changed(\"timeout\")) or via a flag provider loaded last"
+      },
+      {
+        "id": "41.4",
+        "text": "Env keys map to config keys by trimming the prefix and lowercasing"
+      },
+      {
+        "id": "41.5",
+        "text": "Config is loaded once per invocation (cached), not re-read on each access"
+      }
+    ]
+  },
+  {
+    "id": 43,
+    "name": "destructive-operation",
+    "description": "Plan -> confirm -> execute; --force for scripts; non-TTY without --force is a usage error",
+    "prompt": "Add a 'prune' command that deletes all merged worktrees. It'll be run by developers by hand and also from a nightly CI job.",
+    "trap": "Model prompts unconditionally (hangs in CI) or skips confirmation entirely.",
+    "assertions": [
+      {
+        "id": "43.1",
+        "text": "Shows the full plan (worktrees to delete) before acting"
+      },
+      {
+        "id": "43.2",
+        "text": "Asks for confirmation once, only on an interactive terminal"
+      },
+      {
+        "id": "43.3",
+        "text": "--force/--yes skips confirmation; without it in a non-interactive session returns a usage error naming the flag"
+      },
+      {
+        "id": "43.4",
+        "text": "--dry-run prints the same structure marked as a dry run"
+      },
+      {
+        "id": "43.5",
+        "text": "A declined confirmation returns an 'aborted' error (non-zero exit)"
+      }
+    ]
+  },
+  {
+    "id": 44,
+    "name": "help-text-and-naming",
+    "description": "Noun-verb hierarchy, standard verbs, examples first, short Short",
+    "prompt": "Write the Cobra command definitions (Use, Short, Long, Example) for the 'env' group of my CLI: listing environments, showing one, creating one, and removing one.",
+    "trap": "Model mixes verbs (ls, show, new, rm) and omits examples.",
+    "assertions": [
+      {
+        "id": "44.1",
+        "text": "Commands follow one noun-verb structure: env list/get/create/delete"
+      },
+      {
+        "id": "44.2",
+        "text": "Uses the standard verb 'delete' for removal (aliases optional)"
+      },
+      {
+        "id": "44.3",
+        "text": "Each command has an Example section with commented common workflows"
+      },
+      {
+        "id": "44.4",
+        "text": "Short descriptions stay under about 75 characters"
+      },
+      {
+        "id": "44.5",
+        "text": "Each command takes one positional primary target (the env name); other values are named flags"
+      }
+    ]
+  },
+  {
+    "id": 45,
+    "name": "deprecation-rollout",
+    "description": "Deprecated flags/commands keep working with stderr warnings, removed after 2-3 minors",
+    "prompt": "We're renaming our CLI's --api-url flag to --endpoint and the 'ls' command to 'list'. Existing scripts use the old names. How do we roll this out?",
+    "trap": "Model renames outright or adds silent aliases with no removal plan.",
+    "assertions": [
+      {
+        "id": "45.1",
+        "text": "The old flag keeps working and is marked with MarkDeprecated(\"api-url\", \"use --endpoint instead\")"
+      },
+      {
+        "id": "45.2",
+        "text": "The old command keeps working through Cobra's Deprecated field"
+      },
+      {
+        "id": "45.3",
+        "text": "Deprecation warnings print to stderr"
+      },
+      {
+        "id": "45.4",
+        "text": "Lifecycle: announce, warn, remove after 2-3 minor versions"
+      },
+      {
+        "id": "45.5",
+        "text": "Documents the migration path in --help and the changelog"
+      }
+    ]
+  },
+  {
+    "id": 46,
+    "name": "prompt-fallback",
+    "description": "Flags first, prompt only on an interactive TTY, usage error otherwise",
+    "prompt": "Make my 'create' command friendlier: if the user doesn't pass --name and --template, ask for them interactively.",
+    "trap": "Model prompts whenever a value is missing, hanging CI and scripts.",
+    "assertions": [
+      {
+        "id": "46.1",
+        "text": "Prompts only for values not supplied by flags"
+      },
+      {
+        "id": "46.2",
+        "text": "Prompts only when the session is interactive (stdin and stdout are terminals)"
+      },
+      {
+        "id": "46.3",
+        "text": "Missing input without a terminal returns a usage error (exit 2) naming the flag"
+      },
+      {
+        "id": "46.4",
+        "text": "Uses charmbracelet/huh for the prompts"
+      },
+      {
+        "id": "46.5",
+        "text": "Prompts render on stderr so stdout stays clean"
+      },
+      {
+        "id": "46.6",
+        "text": "Tests cover both paths: flags supplied, and missing input without a TTY"
+      }
+    ]
+  },
+  {
+    "id": 47,
+    "name": "no-input-flag",
+    "description": "--no-input forces the non-interactive path through the central interactivity gate",
+    "prompt": "Our CLI prompts for confirmation in a few places. Users driving it from tmux send-keys scripts complain it waits for input even though they're automating it. Add a way to fix that.",
+    "trap": "Model adds a per-command --quiet flag or checks an env var in each prompt site.",
+    "assertions": [
+      {
+        "id": "47.1",
+        "text": "Adds a global --no-input flag that forces the non-interactive path even on a terminal"
+      },
+      {
+        "id": "47.2",
+        "text": "With --no-input, missing required input returns a usage error instead of prompting"
+      },
+      {
+        "id": "47.3",
+        "text": "The override is applied in the single interactivity check (e.g. IOStreams.IsInteractive), not at each prompt site"
+      },
+      {
+        "id": "47.4",
+        "text": "Confirmations also accept --yes/--force"
+      }
+    ]
+  },
+  {
+    "id": 48,
+    "name": "init-wizard",
+    "description": "Wizard fields each have a flag; gated on interactivity; next step printed",
+    "prompt": "Build an 'init' command that walks new users through setting up project name, language, and CI provider with a nice interactive form.",
+    "trap": "Model builds a wizard-only command with no flags, unusable in CI.",
+    "assertions": [
+      {
+        "id": "48.1",
+        "text": "Uses a huh form for the wizard"
+      },
+      {
+        "id": "48.2",
+        "text": "Every field has a matching flag so `myapp init --name x --lang go --ci github` runs non-interactively"
+      },
+      {
+        "id": "48.3",
+        "text": "The wizard runs only when the session is interactive"
+      },
+      {
+        "id": "48.4",
+        "text": "The form renders on stderr"
+      },
+      {
+        "id": "48.5",
+        "text": "Missing fields without a terminal return a usage error"
+      },
+      {
+        "id": "48.6",
+        "text": "Ends by telling the user the next step (e.g. Run 'myapp start')"
+      }
+    ]
+  },
+  {
+    "id": 49,
+    "name": "bounded-fanout",
+    "description": "errgroup + SetLimit for N items, with the signal-aware context",
+    "prompt": "My 'check' command pings 300 hosts one after another and it's slow. Parallelize it.",
+    "trap": "Model starts 300 goroutines with a WaitGroup or hand-rolls a semaphore channel.",
+    "assertions": [
+      {
+        "id": "49.1",
+        "text": "Uses errgroup.WithContext"
+      },
+      {
+        "id": "49.2",
+        "text": "Bounds concurrency with g.SetLimit(n)"
+      },
+      {
+        "id": "49.3",
+        "text": "Passes the errgroup context to each call so cancellation propagates"
+      },
+      {
+        "id": "49.4",
+        "text": "The parent context comes from cmd.Context(), so Ctrl-C cancels in-flight pings"
+      }
+    ]
+  },
+  {
+    "id": 50,
+    "name": "streaming-results",
+    "description": "errgroup producers feed one results channel drained by the command",
+    "prompt": "My 'download' command fetches 50 files in parallel. Users want to see each filename printed as soon as it finishes rather than all at the end.",
+    "trap": "Model prints from inside each goroutine (interleaved writes) or leaks goroutines on cancellation.",
+    "assertions": [
+      {
+        "id": "50.1",
+        "text": "Producers run in an errgroup with SetLimit"
+      },
+      {
+        "id": "50.2",
+        "text": "Results go through one channel drained by the command, which is the single writer to stdout"
+      },
+      {
+        "id": "50.3",
+        "text": "Sends select on ctx.Done() so producers do not block forever"
+      },
+      {
+        "id": "50.4",
+        "text": "The channel closes after g.Wait() in a goroutine, and a final g.Wait() returns the error"
+      },
+      {
+        "id": "50.5",
+        "text": "Only results go to stdout; progress and diagnostics go to stderr"
+      }
+    ]
+  },
+  {
+    "id": 51,
+    "name": "concurrency-test-guards",
+    "description": "goleak in TestMain and -race catch concurrency bugs in commands",
+    "prompt": "I added concurrency to three commands in my CLI. What should I add to the test setup to catch concurrency bugs?",
+    "trap": "Model mentions only -race and misses goroutine leaks after a command returns.",
+    "assertions": [
+      {
+        "id": "51.1",
+        "text": "Runs go test -race in CI"
+      },
+      {
+        "id": "51.2",
+        "text": "Adds go.uber.org/goleak in TestMain to detect goroutines left after a command returns"
+      },
+      {
+        "id": "51.3",
+        "text": "Drives commands through their run functions with fakes so tests do not hit the network"
+      }
+    ]
+  },
+  {
+    "id": 52,
+    "name": "golden-files",
+    "description": "Golden files with -update over runX output",
+    "prompt": "My 'report' command prints a fairly large formatted table and a JSON variant. Writing expected strings inline in tests is painful. Suggest a testing approach and write one test.",
+    "trap": "Model keeps inline expected strings or snapshot-tests the whole binary.",
+    "assertions": [
+      {
+        "id": "52.1",
+        "text": "Stores expected output in testdata/*.golden files"
+      },
+      {
+        "id": "52.2",
+        "text": "Supports an -update flag to regenerate them"
+      },
+      {
+        "id": "52.3",
+        "text": "Calls runReport directly with test streams and a fake client"
+      },
+      {
+        "id": "52.4",
+        "text": "Covers both the table and JSON variants"
+      },
+      {
+        "id": "52.5",
+        "text": "Uses non-TTY, colorless test streams (e.g. iostreams.Test()) so output is deterministic"
+      }
+    ]
+  },
+  {
+    "id": 53,
+    "name": "e2e-exit-codes",
+    "description": "E2E suite builds the binary and asserts exit codes and streams",
+    "prompt": "Write end-to-end tests for my Go CLI binary covering the most important behaviors that scripts depend on.",
+    "trap": "Model only checks that output contains a string and ignores exit codes and stream separation.",
+    "assertions": [
+      {
+        "id": "53.1",
+        "text": "Builds the binary once (e.g. in TestMain) and runs it with os/exec"
+      },
+      {
+        "id": "53.2",
+        "text": "Asserts exit codes: 0 success, 2 for unknown command and bad flag, 1 for runtime failure"
+      },
+      {
+        "id": "53.3",
+        "text": "Asserts stdout and stderr separately"
+      },
+      {
+        "id": "53.4",
+        "text": "Uses a table of args/wantCode or testscript .txtar scripts"
+      },
+      {
+        "id": "53.5",
+        "text": "Builds with -cover to collect coverage from the subprocess"
+      }
+    ]
+  },
+  {
+    "id": 54,
+    "name": "test-doubles",
+    "description": "No doubles for the core; moq or hand-written fakes at narrow consumer interfaces",
+    "prompt": "My command tests use testify/mock with long .On(...).Return(...) chains for our API client interface (12 methods), and also mock our validation package. Tests break on every refactor. How should we restructure test doubles?",
+    "trap": "Model tweaks the mock expectations or switches to gomock.",
+    "assertions": [
+      {
+        "id": "54.1",
+        "text": "The validation (core) package is tested directly with values, with no doubles"
+      },
+      {
+        "id": "54.2",
+        "text": "Commands declare narrow consumer-side interfaces with only the methods they use"
+      },
+      {
+        "id": "54.3",
+        "text": "Small interfaces get hand-written fakes; interfaces with 5+ methods use matryer/moq"
+      },
+      {
+        "id": "54.4",
+        "text": "Prefers state-based fakes over expectation lists"
+      },
+      {
+        "id": "54.5",
+        "text": "Command tests call runX with an options struct holding the fake"
+      }
+    ]
+  },
+  {
+    "id": 55,
+    "name": "test-helpers",
+    "description": "Duplicated test setup across 3+ files moves to a test helpers package",
+    "prompt": "Across five command test files we repeat about 20 lines building fake clients, test output buffers, and a Factory. Clean this up.",
+    "trap": "Model copies a helper into each file or builds a heavy fixture framework.",
+    "assertions": [
+      {
+        "id": "55.1",
+        "text": "Extracts a shared test helpers package (e.g. internal/cmdutil/cmdtest or internal/testutil)"
+      },
+      {
+        "id": "55.2",
+        "text": "A helper returns test streams (buffers), a Factory for the command constructors, and the shared fakes"
+      },
+      {
+        "id": "55.3",
+        "text": "Fakes are small hand-written structs"
+      }
+    ]
+  },
+  {
+    "id": 56,
+    "name": "verbose-vs-debug",
+    "description": "-v is prose for users, --debug is structured slog; both stderr",
+    "prompt": "Add a --verbose flag to my CLI so users can see what it's doing and so I can debug issues from bug reports.",
+    "trap": "Model merges everything into one --verbose flag that dumps debug logs at users.",
+    "assertions": [
+      {
+        "id": "56.1",
+        "text": "Separates -v/--verbose (prose progress) from --debug (structured slog records)"
+      },
+      {
+        "id": "56.2",
+        "text": "Both write to stderr"
+      },
+      {
+        "id": "56.3",
+        "text": "Debug also turns on through an env var (e.g. MYAPP_DEBUG=1) for completion scripts and wrappers"
+      },
+      {
+        "id": "56.4",
+        "text": "The logger discards output unless debug is on"
+      },
+      {
+        "id": "56.5",
+        "text": "The root's PersistentPreRunE sets both on the shared IOStreams (one home for the logger)"
+      }
+    ]
+  },
+  {
+    "id": 57,
+    "name": "slog-setup",
+    "description": "slog on stderr, text on a terminal, JSON when redirected, quiet by default",
+    "prompt": "Set up logging for my Go CLI. It runs both interactively and in CI where logs are collected.",
+    "trap": "Model sets log.SetOutput(os.Stdout) or picks zap/zerolog for a CLI.",
+    "assertions": [
+      {
+        "id": "57.1",
+        "text": "Uses log/slog"
+      },
+      {
+        "id": "57.2",
+        "text": "Logs go to stderr, never stdout"
+      },
+      {
+        "id": "57.3",
+        "text": "Text handler when stderr is a terminal, JSON handler when redirected or in CI (or a --log-format flag)"
+      },
+      {
+        "id": "57.4",
+        "text": "Quiet by default, with debug enabled by flag or env var"
+      },
+      {
+        "id": "57.5",
+        "text": "Adds context with logger.With (e.g. the command name)"
+      }
+    ]
+  },
+  {
+    "id": 58,
+    "name": "atomic-state-write",
+    "description": "Atomic write via CreateTemp in the same dir + Sync + Rename, plus a lock",
+    "prompt": "My CLI saves its state (a JSON file of recent projects) after each command. Users sometimes run two instances at once and occasionally the file ends up truncated. Fix the save function.",
+    "trap": "Model writes to path+\".tmp\" (collides between instances) or keeps os.WriteFile.",
+    "assertions": [
+      {
+        "id": "58.1",
+        "text": "Writes to a uniquely named temp file (os.CreateTemp) in the same directory as the target"
+      },
+      {
+        "id": "58.2",
+        "text": "Syncs before closing, then renames over the target"
+      },
+      {
+        "id": "58.3",
+        "text": "Removes the temp file on failure (defer os.Remove)"
+      },
+      {
+        "id": "58.4",
+        "text": "Guards the read-modify-write with a file lock (gofrs/flock) for concurrent instances"
+      },
+      {
+        "id": "58.5",
+        "text": "Stores the state under an XDG directory for state or data ($XDG_STATE_HOME or $XDG_DATA_HOME), not the config directory"
+      }
+    ]
+  },
+  {
+    "id": 59,
+    "name": "single-instance-lock",
+    "description": "gofrs/flock TryLock in the XDG runtime dir guards single-instance commands",
+    "prompt": "Our CLI has a 'daemon-sync' command that must never run twice at the same time on a machine (cron plus manual runs). Implement the guard.",
+    "trap": "Model writes a PID file and checks for the process manually, racing and leaving stale files.",
+    "assertions": [
+      {
+        "id": "59.1",
+        "text": "Uses gofrs/flock TryLock on a lock file"
+      },
+      {
+        "id": "59.2",
+        "text": "The lock path resolves identically under cron and a login shell (e.g. the XDG state dir), not $XDG_RUNTIME_DIR, which cron often lacks"
+      },
+      {
+        "id": "59.3",
+        "text": "When the lock is held, returns a clear error such as 'another instance is running' (non-zero exit)"
+      },
+      {
+        "id": "59.4",
+        "text": "Unlock is deferred"
+      }
+    ]
+  },
+  {
+    "id": 60,
+    "name": "token-storage",
+    "description": "Tokens in the OS keyring with file fallback; auth status/logout lifecycle",
+    "prompt": "Implement 'myapp auth login' storing the API token so later commands can use it.",
+    "trap": "Model writes the token in plain text into the main config file.",
+    "assertions": [
+      {
+        "id": "60.1",
+        "text": "Stores the token in the OS keyring (zalando/go-keyring)"
+      },
+      {
+        "id": "60.2",
+        "text": "When no keyring is available, falls back to a 0600 file and warns on stderr that the token is stored in plain text"
+      },
+      {
+        "id": "60.3",
+        "text": "Provides auth status and auth logout for the token lifecycle"
+      },
+      {
+        "id": "60.4",
+        "text": "Commands missing a token fail with a hint to run 'myapp auth login'"
+      }
+    ]
+  },
+  {
+    "id": 61,
+    "name": "update-check",
+    "description": "Update checks are opt-in, daily, background, stderr, skipped in CI and pipes",
+    "prompt": "Add a check that tells users when a newer version of my CLI is released on GitHub.",
+    "trap": "Model checks synchronously on every run and prints the notice to stdout.",
+    "assertions": [
+      {
+        "id": "61.1",
+        "text": "The check is opt-in (asks for or respects user consent)"
+      },
+      {
+        "id": "61.2",
+        "text": "Checks at most once per day, caching the last check time"
+      },
+      {
+        "id": "61.3",
+        "text": "Runs in a background goroutine with a short timeout so commands are not slowed"
+      },
+      {
+        "id": "61.4",
+        "text": "Prints the notice to stderr"
+      },
+      {
+        "id": "61.5",
+        "text": "Skips the check in CI and when stdout is not a terminal"
+      }
+    ]
+  },
+  {
+    "id": 62,
+    "name": "go-install-version",
+    "description": "go install builds report their version through debug.ReadBuildInfo",
+    "prompt": "Users install my CLI with `go install github.com/me/tool@latest` and `tool version` prints 'dev'. Release binaries from goreleaser are fine. Fix it.",
+    "trap": "Model tells users to build with ldflags manually, which go install cannot pass.",
+    "assertions": [
+      {
+        "id": "62.1",
+        "text": "Explains that go install builds carry no ldflags"
+      },
+      {
+        "id": "62.2",
+        "text": "Falls back to debug.ReadBuildInfo() Main.Version when the ldflags variable is unset"
+      },
+      {
+        "id": "62.3",
+        "text": "Reads vcs.revision and vcs.time build settings for commit and date"
+      },
+      {
+        "id": "62.4",
+        "text": "Keeps ldflags with the full import path for release builds"
+      }
+    ]
+  },
+  {
+    "id": 63,
+    "name": "path-plugins",
+    "description": "Git-style PATH plugins exec'd with IOStreams, exit codes passed through",
+    "prompt": "I want third parties to extend my CLI with new subcommands written in any language, like `gh` extensions. Design the plugin mechanism.",
+    "trap": "Model proposes Go's plugin package or a gRPC system for simple command extensions.",
+    "assertions": [
+      {
+        "id": "63.1",
+        "text": "Discovers executables named myapp-<name> on PATH"
+      },
+      {
+        "id": "63.2",
+        "text": "Runs the plugin with exec.CommandContext, wiring stdin/stdout/stderr from the CLI's streams"
+      },
+      {
+        "id": "63.3",
+        "text": "Propagates the plugin's exit code (*exec.ExitError) without re-formatting its error"
+      },
+      {
+        "id": "63.4",
+        "text": "Registers discovered plugins as Cobra subcommands so they appear in help and completion"
+      },
+      {
+        "id": "63.5",
+        "text": "Explains why Go's plugin package is unsuitable (identical toolchain and dependencies required, no Windows)"
+      }
+    ]
+  },
+  {
+    "id": 64,
+    "name": "library-defaults",
+    "description": "Default library picks and the Instead-of swaps",
+    "prompt": "Pick the libraries for a new Go CLI: prompts/forms, terminal styling, concurrency helpers, mocking, E2E testing, and dependency wiring.",
+    "trap": "Model suggests survey (archived), sourcegraph/conc, testify/mock and a DI framework.",
+    "assertions": [
+      {
+        "id": "64.1",
+        "text": "charmbracelet/huh for prompts and forms"
+      },
+      {
+        "id": "64.2",
+        "text": "charmbracelet/lipgloss for styling"
+      },
+      {
+        "id": "64.3",
+        "text": "golang.org/x/sync/errgroup with SetLimit for concurrency"
+      },
+      {
+        "id": "64.4",
+        "text": "matryer/moq or hand-written doubles for mocking"
+      },
+      {
+        "id": "64.5",
+        "text": "rogpeppe/go-internal/testscript for E2E"
+      },
+      {
+        "id": "64.6",
+        "text": "Manual wiring through a Factory for dependencies"
+      }
+    ]
+  },
+  {
+    "id": 65,
+    "name": "tier1-library-choice",
+    "description": "Single-purpose tool with env and config file uses ff, not Cobra+viper",
+    "prompt": "I need a single-purpose Go tool (no subcommands) that takes a --listen address, which can also come from an environment variable or a simple config file. Which libraries should I use? Show the flag setup.",
+    "trap": "Model reaches for Cobra + viper for a single-purpose tool.",
+    "assertions": [
+      {
+        "id": "65.1",
+        "text": "Uses peterbourgon/ff wrapping a flag.FlagSet"
+      },
+      {
+        "id": "65.2",
+        "text": "Sets an env var prefix (ff.WithEnvVarPrefix)"
+      },
+      {
+        "id": "65.3",
+        "text": "Adds a config file flag (ff.WithConfigFileFlag) with a parser"
+      },
+      {
+        "id": "65.4",
+        "text": "The flag set uses ContinueOnError so parse errors return and map to exit 2"
+      }
+    ]
+  }
+]

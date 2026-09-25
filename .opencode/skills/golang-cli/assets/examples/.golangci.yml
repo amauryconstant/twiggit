@@ -1,0 +1,31 @@
+# Path: .golangci.yml (golangci-lint v2)
+# Keeps the Functional Core free of I/O and third-party dependencies.
+version: "2"
+linters:
+  enable:
+    - depguard
+  settings:
+    errcheck:
+      # A failed write to the terminal or a pipe is not actionable in a CLI;
+      # a closed pipe raises SIGPIPE and ends the process anyway.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+    depguard:
+      rules:
+        core-isolation:
+          files:
+            - "**/internal/core/**"
+          allow:
+            - $gostd
+            - github.com/samber/lo
+          deny:
+            - pkg: os
+              desc: the core does no I/O; take values as parameters
+            - pkg: net
+              desc: network calls belong to an adapter package
+            - pkg: io/fs
+              desc: filesystem access belongs to an adapter package
+            - pkg: github.com/you/myapp/internal/cmdutil
+              desc: the core never sees the Factory

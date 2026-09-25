@@ -1,9 +1,6 @@
-# 11 — Plugin Architecture
+# Plugin Architecture
 
----
-
-Library picks per model (`hashicorp/go-plugin`, `gopher-lua`, `google/cel-go`) are in
-[14-libraries.md](./14-libraries.md#plugin-systems); this reference covers model choice.
+How to choose an extension model and wire PATH plugins. Library picks per model → `libraries.md`.
 
 ## Four Models
 
@@ -29,26 +26,21 @@ Plugins are separate binaries that launch as subprocesses and communicate over l
 
 ### Model C: Go's `plugin` Package (Shared Libraries)
 
-Largely abandoned in practice. Linux-only, requires matching Go toolchain version and GOPATH. Zero overhead but too fragile for real-world use. **Not recommended.**
+Host and plugin must be built with the identical toolchain and identical versions of every shared dependency, and Windows is unsupported. In-process speed rarely outweighs that fragility; prefer Model A or B.
 
 ### Model D: Embedded Interpreters
 
 Options: Lua (`gopher-lua`), JavaScript, WASM, CEL (`google/cel-go`).
 
-**Use case:** End-users who are not Go developers extending your app in small ways — filtering rules, custom transforms, policy expressions. Not suitable for full plugin systems.
-
----
+**Use case:** users who are not Go developers extending the app in small ways — filters, transforms, policy expressions. Full plugin systems use Model A or B.
 
 ## Decision Framework
 
 | Need | Model |
-|------|-------|
+| --- | --- |
 | Simple command extensions, any language | Git-style PATH |
 | Rich typed interface, bidirectional calls | HashiCorp go-plugin |
 | User-defined scripting/rules | Embedded interpreter (Lua, WASM, CEL) |
-| Performance-critical, Linux-only | Go `plugin` package (not recommended) |
-
----
 
 ## PATH Plugin Implementation
 
@@ -72,24 +64,19 @@ func discoverPlugins(prefix string) []string {
 Execution:
 
 ```go
-func execPlugin(name string, args []string) error {
-    binary := fmt.Sprintf("myapp-%s", name)
-    cmd := exec.Command(binary, args...)
-    cmd.Stdin = os.Stdin
-    cmd.Stdout = os.Stdout
-    cmd.Stderr = os.Stderr
-    return cmd.Run()
+func execPlugin(ctx context.Context, ios *iostreams.IOStreams, name string, args []string) error {
+    cmd := exec.CommandContext(ctx, "myapp-"+name, args...)
+    cmd.Stdin, cmd.Stdout, cmd.Stderr = ios.In, ios.Out, ios.ErrOut
+    return cmd.Run() // *exec.ExitError carries the plugin's exit code
 }
 ```
 
-The `gh` CLI registers discovered extensions as Cobra subcommands so they appear in help text and benefit from shell completion.
+To pass the plugin's own exit code through, add a registry entry (→ `errors.md`) that maps `*exec.ExitError` to `exitErr.ExitCode()` and skip formatting it — the plugin already printed its error.
 
----
+The `gh` CLI registers discovered extensions as Cobra subcommands so they appear in help text and benefit from shell completion.
 
 ## Completion for Plugins
 
 Carapace's bridge system can consume completions from plugin binaries that use different CLI frameworks (Cobra, Click, Clap) or native shell completion scripts. This is the strongest argument for carapace if you have a plugin system.
 
----
-
-**See also:** `samber/cc-skills-golang@golang-design-patterns` — functional options, constructor APIs, resource lifecycle, and graceful shutdown patterns applicable to plugin host design
+→ See `samber/cc-skills-golang@golang-design-patterns` for lifecycle and shutdown patterns in a plugin host.

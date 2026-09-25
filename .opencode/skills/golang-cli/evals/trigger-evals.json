@@ -1,0 +1,114 @@
+[
+  {
+    "query": "I want to write a small Go tool that renames photos by their EXIF date. Should I use cobra or just the flag package, and how should I lay out the code?",
+    "should_trigger": true
+  },
+  {
+    "query": "add a `deploy rollback` subcommand to our cobra-based CLI in cmd/, it needs the same api client the other commands use",
+    "should_trigger": true
+  },
+  {
+    "query": "Our Go CLI exits 1 for everything, including typos in flag names. Our CI scripts need to tell misuse apart from real failures. How should exit codes work?",
+    "should_trigger": true
+  },
+  {
+    "query": "make `mytool list` support -o json so people can pipe it into jq, right now it prints a colored table",
+    "should_trigger": true
+  },
+  {
+    "query": "My Go command asks 'are you sure?' with bufio.Scanner and it hangs forever in GitHub Actions. fix it",
+    "should_trigger": true
+  },
+  {
+    "query": "Review this urfave/cli v2 app for structure problems before we open-source it (main.go is 900 lines with all commands in it)",
+    "should_trigger": true
+  },
+  {
+    "query": "We use knadh/koanf in our CLI. Where should the config file live on Linux and macOS, and how do env vars and flags override it?",
+    "should_trigger": true
+  },
+  {
+    "query": "Our cobra commands call fmt.Println everywhere and the tests shell out to the built binary. How do we make the commands unit-testable?",
+    "should_trigger": true
+  },
+  {
+    "query": "how should my Go CLI handle ctrl-c while it's halfway through uploading 200 files concurrently?",
+    "should_trigger": true
+  },
+  {
+    "query": "Design the package structure for a Go CLI with about 25 commands across 4 domains, maintained by three teams.",
+    "should_trigger": true
+  },
+  {
+    "query": "Where do I store the OAuth token for my Go command-line app after `login`? It must also work on headless Linux boxes.",
+    "should_trigger": true
+  },
+  {
+    "query": "Add --verbose and --debug flags to my Go CLI. What's the difference supposed to be, and where does slog fit?",
+    "should_trigger": true
+  },
+  {
+    "query": "Using peterbourgon/ff for flags in a small Go tool \u2014 how do I also read a config file and MYTOOL_* env vars?",
+    "should_trigger": true
+  },
+  {
+    "query": "The error messages from my Go CLI look like 'exec: exit status 128'. How do I give users something actionable instead?",
+    "should_trigger": true
+  },
+  {
+    "query": "How do I embed the version and commit into my Go binary so `mytool version` and `mytool --version` both work with goreleaser?",
+    "should_trigger": true
+  },
+  {
+    "query": "I'm building an interactive setup wizard for my Go CLI with huh. How do I keep it usable from scripts?",
+    "should_trigger": true
+  },
+  {
+    "query": "Code review please: new cobra command in cmd/sync.go \u2014 logic is all inline in RunE, calls os.Exit on error, logs to stdout.",
+    "should_trigger": true
+  },
+  {
+    "query": "Should my Go CLI's business rules (branch naming, protected branches) live in the cobra commands or somewhere else?",
+    "should_trigger": true
+  },
+  {
+    "query": "What's the difference between cobra.MatchAll and cobra.ExactValidArgs, and when does Cobra call ValidArgsFunction?",
+    "should_trigger": false
+  },
+  {
+    "query": "How do I customize Cobra's help template so flags are grouped under headings?",
+    "should_trigger": false
+  },
+  {
+    "query": "viper.Unmarshal ignores my nested struct fields with mapstructure tags. Why?",
+    "should_trigger": false
+  },
+  {
+    "query": "How do I make viper hot-reload the config file with WatchConfig and OnConfigChange safely?",
+    "should_trigger": false
+  },
+  {
+    "query": "Build a Go HTTP API server with chi: routing, middleware, graceful shutdown.",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a Go library for parsing ISO 8601 durations, with table-driven tests.",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a bash script that loops over git repos and pulls each one, printing failures in red.",
+    "should_trigger": false
+  },
+  {
+    "query": "My Go gRPC service leaks goroutines under load. How do I find the leak?",
+    "should_trigger": false
+  },
+  {
+    "query": "Explain Go generics type constraints with a few examples.",
+    "should_trigger": false
+  },
+  {
+    "query": "Write a Python argparse CLI with subcommands for managing a todo list.",
+    "should_trigger": false
+  }
+]
