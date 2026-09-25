@@ -8,14 +8,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/carapace-sh/carapace"
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
+
+	"github.com/carapace-sh/carapace"
+	"github.com/spf13/cobra"
 )
 
 // CreateOptions captures every input to runCreate.
@@ -154,7 +153,7 @@ func runCreate(opts *CreateOptions) error {
 	}
 
 	parentDir := filepath.Dir(worktreePath)
-	if err := os.MkdirAll(parentDir, 0755); err != nil { // #nosec G301 -- standard directory perms (rwxr-xr-x)
+	if err := os.MkdirAll(parentDir, 0o755); err != nil { // #nosec G301 -- standard directory perms (rwxr-xr-x)
 		return fmt.Errorf("failed to create worktree parent directory: %w", err)
 	}
 

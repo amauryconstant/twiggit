@@ -5,11 +5,10 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
 )
 
 func TestGenerateWrapper(t *testing.T) {

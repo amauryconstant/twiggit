@@ -6,15 +6,14 @@ import (
 	"fmt"
 	"io"
 	"os"
-
-	"github.com/carapace-sh/carapace"
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
 	"twiggit/internal/output"
+
+	"github.com/carapace-sh/carapace"
+	"github.com/spf13/cobra"
 )
 
 // InitOptions captures every input to the init run paths.

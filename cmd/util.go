@@ -3,11 +3,10 @@ package cmd
 import (
 	"fmt"
 	"io"
-
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/core"
 	"twiggit/internal/iostreams"
+
+	"github.com/spf13/cobra"
 )
 
 // verbosef is the verbose-output gate used by every command. It is

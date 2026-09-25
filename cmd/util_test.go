@@ -3,11 +3,10 @@ package cmd
 import (
 	"strings"
 	"testing"
+	"twiggit/internal/iostreams"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/iostreams"
 )
 
 // TestVerbosef_NilIOSafe asserts the helper tolerates a nil *IOStreams

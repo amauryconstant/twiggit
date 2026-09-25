@@ -7,12 +7,11 @@ import (
 	"runtime"
 	"testing"
 	"time"
+	"twiggit/internal/core"
 
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
 )
 
 func TestContextDetector_ContextTypeString(t *testing.T) {
@@ -66,7 +65,7 @@ func TestContextDetector_DetectContext(t *testing.T) {
 			setupFunc: func(t *testing.T) string {
 				t.Helper()
 				dir := t.TempDir()
-				require.NoError(t, os.Mkdir(filepath.Join(dir, ".git"), 0755))
+				require.NoError(t, os.Mkdir(filepath.Join(dir, ".git"), 0o755))
 				return dir
 			},
 			expectedType: core.ContextProject,
@@ -77,10 +76,10 @@ func TestContextDetector_DetectContext(t *testing.T) {
 				t.Helper()
 				tempDir := t.TempDir()
 				worktreeDir := filepath.Join(tempDir, "Worktrees", "test-project", "feature-branch")
-				require.NoError(t, os.MkdirAll(worktreeDir, 0755))
+				require.NoError(t, os.MkdirAll(worktreeDir, 0o755))
 
 				gitFile := filepath.Join(worktreeDir, ".git")
-				require.NoError(t, os.WriteFile(gitFile, []byte("gitdir: /path/to/git/dir"), 0644))
+				require.NoError(t, os.WriteFile(gitFile, []byte("gitdir: /path/to/git/dir"), 0o644))
 
 				return worktreeDir
 			},
@@ -158,10 +157,10 @@ func TestContextDetector_WorktreePriority(t *testing.T) {
 	tempDir := t.TempDir()
 
 	worktreeDir := filepath.Join(tempDir, "Worktrees", "test-project", "main")
-	require.NoError(t, os.MkdirAll(worktreeDir, 0755))
+	require.NoError(t, os.MkdirAll(worktreeDir, 0o755))
 
 	gitFile := filepath.Join(worktreeDir, ".git")
-	require.NoError(t, os.WriteFile(gitFile, []byte("gitdir: /path/to/git/dir"), 0644))
+	require.NoError(t, os.WriteFile(gitFile, []byte("gitdir: /path/to/git/dir"), 0o644))
 
 	config := &core.Config{
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
@@ -181,10 +180,10 @@ func TestContextDetector_ProjectTraversal(t *testing.T) {
 	tempDir := t.TempDir()
 
 	nestedDir := filepath.Join(tempDir, "level1", "level2", "level3")
-	require.NoError(t, os.MkdirAll(nestedDir, 0755))
+	require.NoError(t, os.MkdirAll(nestedDir, 0o755))
 
 	gitDir := filepath.Join(tempDir, ".git")
-	require.NoError(t, os.Mkdir(gitDir, 0755))
+	require.NoError(t, os.Mkdir(gitDir, 0o755))
 
 	config := &core.Config{
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
@@ -204,10 +203,10 @@ func TestContextDetector_InvalidWorktree(t *testing.T) {
 	tempDir := t.TempDir()
 
 	worktreeDir := filepath.Join(tempDir, "Worktrees", "test-project", "feature-branch")
-	require.NoError(t, os.MkdirAll(worktreeDir, 0755))
+	require.NoError(t, os.MkdirAll(worktreeDir, 0o755))
 
 	gitDir := filepath.Join(worktreeDir, ".git")
-	require.NoError(t, os.Mkdir(gitDir, 0755))
+	require.NoError(t, os.Mkdir(gitDir, 0o755))
 
 	config := &core.Config{
 		WorktreesDirectory: filepath.Join(tempDir, "Worktrees"),
@@ -248,8 +247,8 @@ func testWindowsPaths(t *testing.T) {
 	require.NotNil(t, detector)
 
 	projectDir := filepath.Join(config.ProjectsDirectory, "test-project")
-	require.NoError(t, os.MkdirAll(projectDir, 0755))
-	require.NoError(t, os.Mkdir(filepath.Join(projectDir, ".git"), 0755))
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	require.NoError(t, os.Mkdir(filepath.Join(projectDir, ".git"), 0o755))
 
 	ctx, err := detector.DetectContext(projectDir)
 	require.NoError(t, err)
@@ -271,8 +270,8 @@ func testUnixPaths(t *testing.T) {
 	require.NotNil(t, detector)
 
 	projectDir := filepath.Join(config.ProjectsDirectory, "test-project")
-	require.NoError(t, os.MkdirAll(projectDir, 0755))
-	require.NoError(t, os.Mkdir(filepath.Join(projectDir, ".git"), 0755))
+	require.NoError(t, os.MkdirAll(projectDir, 0o755))
+	require.NoError(t, os.Mkdir(filepath.Join(projectDir, ".git"), 0o755))
 
 	ctx, err := detector.DetectContext(projectDir)
 	require.NoError(t, err)

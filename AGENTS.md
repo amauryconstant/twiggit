@@ -47,6 +47,27 @@ graph TB
 `openspec/changes/cli-functional-core-shell/proposal.md` §Lint for the rule
 allow/deny lists.
 
+## Toolchain Policy
+
+Toolchain pins and linter/formatter posture are owned by `.mise/config.toml`,
+`go.mod` (`tool` directive), and `.golangci.yml`. This section records the
+**why** so future contributors do not re-litigate.
+
+| Surface | Owner | Rule |
+|---|---|---|
+| Go toolchain | `go.mod` `go` directive + `.mise/config.toml` `go` | Bump together. Stay on the latest patch within the minor (currently `1.27.1`); security backports land in patches. |
+| `golang.org/x/...` family | `go.mod` | Bump within `patch` scope on each release; reject major-version churn. `go.mod` is for code dependencies only — tool binaries (govulncheck, gocover-cobertura, etc.) live in `.mise/config.toml`. |
+| `govulncheck` | `.mise/config.toml` `tools` | Pinned. Pre-commit and `mise run vuln:check` invoke the mise-installed binary. Never `@latest`. |
+| `gocover-cobertura` | `.mise/config.toml` `tools` | Pinned. `mise run ci:coverage` invokes the mise-installed binary for cobertura conversion. |
+| `gocovmerge` | `.mise/config.toml` `tools` | Pinned. Available on PATH via `mise install` for downstream coverage merge workflows. |
+| `golangci-lint` | `.mise/config.toml` + `.pre-commit-config.yaml` | Pinned to a single version; pre-commit reads from PATH so `mise install` provisions the matching binary. Update in one PR. |
+| `gopls` | `.mise/config.toml` | Pinned to a single version. `mise run gopls:check` runs `gopls check **/*.go` across the module; `mise run gopls:stats` reports analysis state. |
+| Linter set | `.golangci.yml` `linters.enable` | `nolintlint` MUST stay enabled so every `//nolint` directive is forced to carry a reason. New linters land in this change and the existing-rule tasks, not by the side. |
+| Formatters | `.golangci.yml` `formatters.enable` | `gofumpt` (with `extra.group-params`) + `goimports`. Local rewrite via `golangci-lint fmt ./...`; `golangci-lint run` enforces but does not rewrite. |
+
+Adding a new tool: `go get -tool <path>@<version>` for Go-managed tools,
+`mise use <tool>@<version>` for mise backends, then update this table.
+
 ## Essential Commands
 
 | Command                | Purpose                                       |
@@ -55,8 +76,14 @@ allow/deny lists.
 | mise run test:e2e      | CLI end-to-end tests                          |
 | mise run test:golden   | Golden file tests (snapshot testing)          |
 | mise run test:golden:update | Update golden files                      |
-| mise run lint:fix      | Lint + format                                 |
-| mise run verify        | All validation                                |
+| mise run lint:check    | golangci-lint run (no rewrite)                |
+| mise run lint:fix      | golangci-lint run --fix + formatters          |
+| mise run format        | gofmt -w .                                    |
+| mise run gopls:check   | gopls type/semantic diagnostics               |
+| mise run gopls:stats   | gopls analysis state summary                  |
+| mise run lint:gated    | gopls:check + lint:check                      |
+| mise run vuln:check    | govulncheck dependency scan                   |
+| mise run verify        | format + lint:fix + lint:gated + vuln:check + test + build |
 | mise run build         | Build binary                                  |
 | mise tasks             | List all tasks                                |
 

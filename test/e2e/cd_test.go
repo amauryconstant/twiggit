@@ -6,13 +6,12 @@ package e2e
 
 import (
 	"path/filepath"
+	"twiggit/test/e2e/fixtures"
+	"twiggit/test/e2e/helpers"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gexec"
-
-	"twiggit/test/e2e/fixtures"
-	"twiggit/test/e2e/helpers"
 )
 
 var _ = Describe("cd command", func() {

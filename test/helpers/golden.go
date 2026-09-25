@@ -20,7 +20,7 @@ import (
 // Example usage:
 //
 //	helpers.CompareGolden(t, "list/basic_output.golden", actualOutput)
-func CompareGolden(tb testing.TB, goldenFile string, actual string) {
+func CompareGolden(tb testing.TB, goldenFile, actual string) {
 	tb.Helper()
 
 	// Build full path to golden file
@@ -51,16 +51,16 @@ func CompareGolden(tb testing.TB, goldenFile string, actual string) {
 }
 
 // updateGoldenFile writes actual content to the golden file.
-func updateGoldenFile(tb testing.TB, goldenPath string, actual string) {
+func updateGoldenFile(tb testing.TB, goldenPath, actual string) {
 	tb.Helper()
 
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(goldenPath), 0o755); err != nil {
 		tb.Fatalf("failed to create directory for golden file %s: %v", goldenPath, err)
 	}
 
 	// Write golden file
-	if err := os.WriteFile(goldenPath, []byte(actual), 0644); err != nil {
+	if err := os.WriteFile(goldenPath, []byte(actual), 0o644); err != nil {
 		tb.Fatalf("failed to write golden file %s: %v", goldenPath, err)
 	}
 

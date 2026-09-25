@@ -3,12 +3,11 @@ package output_test
 import (
 	"strings"
 	"testing"
+	"twiggit/internal/core"
+	"twiggit/internal/output"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
-	"twiggit/internal/output"
 )
 
 func TestComposeWrapper_EmptyTemplateUsesDefaultPerShell(t *testing.T) {

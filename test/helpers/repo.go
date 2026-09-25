@@ -57,7 +57,7 @@ func (h *RepoTestHelper) SetupTestRepo(projectName string) string {
 
 	// Create repository directory
 	repoPath := filepath.Join(h.baseDir, projectName)
-	if err := os.MkdirAll(repoPath, 0755); err != nil {
+	if err := os.MkdirAll(repoPath, 0o755); err != nil {
 		h.t.Fatalf("Failed to create repository directory: %v", err)
 	}
 

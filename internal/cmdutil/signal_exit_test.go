@@ -5,11 +5,10 @@ import (
 	"testing"
 	"testing/synctest"
 	"time"
+	"twiggit/internal/cmdutil"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/cmdutil"
 )
 
 func TestSignalExitCode_NilCtx(t *testing.T) {

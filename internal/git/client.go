@@ -9,11 +9,10 @@ package git
 
 import (
 	"fmt"
+	"twiggit/internal/core"
 
 	"github.com/go-git/go-git/v5"
 	lru "github.com/hashicorp/golang-lru/v2"
-
-	"twiggit/internal/core"
 )
 
 // defaultCacheSize is the size used when WithCacheSize is omitted.

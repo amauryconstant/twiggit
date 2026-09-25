@@ -3,12 +3,11 @@ package output_test
 import (
 	"bytes"
 	"testing"
+	"twiggit/internal/iostreams"
+	"twiggit/internal/output"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/iostreams"
-	"twiggit/internal/output"
 )
 
 func TestRenderTable_HeadersAndRowsPresent(t *testing.T) {

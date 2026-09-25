@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"runtime/debug"
 	"syscall"
-
 	"twiggit/cmd"
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/output"
@@ -39,6 +38,7 @@ func main() {
 	factory := cmdutil.NewFactory()
 	if err := factory.Init(); err != nil {
 		output.FormatError(os.Stderr, err, nil)
+		//nolint:gocritic // exitAfterDefer: factory init failure aborts the process; pending defers (slog, signal) are non-essential.
 		os.Exit(int(cmdutil.ExitCodeFor(err)))
 	}
 	factory.Context = ctx

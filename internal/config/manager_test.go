@@ -4,11 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
 )
 
 func setupConfigManagerTest(t *testing.T) (*Manager, string, string) {
@@ -361,7 +360,7 @@ func TestConfigManager_LoadWithEnvVarExpansion(t *testing.T) {
 	os.Setenv("TWIGGIT_TEST_WORKTREES", "/custom/worktrees")
 
 	configDir := filepath.Join(tempDir, "twiggit")
-	require.NoError(t, os.MkdirAll(configDir, 0755))
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
 
 	configContent := `
 projects_dir = "$TWIGGIT_TEST_PROJECTS"
@@ -371,7 +370,7 @@ worktrees_dir = "${TWIGGIT_TEST_WORKTREES}"
 backup_dir = "~/backups"
 `
 	configPath := filepath.Join(configDir, "config.toml")
-	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
 
 	manager := NewManager()
 	config, err := manager.Load()
@@ -445,9 +444,9 @@ func TestConfigManager_LoadWrapsKoanfErrors(t *testing.T) {
 	manager, tempDir, _ := setupConfigManagerTest(t)
 
 	configDir := filepath.Join(tempDir, "twiggit")
-	require.NoError(t, os.MkdirAll(configDir, 0755))
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
 	configPath := filepath.Join(configDir, "config.toml")
-	require.NoError(t, os.WriteFile(configPath, []byte("this is not [ valid toml"), 0644))
+	require.NoError(t, os.WriteFile(configPath, []byte("this is not [ valid toml"), 0o644))
 
 	_, err := manager.Load()
 	require.Error(t, err)

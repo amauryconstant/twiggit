@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"github.com/carapace-sh/carapace"
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
+
+	"github.com/carapace-sh/carapace"
+	"github.com/spf13/cobra"
 )
 
 // CdOptions captures every input to runCd.

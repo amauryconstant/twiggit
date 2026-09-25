@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
 	"twiggit/internal/core"
 )
 
@@ -77,13 +76,14 @@ func parseWorktreeLine(line string) *core.WorktreeInfo {
 func buildWorktreeAddArgs(branchExists bool, branchName, worktreePath, sourceBranch string) []string {
 	args := []string{"worktree", "add"}
 
-	if branchExists {
+	switch {
+	case branchExists:
 		// Branch already exists, checkout existing branch
 		args = append(args, worktreePath, branchName)
-	} else if sourceBranch != "" {
+	case sourceBranch != "":
 		// Branch doesn't exist, create new branch from sourceBranch
 		args = append(args, "-b", branchName, worktreePath, sourceBranch)
-	} else {
+	default:
 		// Branch doesn't exist and no sourceBranch provided, create from current HEAD
 		args = append(args, "-b", branchName, worktreePath)
 	}
@@ -103,7 +103,7 @@ func buildWorktreeRemoveArgs(worktreePath string, force bool) []string {
 }
 
 // CreateWorktree creates new worktree using git CLI (idempotent)
-func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch string, worktreePath string) error {
+func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch, worktreePath string) error {
 	// Validate inputs
 	if repoPath == "" {
 		return NewWorktreeError("create", "repository path cannot be empty", nil)
@@ -358,8 +358,7 @@ func (c *cliClient) branchExists(ctx context.Context, repoPath, branchName strin
 		// The executor wraps non-zero exit codes as *core.OperationError(Op="git.command").
 		// The CommandResult returned alongside err already carries ExitCode / Stdout / Stderr
 		// populated by createCommandResult, so we can dispatch on result.ExitCode directly.
-		var oe *core.OperationError
-		if !errors.As(err, &oe) {
+		if _, ok := errors.AsType[*core.OperationError](err); !ok {
 			return false, NewRepoError("branch-exists", "failed to check branch existence", err)
 		}
 	}

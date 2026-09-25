@@ -7,12 +7,11 @@ package e2e
 import (
 	"os"
 	"path/filepath"
+	"twiggit/test/e2e/fixtures"
+	"twiggit/test/e2e/helpers"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"twiggit/test/e2e/fixtures"
-	"twiggit/test/e2e/helpers"
 )
 
 var _ = Describe("delete command", func() {
@@ -67,7 +66,7 @@ var _ = Describe("delete command", func() {
 		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 
 		testFile := filepath.Join(worktreePath, "test.txt")
-		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
+		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0o644)
 		Expect(err).NotTo(HaveOccurred())
 
 		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "--force")
@@ -161,7 +160,7 @@ var _ = Describe("delete command", func() {
 		worktreePath := filepath.Join(fixture.GetConfigHelper().GetWorktreesDir(), "test", result.Feature1Branch)
 
 		testFile := filepath.Join(worktreePath, "test.txt")
-		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0644)
+		err := os.WriteFile(testFile, []byte("uncommitted changes"), 0o644)
 		Expect(err).NotTo(HaveOccurred())
 
 		session := ctxHelper.FromWorktreeDir("test", result.Feature1Branch, "delete", result.Feature1Branch, "-f")

@@ -2,10 +2,9 @@ package cmdutil
 
 import (
 	"context"
+	"twiggit/internal/iostreams"
 
 	"github.com/spf13/cobra"
-
-	"twiggit/internal/iostreams"
 )
 
 // iosContextKey is the unexported context.Context key under which a

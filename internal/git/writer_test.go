@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"testing"
-
 	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
@@ -135,7 +134,7 @@ func TestCLIClient_CreateWorktree(t *testing.T) {
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"show-ref", "--verify", "--quiet", "refs/heads/feature"}).Return(&CommandResult{ExitCode: 1, Stdout: ""}, nil)
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "add", "-b", "feature", worktreeDir, "main"}).Return(func() (*CommandResult, error) {
-		if err := os.MkdirAll(worktreeDir, 0755); err != nil {
+		if err := os.MkdirAll(worktreeDir, 0o755); err != nil {
 			return nil, err
 		}
 		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
@@ -151,7 +150,7 @@ func TestCLIClient_CreateWorktree_WithExistingBranch(t *testing.T) {
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"show-ref", "--verify", "--quiet", "refs/heads/existing-branch"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "add", worktreeDir, "existing-branch"}).Return(func() (*CommandResult, error) {
-		if err := os.MkdirAll(worktreeDir, 0755); err != nil {
+		if err := os.MkdirAll(worktreeDir, 0o755); err != nil {
 			return nil, err
 		}
 		return &CommandResult{ExitCode: 0, Stdout: ""}, nil

@@ -5,10 +5,10 @@
 package e2e
 
 import (
+	"twiggit/test/e2e/helpers"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"twiggit/test/e2e/helpers"
 )
 
 var _ = Describe("version command", func() {

@@ -52,13 +52,13 @@ repos:
 
       - id: govulncheck
         name: Run govulncheck
-        entry: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+        entry: govulncheck ./...
         language: system
         pass_filenames: false
         types: [go]
 
 default_language_version:
-  golang: "1.25.5"
+  golang: "1.27.1"
 
 fail_fast: true
 minimum_pre_commit_version: "3.0.0"

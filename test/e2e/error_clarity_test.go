@@ -5,11 +5,11 @@
 package e2e
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-
 	"twiggit/test/e2e/fixtures"
 	"twiggit/test/e2e/helpers"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("Error Clarity", func() {

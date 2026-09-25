@@ -11,19 +11,19 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"twiggit/internal/git"
+	"twiggit/test/helpers"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"twiggit/internal/git"
 	e2ehelpers "twiggit/test/e2e/helpers"
-	"twiggit/test/helpers"
 )
 
 const (
 	// File permissions for test files
-	FilePermReadWrite = 0644 // read/write for owner, read for others
-	FilePermAll       = 0755 // read/write/execute for all (or use git default)
+	FilePermReadWrite = 0o644 // read/write for owner, read for others
+	FilePermAll       = 0o755 // read/write/execute for all (or use git default)
 )
 
 // E2ETestFixture provides comprehensive test setup for E2E tests

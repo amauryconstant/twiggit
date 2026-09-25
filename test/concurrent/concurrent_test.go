@@ -11,13 +11,12 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"twiggit/internal/core"
+	"twiggit/internal/git"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
-
-	"twiggit/internal/core"
-	"twiggit/internal/git"
 )
 
 // ConcurrentTestSuite provides concurrent operation testing
@@ -38,8 +37,8 @@ func (s *ConcurrentTestSuite) SetupTest() {
 	// Create directories
 	projectsDir := filepath.Join(s.tempDir, "projects")
 	worktreesDir := filepath.Join(s.tempDir, "worktrees")
-	require.NoError(s.T(), os.MkdirAll(projectsDir, 0755))
-	require.NoError(s.T(), os.MkdirAll(worktreesDir, 0755))
+	require.NoError(s.T(), os.MkdirAll(projectsDir, 0o755))
+	require.NoError(s.T(), os.MkdirAll(worktreesDir, 0o755))
 
 	// Create config
 	s.config = &core.Config{

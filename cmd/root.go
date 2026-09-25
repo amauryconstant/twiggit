@@ -1,11 +1,11 @@
 package cmd
 
 import (
-	"github.com/carapace-sh/carapace"
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
+
+	"github.com/carapace-sh/carapace"
+	"github.com/spf13/cobra"
 )
 
 // CommandConfig is the configuration handle every command constructor

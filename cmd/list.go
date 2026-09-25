@@ -6,13 +6,12 @@ import (
 	"io"
 	"path/filepath"
 	"slices"
-
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
+
+	"github.com/spf13/cobra"
 )
 
 // ListOptions captures every input to the runList entry point.

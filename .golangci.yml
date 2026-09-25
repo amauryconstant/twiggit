@@ -1,10 +1,19 @@
 # $schema: https://golangci-lint.run/jsonschema/golangci.jsonschema.json
 version: "2"
 
+formatters:
+  enable:
+    - gofumpt
+    - goimports
+  settings:
+    gofumpt:
+      extra:
+        group-params: true
+
 run:
   timeout: 5m
   tests: true
-  go: "1.25.5"
+  go: "1.27.1"
   build-tags:
     - e2e
     - integration
@@ -54,12 +63,13 @@ linters:
 
     # Modernization
     - modernize
-
-  # gocognit intentionally absent (redundant with gocyclo + nestif).
+    - gocritic
+    - nilerr
+    - nolintlint
 
   settings:
     staticcheck:
-      checks: ["all,-ST1000"]  # all but style-only checks already covered by revive
+      checks: ["all,-ST1000"] # all but style-only checks already covered by revive
 
     testifylint:
       enable-all: true
@@ -93,10 +103,6 @@ linters:
       require-specific: true
 
     depguard:
-      # Tier 2 strict rules per cli-functional-core-shell proposal §Lint.
-      # Each layer lists the imports it legitimately needs. The deny
-      # blocks document WHY a layer cannot reach into others, so future
-      # contributors see the constraint without re-reading the proposal.
       rules:
         core:
           files:
@@ -196,7 +202,6 @@ linters:
             - $gostd
             - github.com/samber/lo
             - charm.land/lipgloss/v2
-            - github.com/charmbracelet/x/term
             - golang.org/x/term
             - twiggit/internal/core
           deny:
@@ -257,14 +262,15 @@ linters:
             - twiggit/cmd
           deny:
             - pkg: "github.com/charmbracelet/lipgloss"
-              desc: "cmd/ uses charm.land/lipgloss/v2 through internal/{iostreams,output} only"
+              desc: "cmd/ uses charm.land/lipgloss/v2 through internal/{iostreams,output}
+                only"
             - pkg: "github.com/charmbracelet/lipgloss/v2"
               desc: "cmd/ uses lipgloss via internal/{iostreams,output} only"
 
   exclusions:
     rules:
-      # Broad test exclusions (fixtures, helpers, mocks, integration, e2e, etc.)
-      - path: ".*_test\\.go|test/(fixtures|helpers|mocks|integration)/.*\\.go|test/e2e/(fixtures|helpers)/.*\\.go"
+      - path: "^.*_test\\.go$|test/(fixtures|helpers|mocks|integration)/.*\\.go|test/e2\
+          e/(fixtures|helpers)/.*\\.go"
         linters:
           - funlen
           - gocyclo

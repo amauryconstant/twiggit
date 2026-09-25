@@ -6,13 +6,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"twiggit/internal/core"
 
 	"github.com/go-git/go-git/v5"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
 )
 
 func TestGoGitClient_OpenRepository(t *testing.T) {
@@ -301,7 +300,7 @@ func setupTestRepo(t *testing.T, tempDir string) string {
 	require.NoError(t, err)
 	repoPath := filepath.Join(tempDir, "test-repo")
 
-	err = os.MkdirAll(repoPath, 0755)
+	err = os.MkdirAll(repoPath, 0o755)
 	require.NoError(t, err)
 
 	_, err = client.OpenRepository(repoPath)
@@ -310,17 +309,17 @@ func setupTestRepo(t *testing.T, tempDir string) string {
 	}
 
 	gitDir := filepath.Join(repoPath, ".git")
-	err = os.MkdirAll(gitDir, 0755)
+	err = os.MkdirAll(gitDir, 0o755)
 	require.NoError(t, err)
 
-	err = os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0644)
+	err = os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte("ref: refs/heads/main\n"), 0o644)
 	require.NoError(t, err)
 
 	refsDir := filepath.Join(gitDir, "refs", "heads")
-	err = os.MkdirAll(refsDir, 0755)
+	err = os.MkdirAll(refsDir, 0o755)
 	require.NoError(t, err)
 
-	err = os.WriteFile(filepath.Join(refsDir, "main"), []byte("0000000000000000000000000000000000000000\n"), 0644)
+	err = os.WriteFile(filepath.Join(refsDir, "main"), []byte("0000000000000000000000000000000000000000\n"), 0o644)
 	require.NoError(t, err)
 
 	return repoPath

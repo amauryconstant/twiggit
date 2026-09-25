@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
 	"twiggit/internal/core"
 )
 
@@ -167,7 +166,7 @@ type contextResolver struct {
 type ContextResolver = contextResolver
 
 // NewContextResolver creates a new context resolver.
-func NewContextResolver(cfg *core.Config, goGit *Client, cli *Client) *ContextResolver {
+func NewContextResolver(cfg *core.Config, goGit, cli *Client) *ContextResolver {
 	return &contextResolver{
 		config:     cfg,
 		goGit:      goGit,
@@ -294,6 +293,7 @@ func (cr *contextResolver) addMainSuggestion(suggestions []*core.ResolutionSugge
 		return suggestions
 	}
 
+	//nolint:gocritic // argOrder: carapace completion wants "main" when the user's partial input is "", "m", "ma", "mai", or "main" — reverse-direction HasPrefix is intentional.
 	if strings.HasPrefix("main", partial) {
 		suggestions = append(suggestions, &core.ResolutionSuggestion{
 			Text:        "main",

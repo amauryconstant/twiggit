@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"twiggit/internal/core"
 	"twiggit/internal/iostreams"
 	"twiggit/internal/output"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatError_ValidationError(t *testing.T) {

@@ -5,11 +5,10 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"twiggit/internal/output"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/output"
 )
 
 type sample struct {

@@ -2,10 +2,9 @@ package iostreams_test
 
 import (
 	"testing"
+	"twiggit/internal/iostreams"
 
 	"github.com/stretchr/testify/assert"
-
-	"twiggit/internal/iostreams"
 )
 
 func TestStyles_IdentityWhenColorDisabled(t *testing.T) {

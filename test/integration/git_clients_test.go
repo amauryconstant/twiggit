@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
 	"twiggit/internal/git"
 
 	"github.com/stretchr/testify/assert"
@@ -26,7 +25,7 @@ func TestGitOperations_Integration(t *testing.T) {
 	repoPath := filepath.Join(tempDir, "test-repo")
 
 	// Initialize git repository
-	require.NoError(t, os.MkdirAll(repoPath, 0755))
+	require.NoError(t, os.MkdirAll(repoPath, 0o755))
 
 	// Use command executor to initialize git repo
 	executor := git.NewCommandExecutor(30 * time.Second)
@@ -43,7 +42,7 @@ func TestGitOperations_Integration(t *testing.T) {
 
 	// Create initial commit
 	testFile := filepath.Join(repoPath, "test.txt")
-	require.NoError(t, os.WriteFile(testFile, []byte("test content"), 0644))
+	require.NoError(t, os.WriteFile(testFile, []byte("test content"), 0o644))
 	_, err = executor.Execute(context.Background(), repoPath, "git", "add", "test.txt")
 	require.NoError(t, err)
 	_, err = executor.Execute(context.Background(), repoPath, "git", "commit", "-m", "Initial commit")

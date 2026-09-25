@@ -7,11 +7,10 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"twiggit/internal/core"
 
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/v2"
-
-	"twiggit/internal/core"
 )
 
 // Manager is the canonical configuration manager. cmdutil.Factory.Config

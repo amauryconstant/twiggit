@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
-
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 
@@ -32,7 +31,7 @@ func TestContextDetector_Integration(t *testing.T) {
 			setupFunc: func(t *testing.T, config *core.Config) string {
 				t.Helper()
 				repoDir := filepath.Join(config.ProjectsDirectory, "test-repo")
-				require.NoError(t, os.MkdirAll(repoDir, 0755))
+				require.NoError(t, os.MkdirAll(repoDir, 0o755))
 
 				// Use git to initialize repository
 				cmd := exec.Command("git", "init")
@@ -50,7 +49,7 @@ func TestContextDetector_Integration(t *testing.T) {
 				t.Helper()
 				// Setup main repository
 				mainRepo := filepath.Join(config.ProjectsDirectory, "main-repo")
-				require.NoError(t, os.MkdirAll(mainRepo, 0755))
+				require.NoError(t, os.MkdirAll(mainRepo, 0o755))
 
 				// Initialize main repo
 				cmd := exec.Command("git", "init")
@@ -77,7 +76,7 @@ func TestContextDetector_Integration(t *testing.T) {
 
 				// Create worktree
 				worktreeDir := filepath.Join(config.WorktreesDirectory, "main-repo", "feature-branch")
-				require.NoError(t, os.MkdirAll(filepath.Dir(worktreeDir), 0755))
+				require.NoError(t, os.MkdirAll(filepath.Dir(worktreeDir), 0o755))
 
 				cmd = exec.Command("git", "worktree", "add", worktreeDir, "-b", "feature-branch")
 				cmd.Dir = mainRepo
@@ -127,7 +126,7 @@ func TestContextResolver_Integration(t *testing.T) {
 
 	// Setup a real git repository with worktree
 	mainRepo := filepath.Join(config.ProjectsDirectory, "test-project")
-	require.NoError(t, os.MkdirAll(mainRepo, 0755))
+	require.NoError(t, os.MkdirAll(mainRepo, 0o755))
 
 	// Initialize main repo
 	cmd := exec.Command("git", "init")
@@ -154,7 +153,7 @@ func TestContextResolver_Integration(t *testing.T) {
 
 	// Create worktree
 	worktreeDir := filepath.Join(config.WorktreesDirectory, "test-project", "feature-branch")
-	require.NoError(t, os.MkdirAll(filepath.Dir(worktreeDir), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Dir(worktreeDir), 0o755))
 
 	cmd = exec.Command("git", "worktree", "add", worktreeDir, "-b", "feature-branch")
 	cmd.Dir = mainRepo
@@ -208,7 +207,7 @@ func TestContextService_Integration(t *testing.T) {
 
 	// Setup a real git repository
 	repoDir := filepath.Join(config.ProjectsDirectory, "service-test")
-	require.NoError(t, os.MkdirAll(repoDir, 0755))
+	require.NoError(t, os.MkdirAll(repoDir, 0o755))
 
 	cmd := exec.Command("git", "init")
 	cmd.Dir = repoDir

@@ -5,11 +5,10 @@ import (
 	"io"
 	"log/slog"
 	"testing"
+	"twiggit/internal/iostreams"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/iostreams"
 )
 
 func TestTest_ReturnsNonTTYStreams(t *testing.T) {

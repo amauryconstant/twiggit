@@ -43,6 +43,7 @@ func NormalizePath(path string) (string, error) {
 
 	resolved, err := filepath.EvalSymlinks(abs)
 	if err != nil {
+		//nolint:nilerr // EvalSymlinks can fail on broken symlinks; callers get a usable absolute path instead of an error.
 		return abs, nil
 	}
 

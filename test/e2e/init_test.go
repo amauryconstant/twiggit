@@ -8,12 +8,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"twiggit/test/e2e/fixtures"
+	"twiggit/test/e2e/helpers"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"twiggit/test/e2e/fixtures"
-	"twiggit/test/e2e/helpers"
 )
 
 var _ = Describe("init command", func() {
@@ -114,7 +113,7 @@ var _ = Describe("init command", func() {
 
 	It("installs with explicit --config flag", func() {
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0o644)).To(Succeed())
 
 		session := cli.Run("init", "bash", "--install", "--config", bashrcPath)
 		cli.ShouldSucceed(session)
@@ -132,7 +131,7 @@ var _ = Describe("init command", func() {
 
 	It("installs with explicit shell and --config", func() {
 		zshrcPath := filepath.Join(fixture.GetTempDir(), ".zshrc")
-		Expect(os.WriteFile(zshrcPath, []byte("# Zsh config\n"), 0644)).To(Succeed())
+		Expect(os.WriteFile(zshrcPath, []byte("# Zsh config\n"), 0o644)).To(Succeed())
 
 		session := cli.Run("init", "zsh", "--install", "--config", zshrcPath)
 		cli.ShouldSucceed(session)
@@ -144,7 +143,7 @@ var _ = Describe("init command", func() {
 
 	It("installs to custom config with --install --config", func() {
 		customConfigPath := filepath.Join(fixture.GetTempDir(), "my-bash-config")
-		Expect(os.WriteFile(customConfigPath, []byte("# Custom config\n"), 0644)).To(Succeed())
+		Expect(os.WriteFile(customConfigPath, []byte("# Custom config\n"), 0o644)).To(Succeed())
 
 		session := cli.Run("init", "bash", "--install", "--config", customConfigPath)
 		cli.ShouldSucceed(session)
@@ -170,7 +169,7 @@ var _ = Describe("init command", func() {
 
 	It("skips when wrapper already installed", func() {
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0o644)).To(Succeed())
 
 		// First install
 		session1 := cli.Run("init", "bash", "--install", "--config", bashrcPath)
@@ -187,7 +186,7 @@ var _ = Describe("init command", func() {
 
 	It("forces reinstall with --install --force", func() {
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0o644)).To(Succeed())
 
 		// First install
 		session1 := cli.Run("init", "bash", "--install", "--config", bashrcPath)
@@ -238,7 +237,7 @@ var _ = Describe("init command", func() {
 
 	It("shows level 1 verbose output with -v flag in install mode", func() {
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0o644)).To(Succeed())
 
 		session := cli.Run("init", "bash", "--install", "--config", bashrcPath, "-v")
 		cli.ShouldSucceed(session)
@@ -247,7 +246,7 @@ var _ = Describe("init command", func() {
 
 	It("shows verbose output with -vv flag in install mode", func() {
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0o644)).To(Succeed())
 
 		session := cli.Run("init", "bash", "--install", "--config", bashrcPath, "-vv")
 		cli.ShouldSucceed(session)
@@ -257,7 +256,7 @@ var _ = Describe("init command", func() {
 
 	It("shows no verbose output by default in install mode", func() {
 		bashrcPath := filepath.Join(fixture.GetTempDir(), ".bashrc")
-		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0644)).To(Succeed())
+		Expect(os.WriteFile(bashrcPath, []byte("# Bash config\n"), 0o644)).To(Succeed())
 
 		session := cli.Run("init", "bash", "--install", "--config", bashrcPath)
 		cli.ShouldSucceed(session)

@@ -8,11 +8,10 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
 )
 
 func TestNormalizePath_Integration(t *testing.T) {
@@ -21,7 +20,7 @@ func TestNormalizePath_Integration(t *testing.T) {
 
 		// Create a subdirectory
 		subDir := filepath.Join(tempDir, "subdir")
-		err := os.Mkdir(subDir, 0755)
+		err := os.Mkdir(subDir, 0o755)
 		require.NoError(t, err)
 
 		// Change to subdirectory
@@ -48,7 +47,7 @@ func TestNormalizePath_Integration(t *testing.T) {
 
 		// Create target file
 		targetFile := filepath.Join(tempDir, "target.txt")
-		err := os.WriteFile(targetFile, []byte("content"), 0644)
+		err := os.WriteFile(targetFile, []byte("content"), 0o644)
 		require.NoError(t, err)
 
 		// Create symlink
@@ -90,12 +89,12 @@ func TestNormalizePath_Integration(t *testing.T) {
 
 		// Create target directory
 		targetDir := filepath.Join(tempDir, "target_dir")
-		err := os.Mkdir(targetDir, 0755)
+		err := os.Mkdir(targetDir, 0o755)
 		require.NoError(t, err)
 
 		// Create file in target directory
 		targetFile := filepath.Join(targetDir, "file.txt")
-		err = os.WriteFile(targetFile, []byte("content"), 0644)
+		err = os.WriteFile(targetFile, []byte("content"), 0o644)
 		require.NoError(t, err)
 
 		// Create symlink to directory
@@ -118,12 +117,12 @@ func TestNormalizePath_Integration(t *testing.T) {
 
 		// Create nested directory structure
 		deepDir := filepath.Join(tempDir, "a", "b", "c")
-		err := os.MkdirAll(deepDir, 0755)
+		err := os.MkdirAll(deepDir, 0o755)
 		require.NoError(t, err)
 
 		// Create file in deep directory
 		deepFile := filepath.Join(deepDir, "deep.txt")
-		err = os.WriteFile(deepFile, []byte("deep content"), 0644)
+		err = os.WriteFile(deepFile, []byte("deep content"), 0o644)
 		require.NoError(t, err)
 
 		// Create symlink chain
@@ -146,16 +145,16 @@ func TestNormalizePath_Integration(t *testing.T) {
 
 		// Create nested structure
 		nestedDir := filepath.Join(tempDir, "level1", "level2")
-		err := os.MkdirAll(nestedDir, 0755)
+		err := os.MkdirAll(nestedDir, 0o755)
 		require.NoError(t, err)
 
 		// Create file at different levels
 		rootFile := filepath.Join(tempDir, "root.txt")
-		err = os.WriteFile(rootFile, []byte("root"), 0644)
+		err = os.WriteFile(rootFile, []byte("root"), 0o644)
 		require.NoError(t, err)
 
 		nestedFile := filepath.Join(nestedDir, "nested.txt")
-		err = os.WriteFile(nestedFile, []byte("nested"), 0644)
+		err = os.WriteFile(nestedFile, []byte("nested"), 0o644)
 		require.NoError(t, err)
 
 		originalWd, err := os.Getwd()
@@ -195,9 +194,9 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		deepDir := filepath.Join(subDir, "deep")
 		outsideDir := filepath.Join(tempDir, "outside")
 
-		err := os.MkdirAll(deepDir, 0755)
+		err := os.MkdirAll(deepDir, 0o755)
 		require.NoError(t, err)
-		err = os.MkdirAll(outsideDir, 0755)
+		err = os.MkdirAll(outsideDir, 0o755)
 		require.NoError(t, err)
 
 		// Create files
@@ -206,13 +205,13 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		deepFile := filepath.Join(deepDir, "deep.txt")
 		outsideFile := filepath.Join(outsideDir, "outside.txt")
 
-		err = os.WriteFile(baseFile, []byte("base"), 0644)
+		err = os.WriteFile(baseFile, []byte("base"), 0o644)
 		require.NoError(t, err)
-		err = os.WriteFile(subFile, []byte("sub"), 0644)
+		err = os.WriteFile(subFile, []byte("sub"), 0o644)
 		require.NoError(t, err)
-		err = os.WriteFile(deepFile, []byte("deep"), 0644)
+		err = os.WriteFile(deepFile, []byte("deep"), 0o644)
 		require.NoError(t, err)
-		err = os.WriteFile(outsideFile, []byte("outside"), 0644)
+		err = os.WriteFile(outsideFile, []byte("outside"), 0o644)
 		require.NoError(t, err)
 
 		tests := []struct {
@@ -250,7 +249,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		// Create real directory structure
 		realBase := filepath.Join(tempDir, "real_base")
 		realSub := filepath.Join(realBase, "subdir")
-		err := os.MkdirAll(realSub, 0755)
+		err := os.MkdirAll(realSub, 0o755)
 		require.NoError(t, err)
 
 		// Create symlink to base directory
@@ -274,7 +273,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		// Create structure
 		baseDir := filepath.Join(tempDir, "base")
 		subDir := filepath.Join(baseDir, "sub")
-		err := os.MkdirAll(subDir, 0755)
+		err := os.MkdirAll(subDir, 0o755)
 		require.NoError(t, err)
 
 		originalWd, err := os.Getwd()
@@ -320,7 +319,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 
 		dirs := []string{srcDir, pkgDir, cmdDir, vendorDir, testDir}
 		for _, dir := range dirs {
-			err := os.MkdirAll(dir, 0755)
+			err := os.MkdirAll(dir, 0o755)
 			require.NoError(t, err)
 		}
 
@@ -334,7 +333,7 @@ func TestIsPathUnder_Integration(t *testing.T) {
 		}
 
 		for file, content := range files {
-			err := os.WriteFile(file, []byte(content), 0644)
+			err := os.WriteFile(file, []byte(content), 0o644)
 			require.NoError(t, err)
 		}
 
@@ -396,9 +395,9 @@ func TestPathUtils_Integration_EdgeCases(t *testing.T) {
 
 		// Create a directory and remove read permissions
 		restrictedDir := filepath.Join(tempDir, "restricted")
-		err := os.Mkdir(restrictedDir, 0000)
+		err := os.Mkdir(restrictedDir, 0o000)
 		require.NoError(t, err)
-		defer os.Chmod(restrictedDir, 0755) // Restore permissions for cleanup
+		defer os.Chmod(restrictedDir, 0o755) // Restore permissions for cleanup
 
 		// Test NormalizePath with restricted directory
 		// This should still work as it doesn't need to read the directory contents
@@ -418,7 +417,7 @@ func TestPathUtils_Integration_EdgeCases(t *testing.T) {
 		longName := strings.Repeat("very_long_directory_name_", 10)
 		longPath := filepath.Join(tempDir, longName)
 
-		err := os.Mkdir(longPath, 0755)
+		err := os.Mkdir(longPath, 0o755)
 		require.NoError(t, err)
 
 		result, err := core.NormalizePath(longPath)

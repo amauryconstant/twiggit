@@ -9,10 +9,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"twiggit/internal/core"
 
 	lru "github.com/hashicorp/golang-lru/v2"
-
-	"twiggit/internal/core"
 )
 
 const contextDetectorCacheSize = 256

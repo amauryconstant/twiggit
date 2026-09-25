@@ -3,11 +3,10 @@ package output
 import (
 	"fmt"
 	"io"
+	"twiggit/internal/iostreams"
 
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
-
-	"twiggit/internal/iostreams"
 )
 
 // RenderTable renders headers and rows as a lipgloss table to w.

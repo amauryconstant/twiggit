@@ -10,14 +10,13 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"github.com/carapace-sh/carapace"
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
+
+	"github.com/carapace-sh/carapace"
+	"github.com/spf13/cobra"
 )
 
 // PruneOptions captures every input to runPrune.
@@ -219,7 +218,7 @@ func runPruneWalk(ctx context.Context, client *git.Client, logger *slog.Logger, 
 	}
 
 	if len(result.DeletedWorktrees) == 1 && req.SpecificWorktree != "" {
-		projectName := strings.Split(req.SpecificWorktree, "/")[0]
+		projectName, _, _ := strings.Cut(req.SpecificWorktree, "/")
 		projectPath := filepath.Join(cfg.ProjectsDirectory, projectName)
 		if _, statErr := os.Stat(projectPath); statErr == nil {
 			result.NavigationPath = projectPath

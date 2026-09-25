@@ -2,7 +2,6 @@ package output
 
 import (
 	"strings"
-
 	"twiggit/internal/core"
 )
 

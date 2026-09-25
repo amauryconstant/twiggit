@@ -8,11 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"twiggit/internal/core"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"twiggit/internal/core"
 
 	"github.com/pelletier/go-toml"
 )
@@ -81,14 +80,14 @@ func (c *ConfigHelper) WithCustomConfig(content string) *ConfigHelper {
 // Build creates the configuration file and returns the config directory path
 func (c *ConfigHelper) Build() string {
 	// Create config directory
-	err := os.MkdirAll(c.configDir, 0755)
+	err := os.MkdirAll(c.configDir, 0o755)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Create projects and worktrees directories
-	err = os.MkdirAll(c.projectsDir, 0755)
+	err = os.MkdirAll(c.projectsDir, 0o755)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = os.MkdirAll(c.worktreesDir, 0755)
+	err = os.MkdirAll(c.worktreesDir, 0o755)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Build configuration content
@@ -126,7 +125,7 @@ max_concurrent = 1
 `)
 
 	// Write configuration file
-	err = os.WriteFile(c.configPath, []byte(configContent.String()), 0644)
+	err = os.WriteFile(c.configPath, []byte(configContent.String()), 0o644)
 	Expect(err).NotTo(HaveOccurred())
 
 	// Validate TOML syntax

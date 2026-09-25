@@ -6,11 +6,10 @@ import (
 	"path/filepath"
 	"sort"
 	"time"
-
-	"github.com/carapace-sh/carapace"
-
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+
+	"github.com/carapace-sh/carapace"
 )
 
 // getCompletionTimeout returns the completion timeout duration from config, defaulting to 500ms

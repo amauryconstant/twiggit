@@ -5,15 +5,14 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
 	"twiggit/test/helpers"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // cdTestOpts assembles CdOptions for the supplied working dir + target.
@@ -144,5 +143,7 @@ func TestCd_EmptyTargetReturnsError(t *testing.T) {
 }
 
 // silence unused cdTestOpts shim; helpers/tests use bespoke opts.
-var _ = cdTestOpts
-var _ = strings.Builder{}
+var (
+	_ = cdTestOpts
+	_ = strings.Builder{}
+)

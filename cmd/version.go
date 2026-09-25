@@ -3,13 +3,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
+
+	"github.com/spf13/cobra"
 )
 
 // VersionOptions captures every input to the version command.

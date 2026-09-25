@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
 	"twiggit/internal/core"
 )
 
@@ -79,7 +78,7 @@ func InstallWrapper(shellType core.ShellType, wrapper, configFile string, force 
 
 	if !fileExists {
 		// Create the file if it doesn't exist.
-		if err := os.WriteFile(configFile, []byte(wrapper), 0644); err != nil { // #nosec G306 -- standard perms for shell configs
+		if err := os.WriteFile(configFile, []byte(wrapper), 0o644); err != nil { // #nosec G306 -- standard perms for shell configs
 			return core.NewShellWrapperError(string(shellType), "installation", "failed to create config file", err)
 		}
 		return nil
@@ -104,7 +103,7 @@ func InstallWrapper(shellType core.ShellType, wrapper, configFile string, force 
 
 	// Append wrapper to config file.
 	updatedContent := appendWrapper(contentStr, wrapper)
-	if err := os.WriteFile(configFile, []byte(updatedContent), 0644); err != nil { // #nosec G306,G703 -- standard perms for shell configs, path from DetectConfigFile
+	if err := os.WriteFile(configFile, []byte(updatedContent), 0o644); err != nil { // #nosec G306,G703 -- standard perms for shell configs, path from DetectConfigFile
 		return core.NewShellWrapperError(string(shellType), "installation", "failed to write wrapper to config file", err)
 	}
 

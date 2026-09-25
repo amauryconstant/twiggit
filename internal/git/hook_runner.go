@@ -8,12 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"twiggit/internal/core"
 
 	"github.com/knadh/koanf/parsers/toml"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
-
-	"twiggit/internal/core"
 )
 
 // *HookRunner satisfies the consumer-side HookRunner interface declared

@@ -21,7 +21,7 @@ func TestMainConfigLoadFailure_InvalidYAML(t *testing.T) {
 	// Create a temp directory with invalid config
 	tempDir := t.TempDir()
 	configDir := filepath.Join(tempDir, "twiggit")
-	require.NoError(t, os.MkdirAll(configDir, 0755))
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
 
 	// Write invalid YAML to config file
 	configPath := filepath.Join(configDir, "config.toml")
@@ -30,7 +30,7 @@ projects_dir = "/tmp/projects
 # Missing closing quote and invalid structure
 worktrees_dir = /tmp/worktrees
 `
-	require.NoError(t, os.WriteFile(configPath, []byte(invalidYAML), 0644))
+	require.NoError(t, os.WriteFile(configPath, []byte(invalidYAML), 0o644))
 
 	// Build the binary
 	binaryPath := buildTestBinary(t)
@@ -48,8 +48,7 @@ worktrees_dir = /tmp/worktrees
 	// Should fail with non-zero exit code
 	require.Error(t, err, "Should fail with invalid config")
 	// Exit code should be non-zero (may be 1 for config error)
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		assert.Equal(t, 1, exitErr.ExitCode(), "config error must exit 1 per the 3-code contract")
 	}
 }
@@ -84,13 +83,13 @@ func TestMainSuccessfulExecution_ValidConfig(t *testing.T) {
 	// Create a temp directory with valid config
 	tempDir := t.TempDir()
 	configDir := filepath.Join(tempDir, "twiggit")
-	require.NoError(t, os.MkdirAll(configDir, 0755))
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
 
 	// Create valid config
 	projectsDir := filepath.Join(tempDir, "projects")
 	worktreesDir := filepath.Join(tempDir, "worktrees")
-	require.NoError(t, os.MkdirAll(projectsDir, 0755))
-	require.NoError(t, os.MkdirAll(worktreesDir, 0755))
+	require.NoError(t, os.MkdirAll(projectsDir, 0o755))
+	require.NoError(t, os.MkdirAll(worktreesDir, 0o755))
 
 	configContent := fmt.Sprintf(`
 projects_dir = "%s"
@@ -111,7 +110,7 @@ timeout = "500ms"
 `, projectsDir, worktreesDir)
 
 	configPath := filepath.Join(configDir, "config.toml")
-	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0644))
+	require.NoError(t, os.WriteFile(configPath, []byte(configContent), 0o644))
 
 	// Build the binary
 	binaryPath := buildTestBinary(t)
@@ -165,8 +164,7 @@ func TestMainCommandExecutionFailure_InvalidCommand(t *testing.T) {
 	require.Error(t, err, "Should fail with unknown command")
 
 	// Check exit code
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		assert.Equal(t, 1, exitErr.ExitCode(), "Should exit with code 1 for unknown command")
 	}
 	assert.Contains(t, stderr.String(), "unknown command")
@@ -188,8 +186,7 @@ func TestMainCommandExecutionFailure_InvalidArguments(t *testing.T) {
 	require.Error(t, err, "Should fail without arguments")
 
 	// Check exit code
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		// Usage errors should exit with code 2
 		assert.Equal(t, 2, exitErr.ExitCode(), "Should exit with code 2 for usage error")
 	}
@@ -210,7 +207,7 @@ func buildTestBinary(t *testing.T) string {
 	}
 
 	binDir := filepath.Join(cwd, "bin")
-	require.NoError(t, os.MkdirAll(binDir, 0755), "Failed to create bin directory")
+	require.NoError(t, os.MkdirAll(binDir, 0o755), "Failed to create bin directory")
 
 	binaryPath := filepath.Join(binDir, "twiggit-test")
 

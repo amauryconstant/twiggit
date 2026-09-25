@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"twiggit/test/e2e/fixtures"
 
 	. "github.com/onsi/ginkgo/v2"
 
-	"twiggit/test/e2e/fixtures"
 	e2ehelpers "twiggit/test/e2e/helpers"
 )
 
@@ -111,7 +111,7 @@ var _ = Describe("Golden file tests", func() {
 
 // compareGolden compares actual output with golden file content for E2E tests.
 // If UPDATE_GOLDEN environment variable is set to "true", the golden file will be updated.
-func compareGolden(goldenFile string, actual string) {
+func compareGolden(goldenFile, actual string) {
 	// Get project root (navigate up from test/e2e)
 	goldenPath := filepath.Join("..", "..", "test", "golden", goldenFile)
 	// Convert to absolute path
@@ -148,14 +148,14 @@ func compareGolden(goldenFile string, actual string) {
 }
 
 // updateGoldenFileE2E writes actual content to the golden file for E2E tests.
-func updateGoldenFileE2E(goldenPath string, actual string) {
+func updateGoldenFileE2E(goldenPath, actual string) {
 	// Ensure directory exists
-	if err := os.MkdirAll(filepath.Dir(goldenPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(goldenPath), 0o755); err != nil {
 		GinkgoT().Fatalf("failed to create directory for golden file %s: %v", goldenPath, err)
 	}
 
 	// Write golden file
-	if err := os.WriteFile(goldenPath, []byte(actual), 0644); err != nil {
+	if err := os.WriteFile(goldenPath, []byte(actual), 0o644); err != nil {
 		GinkgoT().Fatalf("failed to write golden file %s: %v", goldenPath, err)
 	}
 

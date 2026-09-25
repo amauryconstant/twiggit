@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-
 	"twiggit/internal/config"
 	"twiggit/internal/core"
 	"twiggit/internal/git"

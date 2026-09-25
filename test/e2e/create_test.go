@@ -7,12 +7,11 @@ package e2e
 import (
 	"os"
 	"path/filepath"
+	"twiggit/test/e2e/fixtures"
+	"twiggit/test/e2e/helpers"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-
-	"twiggit/test/e2e/fixtures"
-	"twiggit/test/e2e/helpers"
 )
 
 var _ = Describe("create command", func() {
@@ -190,7 +189,7 @@ var _ = Describe("create command", func() {
 commands = ["echo hook-ran-successfully"]
 `
 		hookConfigPath := filepath.Join(projectPath, ".twiggit.toml")
-		err := os.WriteFile(hookConfigPath, []byte(hookConfigContent), 0644)
+		err := os.WriteFile(hookConfigPath, []byte(hookConfigContent), 0o644)
 		Expect(err).NotTo(HaveOccurred())
 
 		testID := fixture.GetTestID()
@@ -216,7 +215,7 @@ commands = ["echo hook-ran-successfully"]
 commands = ["exit 1"]
 `
 		hookConfigPath := filepath.Join(projectPath, ".twiggit.toml")
-		err := os.WriteFile(hookConfigPath, []byte(hookConfigContent), 0644)
+		err := os.WriteFile(hookConfigPath, []byte(hookConfigContent), 0o644)
 		Expect(err).NotTo(HaveOccurred())
 
 		testID := fixture.GetTestID()

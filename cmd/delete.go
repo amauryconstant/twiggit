@@ -6,14 +6,13 @@ import (
 	"fmt"
 	"path/filepath"
 	"time"
-
-	"github.com/carapace-sh/carapace"
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
+
+	"github.com/carapace-sh/carapace"
+	"github.com/spf13/cobra"
 )
 
 // DeleteOptions captures every input to runDelete.
@@ -235,11 +234,12 @@ func getWorktreeStatus(ctx context.Context, client *git.Client, worktreePath str
 	}
 
 	branchStatus := "up-to-date"
-	if repoStatus.Ahead > 0 && repoStatus.Behind > 0 {
+	switch {
+	case repoStatus.Ahead > 0 && repoStatus.Behind > 0:
 		branchStatus = "diverged"
-	} else if repoStatus.Ahead > 0 {
+	case repoStatus.Ahead > 0:
 		branchStatus = "ahead"
-	} else if repoStatus.Behind > 0 {
+	case repoStatus.Behind > 0:
 		branchStatus = "behind"
 	}
 

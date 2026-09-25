@@ -2,11 +2,10 @@ package cmd
 
 import (
 	"testing"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
 )
 
 // TestCreate_BranchValidationError covers the validation gate at

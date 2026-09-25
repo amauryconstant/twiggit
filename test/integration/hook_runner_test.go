@@ -8,11 +8,10 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/stretchr/testify/suite"
-
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+
+	"github.com/stretchr/testify/suite"
 )
 
 type HookRunnerIntegrationSuite struct {
@@ -40,7 +39,7 @@ func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_ExecutesEchoCommand(
 [hooks.post-create]
 commands = ["echo hello"]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
@@ -67,7 +66,7 @@ commands = [
     "echo third",
 ]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
@@ -94,7 +93,7 @@ commands = [
     "echo third",
 ]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
@@ -119,7 +118,7 @@ func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_EnvironmentVariables
 [hooks.post-create]
 commands = ["printenv TWIGGIT_PROJECT_NAME"]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
@@ -146,7 +145,7 @@ func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_CommandExecutesInWor
 [hooks.post-create]
 commands = ["touch marker.txt"]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
@@ -185,7 +184,7 @@ func (s *HookRunnerIntegrationSuite) TestRun_EmptyHooksSection_ReturnsNotExecute
 [other-section]
 key = "value"
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{

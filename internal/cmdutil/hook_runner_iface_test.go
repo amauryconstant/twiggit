@@ -3,12 +3,11 @@ package cmdutil
 import (
 	"context"
 	"testing"
+	"twiggit/internal/core"
+	"twiggit/internal/git"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
-	"twiggit/internal/git"
 )
 
 // HookRunnerFunc adapts a plain function to the HookRunner interface.

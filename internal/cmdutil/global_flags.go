@@ -1,9 +1,9 @@
 package cmdutil
 
 import (
-	"github.com/spf13/cobra"
-
 	"twiggit/internal/iostreams"
+
+	"github.com/spf13/cobra"
 )
 
 // GlobalOptions holds the values parsed from the persistent --output /

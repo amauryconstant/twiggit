@@ -5,12 +5,12 @@
 package e2e
 
 import (
+	"twiggit/test/e2e/fixtures"
+	"twiggit/test/e2e/helpers"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
-
-	"twiggit/test/e2e/fixtures"
-	"twiggit/test/e2e/helpers"
 )
 
 var _ = Describe("list command", func() {

@@ -5,12 +5,11 @@ import (
 	"errors"
 	"path/filepath"
 	"strings"
+	"twiggit/internal/core"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	lru "github.com/hashicorp/golang-lru/v2"
-
-	"twiggit/internal/core"
 )
 
 // reader implements the read-side git operations (OpenRepository,
@@ -105,7 +104,6 @@ func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.Branch
 		}
 		return nil
 	})
-
 	if err != nil {
 		return nil, NewRepoError("list-branches", "failed to iterate branches", err)
 	}
@@ -172,12 +170,12 @@ func (r *reader) GetRepositoryStatus(_ context.Context, repoPath string) (core.R
 		// In worktrees, repo.Head() may fail with "reference not found"
 		// even though HEAD file exists. We can still return a valid status
 		// without branch/commit info.
-		repoStatus := core.RepositoryStatus{
+		//nolint:nilerr // Deliberate fallback: callers get a partial status instead of a hard failure.
+		return core.RepositoryStatus{
 			IsClean: len(filteredStatus) == 0,
 			Branch:  "unknown",
 			Commit:  "",
-		}
-		return repoStatus, nil
+		}, nil
 	}
 
 	repoStatus := core.RepositoryStatus{

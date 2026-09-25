@@ -4,10 +4,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
-
-	"twiggit/internal/core"
 )
 
 func TestNewErrorFormatter(t *testing.T) {

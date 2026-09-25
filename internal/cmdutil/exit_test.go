@@ -4,12 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"twiggit/internal/cmdutil"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/cmdutil"
-	"twiggit/internal/core"
 )
 
 // TestExitCodeFor_NilReturnsExitOK confirms the no-error path is the

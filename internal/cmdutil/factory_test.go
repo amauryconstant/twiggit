@@ -4,13 +4,12 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestNewFactory_ReturnsNonNilWithSystemIOStreams covers the happy

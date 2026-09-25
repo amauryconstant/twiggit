@@ -1,9 +1,11 @@
 [tools]
-go = "1.26.1"
-golangci-lint = "2.11.3"
-goreleaser = "2.14.3"
-ginkgo = "2.28.1"
-"go:github.com/boumenot/gocover-cobertura" = "1.4.0"
+go = "1.27.1"
+golangci-lint = "2.14.0"
+goreleaser = "2.18.2"
+ginkgo = "2.33.0"
+"go:golang.org/x/tools/gopls" = "0.23.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.8.0"
+"go:github.com/boumenot/gocover-cobertura" = "1.5.0"
 "go:github.com/cybusio/gocovmerge" = "1.0.1"
 pre-commit = "latest"
 
@@ -17,10 +19,10 @@ experimental = true
 [tasks."test"]
 description = "Run all tests (unit, integration, e2e, race)"
 run = [
-    {task="test:unit"},
-    {task="test:integration"},
-    {task="test:race"},
-    {task="test:e2e"}
+    { task = "test:unit" },
+    { task = "test:integration" },
+    { task = "test:race" },
+    { task = "test:e2e" },
 ]
 
 
@@ -61,13 +63,43 @@ run = "golangci-lint run --fix"
 description = "Format Go code"
 run = "gofmt -w ."
 
-[tasks.verify]
-description = "Run all validation checks"
+[tasks."gopls:check"]
+description = "Run gopls diagnostics across the module"
+run = "shopt -s globstar && gopls check **/*.go"
+
+[tasks."gopls:stats"]
+description = "Summarise gopls analysis state"
+run = "gopls stats"
+
+[tasks."lint:gated"]
+description = "Run gopls + golangci-lint together"
 run = [
-    {task="format"},
-    {task="lint:fix"},
-    {task="test"},
-    {task="build"},
+    { task = "gopls:check" },
+    { task = "lint:check" },
+]
+
+[tasks."vuln:check"]
+description = "Scan for known vulnerabilities via govulncheck"
+run = "govulncheck ./..."
+
+[tasks.verify]
+description = "Run all maintenance tasks: format, auto-fix lint, gate lint (gopls + golangci-lint), vuln scan, full test suite, build"
+run = [
+    { task = "format" },
+    { task = "lint:fix" },
+    { task = "lint:gated" },
+    { task = "vuln:check" },
+    { task = "test" },
+    { task = "build" },
+]
+
+[tasks."ci:coverage"]
+description = "Run coverage with race and e2e tests for CI"
+run = [
+    "go test -race -coverprofile=coverage.out -covermode=atomic ./...",
+    "go tool cover -html=coverage.out -o coverage.html",
+    "gocover-cobertura coverage.out > coverage.xml",
+    { task = "test:e2e" },
 ]
 
 # ========================

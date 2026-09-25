@@ -6,12 +6,11 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/core"
 )
 
 func setupHookRunnerTest(t *testing.T) (*HookRunner, *MockCommandExecutor, string) {
@@ -43,7 +42,7 @@ func TestHookRunner_Run_EmptyConfigFile_ReturnsNotExecuted(t *testing.T) {
 	_, mockExec, tempDir := setupHookRunnerTest(t)
 	configPath := filepath.Join(tempDir, ".twiggit.toml")
 
-	err := os.WriteFile(configPath, []byte(""), 0644)
+	err := os.WriteFile(configPath, []byte(""), 0o644)
 	require.NoError(t, err)
 
 	req := &core.HookRunRequest{
@@ -68,7 +67,7 @@ func TestHookRunner_Run_ConfigWithCommands_ExecutesCommands(t *testing.T) {
 [hooks.post-create]
 commands = ["mise trust", "npm install"]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	mockExec.On("ExecuteWithTimeout",
@@ -102,7 +101,7 @@ func TestHookRunner_Run_CommandFailure_ContinuesAndCollectsFailures(t *testing.T
 [hooks.post-create]
 commands = ["mise trust", "npm install", "echo done"]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	mockExec.On("ExecuteWithTimeout",
@@ -141,7 +140,7 @@ func TestHookRunner_Run_MalformedTOML_LogsWarningAndReturnsNotExecuted(t *testin
 [hooks.post-create
 commands = ["mise trust"]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	req := &core.HookRunRequest{
@@ -164,7 +163,7 @@ func TestHookRunner_Run_MissingCommandsArray_ReturnsNotExecuted(t *testing.T) {
 	configContent := `
 [hooks.post-create]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	req := &core.HookRunRequest{
@@ -188,7 +187,7 @@ func TestHookRunner_Run_EmptyCommandsArray_ReturnsNotExecuted(t *testing.T) {
 [hooks.post-create]
 commands = []
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	req := &core.HookRunRequest{
@@ -212,7 +211,7 @@ func TestHookRunner_Run_EnvironmentVariablesSet(t *testing.T) {
 [hooks.post-create]
 commands = ["echo test"]
 `
-	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	var capturedArgs []string

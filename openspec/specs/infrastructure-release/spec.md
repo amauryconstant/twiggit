@@ -7,6 +7,10 @@ discoverability, Homebrew tap), and contributor onboarding. This spec
 is the canonical owner of release-process behavior; per-concern
 details are cross-referenced.
 
+Tool ownership (which file pins which tool) and the composition of
+`mise run verify` are owned by `infrastructure-toolchain`; this spec
+references those contracts instead of restating them.
+
 ## Requirements
 
 ### Requirement: CI pipeline
@@ -18,7 +22,7 @@ artifact upload run on tagged releases.
 #### Scenario: Push to main
 
 - **WHEN** a commit is pushed to `main`
-- **THEN** CI SHALL run `mise run lint` and `mise run test`
+- **THEN** CI SHALL run `mise run lint:gated` and `mise run test`
 - **AND** SHALL upload a debug binary for manual verification
 
 #### Scenario: Tagged release
@@ -92,7 +96,12 @@ and `mise run release:dry-run` (test GoReleaser config without publishing).
 
 `CONTRIBUTING.md` SHALL cover: `mise install` for toolchain setup,
 `pre-commit install` for hooks, `mise run verify` for the full
-validation suite, and the project's commit conventions.
+validation suite, and the project's commit conventions. The
+toolchain provisioned by `mise install` SHALL include (at minimum):
+`go`, `golangci-lint`, `goreleaser`, `ginkgo`, `gopls`,
+`govulncheck`, `gocover-cobertura`, `gocovmerge`, and `pre-commit`.
+The exact mapping of which file pins which tool is the concern of
+`infrastructure-toolchain`.
 
 #### Scenario: New contributor setup
 
@@ -100,26 +109,23 @@ validation suite, and the project's commit conventions.
 - **THEN** they SHALL find: toolchain install via `mise install`,
   pre-commit hook install via `pre-commit install`, and the
   `mise run verify` validation command
+- **AND** the documented toolchain SHALL match the set enforced by
+  `infrastructure-toolchain`
 
-### Requirement: Test coverage policy
+### Requirement: cmd tested exclusively via E2E
 
-The project SHALL target ≥70% coverage on all packages. The cmd
-package is tested exclusively via E2E (Ginkgo/Gomega); unit tests in
-`cmd/` are not required and SHALL NOT be added. See `testing-e2e`.
-
-#### Scenario: Coverage gate
-
-- **WHEN** `mise run test:coverage` runs
-- **THEN** coverage SHALL be reported per package
-- **AND** packages below 70% SHALL be flagged (not blocking)
+The `cmd/` package SHALL be tested exclusively via E2E
+(Ginkgo/Gomega); unit tests in `cmd/` SHALL NOT be added.
 
 #### Scenario: No cmd/ unit tests
 
-- **WHEN** developer inspects `cmd/`
+- **WHEN** a developer inspects `cmd/`
 - **THEN** only E2E tests (in `test/e2e/`) SHALL cover cmd behavior
 - **AND** no `_test.go` files SHALL exist alongside the cmd source
   files (other than `cmd/error_formatter_test.go` and
   `cmd/util_test.go`, which test pure helpers)
+
+See `testing-e2e`.
 
 ### Requirement: Unit-test conventions
 

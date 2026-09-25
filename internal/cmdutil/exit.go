@@ -3,7 +3,6 @@ package cmdutil
 import (
 	"errors"
 	"strconv"
-
 	"twiggit/internal/core"
 )
 
@@ -35,8 +34,7 @@ func ExitCodeFor(err error) ExitCode {
 	if err == nil {
 		return ExitOK
 	}
-	var usage *core.UsageError
-	if errors.As(err, &usage) {
+	if _, ok := errors.AsType[*core.UsageError](err); ok {
 		return ExitUsage
 	}
 	return ExitError

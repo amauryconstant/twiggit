@@ -195,7 +195,7 @@ func TestIsPathUnder_RealSymlinkStaysUnderBase(t *testing.T) {
 
 	base := t.TempDir()
 	leafDir := filepath.Join(base, "leaf")
-	require.NoError(t, os.MkdirAll(leafDir, 0755))
+	require.NoError(t, os.MkdirAll(leafDir, 0o755))
 	linkPath := filepath.Join(base, "link-stays")
 
 	require.NoError(t, os.Symlink(leafDir, linkPath))

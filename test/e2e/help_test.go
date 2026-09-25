@@ -5,9 +5,9 @@
 package e2e
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-
 	"twiggit/test/e2e/helpers"
+
+	. "github.com/onsi/ginkgo/v2"
 )
 
 var _ = Describe("help command", func() {

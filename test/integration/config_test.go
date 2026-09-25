@@ -6,12 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"twiggit/internal/config"
+	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"twiggit/internal/config"
-	"twiggit/internal/core"
 )
 
 func TestConfigManager_Integration_ConfigFile(t *testing.T) {
@@ -20,7 +19,7 @@ func TestConfigManager_Integration_ConfigFile(t *testing.T) {
 
 	// Create config directory and file
 	configDir := filepath.Join(tempDir, "twiggit")
-	err := os.MkdirAll(configDir, 0755)
+	err := os.MkdirAll(configDir, 0o755)
 	require.NoError(t, err)
 
 	configPath := filepath.Join(configDir, "config.toml")
@@ -30,7 +29,7 @@ worktrees_dir = "/test/worktrees"
 default_source_branch = "develop"
 `
 
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	err = os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	// Set XDG_CONFIG_HOME to temp directory
@@ -51,7 +50,7 @@ func TestConfigManager_Integration_XDGFallback(t *testing.T) {
 
 	// Create config file in .config structure
 	configDir := filepath.Join(tempDir, ".config", "twiggit")
-	err := os.MkdirAll(configDir, 0755)
+	err := os.MkdirAll(configDir, 0o755)
 	require.NoError(t, err)
 
 	configPath := filepath.Join(configDir, "config.toml")
@@ -61,7 +60,7 @@ worktrees_dir = "/fallback/worktrees"
 default_source_branch = "main"
 `
 
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	err = os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	// Set HOME to temp directory, but not XDG_CONFIG_HOME
@@ -83,7 +82,7 @@ func TestConfigManager_Integration_Validation(t *testing.T) {
 
 	// Create config directory and invalid config file
 	configDir := filepath.Join(tempDir, "twiggit")
-	err := os.MkdirAll(configDir, 0755)
+	err := os.MkdirAll(configDir, 0o755)
 	require.NoError(t, err)
 
 	configPath := filepath.Join(configDir, "config.toml")
@@ -91,7 +90,7 @@ func TestConfigManager_Integration_Validation(t *testing.T) {
 projects_dir = "relative/path"
 `
 
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	err = os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	// Set XDG_CONFIG_HOME to temp directory
@@ -109,7 +108,7 @@ func TestConfigManager_Integration_MalformedTOML(t *testing.T) {
 
 	// Create config directory and malformed TOML file
 	configDir := filepath.Join(tempDir, "twiggit")
-	err := os.MkdirAll(configDir, 0755)
+	err := os.MkdirAll(configDir, 0o755)
 	require.NoError(t, err)
 
 	configPath := filepath.Join(configDir, "config.toml")
@@ -119,7 +118,7 @@ invalid toml syntax here
 worktrees_dir = "/test/worktrees"
 `
 
-	err = os.WriteFile(configPath, []byte(configContent), 0644)
+	err = os.WriteFile(configPath, []byte(configContent), 0o644)
 	require.NoError(t, err)
 
 	// Set XDG_CONFIG_HOME to temp directory

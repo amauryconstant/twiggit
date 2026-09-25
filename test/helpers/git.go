@@ -63,7 +63,7 @@ func (h *GitTestHelper) CreateRepoWithCommits(commitCount int) string {
 			filename := filepath.Join(repoPath, "file.txt")
 			content := fmt.Appendf(nil, "Content %d\n", i)
 
-			if err := os.WriteFile(filename, content, 0644); err != nil {
+			if err := os.WriteFile(filename, content, 0o644); err != nil {
 				return err
 			}
 
