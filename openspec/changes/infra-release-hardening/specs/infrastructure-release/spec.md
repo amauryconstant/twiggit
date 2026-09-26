@@ -4,55 +4,58 @@
 
 ### Requirement: TLS-enabled DinD service
 
-The `build-ci-image` job SHALL use the TLS-enabled Docker-in-Docker
-service image rather than the plain TCP service. The DinD service
-SHALL present a TLS certificate under a non-empty
-`DOCKER_TLS_CERTDIR`, and the client SHALL connect via `tcp://docker:2376`
-with the certificate bundle mounted into the client container.
+The `build-ci-image` job SHALL enable TLS on the Docker-in-Docker
+service by setting `DOCKER_TLS_CERTDIR: "/certs"` in job `variables:`.
+The DinD service SHALL present a TLS certificate on port 2376 under
+the `dockerd-entrypoint.sh` contract, and the client SHALL connect
+via `tcp://docker:2376` with the client cert set mounted at
+`/certs/client`.
 
 #### Scenario: TLS handshake succeeds between client and service
 
 - **WHEN** `build-ci-image` runs
 - **THEN** the CI SHALL NOT expose `DOCKER_HOST: tcp://docker:2375`
+- **AND** `DOCKER_TLS_CERTDIR` SHALL be a non-empty path
 - **AND** the `docker build` invocation SHALL complete via the TLS
-  socket
+  socket on port 2376
 - **AND** a co-tenant runner SHALL NOT be able to drive `docker build`
   or `docker push` against the registry without the DinD cert bundle
 
 ### Requirement: Mirror push is non-forced
 
-The `mirror-to-github` job SHALL push the main-branch mirror without
-`--force`. Tag mirroring SHALL be gated by the same non-forced push
-form, scoped to the explicit tag trigger.
+The `mirror-to-github` job SHALL push the GitHub mirror without
+`--force`. The push SHALL be plain `git push github HEAD:$CI_COMMIT_BRANCH --tags`
+and SHALL fail rather than overwrite remote refs.
 
 #### Scenario: Main-branch sync
 
 - **WHEN** a commit is pushed to `main` and the mirror job runs
 - **THEN** the push SHALL NOT include `--force`
+- **AND** the push SHALL be `git push github HEAD:$CI_COMMIT_BRANCH --tags`
 - **AND** the push SHALL succeed only if the remote ref fast-forwards
 - **AND** a non-fast-forward local branch SHALL cause the job to fail
   instead of overwriting the GitHub ref
 
-#### Scenario: Tag mirror
+#### Scenario: Tag push
 
-- **WHEN** a `v*` tag is pushed
+- **WHEN** a `v*` tag is mirrored via `--tags`
 - **THEN** the tag SHALL be pushed without `--force`
-- **AND** an existing tag at the same name SHALL cause the job to fail
+- **AND** an existing tag at the same name SHALL cause the push to fail
   rather than overwrite the GitHub tag
 
 ### Requirement: Release publish is non-overwriting on tag reuse
 
-The `release` job SHALL invoke goreleaser in `release.mode: append`
-configuration. The goreleaser invocation SHALL pass
-`--fail-if-tag-exists` so an accidental re-tag hard-fails the release
-job instead of silently replacing the artifacts of an existing
-release.
+The `release` job SHALL verify the tag has no existing GitLab release
+before invoking goreleaser. `.goreleaser.yml` SHALL set
+`release.replace_existing_artifacts: false` so goreleaser never silently
+overwrites artifacts when invoked.
 
 #### Scenario: First release of a tag
 
 - **WHEN** CI runs `release` for a previously-unreleased `v*` tag
-- **THEN** goreleaser SHALL publish artifacts to the GitLab release
-  URL
+- **THEN** the GitLab Releases API preflight SHALL return non-200 for
+  the tag
+- **AND** goreleaser SHALL publish artifacts to the GitLab release URL
 - **AND** the artifacts SHALL be downloadable from
   `gitlab.com/amoconst/twiggit/-/releases/v<tag>`
 
@@ -60,8 +63,9 @@ release.
 
 - **WHEN** CI runs `release` for a tag that already has a published
   release
-- **THEN** goreleaser SHALL exit non-zero
-- **AND** CI SHALL fail the `release` job
+- **THEN** the GitLab Releases API preflight SHALL return 200 for the
+  tag
+- **AND** CI SHALL fail the `release` job before goreleaser is invoked
 - **AND** no artifact SHALL be silently overwritten
 
 ### Requirement: CI supply-chain scans
@@ -72,9 +76,11 @@ vulnerabilities and SHALL sign release SBOMs.
 #### Scenario: Trivy scan on the CI image
 
 - **WHEN** `build-ci-image` finishes `docker push`
-- **THEN** a `trivy image` step SHALL scan the published CI image
-- **AND** `CRITICAL` and `HIGH` findings SHALL cause the downstream
-  `validate`-stage jobs to gate
+- **THEN** a `trivy image --exit-code 1 --severity CRITICAL,HIGH
+  --no-progress` step SHALL scan the published CI image
+- **AND** `CRITICAL` and `HIGH` findings SHALL exit the step non-zero
+- **AND** the non-zero exit SHALL cause the downstream `validate`-stage
+  jobs to gate
 
 #### Scenario: cosign SBOM signature
 
@@ -170,8 +176,9 @@ to every job unless a job overrides them.
 
 - **WHEN** a job does not override `tags:`
 - **THEN** the job SHALL run on the runner tag declared at `default:`
-- **AND** transient errors SHALL be retried up to the `default:`
-  `retry:` count
+- **AND** runner-system or stuck-or-timeout failures SHALL be retried
+  up to the `default:` `retry:` count
+- **AND** test failures SHALL NOT be retried by the default policy
 
 #### Scenario: Default interruptibility
 
@@ -235,9 +242,11 @@ releases.
 #### Scenario: Default branch race subset
 
 - **WHEN** CI runs on a merge request or main-branch push
-- **THEN** a `test:race:subset` job SHALL run `go test -race
-  ./internal/... ./cmd/...`
+- **THEN** a `test:race:subset` job SHALL run
+  `go test -race -shuffle=on ./internal/... ./cmd/...`
 - **AND** the subset SHALL complete on the order of minutes
+- **AND** `-shuffle=on` SHALL randomize test order to catch
+  order-dependent races
 
 #### Scenario: Tagged release race coverage
 
@@ -247,15 +256,3 @@ releases.
 - **AND** the tagged-release job SHALL fail if `-race` reports a
   failure even when the subset passed
 
-### Requirement: Mirror job's main-branch push is non-forced
-
-The `mirror-to-github` job's main-branch sync SHALL NOT use
-`--force`. Tag mirroring SHALL use `--follow-tags` (no `--force`)
-under the existing `when: never` exclusion for the tag trigger.
-
-#### Scenario: Push protection
-
-- **WHEN** the mirror job runs for a main-branch sync
-- **THEN** the push SHALL be plain `git push github HEAD:$CI_COMMIT_BRANCH --tags`
-- **AND** a non-fast-forward remote SHALL reject the push
-- **AND** the job SHALL fail instead of overwriting GitHub history

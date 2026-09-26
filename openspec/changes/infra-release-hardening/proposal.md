@@ -37,16 +37,39 @@ provenance) are explicitly deferred.
 - **A7** `.golangci.yml` `cmdutil:` depguard allow-list narrows per the
   skill contract — `cmdutil` is for Factory + exit codes + persistent
   flags + consumer interfaces; direct imports of `internal/{output,git,config,version}`
-  are removed in favor of the documented `cmd/` composition layer.
-- **A8** `.vscode/settings.json` is committed with the project IDE baseline
-  (gopls on, golangci-lint on, `editor.formatOnSave` delegated to
-  golangci-lint; per-language settings for Markdown overage if needed).
-- **A9** `install.sh` provisions `gopls` (currently only Go + mise); the
-  `AGENTS.md` contributor section records the
-  editor/LSP/go-version triad.
+  are removed in favor of the documented `main.go` composition root.
+  The narrow is gated on a `cmdutil.NewFactory` refactor that moves the
+  composition-root wiring out of `cmdutil` and into `main.go`. The new
+  `NewFactory(opts ...FactoryOption)` signature accepts three functional
+  options: `WithVersion(string)` (replaces the eager `version.Version`
+  read), `WithConfigLoader(func() (*core.Config, error))`, and
+  `WithGitClientFactory(func() (interface{}, error))`. The `Factory.GitClient`
+  field type changes from `*git.Client` to `interface{}` so `*git.Client`
+  satisfies it implicitly (Go's structural interface satisfaction) without
+  `cmdutil` importing `internal/git`. `main.go` calls
+  `cmdutil.NewFactory(cmdutil.WithVersion(version.Version), cmdutil.WithConfigLoader(loadConfig), cmdutil.WithGitClientFactory(newGitClient))`
+  where `loadConfig` and `newGitClient` close over `config.NewManager()`
+  and `git.NewClient()`. The default no-arg `NewFactory()` call returns a
+  Factory with the same eager fields as today (`IOStreams`, `Context`,
+  `Executable`) plus lazy fields that return a sentinel error if invoked
+  — preserving every existing test literal in `factory_test.go`. This is
+  sequenced after the rest of the foundation polish in Group 7 because
+  the depguard narrow immediately fails `golangci-lint run ./internal/cmdutil/...`
+  until the imports drop.
 - **A10** `.mise/config.toml` `gopls:check` switches from
   `gopls check **/*.go` (filesystem glob) to `gopls check ./...`
   (module-aware), so it respects `go.mod` boundaries.
+- **A11** `.mise/config.toml` adds `cosign` to `[tools]` using the
+  `github.com/sigstore/cosign/v3/cmd/cosign` Go module path so local dev
+  matches the `cosign v3.1.3` bundled in `goreleaser/goreleaser:v2.18.2`.
+- **A12** `.mise/config.toml` adds a `min_version` directive to pin
+  the minimum mise release that the project's `[env] experimental = true`
+  and Go backend syntax rely on.
+- **A13** `AGENTS.md` and `CONTRIBUTING.md` developer-bootstrap section
+  records that `mise install && pre-commit install` provisions gopls,
+  golangci-lint, goreleaser, govulncheck, cosign, and pre-commit hooks
+  on a clean checkout (replaces the proposal's A9 `install.sh` edit,
+  which targeted the end-user binary installer in error).
 
 ### CI / release hardening (modifies `infrastructure-release`)
 
@@ -54,15 +77,20 @@ provenance) are explicitly deferred.
   becomes non-forced for main-branch syncs and accepts `--tags` only on
   the explicit tag trigger (which already routes through `when: never`
   for `mirror-to-github`).
-- **B5** `.goreleaser.yml` switches from `release.mode: replace` to
-  `release.mode: append`; goreleaser invocation in CI adds
-  `--fail-if-tag-exists` so an accidental re-tag hard-fails the release
-  job instead of silently overwriting artifacts.
-- **B6** `.gitlab-ci.yml` `build-ci-image` swaps the TLS-disabled DinD
-  service (`docker:29.1.4-dind` with `DOCKER_TLS_CERTDIR: ""` +
-  `tcp://docker:2375`) for the TLS-enabled equivalent
-  (`docker:29.1.4-dind:tls` with `DOCKER_TLS_CERTDIR: /certs` and the
-  matching `:cli` client); build context is pushed through TLS.
+- **B5** `.goreleaser.yml` keeps `release.mode: replace` (release-notes
+  merge mode is unrelated to artifact overwrite) and adds
+  `release.replace_existing_artifacts: false` so a re-tag never silently
+  overwrites artifacts. The release job's `before_script` adds a GitLab
+  Releases API preflight (`curl -sI` against `/releases/v<tag>`) that
+  fails the job when a release for the tag already exists. The goreleaser
+  flag `--fail-if-tag-exists` does not exist in v2.18.2; replaced with
+  the preflight gate.
+- **B6** `.gitlab-ci.yml` `build-ci-image` enables TLS on the existing
+  `docker:29.1.4-dind` service by setting `DOCKER_TLS_CERTDIR: "/certs"`
+  in job `variables:` (the `:tls` image variant does not exist; TLS is
+  triggered by the env var per `dockerd-entrypoint.sh`). The client sets
+  `DOCKER_HOST: tcp://docker:2376` and mounts `/certs/client` from the
+  service into the client container.
 - **B7** `.gitlab-ci.yml` `lint` job runs `go mod tidy && git diff --exit-code`
   before `golangci-lint run` so the diff between `go.mod`/`go.sum` and
   source is caught at the same gate.
@@ -79,9 +107,10 @@ provenance) are explicitly deferred.
   step after the `docker push`; findings gate the `validate` stage for
   subsequent jobs.
 - **B11** `.gitlab-ci.yml` `release` job adds a `cosign sign` step after
-  `goreleaser release --clean` so each `_sbom.spdx.json` artifact is
-  signed (keyless via GitLab OIDC, or `COSIGN_KEY` secret depending on
-  runner capability — see Risk #3 in the design).
+  `goreleaser release --clean` (keyless via GitLab OIDC using the
+  image-bundled `cosign v3.1.3` at `/usr/bin/cosign`). The job configures
+  `id_tokens: { SIGSTORE_ID_TOKEN: { aud: sigstore } }` for OIDC and a
+  `before_script` switch for `$COSIGN_KEY` when OIDC is unavailable.
 - **B12** `.gitlab-ci.yml` `goreleaser-dry-run` and `release` jobs pin
   the goreleaser image to `goreleaser/goreleaser:v2.18.2` matching
   `.mise/config.toml:4`; unversioned `goreleaser/goreleaser` is removed.
@@ -124,11 +153,12 @@ existing CI/release surfaces or as tooling polish.
 ### Modified Capabilities
 
 - `infrastructure-release`: gains requirements covering TLS-enabled
-  DinD service, non-forced mirror push, append-mode release with
-  `--fail-if-tag-exists`, Trivy image scan, cosign SBOM sign, pinned
-  goreleaser image, Go-version matrix, standalone race CI job,
-  `go mod tidy` gate, matrix-less dry-run, and pipeline defaults
-  (`tags:`, `retry:`, `interruptible:`).
+  DinD service, non-forced mirror push, GitLab Releases API preflight
+  gate on release-tag reuse plus `release.replace_existing_artifacts:
+  false`, Trivy image scan, cosign SBOM sign, pinned goreleaser image,
+  Go-version matrix, standalone race CI job, `go mod tidy` gate,
+  matrix-less dry-run, and pipeline defaults (`tags:`, `retry:` scoped
+  to transient failures, `interruptible:`).
 
 ## Non-Goals
 
@@ -152,6 +182,16 @@ existing CI/release surfaces or as tooling polish.
 
 ## Impact
 
+### Layer rollup
+
+Per the `golang-cli` Tier 2 convention, `main.go` is the composition root
+and `cmd/` is the Cobra tree assembly layer. Every change in this PR lives
+in `main.go` (Group 7 wiring migration) or in repo-root config / CI YAML /
+Docker / linter config (Groups 1-6). No `cmd/` command file or `internal/core`
+/ `internal/git` / `internal/config` / `internal/output` / `internal/iostreams`
+package is touched. The single Go-code change is the cmdutil refactor
+(Group 7), which moves responsibility without changing observable behavior.
+
 ### Files modified
 
 ```
@@ -160,20 +200,33 @@ existing CI/release surfaces or as tooling polish.
                                   B23
 Dockerfile.ci                   — A1, A3
 .dockerignore                   — A2, B21
-.golangci.yml                   — A4, A5, A6, A7
+.golangci.yml                   — A4, A5, A6, A7 (A7 sequenced after
+                                  Group 7)
 .goreleaser.yml                 — B5
-.mise/config.toml               — A10
-.vscode/settings.json (new)     — A8
-install.sh                      — A9
-AGENTS.md                       — A9
+.mise/config.toml               — A10, A11, A12
+AGENTS.md                       — A13
+CONTRIBUTING.md                 — A13
+internal/cmdutil/factory.go     — Group 7 (refactor: lazy constructors
+                                  via functional options)
+main.go                         — Group 7 (composition-root wiring of
+                                  config/git/version)
+internal/cmdutil/factory_test.go — Group 7 (test seam: exercise both
+                                  default and wired construction paths)
 openspec/specs/infrastructure-release/spec.md     — proposal→specs phase
 openspec/changes/infra-release-hardening/specs/infrastructure-release/
                                                   — delta spec
 ```
 
-### Files unchanged
+### Files unchanged (within this change's typical scope)
 
-- `cmd/`, `internal/` — implementation untouched.
+- `cmd/` (all command files and `cmd/root.go`) — implementation
+  untouched. `cmd/root.go` continues to receive `*cmdutil.Factory` from
+  `main.go` without owning its construction; the `CommandConfig = cmdutil.Factory`
+  type alias at `cmd/root.go:16` stays unchanged.
+- `internal/{core,git,config,output,iostreams}` — implementation
+  untouched. The `cmdutil` refactor moves responsibility for constructing
+  `config.NewManager()` and `git.NewClient()` into `main.go`; the
+  packages themselves are unchanged.
 - `go.mod`, `go.sum` — already current.
 - All pre-commit hooks — already aligned with `infrastructure-toolchain`.
 
@@ -182,22 +235,29 @@ openspec/changes/infra-release-hardening/specs/infrastructure-release/
 - CI minutes roughly double for matrix expansion (B8) and
   fast-subset race (B23). Acceptable; the matrix failure is the
   release-blocking signal, not the race subset.
-- TLS DinD (B6) requires GitLab Runner DinD TLS cert distribution,
-  which is the runner default on self-hosted GitLab runners; on
-  GitLab.com shared runners the `docker:dind:tls` image is provided.
-- `release.mode: append` (B5) plus `--fail-if-tag-exists` means a
-  re-tag must be preceded by deleting the previous GitLab release;
-  `mise run release:tag` task must be updated to surface this.
-- Homebrew tap behavior on append (B5) — see Risk #1 in `design.md`.
+- TLS DinD (B6) requires GitLab Runner DinD TLS cert distribution
+  via `DOCKER_TLS_CERTDIR: "/certs"`. Self-hosted runners emit the certs
+  automatically through `dockerd-entrypoint.sh`; GitLab.com shared
+  runners behave the same.
+- Release-tag reuse protection (B5) requires the GitLab Releases API
+  preflight in the `release` job `before_script`. A re-tag of an existing
+  tag fails the preflight before goreleaser runs; no local `release:tag`
+  update is required because the local task already exits 1 on existing
+  tags (`.mise/tasks/release/tag` lines 32-35).
+- Homebrew tap behavior is independent of `release.mode` and is
+  governed by `homebrew_casks.skip_upload`; no change required.
 
 ### Compatibility
 
-- **BREAKING**: `.goreleaser.yml` `release.mode` change is a
-  publisher-side change; it does not affect consumers. Existing
-  GitLab releases on tags `≤v<current>` remain; new tags `≥v<current+1>`
-  become additive.
-- **BREAKING**: `goreleaser/goreleaser` image pin (B12) is a CI-only
-  change. If a runner image does not include `v2.18.2`, the build
-  pulls the official pinned image.
+- **BREAKING (CI-side only)**: `.goreleaser.yml` gains
+  `release.replace_existing_artifacts: false`. Existing GitLab releases
+  on prior tags remain; subsequent re-tags no longer overwrite artifact
+  binaries. Consumers that re-tag an upstream consumer's prebuilt binary
+  must delete the prior GitLab release first.
+- **BREAKING (CI-side only)**: `goreleaser/goreleaser` image pin (B12).
+  If a runner image does not include `v2.18.2`, the build pulls the
+  official pinned image.
 - Non-breaking: DinD TLS (B6), Trivy (B10), cosign (B11), matrix
-  (B8), and all A-post items affect CI/toolchain only.
+  (B8), `cmdutil` factory refactor (Group 7), and all A-post items
+  affect CI/toolchain only or are internal rewirings with no
+  externally observable behavior change.
