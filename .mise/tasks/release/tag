@@ -67,6 +67,12 @@ fi
 git tag -a "$NEW_TAG" -m "Release $NEW_TAG" "$TAG_TARGET"
 git push origin "$NEW_TAG"
 
+# Push the release commit so the GitLab mirror-to-github job has fresh main.
+# release_lib_validate_environment already enforced on main + clean tree,
+# so HEAD:main is guaranteed fast-forward. Tag pushed first so a failure here
+# leaves no half-applied state: tag exists iff commit is intended to exist.
+git push origin HEAD:main
+
 echo ""
 echo "✅ Tag $NEW_TAG created and pushed"
 echo "📋 Monitor CI pipeline at $(git remote get-url origin | sed 's|\.git$||')/-/pipelines"
