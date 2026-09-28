@@ -36,7 +36,7 @@ func newTestFactory(t *testing.T) *cmdutil.Factory {
 	f.Config = func() (*core.Config, error) { return cfg, nil }
 	gitClient, err := git.NewClient()
 	require.NoError(t, err)
-	f.GitClient = func() (*git.Client, error) { return gitClient, nil }
+	f.GitClient = func() (cmdutil.Client, error) { return gitClient, nil }
 	f.Logger = func() *slog.Logger {
 		return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError}))
 	}
@@ -61,7 +61,7 @@ func initTestOpts(t *testing.T, shell core.ShellType, install, force bool, confi
 	opts := &InitOptions{
 		IO:            ios,
 		Config:        func() (*core.Config, error) { return cfg, nil },
-		GitClient:     func() (*git.Client, error) { return gitClient, nil },
+		GitClient:     func() (cmdutil.Client, error) { return gitClient, nil },
 		Ctx:           t.Context(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 		ShellType:     shell,

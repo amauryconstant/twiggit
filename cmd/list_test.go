@@ -42,7 +42,7 @@ func listTestOpts(t *testing.T, projectsDir, worktreesDir string) (*ListOptions,
 	opts := &ListOptions{
 		IO:            ios,
 		Config:        func() (*core.Config, error) { return cfg, nil },
-		GitClient:     func() (*git.Client, error) { return gitClient, nil },
+		GitClient:     func() (cmdutil.Client, error) { return gitClient, nil },
 		Ctx:           t.Context(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 	}

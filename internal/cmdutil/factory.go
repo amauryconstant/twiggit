@@ -9,11 +9,29 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
-	"twiggit/internal/config"
 	"twiggit/internal/core"
-	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
-	"twiggit/internal/version"
+)
+
+// FactoryOption mutates a Factory during construction. Functional options
+// keep NewFactory's signature stable as Factory dependencies grow.
+type FactoryOption func(*Factory)
+
+// Client is the type of the composite git client exposed via Factory.GitClient.
+// Declared as `any` so `*git.Client` (in internal/git) satisfies it implicitly
+// without cmdutil importing internal/git — the depguard narrow relies on
+// this. Callers narrow via the per-role fields (RepoOpener, BranchReader,
+// ...) which already type as core.* interfaces, or cast to `*git.Client`
+// directly inside cmd/ which keeps the concrete type because cmd/ still
+// imports internal/git.
+type Client = any
+
+// Sentinel errors returned by the default lazy fields when their
+// corresponding functional option is not supplied. Wrapped with %w by Init
+// so `errors.Is(err, cmdutil.ErrNoConfigLoader)` walks the chain.
+var (
+	ErrNoConfigLoader = errors.New("cmdutil: no config loader wired")
+	ErrNoGitClient    = errors.New("cmdutil: no git client wired")
 )
 
 // Factory is the composition seam shared by every cmd/*.go. Each lazy
@@ -23,16 +41,15 @@ import (
 // config (GitClient, Logger) reaches it through f.Config(), so the
 // config file is parsed exactly once per binary invocation.
 //
-// Construction populates IOStreams, Context, AppVersion, and
-// Executable eagerly (they are cheap and never fail). The expensive
-// fields (Config, GitClient, Logger) are sync.OnceValue /
-// sync.OnceFunc wrappers that run on first call. Init touches each
-// lazy field so initialization failures surface before any command
-// body executes.
+// Construction populates IOStreams, Context, and Executable eagerly
+// (they are cheap and never fail). The expensive fields (Config,
+// GitClient, Logger) are sync.OnceValue / sync.OnceFunc wrappers that
+// run on first call. Init touches each lazy field so initialization
+// failures surface before any command body executes.
 //
-// Customizing for tests: assign new functions to the fields before the
-// first call (or before Init). Once cached, the result is pinned for
-// the Factory's lifetime.
+// Customizing for tests: supply functional options via NewFactory(opts...)
+// before the first call (or before Init). Once cached, the result is
+// pinned for the Factory's lifetime.
 type Factory struct {
 	// IOStreams is the terminal I/O surface. Populated by NewFactory
 	// from iostreams.System(); tests may swap in iostreams.Test().
@@ -44,7 +61,10 @@ type Factory struct {
 	// closures read this through opts.Ctx.
 	Context context.Context
 
-	// AppVersion is the build-time injected version string.
+	// AppVersion is the build-time injected version string. main.go
+	// supplies it via WithVersion(version.Version); the default no-arg
+	// NewFactory leaves it empty so factory_test.go literals compile
+	// unchanged.
 	AppVersion string
 
 	// Executable is the basename of the running binary (twiggit).
@@ -54,14 +74,16 @@ type Factory struct {
 	// first call reads and parses the config file, every later call
 	// returns the same *core.Config pointer. A load error pins for
 	// the Factory's lifetime (subsequent calls return the same error).
+	// Default is a sentinel-returning function; wire with WithConfigLoader.
 	Config func() (*core.Config, error)
 
 	// GitClient returns the composite git client. sync.OnceValue-cached;
 	// the closure first reads f.Config() so config load errors surface
 	// here rather than as a confused git-construction failure.
-	GitClient func() (*git.Client, error)
+	// Default is a sentinel-returning function; wire with WithGitClientFactory.
+	GitClient func() (Client, error)
 
-	// Per-role lazy fields. Each returns the cached *git.Client typed as
+	// Per-role lazy fields. Each returns the cached composite typed as
 	// the requested role (Go interface satisfaction via embedded promotion
 	// on the composite). Bodies route through f.GitClient() so the
 	// sync.OnceValues cache on the composite is the only cache; per-role
@@ -92,10 +114,30 @@ type Factory struct {
 	GlobalOptions *GlobalOptions
 }
 
-// NewFactory returns a Factory wired with the system IOStreams, the
-// build-time version, and lazy fields for the three expensive
-// dependencies. Every lazy field is wrapped in sync.OnceValue /
-// sync.OnceFunc so the underlying work runs at most once per Factory.
+// WithVersion sets Factory.AppVersion. main.go passes version.Version.
+func WithVersion(v string) FactoryOption {
+	return func(f *Factory) { f.AppVersion = v }
+}
+
+// WithConfigLoader wires Factory.Config with the supplied constructor.
+// The option wraps the constructor in sync.OnceValues so the cache
+// contract (one parse per Factory lifetime) is preserved regardless of
+// whether the caller pre-wraps or not.
+func WithConfigLoader(load func() (*core.Config, error)) FactoryOption {
+	return func(f *Factory) { f.Config = sync.OnceValues(load) }
+}
+
+// WithGitClientFactory wires Factory.GitClient with the supplied
+// constructor. Same sync.OnceValues wrapping as WithConfigLoader.
+func WithGitClientFactory(build func() (Client, error)) FactoryOption {
+	return func(f *Factory) { f.GitClient = sync.OnceValues(build) }
+}
+
+// NewFactory returns a Factory wired with the system IOStreams and
+// eager fields. Lazy fields default to sentinel-returning functions so
+// the test seam (factory_test.go literals with no args) keeps compiling;
+// main.go passes WithVersion, WithConfigLoader, and WithGitClientFactory
+// to wire the real constructors.
 //
 // NewFactory never errors: all failures are deferred to the first call
 // to a lazy field (or to Init). Tests that need to short-circuit a
@@ -105,25 +147,19 @@ type Factory struct {
 // replaces it with the signal.NotifyContext result so SIGINT /
 // SIGTERM propagate to long-running commands. Tests pass
 // t.Context() or a cancellable context directly.
-func NewFactory() *Factory {
+func NewFactory(opts ...FactoryOption) *Factory {
 	f := &Factory{
 		IOStreams:  iostreams.System(),
 		Context:    context.Background(),
-		AppVersion: version.Version,
 		Executable: executableName(),
 	}
 
+	// Default lazy fields return sentinels if invoked without wiring.
 	f.Config = sync.OnceValues(func() (*core.Config, error) {
-		manager := config.NewManager()
-		return manager.Load()
+		return nil, ErrNoConfigLoader
 	})
-
-	f.GitClient = sync.OnceValues(func() (*git.Client, error) {
-		// Touch Config so config load errors surface here too.
-		if _, err := f.Config(); err != nil {
-			return nil, err
-		}
-		return git.NewClient()
+	f.GitClient = sync.OnceValues(func() (Client, error) {
+		return nil, ErrNoGitClient
 	})
 
 	f.RepoOpener = func() (core.RepositoryOpener, error) {
@@ -131,47 +167,62 @@ func NewFactory() *Factory {
 		if err != nil {
 			return nil, err
 		}
-		return c, nil
+		// Type assertion: f.GitClient returns Client (any); the wired
+		// implementation is always *git.Client which satisfies
+		// core.RepositoryOpener via embedded promotion. The assertion
+		// cannot fail under the wired path; tests inject f.GitClient
+		// directly so they control the asserted type.
+		client, _ := c.(core.RepositoryOpener)
+		return client, nil
 	}
 	f.BranchReader = func() (core.BranchReader, error) {
 		c, err := f.GitClient()
 		if err != nil {
 			return nil, err
 		}
-		return c, nil
+		client, _ := c.(core.BranchReader)
+		return client, nil
 	}
 	f.RepositoryReader = func() (core.RepositoryReader, error) {
 		c, err := f.GitClient()
 		if err != nil {
 			return nil, err
 		}
-		return c, nil
+		client, _ := c.(core.RepositoryReader)
+		return client, nil
 	}
 	f.RemoteReader = func() (core.RemoteReader, error) {
 		c, err := f.GitClient()
 		if err != nil {
 			return nil, err
 		}
-		return c, nil
+		client, _ := c.(core.RemoteReader)
+		return client, nil
 	}
 	f.WorktreeWriter = func() (core.WorktreeWriter, error) {
 		c, err := f.GitClient()
 		if err != nil {
 			return nil, err
 		}
-		return c, nil
+		client, _ := c.(core.WorktreeWriter)
+		return client, nil
 	}
 	f.BranchWriter = func() (core.BranchWriter, error) {
 		c, err := f.GitClient()
 		if err != nil {
 			return nil, err
 		}
-		return c, nil
+		client, _ := c.(core.BranchWriter)
+		return client, nil
 	}
 
 	f.Logger = sync.OnceValue(func() *slog.Logger {
 		return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	})
+
+	for _, opt := range opts {
+		opt(f)
+	}
 
 	return f
 }

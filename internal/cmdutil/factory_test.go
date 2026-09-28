@@ -12,9 +12,18 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// stubGitClient returns a *git.Client the Factory can cache. Tests that
+// need a wired Factory but do not exercise real git behaviour pass
+// this through WithGitClientFactory.
+func stubGitClient() *git.Client {
+	return &git.Client{}
+}
+
 // TestNewFactory_ReturnsNonNilWithSystemIOStreams covers the happy
 // construction path: every eager field populated, every lazy field
-// non-nil so the first call sites do not panic.
+// non-nil so the first call sites do not panic. AppVersion defaults
+// empty when no WithVersion option is supplied; the wired variant is
+// covered by TestNewFactory_WithVersionSetsAppVersion.
 func TestNewFactory_ReturnsNonNilWithSystemIOStreams(t *testing.T) {
 	t.Parallel()
 
@@ -25,17 +34,65 @@ func TestNewFactory_ReturnsNonNilWithSystemIOStreams(t *testing.T) {
 	require.NotNil(t, f.Config)
 	require.NotNil(t, f.GitClient)
 	require.NotNil(t, f.Logger)
-	assert.NotEmpty(t, f.AppVersion)
+	assert.Empty(t, f.AppVersion, "AppVersion defaults empty without WithVersion")
 	assert.NotEmpty(t, f.Executable)
 }
 
-// TestFactory_ConfigIsCachedAcrossCalls covers the sync.OnceValue
-// guarantee: two calls share the same pointer so consumers can rely on
-// the cache rather than re-reading the config file.
-func TestFactory_ConfigIsCachedAcrossCalls(t *testing.T) {
+// TestNewFactory_WithVersionSetsAppVersion covers the WithVersion
+// functional option. main.go uses this to wire version.Version into
+// the factory at composition time.
+func TestNewFactory_WithVersionSetsAppVersion(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory(cmdutil.WithVersion("test"))
+
+	assert.Equal(t, "test", f.AppVersion)
+}
+
+// TestFactory_DefaultLazyFieldsReturnSentinels covers the no-arg
+// construction path: lazy fields return the package sentinels so
+// Init() surfaces a joined error before any command body runs.
+// main.go MUST wire WithConfigLoader and WithGitClientFactory or
+// every command will hit a sentinel on first lazy access.
+func TestFactory_DefaultLazyFieldsReturnSentinels(t *testing.T) {
 	t.Parallel()
 
 	f := cmdutil.NewFactory()
+
+	_, err := f.Config()
+	assert.ErrorIs(t, err, cmdutil.ErrNoConfigLoader)
+
+	_, err = f.GitClient()
+	assert.ErrorIs(t, err, cmdutil.ErrNoGitClient)
+}
+
+// TestFactory_DefaultInitJoinsSentinels covers Init's contract when
+// no options are wired: every lazy field surfaces its sentinel and
+// Init returns a joined error so callers see the full diagnostic in
+// one pass.
+func TestFactory_DefaultInitJoinsSentinels(t *testing.T) {
+	t.Parallel()
+
+	f := cmdutil.NewFactory()
+
+	err := f.Init()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, cmdutil.ErrNoConfigLoader)
+	assert.ErrorIs(t, err, cmdutil.ErrNoGitClient)
+}
+
+// TestFactory_ConfigIsCachedAcrossCalls covers the sync.OnceValue
+// guarantee under the wired path: WithConfigLoader wraps the supplied
+// constructor once, and two calls share the same pointer.
+func TestFactory_ConfigIsCachedAcrossCalls(t *testing.T) {
+	t.Parallel()
+
+	var calls int
+	stubCfg := &core.Config{DefaultSourceBranch: "stub"}
+	f := cmdutil.NewFactory(cmdutil.WithConfigLoader(func() (*core.Config, error) {
+		calls++
+		return stubCfg, nil
+	}))
 
 	first, err := f.Config()
 	require.NoError(t, err)
@@ -44,6 +101,7 @@ func TestFactory_ConfigIsCachedAcrossCalls(t *testing.T) {
 	second, err := f.Config()
 	require.NoError(t, err)
 	assert.Same(t, first, second, "config must be cached across calls")
+	assert.Equal(t, 1, calls, "loader must run exactly once across two calls")
 }
 
 // TestFactory_LoggerIsCachedAcrossCalls confirms the Logger field also
@@ -70,7 +128,6 @@ func TestFactory_LazyFieldsAreReplaceable(t *testing.T) {
 
 	f := cmdutil.NewFactory()
 
-	// Swap Config with a deterministic stub before the first call.
 	stubCfg := &core.Config{DefaultSourceBranch: "stub"}
 	f.Config = func() (*core.Config, error) { return stubCfg, nil }
 
@@ -80,21 +137,30 @@ func TestFactory_LazyFieldsAreReplaceable(t *testing.T) {
 }
 
 // TestFactory_InitTouchesEveryLazyField covers the "fail fast at
-// startup" contract: Init returns nil when the underlying singletons
-// can be constructed, joining all errors otherwise.
+// startup" contract under the wired path. The default-path sentinel
+// behaviour is covered by TestFactory_DefaultInitJoinsSentinels.
 func TestFactory_InitTouchesEveryLazyField(t *testing.T) {
 	t.Parallel()
 
-	t.Run("happy path", func(t *testing.T) {
+	t.Run("happy path with wiring", func(t *testing.T) {
 		t.Parallel()
-		f := cmdutil.NewFactory()
+		f := cmdutil.NewFactory(
+			cmdutil.WithConfigLoader(func() (*core.Config, error) {
+				return &core.Config{}, nil
+			}),
+			cmdutil.WithGitClientFactory(func() (cmdutil.Client, error) {
+				return stubGitClient(), nil
+			}),
+		)
 		assert.NoError(t, f.Init())
 	})
 
 	t.Run("config failure surfaces", func(t *testing.T) {
 		t.Parallel()
-		f := cmdutil.NewFactory()
-		f.Config = func() (*core.Config, error) { return nil, errors.New("config broken") }
+		f := cmdutil.NewFactory(
+			cmdutil.WithConfigLoader(func() (*core.Config, error) { return nil, errors.New("config broken") }),
+			cmdutil.WithGitClientFactory(func() (cmdutil.Client, error) { return stubGitClient(), nil }),
+		)
 
 		err := f.Init()
 		require.Error(t, err)
@@ -109,12 +175,18 @@ func TestFactory_InitTouchesEveryLazyField(t *testing.T) {
 func TestFactory_PerRoleFieldsReturnSameCompositeInstance(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.NewFactory()
+	stub := stubGitClient()
+	f := cmdutil.NewFactory(
+		cmdutil.WithConfigLoader(func() (*core.Config, error) { return &core.Config{}, nil }),
+		cmdutil.WithGitClientFactory(func() (cmdutil.Client, error) { return stub, nil }),
+	)
 	require.NoError(t, f.Init())
 
 	gc, err := f.GitClient()
 	require.NoError(t, err)
 	require.NotNil(t, gc)
+	gcConcrete, ok := gc.(*git.Client)
+	require.True(t, ok, "GitClient must be *git.Client under the wired path")
 
 	ro, err := f.RepoOpener()
 	require.NoError(t, err)
@@ -129,12 +201,12 @@ func TestFactory_PerRoleFieldsReturnSameCompositeInstance(t *testing.T) {
 	bw, err := f.BranchWriter()
 	require.NoError(t, err)
 
-	assert.Same(t, gc, ro, "RepoOpener must return same instance as GitClient")
-	assert.Same(t, gc, br, "BranchReader must return same instance as GitClient")
-	assert.Same(t, gc, rr, "RepositoryReader must return same instance as GitClient")
-	assert.Same(t, gc, rm, "RemoteReader must return same instance as GitClient")
-	assert.Same(t, gc, wt, "WorktreeWriter must return same instance as GitClient")
-	assert.Same(t, gc, bw, "BranchWriter must return same instance as GitClient")
+	assert.Same(t, gcConcrete, ro, "RepoOpener must return same instance as GitClient")
+	assert.Same(t, gcConcrete, br, "BranchReader must return same instance as GitClient")
+	assert.Same(t, gcConcrete, rr, "RepositoryReader must return same instance as GitClient")
+	assert.Same(t, gcConcrete, rm, "RemoteReader must return same instance as GitClient")
+	assert.Same(t, gcConcrete, wt, "WorktreeWriter must return same instance as GitClient")
+	assert.Same(t, gcConcrete, bw, "BranchWriter must return same instance as GitClient")
 }
 
 // TestFactory_InitTouchesEveryPerRoleField covers core-git R11.S3:
@@ -143,7 +215,10 @@ func TestFactory_PerRoleFieldsReturnSameCompositeInstance(t *testing.T) {
 func TestFactory_InitTouchesEveryPerRoleField(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.NewFactory()
+	f := cmdutil.NewFactory(
+		cmdutil.WithConfigLoader(func() (*core.Config, error) { return &core.Config{}, nil }),
+		cmdutil.WithGitClientFactory(func() (cmdutil.Client, error) { return stubGitClient(), nil }),
+	)
 
 	sentinel := errors.New("branch reader init sentinel")
 	f.BranchReader = func() (core.BranchReader, error) { return nil, sentinel }
@@ -162,7 +237,9 @@ func TestFactory_InitTouchesEveryPerRoleField(t *testing.T) {
 func TestFactory_PerRoleErrorPropagation(t *testing.T) {
 	t.Parallel()
 
-	f := cmdutil.NewFactory()
+	f := cmdutil.NewFactory(
+		cmdutil.WithConfigLoader(func() (*core.Config, error) { return &core.Config{}, nil }),
+	)
 
 	sentinel := &git.ExternalError{
 		Tool:      "git",
@@ -174,7 +251,7 @@ func TestFactory_PerRoleErrorPropagation(t *testing.T) {
 			Message: "boom",
 		},
 	}
-	f.GitClient = func() (*git.Client, error) { return nil, sentinel }
+	f.GitClient = func() (cmdutil.Client, error) { return nil, sentinel }
 
 	_, err := f.RepoOpener()
 	require.Error(t, err)

@@ -21,7 +21,7 @@ import (
 type ListOptions struct {
 	IO            *iostreams.IOStreams
 	Config        func() (*core.Config, error)
-	GitClient     func() (*git.Client, error)
+	GitClient     func() (cmdutil.Client, error)
 	Ctx           context.Context
 	GlobalOptions *cmdutil.GlobalOptions
 
@@ -92,10 +92,11 @@ func runList(opts *ListOptions) error {
 		return fmt.Errorf("config load failed: %w", err)
 	}
 
-	gitClient, err := opts.GitClient()
+	client, err := opts.GitClient()
 	if err != nil {
 		return fmt.Errorf("git client init failed: %w", err)
 	}
+	gitClient, _ := client.(*git.Client)
 
 	detector, err := git.NewContextDetector(cfg)
 	if err != nil {

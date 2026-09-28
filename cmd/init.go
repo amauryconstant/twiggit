@@ -20,7 +20,7 @@ import (
 type InitOptions struct {
 	IO            *iostreams.IOStreams
 	Config        func() (*core.Config, error)
-	GitClient     func() (*git.Client, error)
+	GitClient     func() (cmdutil.Client, error)
 	Ctx           context.Context
 	GlobalOptions *cmdutil.GlobalOptions
 

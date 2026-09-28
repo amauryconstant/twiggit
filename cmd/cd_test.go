@@ -33,7 +33,7 @@ func cdTestOpts(t *testing.T, worktreesDir, target string) (*CdOptions, *iostrea
 	opts := &CdOptions{
 		IO:            ios,
 		Config:        func() (*core.Config, error) { return cfg, nil },
-		GitClient:     func() (*git.Client, error) { return gitClient, nil },
+		GitClient:     func() (cmdutil.Client, error) { return gitClient, nil },
 		Ctx:           context.Background(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 		Target:        target,
@@ -61,7 +61,7 @@ func TestCd_NotFoundError(t *testing.T) {
 	opts := &CdOptions{
 		IO:            ios,
 		Config:        func() (*core.Config, error) { return cfg, nil },
-		GitClient:     func() (*git.Client, error) { return gitClient, nil },
+		GitClient:     func() (cmdutil.Client, error) { return gitClient, nil },
 		Ctx:           t.Context(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 		Target:        bogus,
@@ -101,7 +101,7 @@ func TestCd_HappyPathEchoesTarget(t *testing.T) {
 	opts := &CdOptions{
 		IO:            ios,
 		Config:        func() (*core.Config, error) { return cfg, nil },
-		GitClient:     func() (*git.Client, error) { return gitClient, nil },
+		GitClient:     func() (cmdutil.Client, error) { return gitClient, nil },
 		Ctx:           t.Context(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 		Target:        "", // omit → runCd picks project-context default
@@ -129,7 +129,7 @@ func TestCd_EmptyTargetReturnsError(t *testing.T) {
 	opts := &CdOptions{
 		IO:            ios,
 		Config:        func() (*core.Config, error) { return cfg, nil },
-		GitClient:     func() (*git.Client, error) { return gitClient, nil },
+		GitClient:     func() (cmdutil.Client, error) { return gitClient, nil },
 		Ctx:           t.Context(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 		Target:        "",

@@ -11,8 +11,20 @@ import (
 	"syscall"
 	"twiggit/cmd"
 	"twiggit/internal/cmdutil"
+	"twiggit/internal/config"
+	"twiggit/internal/core"
+	"twiggit/internal/git"
 	"twiggit/internal/output"
+	"twiggit/internal/version"
 )
+
+// loadConfig closes over config.NewManager so cmdutil stays free of
+// internal/config imports. main.go is the sole composition root for
+// the config dependency.
+func loadConfig() (*core.Config, error) {
+	//nolint:wrapcheck // composition-root closure: cmdutil.WithConfigLoader expects the raw (T, error) signature.
+	return config.NewManager().Load()
+}
 
 func main() {
 	slogLevel := slog.LevelInfo
@@ -35,7 +47,13 @@ func main() {
 		}
 	}()
 
-	factory := cmdutil.NewFactory()
+	factory := cmdutil.NewFactory(
+		cmdutil.WithVersion(version.Version),
+		cmdutil.WithConfigLoader(loadConfig),
+		cmdutil.WithGitClientFactory(func() (cmdutil.Client, error) {
+			return git.NewClient()
+		}),
+	)
 	if err := factory.Init(); err != nil {
 		output.FormatError(os.Stderr, err, nil)
 		//nolint:gocritic // exitAfterDefer: factory init failure aborts the process; pending defers (slog, signal) are non-essential.

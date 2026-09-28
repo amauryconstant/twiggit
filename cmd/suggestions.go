@@ -102,10 +102,11 @@ func listProjects(_ context.Context, f *CommandConfig) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	gitClient, err := f.GitClient()
+	client, err := f.GitClient()
 	if err != nil {
 		return nil, fmt.Errorf("init git client: %w", err)
 	}
+	gitClient, _ := client.(*git.Client)
 	finder := git.NewRepoFinder(gitClient)
 	gitDirs, err := finder.FindGitRepositories(cfg.ProjectsDirectory)
 	if err != nil {
@@ -127,10 +128,11 @@ func listBranchesFromContext(ctx context.Context, f *CommandConfig) ([]string, e
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	gitClient, err := f.GitClient()
+	client, err := f.GitClient()
 	if err != nil {
 		return nil, fmt.Errorf("init git client: %w", err)
 	}
+	gitClient, _ := client.(*git.Client)
 	projectPath := pickProjectPath(ctx, f, cfg)
 	if projectPath == "" {
 		return nil, nil
@@ -153,10 +155,11 @@ func listBranchesForProject(ctx context.Context, f *CommandConfig, projectName s
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
-	gitClient, err := f.GitClient()
+	client, err := f.GitClient()
 	if err != nil {
 		return nil, fmt.Errorf("init git client: %w", err)
 	}
+	gitClient, _ := client.(*git.Client)
 	projectPath := filepath.Join(cfg.ProjectsDirectory, filepath.Base(projectName))
 	branches, err := gitClient.ListBranches(ctx, projectPath)
 	if err != nil {
@@ -173,10 +176,11 @@ func listBranchesForProject(ctx context.Context, f *CommandConfig, projectName s
 // pickProjectPath returns the project path best matching the current
 // working directory. Mirrors the legacy resolver priority chain.
 func pickProjectPath(_ context.Context, f *CommandConfig, cfg *core.Config) string {
-	gitClient, err := f.GitClient()
+	client, err := f.GitClient()
 	if err != nil {
 		return ""
 	}
+	gitClient, _ := client.(*git.Client)
 	detector, err := git.NewContextDetector(cfg)
 	if err != nil {
 		return ""
