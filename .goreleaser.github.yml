@@ -1,0 +1,8 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+project_name: twiggit
+version: 2
+
+release:
+  github:
+    owner: amauryconstant
+    name: twiggit
