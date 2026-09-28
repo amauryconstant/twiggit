@@ -45,15 +45,17 @@ build-ci-image:
       changes:
         - Dockerfile.ci
         - .mise/config.toml
+        - .goreleaser.yml
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       changes:
         - Dockerfile.ci
         - .mise/config.toml
+        - .goreleaser.yml
     - when: manual
       allow_failure: true
   variables:
-    DOCKER_HOST: tcp://docker:2375
-    DOCKER_TLS_CERTDIR: ""
+    DOCKER_HOST: tcp://docker:2376
+    DOCKER_TLS_CERTDIR: "/certs"
     CI_REGISTRY: registry.gitlab.com
     CI_REGISTRY_IMAGE: "$CI_REGISTRY/amoconst/twiggit/ci"
   before_script:
@@ -120,6 +122,12 @@ build-ci-image:
 # --------------------------------
 default:
   image: registry.gitlab.com/amoconst/twiggit/ci:latest
+  interruptible: true
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
   cache:
     key:
       files:
@@ -177,6 +185,8 @@ lint:
     policy: pull
   interruptible: true
   script:
+    - go mod tidy && git diff --exit-code
+    - govulncheck ./...
     - golangci-lint run
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -189,8 +199,10 @@ test:
     <<: *cache_config
     policy: pull
   interruptible: true
+  variables:
+    GOFLAGS: "-mod=readonly"
   script:
-    - mise run ci:coverage
+    - go test -race ./...
     - mise run build
     - mise run test:e2e
   artifacts:
@@ -208,7 +220,7 @@ test:
 goreleaser-dry-run:
   stage: validate
   image:
-    name: goreleaser/goreleaser
+    name: goreleaser/goreleaser:v2.18.2
     entrypoint: [""]
   cache: {}
   interruptible: true
@@ -216,14 +228,17 @@ goreleaser-dry-run:
     GIT_DEPTH: 10
   script:
     - goreleaser release --snapshot --clean --skip=sbom,before
+  artifacts:
+    expire_in: 1 day
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      changes:
-        - .goreleaser.yml
-        - go.mod
-        - go.sum
-        - cmd/**/*
-        - internal/**/*
+    - changes:
+        paths:
+          - cmd/**
+          - internal/**
+          - .goreleaser.yml
+          - go.mod
+          - go.sum
+      if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
 # --------------------------------
 # Release with GoReleaser
@@ -231,10 +246,14 @@ goreleaser-dry-run:
 release:
   stage: distribute
   needs: [lint, test]
+  interruptible: false
   image:
-    name: goreleaser/goreleaser
+    name: goreleaser/goreleaser:v2.18.2
     entrypoint: [""]
   cache: {}
+  id_tokens:
+    SIGSTORE_ID_TOKEN:
+      aud: sigstore
   variables:
     GIT_DEPTH: 0
     GITLAB_TOKEN: "$GITLAB_RELEASE_TOKEN"
@@ -244,8 +263,34 @@ release:
         echo "ERROR: Invalid tag format: $CI_COMMIT_TAG (expected vX.Y.Z)"
         exit 1
       fi
+    - |
+      # GitLab Releases API preflight: fail if release for tag already exists.
+      # Backup for goreleaser's missing --fail-if-tag-exists flag in v2.18.2.
+      status=$(curl -sI -o /dev/null -w "%{http_code}" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases/v$CI_COMMIT_TAG")
+      if [ "$status" = "200" ]; then
+        echo "ERROR: release for tag $CI_COMMIT_TAG already exists (HTTP 200)"
+        exit 1
+      fi
+    - |
+      # Signing mode: prefer OIDC keyless; fall back to $COSIGN_KEY.
+      if [ -n "${SIGSTORE_ID_TOKEN:-}" ]; then
+        echo "cosign: OIDC keyless signing (SIGSTORE_ID_TOKEN set)"
+      elif [ -n "${COSIGN_KEY:-}" ]; then
+        echo "cosign: keyful signing via COSIGN_KEY"
+      else
+        echo "ERROR: cosign requires SIGSTORE_ID_TOKEN (OIDC) or COSIGN_KEY env var"
+        exit 1
+      fi
   script:
     - goreleaser release --clean
+    - |
+      # Sign each SBOM artifact. The cosign binary is bundled in the goreleaser image
+      # at /usr/bin/cosign v3.1.3; no per-run install required.
+      for sbom in dist/*_sbom.spdx.json; do
+        [ -f "$sbom" ] || continue
+        cosign sign --yes "$sbom"
+      done
   rules:
     - if: "$CI_COMMIT_TAG"
 
@@ -261,7 +306,7 @@ mirror-to-github:
   script:
     - git remote add github "https://${GITHUB_ACCESS_TOKEN}@github.com/${GITHUB_REPO_URL}.git"
     - git fetch github
-    - git push github HEAD:$CI_COMMIT_BRANCH --tags --force
+    - git push github HEAD:$CI_COMMIT_BRANCH --tags
   interruptible: true
   rules:
     - if: "$CI_COMMIT_TAG"
