@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-09-28
+
+
+### Added
+
+- Role interfaces (`Reader`, `Writer`, `Executor`) declared consumer-side in `internal/core/git.go` with compile-time satisfaction checks on `*git.Client`; per-role lazy fields on `cmdutil.Factory` (interface-segregation)
+- TLS-enabled DinD CI image, non-forced GitHub mirror push, `replace_existing_artifacts: false` for releases, govulncheck as required CI gate (infra-release-hardening)
+- GitHub Actions release workflow publishing GitHub Releases alongside GitLab artifacts (`.goreleaser.github.yml`, `.github/workflows/release.yml` on `v*` tags with `gh release view` preflight and OIDC keyless cosign SBOM signing)
+
+### Changed
+
+- `.golangci.yml` test-exclusion regex anchored; `staticcheck.checks` enumerates exclusions explicitly; depguard allow-lists narrowed for `cmdutil`; `.dockerignore` excludes `openspec/` and `.github/` (infra-release-hardening)
+
+### Breaking
+
+- **BREAKING**: Adopt sentinel-based error chain with `errors.Is`/`errors.As` walks; collapse CLI exit codes 3-6 into single failure code 1 — scripts keyed on per-resource codes break by design (foundation-error-chain)
+- **BREAKING**: Invert architecture layers to `cmd → cmdutil → core`; delete `internal/application/`, `internal/service/`, `CompositeGitClient`, `application.GitClient` umbrella (architecture-layer-inversion)
+- **BREAKING**: Collapse five-layer DDD-Light into Tier 2 (`golang-cli`) layout — new `internal/core/`, `internal/git/`, `internal/output/`, `internal/iostreams/`, `internal/cmdutil/`, `internal/config/`; rename `domain.X` → `core.X`; adopt Factory + IOStreams + Formatter composition pattern (cli-functional-core-shell)
+
 ## [0.12.0] - 2026-09-19
 
 
