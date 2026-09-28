@@ -37,7 +37,7 @@ graph TB
 | `internal/config/` | koanf-backed config loader + XDG resolution. | stdlib, `koanf`, `twiggit/internal/core` |
 | `internal/output/` | Formatter registry, error renderer, table writer, shell wrapper. | stdlib, `charm.land/lipgloss/v2`, `twiggit/internal/core`, `twiggit/internal/iostreams` |
 | `internal/iostreams/` | TTY detection, IOStreams struct, lipgloss styles. | stdlib, `charm.land/lipgloss/v2`, `lo`, `golang.org/x/term` |
-| `internal/cmdutil/` | `Factory` (lazy init), `ExitCodeFor`, persistent flags, `HookRunner` consumer interface. | stdlib, `lo`, `twiggit/internal/core`, `twiggit/internal/iostreams` |
+| `internal/cmdutil/` | `Factory` (functional-option construction; `WithVersion`/`WithConfigLoader`/`WithGitClientFactory`), `ExitCodeFor`, persistent flags, `HookRunner` consumer interface. | stdlib, `lo`, `twiggit/internal/core`, `twiggit/internal/iostreams` |
 | `internal/version/` | Build-time version injection. | stdlib |
 | `cmd/` | Cobra command tree (`list`, `create`, `delete`, `prune`, `cd`, `init`, `_carapace`, `version`). | everything above + `twiggit/cmd` |
 | `main.go` | Composition root: Factory init, signal context, panic recover, cobra dispatch, exit-code mapping. | `twiggit/cmd`, `twiggit/internal/cmdutil`, `twiggit/internal/output` |
@@ -58,6 +58,7 @@ Toolchain pins and linter/formatter posture are owned by `.mise/config.toml`,
 | Go toolchain | `go.mod` `go` directive + `.mise/config.toml` `go` | Bump together. Stay on the latest patch within the minor (currently `1.27.1`); security backports land in patches. |
 | `golang.org/x/...` family | `go.mod` | Bump within `patch` scope on each release; reject major-version churn. `go.mod` is for code dependencies only — tool binaries (govulncheck, gocover-cobertura, etc.) live in `.mise/config.toml`. |
 | `govulncheck` | `.mise/config.toml` `tools` | Pinned. Pre-commit and `mise run vuln:check` invoke the mise-installed binary. Never `@latest`. |
+| `cosign` | `.mise/config.toml` `tools` | Pinned to match `goreleaser/goreleaser:v2.18.2` image bundle (`cosign v3.1.3`). CI `release` job signs SBOMs keyless via GitLab OIDC; local dev uses the mise-installed binary. Never `@latest`. |
 | `gocover-cobertura` | `.mise/config.toml` `tools` | Pinned. `mise run ci:coverage` invokes the mise-installed binary for cobertura conversion. |
 | `gocovmerge` | `.mise/config.toml` `tools` | Pinned. Available on PATH via `mise install` for downstream coverage merge workflows. |
 | `golangci-lint` | `.mise/config.toml` + `.pre-commit-config.yaml` | Pinned to a single version; pre-commit reads from PATH so `mise install` provisions the matching binary. Update in one PR. |
@@ -67,6 +68,21 @@ Toolchain pins and linter/formatter posture are owned by `.mise/config.toml`,
 
 Adding a new tool: `go get -tool <path>@<version>` for Go-managed tools,
 `mise use <tool>@<version>` for mise backends, then update this table.
+
+## CI Pipeline
+
+`.gitlab-ci.yml` defines: `lint` (golangci-lint + govulncheck + go mod tidy gate), `test` (`go test -race ./...`), `build-ci-image` (TLS-enabled DinD), `goreleaser-dry-run` (path-filtered to `cmd/ internal/ .goreleaser.yml go.mod go.sum`), `release` (GitLab Releases API preflight → goreleaser → cosign SBOM sign), `mirror-to-github` (non-forced push).
+
+| Job | Gate | Notes |
+|-----|------|-------|
+| `lint` | golangci-lint + `govulncheck ./...` + `go mod tidy && git diff --exit-code` | Single lint job; vuln scan + module-drift gate in one |
+| `test` | `go test -race ./...` | Race detector folds into the main test job |
+| `build-ci-image` | TLS DinD (`DOCKER_TLS_CERTDIR=/certs`, `DOCKER_HOST=tcp://docker:2376`) | Triggers on Dockerfile.ci, `.gitlab-ci.yml`, `.mise/config.toml`, `.goreleaser.yml`, go.mod/sum |
+| `goreleaser-dry-run` | path-filtered to release-affecting paths | Docs-only MRs skip the dry-run |
+| `release` | tag preflight via `/releases/v<tag>` API check, then `goreleaser release --clean`, then `cosign sign` (OIDC keyless or `$COSIGN_KEY`) | `interruptible: false`; `replace_existing_artifacts: false` |
+| `mirror-to-github` | non-forced `git push` with `--tags` | Tag push routes through `when: never` |
+
+Pipeline defaults: `retry: { max: 2, when: [runner_system_failure, stuck_or_timeout_failure] }`, `interruptible: true` (release job overrides to `false`).
 
 ## Essential Commands
 
