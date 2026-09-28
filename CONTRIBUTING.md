@@ -14,8 +14,8 @@ Thank you for your interest in contributing to Twiggit! This guide will help you
 
 ### Prerequisites
 
-- **Go 1.25+** (see `go.mod` for exact version)
-- **mise** for task automation (optional but recommended)
+- **Go 1.27.1** (see `go.mod` for exact version; bump via `mise use go@<patch>` and the go directive together)
+- **mise** for task automation and tool provisioning
 - **pre-commit** for git hooks
 
 ### Initial Setup
@@ -26,14 +26,14 @@ Thank you for your interest in contributing to Twiggit! This guide will help you
    cd twiggit
    ```
 
-2. **Install development tools:**
+2. **Install the full development toolchain:**
    ```bash
-   # Using mise (recommended)
    mise install
-
-   # Or manually install required tools
-   go mod download
    ```
+   `mise install` provisions Go, `golangci-lint`, `goreleaser`, `govulncheck`,
+   `cosign`, `gopls`, `ginkgo`, `gocover-cobertura`, `gocovmerge`, and
+   `pre-commit` per the pins in `.mise/config.toml`. No manual binary
+   installation is required on a clean checkout.
 
 3. **Set up pre-commit hooks:**
    ```bash

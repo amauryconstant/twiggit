@@ -5,6 +5,10 @@
 # CI files
 .gitlab-ci.yml
 
+# Repository metadata and planning
+.github/
+openspec/
+
 # Test and coverage files
 coverage*.out
 coverage.html

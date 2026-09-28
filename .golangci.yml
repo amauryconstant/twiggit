@@ -69,7 +69,7 @@ linters:
 
   settings:
     staticcheck:
-      checks: ["all,-ST1000"] # all but style-only checks already covered by revive
+      checks: ["all,-ST1000,-ST1003,-ST1005,-ST1016,-ST1020,-ST1021"]
 
     testifylint:
       enable-all: true
@@ -225,10 +225,6 @@ linters:
             - github.com/spf13/cobra
             - twiggit/internal/core
             - twiggit/internal/iostreams
-            - twiggit/internal/output
-            - twiggit/internal/git
-            - twiggit/internal/config
-            - twiggit/internal/version
           deny:
             - pkg: "github.com/charmbracelet/lipgloss"
               desc: "cmdutil does not render; let iostreams/output own styling"

@@ -61,7 +61,7 @@ Toolchain pins and linter/formatter posture are owned by `.mise/config.toml`,
 | `gocover-cobertura` | `.mise/config.toml` `tools` | Pinned. `mise run ci:coverage` invokes the mise-installed binary for cobertura conversion. |
 | `gocovmerge` | `.mise/config.toml` `tools` | Pinned. Available on PATH via `mise install` for downstream coverage merge workflows. |
 | `golangci-lint` | `.mise/config.toml` + `.pre-commit-config.yaml` | Pinned to a single version; pre-commit reads from PATH so `mise install` provisions the matching binary. Update in one PR. |
-| `gopls` | `.mise/config.toml` | Pinned to a single version. `mise run gopls:check` runs `gopls check **/*.go` across the module; `mise run gopls:stats` reports analysis state. |
+| `gopls` | `.mise/config.toml` | Pinned to a single version. `mise run gopls:check` runs `gopls check ./...` across the module; `mise run gopls:stats` reports analysis state. |
 | Linter set | `.golangci.yml` `linters.enable` | `nolintlint` MUST stay enabled so every `//nolint` directive is forced to carry a reason. New linters land in this change and the existing-rule tasks, not by the side. |
 | Formatters | `.golangci.yml` `formatters.enable` | `gofumpt` (with `extra.group-params`) + `goimports`. Local rewrite via `golangci-lint fmt ./...`; `golangci-lint run` enforces but does not rewrite. |
 
@@ -97,6 +97,24 @@ Adding a new tool: `go get -tool <path>@<version>` for Go-managed tools,
 **Distribution**: Homebrew via `amoconst/homebrew-tap`, GitLab artifacts with GitHub discoverability pages
 **CHANGELOG**: Auto-generated via `openspec-generate-changelog` after archiving changes.
 
+### SBOM verification
+
+Each release publishes SPDX SBOMs (`*_sbom.spdx.json`) signed by `cosign`
+(keyless via GitLab OIDC, image-bundled `cosign v3.1.3`). Consumers verify
+the SBOM integrity before relying on the inventory:
+
+```bash
+# Download the SBOM and its detached signature from the GitLab release page,
+# then verify with cosign (Rekor log entry URL prints on success):
+cosign verify-blob \
+  --signature twiggit_<version>_linux_amd64_sbom.spdx.json.sig \
+  twiggit_<version>_linux_amd64_sbom.spdx.json
+```
+
+For OIDC-keyless verification cosign uses the ambient identity from the
+TUF/Rekor transparency log; no public-key fingerprint is needed because
+the signing cert is short-lived and rooted in Fulcio.
+
 ## Twiggit CLI Commands
 
 | Command | Aliases | Purpose | Common Flags |
@@ -110,9 +128,15 @@ Adding a new tool: `go get -tool <path>@<version>` for Go-managed tools,
 
 ## Pre-Commit Hooks
 
-Setup: `mise install && pre-commit install`
-Run: `pre-commit run --all-files`
-Skip: `git commit -m "msg" --no-verify`
+A clean checkout provisions the full toolchain via:
+
+```bash
+mise install      # provisions Go, golangci-lint, goreleaser, govulncheck, cosign, gopls, ginkgo, pre-commit, gocover-cobertura, gocovmerge
+pre-commit install  # wires the git hooks (gofmt, govet, golangci-lint, whitespace, YAML/TOML validators, merge-conflict detection)
+```
+
+Run hooks manually: `pre-commit run --all-files`
+Skip on a commit: `git commit -m "msg" --no-verify`
 
 ## Shell Integration
 

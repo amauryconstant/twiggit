@@ -73,6 +73,7 @@ release:
     owner: amoconst
     name: twiggit
   mode: replace
+  replace_existing_artifacts: false
   name_template: "v{{ .Version }}"
 
 homebrew_casks:
