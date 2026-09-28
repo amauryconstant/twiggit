@@ -10,21 +10,20 @@ no part of change **B** (CI security gates). The REVIEW titled
 `REVIEW.md:2026-09-25` flagged six critical findings under
 `infrastructure-release` — TLS-disabled DinD, `--force` mirror push,
 `release.mode: replace` overwrite, plus missing govulncheck CI job / CodeQL
-/ Dependabot — three of which this change ships the remedies for. The
-remaining three (B1, B2, B3) plus B13 (homebrew token scope) and B14 (SLSA
-provenance) are explicitly deferred.
+/ Dependabot — of which this change ships the TLS DinD, non-forced
+mirror, and `replace_existing_artifacts: false` remedies, plus promotes
+the previously-deferred govulncheck CI gate to active. The remaining
+items (B2 CodeQL, B3 Dependabot, B13 homebrew token scope, B14 SLSA
+provenance) remain explicitly deferred.
 
 ## What Changes
 
 ### Foundation polish (no spec delta — `infrastructure-toolchain` already governs this surface)
 
-- **A1** `Dockerfile.ci` final stage runs as a non-root user; document the
-  UID/permission model alongside the existing `USER nonroot` convention.
-- **A2** `.dockerignore` excludes `.gitlab/`, `openspec/`, `.github/` so the
-  build context sent to `docker build` does not ship planning artifacts.
-- **A3** `.gomodcache` (and any other persistent CI paths) gain a known
-  owner before the `USER nonroot` cutover in A1; chown or relocate to the
-  runtime user.
+- **A2** `.dockerignore` excludes `openspec/` and `.github/` so the build
+  context sent to `docker build` does not ship planning artifacts
+  (`.gitlab/` dropped from the original scope — the project's CI image
+  registry is private and does not need build-context leak protection).
 - **A4** `.golangci.yml` test-exclusion regex gains `^` anchors and a
   narrower surface so it does not catch unrelated `*_test.go` paths in
   subpackages.
@@ -94,18 +93,11 @@ provenance) are explicitly deferred.
 - **B7** `.gitlab-ci.yml` `lint` job runs `go mod tidy && git diff --exit-code`
   before `golangci-lint run` so the diff between `go.mod`/`go.sum` and
   source is caught at the same gate.
-- **B8** `.gitlab-ci.yml` adds a Go-version matrix that exercises the
-  toolchain set: `go.mod` directive version (currently `1.27.1`) plus
-  the prior supported minor (currently `1.26.x` latest patch);
-  `fail-fast: false` so a single-broken-matrix entry does not cancel
-  the others.
-- **B9** `.gitlab-ci.yml` adds a standalone `test:race` CI job (currently
-  `-race` only runs as a flag inside `mise run ci:coverage`), so race
-  failures surface at their own job instead of being folded into
-  coverage noise.
-- **B10** `.gitlab-ci.yml` `build-ci-image` adds a `trivy image` scan
-  step after the `docker push`; findings gate the `validate` stage for
-  subsequent jobs.
+- **B9** `.gitlab-ci.yml` `test` job runs `go test -race ./...` so the
+  race detector flags failures at the same job as the unit tests (folded
+  in from a previously-planned standalone `test:race` job; the
+  `mise run ci:coverage` task keeps the canonical coverage signal on
+  tagged releases).
 - **B11** `.gitlab-ci.yml` `release` job adds a `cosign sign` step after
   `goreleaser release --clean` (keyless via GitLab OIDC using the
   image-bundled `cosign v3.1.3` at `/usr/bin/cosign`). The job configures
@@ -118,30 +110,32 @@ provenance) are explicitly deferred.
   `when: never` for tag triggers (already present) is paired with an
   explicit `interruptible: false` for the main-branch sync, and the
   push switches to `git push --follow-tags` (no `--force`).
-- **B16** `.gitlab-ci.yml` `goreleaser-dry-run` no longer scopes its
-  trigger to `.goreleaser.yml`/`go.mod`/`cmd`/`internal` changes — it
-  runs on every MR so a refactor that touches the release binary is
-  caught before merge.
-- **B17** `.gitlab-ci.yml` `default:` block sets explicit `tags:`,
-  `retry:` (2 max for transient errors), and `interruptible: true`
-  (overridable per-job).
-- **B18** `.gitlab-ci.yml` `test` job `before_script` adds a
-  `go mod tidy -diff` verification so uncommitted module-graph drift
-  fails the job before tests run.
+- **B16** `.gitlab-ci.yml` `goreleaser-dry-run` scopes its trigger to
+  release-affecting paths (`cmd/`, `internal/`, `.goreleaser.yml`,
+  `go.mod`, `go.sum`) so a docs-only MR does not pay for a goreleaser
+  dry-run that cannot fail.
+- **B17** `.gitlab-ci.yml` `default:` block sets explicit `retry:`
+  (2 max for transient errors) and `interruptible: true` (overridable
+  per-job). `tags:` is dropped from the default block — twiggit uses no
+  self-hosted runner tags; the GitLab-hosted runner default applies.
 - **B19** `.gitlab-ci.yml` `release` job sets `interruptible: false`
   so an upstream cancel cannot abort the publish mid-flight.
 - **B20** `.gitlab-ci.yml` `build-ci-image` trigger extends to
-  `.goreleaser.yml` so a goreleaser-version bump that needs a fresh
-  image rebuilds the CI image automatically.
-- **B21** `.dockerignore` excludes `.cache-key` (the cache-key file
-  written by `setup:` job) so it does not leak into the docker build
-  context.
+  `.goreleaser.yml` and `.mise/config.toml` so a goreleaser-version bump
+  that needs a fresh image rebuilds the CI image automatically (drift
+  between the goreleaser pin and the CI image is closed at the
+  image-rebuild step; no per-job drift check is required).
 - **B22** `.gitlab-ci.yml` `goreleaser-dry-run` artifacts use
   `expire_in: 1 day` so the snapshot churns do not fill runner disk.
-- **B23** `.gitlab-ci.yml` adds a fast `test:race:subset` job that
-  runs `go test -race ./internal/... ./cmd/...` (per-target) so the
-  default branch has a quick race pass; the existing
-  `mise run ci:coverage` keeps the full race run for tagged releases.
+- **B24** `.gitlab-ci.yml` `lint` job adds a `govulncheck ./...` step
+  after `go mod tidy` so unfixed vulnerabilities in called code from
+  twiggit's source dependencies (charm.land, samber/lo, go-git, etc.)
+  fail the `lint` job. `govulncheck` is already in the CI image via
+  `mise` (toolchain governance); no per-run install is required.
+  This is the previously-deferred B1 promoted to active; it replaces
+  the originally-planned Trivy image scan on the CI image, which
+  produced only false positives from vendored test fixtures and
+  toolchain-binary CVEs (see `design.md` Decisions rationale).
 
 ## Capabilities
 
@@ -155,16 +149,14 @@ existing CI/release surfaces or as tooling polish.
 - `infrastructure-release`: gains requirements covering TLS-enabled
   DinD service, non-forced mirror push, GitLab Releases API preflight
   gate on release-tag reuse plus `release.replace_existing_artifacts:
-  false`, Trivy image scan, cosign SBOM sign, pinned goreleaser image,
-  Go-version matrix, standalone race CI job, `go mod tidy` gate,
-  matrix-less dry-run, and pipeline defaults (`tags:`, `retry:` scoped
-  to transient failures, `interruptible:`).
+  false`, `govulncheck` on the `lint` job, cosign SBOM sign, pinned
+  goreleaser image, `-race` flag in the `test` job, `go mod tidy`
+  gate in the `lint` job, path-filtered goreleaser-dry-run, and
+  pipeline defaults (`retry:` scoped to transient failures,
+  `interruptible:`).
 
 ## Non-Goals
 
-- **B1** govulncheck CI job — deferred. `mise run vuln:check` is the
-  developer-local + pre-commit gate today; promoting it to CI is a
-  follow-up change once the linter expansion in change A has settled.
 - **B2** CodeQL / SARIF publish — deferred. gosec inside
   golangci-lint covers SAST locally today; surfacing results in the
   GitLab Security tab requires a future SARIF-upload job.
@@ -195,23 +187,21 @@ package is touched. The single Go-code change is the cmdutil refactor
 ### Files modified
 
 ```
-.gitlab-ci.yml                  — B4, B6, B7, B8, B9, B10, B11, B12,
-                                  B15, B16, B17, B18, B19, B20, B22,
-                                  B23
-Dockerfile.ci                   — A1, A3
-.dockerignore                   — A2, B21
+.gitlab-ci.yml                  — B4, B6, B7, B9, B11, B12, B15, B16,
+                                   B17, B19, B20, B22, B24
+.dockerignore                   — A2
 .golangci.yml                   — A4, A5, A6, A7 (A7 sequenced after
-                                  Group 7)
+                                   Group 7)
 .goreleaser.yml                 — B5
 .mise/config.toml               — A10, A11, A12
 AGENTS.md                       — A13
 CONTRIBUTING.md                 — A13
 internal/cmdutil/factory.go     — Group 7 (refactor: lazy constructors
-                                  via functional options)
+                                   via functional options)
 main.go                         — Group 7 (composition-root wiring of
-                                  config/git/version)
+                                   config/git/version)
 internal/cmdutil/factory_test.go — Group 7 (test seam: exercise both
-                                  default and wired construction paths)
+                                   default and wired construction paths)
 openspec/specs/infrastructure-release/spec.md     — proposal→specs phase
 openspec/changes/infra-release-hardening/specs/infrastructure-release/
                                                   — delta spec
@@ -232,9 +222,11 @@ openspec/changes/infra-release-hardening/specs/infrastructure-release/
 
 ### Operational impact
 
-- CI minutes roughly double for matrix expansion (B8) and
-  fast-subset race (B23). Acceptable; the matrix failure is the
-  release-blocking signal, not the race subset.
+- CI minutes drop: single Go version replaces the originally-planned
+  two-entry matrix, and the `-race` flag folds into the main `test`
+  job (no standalone `test:race` or `test:race:subset`). The
+  `goreleaser-dry-run` job is now path-filtered to release-affecting
+  MRs, so docs-only MRs no longer pay the goreleaser cost.
 - TLS DinD (B6) requires GitLab Runner DinD TLS cert distribution
   via `DOCKER_TLS_CERTDIR: "/certs"`. Self-hosted runners emit the certs
   automatically through `dockerd-entrypoint.sh`; GitLab.com shared
@@ -246,6 +238,13 @@ openspec/changes/infra-release-hardening/specs/infrastructure-release/
   tags (`.mise/tasks/release/tag` lines 32-35).
 - Homebrew tap behavior is independent of `release.mode` and is
   governed by `homebrew_casks.skip_upload`; no change required.
+- `govulncheck ./...` (B24) runs in the `lint` job on every MR + tag.
+  `govulncheck` is already in the CI image via `mise` (no per-run
+  install). Real supply-chain signal: vulnerabilities in called code
+  from twiggit's actual dependencies. The previously-considered
+  Trivy image scan (B10, since dropped) scanned the ephemeral CI
+  image and produced only false positives from vendored test fixtures
+  and toolchain-binary CVEs.
 
 ### Compatibility
 
@@ -257,7 +256,7 @@ openspec/changes/infra-release-hardening/specs/infrastructure-release/
 - **BREAKING (CI-side only)**: `goreleaser/goreleaser` image pin (B12).
   If a runner image does not include `v2.18.2`, the build pulls the
   official pinned image.
-- Non-breaking: DinD TLS (B6), Trivy (B10), cosign (B11), matrix
-  (B8), `cmdutil` factory refactor (Group 7), and all A-post items
-  affect CI/toolchain only or are internal rewirings with no
-  externally observable behavior change.
+- Non-breaking: DinD TLS (B6), `govulncheck` in lint (B24), cosign
+  (B11), `-race` fold into test (B9), `cmdutil` factory refactor
+  (Group 7), and all A-post items affect CI/toolchain only or are
+  internal rewirings with no externally observable behavior change.

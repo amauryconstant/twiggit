@@ -14,29 +14,31 @@ motivation, and `specs/infrastructure-release/spec.md` for the
 behavioral contract each decision must satisfy.
 
 The change ships in a single OpenSpec change. Tooling choices follow
-the existing project standard (mise owns tools; `cosign` and `trivy` are
-provisioned the same way `govulncheck` is — via the mise `[tools]`
-block). All choices below assume that governance is unchanged.
+the existing project standard (mise owns tools; `cosign` and
+`govulncheck` are provisioned via the mise `[tools]` block, and
+`govulncheck` is now wired into the `lint` job as the supply-chain
+signal for twiggit's source dependencies). All choices below assume
+that governance is unchanged.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
 - Close REVIEW-B critical findings (B4, B5, B6) and most warn findings
-  (B7–B12, B15–B23) with minimal CI-minute expansion.
+  (B7, B9–B12, B15, B17, B19, B20, B22) with minimal CI-minute
+  expansion.
 - Preserve the existing `infrastructure-toolchain` contract: mise owns
-  tools, `mise run verify` order is unchanged, govulncheck stays
-  developer-local + pre-commit.
+  tools, `mise run verify` order is unchanged, govulncheck is now
+  both developer-local + pre-commit AND a CI gate on the `lint` job.
 - Keep the change's risk surface localized to `.gitlab-ci.yml`,
   `.goreleaser.yml`, and the Docker lint files. `cmd/` and `internal/`
   must remain untouched.
 
 **Non-Goals:**
 
-- Realize the B1, B2, B3, B13, B14 deferred items (govulncheck CI,
-  CodeQL SARIF, Dependabot/Renovate, homebrew token scope, SLSA
-  provenance). Those are explicitly deferred per the proposal's
-  Non-Goals section.
+- Realize the B2, B3, B13, B14 deferred items (CodeQL SARIF,
+  Dependabot/Renovate, homebrew token scope, SLSA provenance). Those
+  are explicitly deferred per the proposal's Non-Goals section.
 - Cut over to Buildah/Kaniko or another daemon-free builder; TLS DinD
   is the chosen path. Buildah is revisited only if (B6) reveals a
   second-order runtime problem.
@@ -136,46 +138,46 @@ on every release.
 - *Pin mise cosign to v2.* Rejected: would cause local-vs-CI
   version drift between developer signing and CI signing.
 
-### 4. Go-version matrix keyed off `go.mod` directive + previous minor's latest patch
+### 4. Single Go version from `go.mod` directive
 
-**Choice:** A two-entry matrix, populated by `.gitlab-ci.yml`
-`variables:`. Entry 1 reads the `go` directive from `go.mod`; Entry 2
-is the previous minor's latest patch. Matrix uses `fail-fast: false`
-and a single, shared `script:`.
+**Choice:** The `test` job runs the toolchain version declared by the
+`go.mod` `go` directive (currently `1.27.1`). No version matrix.
 
-**Rationale:** Two entries cover the project-stated toolchain set
-without doubling CI minutes proportionally. Reading the directive
-from `go.mod` keeps the matrix in lockstep with the actual code; the
-prior minor is the realistic floor for `golang.org/x/...` dependency
-compatibility.
-
-**Alternatives considered:**
-
-- *Three-entry matrix (directive + n-1 latest + n-1 minimum).*
-  Marginal benefit, doubles again. Rejected.
-- *Single Go version (the directive only).* Insufficient — losing
-  the cross-version coverage that the matrix is supposed to provide.
-  Rejected.
-
-### 5. Race jobs: standalone full matrix + fast subset, both `-race`
-
-**Choice:** Two distinct jobs:
-`test:race` runs `go test -race ./...` in a matrix cell;
-`test:race:subset` runs `go test -race ./internal/... ./cmd/...` as a
-faster pre-merge check. The tagged-release `coverage` job remains
-the source of truth.
-
-**Rationale:** The subset gives a fast race pass on every MR; the
-full `-race` run on tags catches the longer path. The duplication is
-intentional — the spec specifies both because the failure modes are
-different (subset-jobs fail fast on common races; tagged release
-fails on the rare races only the full run can detect).
+**Rationale:** twiggit is an n=1 CLI with pinned dependencies. AGENTS.md
+records no n-1 compatibility policy. A two-entry matrix doubles CI
+minutes per MR for a hypothetical cross-version compat regression that
+the pinned toolchain (`mise` owns `go`, `golangci-lint`, `gopls`,
+`goreleaser`, `govulncheck`, `cosign`) does not exercise in practice.
+The toolchain set in `.mise/config.toml` already pins the same version
+for local + CI; cross-version compat is a property of the dependency
+graph, not of the language runtime.
 
 **Alternatives considered:**
 
-- *Single full `-race` job, no subset.* Faster to set up, but a long
-  blocking wait on every MR. Rejected.
-- *Subset-only on MRs.* Covers common cases but misses rare races.
+- *Two-entry matrix (directive + n-1 latest).* Doubles CI minutes for
+  signal that does not exist. Rejected.
+- *Three-entry matrix (directive + n-1 latest + n-1 minimum).* Doubles
+  again. Rejected.
+
+### 5. `-race` folded into the main `test` job
+
+**Choice:** The `test` job runs `go test -race ./...` (a single `-race`
+invocation covering all packages). The `mise run ci:coverage` task on
+tagged releases provides the canonical coverage-and-race signal.
+
+**Rationale:** A standalone `test:race` job duplicates what the main
+`test` job can do with a flag. A fast `test:race:subset` covering
+`internal/`+`cmd/` adds MR-gate cost without catching races the
+fold-into-test pass does not already catch; the novel `-shuffle=on`
+flag was paying for order-dep detection that the deterministic local
+`mise run test:race` would have surfaced earlier. Tagged-release
+coverage remains the source of truth.
+
+**Alternatives considered:**
+
+- *Standalone `test:race` + `test:race:subset`.* Doubled race-related
+  MR cost with redundant coverage. Rejected.
+- *Race only on tags, not on MRs.* Loses the MR-gate race signal.
   Rejected.
 
 ### 6. Mirror push uses plain `git push --follow-tags`, never `--force`
@@ -270,13 +272,15 @@ is config / CI YAML / Docker / linter config.
 **Choice:** `goreleaser/goreleaser:v2.18.2` everywhere it appears in
 `.gitlab-ci.yml` (`goreleaser-dry-run` job, `release` job). The image
 tag is updated only when `.mise/config.toml` `[tools] goreleaser`
-moves, and the trigger for `build-ci-image` covers that case (B20).
+moves; the `build-ci-image` trigger covers `.mise/config.toml` and
+`.goreleaser.yml` so a goreleaser-version bump rebuilds the image
+before downstream jobs run.
 
 **Rationale:** The CI image and the goreleaser runtime share the
-goreleaser contract. A drift between the two would cause the
-`goreleaser --version` check in the CI Dockerfile to disagree with
-the runtime, masking configuration errors. Pinning both at the same
-version with a coupled trigger (B20) eliminates the drift class.
+goreleaser contract. A drift between the two would cause the runtime
+to disagree with the mise-pinned version, masking configuration
+errors. The coupled `build-ci-image` trigger eliminates the drift
+class at the image-rebuild step, with no per-job drift check needed.
 
 **Alternatives considered:**
 
@@ -285,6 +289,10 @@ version with a coupled trigger (B20) eliminates the drift class.
   for one cycle. Rejected.
 - *Use the CI image's goreleaser.* Requires the CI image to embed
   goreleaser; current image does not. Not justified by gain.
+- *Per-job `before_script` drift check* (parse `.mise/config.toml`,
+  compare to `goreleaser --version`, fail on mismatch). Drift path is
+  closed upstream by the `build-ci-image` trigger; per-job defense is
+  redundant. Rejected.
 
 ## Risks / Trade-offs
 
@@ -307,30 +315,17 @@ mounted into both jobs; not expected on the current runner fleet.
 
 **[R3] cosign keyless depends on runner OIDC availability.** → GitLab.com shared runners expose OIDC; the CI YAML registers `id_tokens` for the relevant job. The release job uses the `cosign v3.1.3` binary bundled in the goreleaser image (no per-run install). If a self-hosted runner rejects OIDC, the fallback uses `COSIGN_KEY` (project CI variable). The fallback is a `before_script` switch, not a second pipeline.
 
-**[R4] Go-version matrix roughly doubles validate-stage CI minutes per MR.** → Acceptable cost for cross-version coverage; the matrix is two entries (`directive + n-1 latest`). For self-hosted runners, the matrix is configurable via `variables:` and can be reduced to one entry if cost is the priority.
+**[R4] govulncheck on the `lint` job adds a build-time dependency scan.** → `govulncheck` is already in the CI image via `mise` (toolchain governance). One `govulncheck ./...` per MR + per tag; ~10s on the current cache. Real signal: vulnerabilities in called code from twiggit's actual dependencies (charm.land, samber/lo, go-git, etc.). The previously-considered Trivy image scan produced only false positives from vendored test fixtures and toolchain-binary CVEs; the source-code analysis is the right scope.
 
-**[R5] Race subset misses long-running packages outside `internal/`+`cmd/`.** → The full `-race` run lives on the tagged-release job; the subset is explicitly an MR-gate fast pass, not the canonical signal. If the subset scope changes, the spec's "fast race-detector subset" requirement re-evaluates; see `Open Questions`.
+**[R5] cosign-signed SBOM verification breaks if the Rekor transparency log rejects an entry.** → Verified blobs are still downloadable; signing fails-soft with an explicit log line. The release job does not gate on cosign success in v1 (matches the spec's loose behaviour); v2 can tighten via a follow-up.
 
-**[R6] cosign-signed SBOM verification breaks if the Rekor transparency log rejects an entry.** → Verified blobs are still downloadable; signing fails-soft with an explicit log line. The release job does not gate on cosign success in v1 (matches the spec's loose behaviour); v2 can tighten via a follow-up.
-
-**[R7] B7 + B18 (`go mod tidy` gate) double-runs `go mod tidy` in the pipeline.** → Pipeline cost is one `go mod tidy` call per gate, total ~10s on the current cache. Acceptable; the gate catches a class of bugs (`go.mod` drift between local and CI) the test job cannot.
-
-**[R8] Goreleaser image version vs mise pin drift.** → The CI image
+**[R6] Goreleaser image version vs mise pin drift.** → The CI image
 (`goreleaser/goreleaser:v2.18.2`) and the mise pin (`goreleaser = "2.18.2"`)
-are coupled by convention, not by automation. A goreleaser bump in
-`.mise/config.toml` will not automatically bump the CI image, and vice
-versa. Group 4 task 4.7 adds a `before_script` check that compares
-`goreleaser --version` (from the image) to the pinned version in
-`.mise/config.toml`; the `release` and `goreleaser-dry-run` jobs fail on
-mismatch. This catches drift at the gate rather than at publish time.
+are coupled by the `build-ci-image` trigger covering `.mise/config.toml`
+and `.goreleaser.yml`. A goreleaser bump in either file rebuilds the
+image before downstream jobs run; no per-job drift check is required.
 
 ## Open Questions
-
-- **Race-subset scope** (`./internal/...` + `./cmd/...`): the subset
-  uses `-shuffle=on` to catch order-dependent races; the full
-  `mise run test:race` stays deterministic locally. The scope question
-  remains open per the original draft — a future `test/integration/`
-  race path would require widening the subset.
 
 - **`homebrew_casks.token` rotation cadence** is not in scope (B13
   deferred) but the release job still uses `GITHUB_TOKEN` from the

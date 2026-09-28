@@ -68,19 +68,18 @@ overwrites artifacts when invoked.
 - **AND** CI SHALL fail the `release` job before goreleaser is invoked
 - **AND** no artifact SHALL be silently overwritten
 
-### Requirement: CI supply-chain scans
+### Requirement: CI supply-chain signals
 
-The CI pipeline SHALL scan published images and release artifacts for
-vulnerabilities and SHALL sign release SBOMs.
+The CI pipeline SHALL run `govulncheck` on twiggit's source code at the
+`lint` stage and SHALL sign release SBOMs.
 
-#### Scenario: Trivy scan on the CI image
+#### Scenario: govulncheck on source
 
-- **WHEN** `build-ci-image` finishes `docker push`
-- **THEN** a `trivy image --exit-code 1 --severity CRITICAL,HIGH
-  --no-progress` step SHALL scan the published CI image
-- **AND** `CRITICAL` and `HIGH` findings SHALL exit the step non-zero
-- **AND** the non-zero exit SHALL cause the downstream `validate`-stage
-  jobs to gate
+- **WHEN** `lint` runs
+- **THEN** a `govulncheck ./...` step SHALL run after `go mod tidy`
+- **AND** unfixed vulnerabilities in called code SHALL exit the step
+  non-zero
+- **AND** the non-zero exit SHALL fail the `lint` job
 
 #### Scenario: cosign SBOM signature
 
@@ -94,7 +93,9 @@ vulnerabilities and SHALL sign release SBOMs.
 
 CI jobs that require a goreleaser container SHALL pin the image to a
 specific tag. The pinned version SHALL match the goreleaser entry in
-`.mise/config.toml` `[tools]`.
+`.mise/config.toml` `[tools]`. The `build-ci-image` trigger SHALL cover
+`.mise/config.toml` and `.goreleaser.yml` so a goreleaser-version bump
+rebuilds the image before downstream jobs run.
 
 #### Scenario: Goreleaser dry-run job
 
@@ -108,50 +109,12 @@ specific tag. The pinned version SHALL match the goreleaser entry in
 
 - **WHEN** `release` runs
 - **THEN** the job image SHALL be the same pinned tag
-- **AND** the version SHALL be discoverable via `goreleaser --version`
-  in `before_script`
-
-### Requirement: Go-version matrix in CI
-
-The CI pipeline SHALL execute the test suite under a matrix of Go
-versions covering the toolchain set: the directive version declared in
-`go.mod` plus the prior supported minor's latest patch. The matrix
-SHALL set `fail-fast: false` so a single matrix entry does not cancel
-the others.
-
-#### Scenario: Matrix entries
-
-- **WHEN** CI runs on a merge request
-- **THEN** the test job SHALL include entries for the `go.mod`
-  directive version and the previous minor's latest patch
-- **AND** each entry SHALL run `mise run test` (or equivalent) and
-  report independently
-
-#### Scenario: Failure isolation
-
-- **WHEN** one matrix entry fails
-- **THEN** the other entries SHALL continue to completion
-- **AND** the job SHALL report aggregate success only when every entry
-  succeeds
-
-### Requirement: Standalone race-detector job
-
-The CI pipeline SHALL execute a `go test -race` job decoupled from
-coverage. Race failures SHALL surface at that job's log instead of
-being folded into coverage noise.
-
-#### Scenario: Race failure visibility
-
-- **WHEN** a race detector finding is introduced
-- **THEN** the standalone race job SHALL fail
-- **AND** the failure message SHALL point to the race-detected data
-  race, distinct from coverage-shaping noise
 
 ### Requirement: Module-graph freshness gate
 
 The CI pipeline SHALL verify that the module graph declared by
 `go.mod`/`go.sum` matches the source under review. The check SHALL run
-before lint and before the test job in the `validate` stage.
+in the `lint` job before `golangci-lint run`.
 
 #### Scenario: Lint gate
 
@@ -159,24 +122,16 @@ before lint and before the test job in the `validate` stage.
 - **THEN** it SHALL first execute `go mod tidy && git diff --exit-code`
 - **AND** an unstaged `go.mod`/`go.sum` drift SHALL fail the lint job
 
-#### Scenario: Test gate
-
-- **WHEN** `test` runs
-- **THEN** its `before_script` SHALL run `go mod tidy -diff`
-- **AND** a missing tidy SHALL fail the test job before any test
-  executes
-
 ### Requirement: Pipeline defaults for jobs
 
-The CI `.gitlab-ci.yml` `default:` block SHALL declare the runner
-selection, retry policy, and interruptibility expectation that apply
-to every job unless a job overrides them.
+The CI `.gitlab-ci.yml` `default:` block SHALL declare the retry policy
+and interruptibility expectation that apply to every job unless a job
+overrides them.
 
-#### Scenario: Default tags and retry apply
+#### Scenario: Default retry applies
 
-- **WHEN** a job does not override `tags:`
-- **THEN** the job SHALL run on the runner tag declared at `default:`
-- **AND** runner-system or stuck-or-timeout failures SHALL be retried
+- **WHEN** a job does not override `retry:`
+- **THEN** runner-system or stuck-or-timeout failures SHALL be retried
   up to the `default:` `retry:` count
 - **AND** test failures SHALL NOT be retried by the default policy
 
@@ -213,46 +168,27 @@ goreleaser-version bump rebuilds the CI image automatically.
 - **AND** the rebuilt image SHALL carry the goreleaser version
   expected by `.gitlab-ci.yml`
 
-### Requirement: Goreleaser dry-run runs on every merge request
+### Requirement: Goreleaser dry-run on release-affecting merge requests
 
-The `goreleaser-dry-run` job SHALL run on every merge request,
-independent of which paths the MR touches. The dry-run SHALL produce
-snapshot artifacts under a short retention window to avoid runner
-disk pressure.
+The `goreleaser-dry-run` job SHALL run on merge requests that touch
+release-affecting paths (`cmd/`, `internal/`, `.goreleaser.yml`,
+`go.mod`, `go.sum`). The dry-run SHALL produce snapshot artifacts
+under a short retention window to avoid runner disk pressure.
 
-#### Scenario: Path-agnostic trigger
+#### Scenario: Release-affecting trigger
 
-- **WHEN** any merge request is opened
+- **WHEN** a merge request touches a release-affecting path
 - **THEN** `goreleaser-dry-run` SHALL run
 - **AND** the result SHALL gate the MR
+
+#### Scenario: Docs-only trigger
+
+- **WHEN** a merge request touches only docs or non-release paths
+- **THEN** `goreleaser-dry-run` SHALL NOT run
 
 #### Scenario: Artifact retention
 
 - **WHEN** `goreleaser-dry-run` publishes snapshot artifacts
 - **THEN** the artifacts SHALL expire within one day
 - **AND** older snapshots SHALL NOT accumulate
-
-### Requirement: Fast race-detector subset
-
-The CI pipeline SHALL execute a fast `-race` subset covering the
-`internal/` and `cmd/` trees before the slower full `mise run
-ci:coverage` job. The full `-race` run remains required for tagged
-releases.
-
-#### Scenario: Default branch race subset
-
-- **WHEN** CI runs on a merge request or main-branch push
-- **THEN** a `test:race:subset` job SHALL run
-  `go test -race -shuffle=on ./internal/... ./cmd/...`
-- **AND** the subset SHALL complete on the order of minutes
-- **AND** `-shuffle=on` SHALL randomize test order to catch
-  order-dependent races
-
-#### Scenario: Tagged release race coverage
-
-- **WHEN** CI runs on a `v*` tag
-- **THEN** `mise run ci:coverage` SHALL run and include the `-race`
-  flag for `./...`
-- **AND** the tagged-release job SHALL fail if `-race` reports a
-  failure even when the subset passed
 
