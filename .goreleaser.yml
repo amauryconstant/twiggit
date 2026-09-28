@@ -91,7 +91,6 @@ homebrew_casks:
       - twiggit
     url:
       template: "https://gitlab.com/amoconst/twiggit/-/releases/{{ .Tag }}/downloads/{{ .ArtifactName }}"
-      verified: gitlab.com/amoconst/twiggit
     hooks:
       post:
         install: |
