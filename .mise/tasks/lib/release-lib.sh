@@ -71,7 +71,7 @@ release_lib_validate_commits_since_tag() {
 }
 
 release_lib_get_latest_tag() {
-  git describe --tags --abbrev=0 2>/dev/null || echo ""
+  git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1
 }
 
 release_lib_validate_tag_format() {

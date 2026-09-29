@@ -204,24 +204,35 @@ via `tcp://docker:2376` with the client cert set mounted at
 - **AND** a co-tenant runner SHALL NOT be able to drive `docker build`
   or `docker push` against the registry without the DinD cert bundle
 
-### Requirement: Mirror push is non-forced
+### Requirement: Mirror push uses --force-with-lease
 
-The `mirror-to-github` job SHALL push the GitHub mirror without
-`--force`. The push SHALL be plain `git push github HEAD:$CI_COMMIT_BRANCH --tags`
-and SHALL fail rather than overwrite remote refs.
+The `mirror-to-github` job SHALL push the GitHub mirror using
+`git push --force-with-lease` so a divergent GitHub ref can be reconciled
+without overwriting concurrent updates. The push SHALL be
+`git push github HEAD:$CI_COMMIT_BRANCH --tags --force-with-lease` after
+explicitly fetching `github/$CI_COMMIT_BRANCH` so the lease tracks the
+remote state. GitLab is the canonical reference; GitHub follows.
 
-#### Scenario: Main-branch sync
+#### Scenario: Main-branch sync with divergent GitHub ref
 
 - **WHEN** a commit is pushed to `main` and the mirror job runs
-- **THEN** the push SHALL NOT include `--force`
-- **AND** the push SHALL be `git push github HEAD:$CI_COMMIT_BRANCH --tags`
-- **AND** the push SHALL succeed only if the remote ref fast-forwards
-- **AND** a non-fast-forward local branch SHALL cause the job to fail
-  instead of overwriting the GitHub ref
+- **AND** `github/main` has diverged from `origin/main` (e.g. an earlier
+  mirror attempt failed non-fast-forward)
+- **THEN** the job SHALL fetch `github/$CI_COMMIT_BRANCH` before pushing
+- **AND** the push SHALL include `--force-with-lease`
+- **AND** the push SHALL succeed and overwrite the divergent GitHub ref
+
+#### Scenario: Main-branch sync when GitHub ref has moved concurrently
+
+- **WHEN** a commit is pushed to `main` and the mirror job runs
+- **AND** `github/main` has been updated since the local fetch
+- **THEN** the push SHALL fail with the lease-mismatch error
+- **AND** the job SHALL NOT overwrite the concurrent update
 
 #### Scenario: Tag push
 
 - **WHEN** a `v*` tag is mirrored via `--tags`
+- **AND** a tag with the same name does NOT exist on GitHub
 - **THEN** the tag SHALL be pushed without `--force`
 - **AND** an existing tag at the same name SHALL cause the push to fail
   rather than overwrite the GitHub tag
