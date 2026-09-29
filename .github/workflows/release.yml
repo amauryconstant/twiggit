@@ -45,7 +45,8 @@ jobs:
         with:
           version: v2.18.2
           args: release --clean -f .goreleaser.github.yml
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Sign SBOMs (OIDC keyless)
         env:
