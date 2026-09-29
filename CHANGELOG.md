@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.4] - 2026-09-29
+
+
+### Fixed
+
+- GitHub Actions release workflow: install `syft` v1.52.0 into `$PATH` via `anchore/sbom-action/install@v0` before goreleaser runs. `goreleaser-action@v6` ships only the goreleaser binary, so the `sboms:` step would fail with `exec: "syft": executable file not found in $PATH` and ship no SBOMs to the GitHub release. The GitLab CI release job is unaffected (the `goreleaser/goreleaser:v2.18.2` Docker image bundles both tools); bump `syft` in lockstep with goreleaser SBOM format expectations.
+
+### Changed
+
+- Distribution surface ownership now split at the goreleaser config layer: GitLab CI `release` job (`.goreleaser.yml`, `force_token: gitlab`) owns the GitLab release; GitHub Actions `release.yml` (`.goreleaser.github.yml`, `force_token: github`) owns the GitHub release and the Homebrew cask push. Both providers publish the same tarballs, checksums, and SBOMs for each `v*` tag — GitHub is no longer a discoverability stub for GitLab. `homebrew_casks` MUST stay in `.goreleaser.github.yml` only; goreleaser OSS cannot cross-SCM publish (the `token_type` field that would unlock it is Pro-only), and putting it back into `.goreleaser.yml` re-introduces the v0.13.2 401 because the branch-existence pre-flight uses the inferred SCM's API. AGENTS documents the split (toolchain row for `syft`, distribution ownership table, homebrew 401 troubleshooting entry); `infrastructure-release` spec adds the GitHub Actions workflow requirement (syft install, tag-format guard, per-provider preflight, cask ownership) and rewrites the GitLab/GitHub primary requirements around the new split.
+
 ## [0.13.3] - 2026-09-29
 
 
