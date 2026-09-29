@@ -80,7 +80,7 @@ Adding a new tool: `go get -tool <path>@<version>` for Go-managed tools,
 | `test` | `go test -race ./...` | Race detector folds into the main test job |
 | `build-ci-image` | TLS DinD (`DOCKER_TLS_CERTDIR=/certs`, `DOCKER_HOST=tcp://docker:2376`) | Triggers on Dockerfile.ci, `.gitlab-ci.yml`, `.mise/config.toml`, `.goreleaser.yml`, go.mod/sum |
 | `goreleaser-dry-run` | path-filtered to release-affecting paths | Docs-only MRs skip the dry-run |
-| `release` | tag preflight via `/releases/v<tag>` API check, then `goreleaser release --clean`, then `cosign sign-blob --yes --output-signature <file>.sig` (OIDC keyless via GitLab OIDC, or `$COSIGN_KEY` fallback) | `interruptible: false`; `replace_existing_artifacts: false` |
+| `release` | tag preflight via `/releases/v<tag>` API check, then `goreleaser release --clean` with a `signs:` block (artifacts: checksum) that invokes `cosign sign-blob --bundle <file>.sigstore.json` on `checksums.txt` (OIDC keyless via GitLab OIDC, or `$COSIGN_KEY` fallback) | `interruptible: false`; `replace_existing_artifacts: false` |
 | `mirror-to-github` | non-forced `git push` with `--tags` | Tag push routes through `when: never` |
 
 Pipeline defaults: `retry: { max: 2, when: [runner_system_failure, stuck_or_timeout_failure] }`, `interruptible: true` (release job overrides to `false`).
@@ -123,27 +123,42 @@ Pipeline defaults: `retry: { max: 2, when: [runner_system_failure, stuck_or_time
 
 **CHANGELOG**: Auto-generated via `openspec-generate-changelog` after archiving changes.
 
-### SBOM verification
+### Release verification
 
-Each release publishes SPDX SBOMs (`*_sbom.spdx.json`) signed by `cosign`
-keyless via OIDC (GitLab OIDC on the GitLab release, GitHub Actions OIDC
-on the GitHub release; image-bundled `cosign v3.1.3`). Detached `.sig`
-files are written to `dist/` locally for debugging but are NOT published
-as release assets — verification uses the Rekor transparency log via
-the keyless OIDC + identity flags:
+Each release publishes:
+- `twiggit_<VERSION>_<OS>_<ARCH>.<ext>` archives (tar.gz / zip)
+- `twiggit_<VERSION>_<OS>_<ARCH>_sbom.spdx.json` SPDX SBOMs (one per archive)
+- `twiggit_<VERSION>_checksums.txt` containing sha256 of every archive and SBOM
+
+The checksum file is signed by `cosign` keyless via OIDC (GitLab OIDC on
+the GitLab release, GitHub Actions OIDC on the GitHub release;
+image-bundled `cosign v3.1.3`). cosign v3 writes a single
+`checksums.txt.sigstore.json` bundle (signature + cert + Rekor inclusion)
+in `dist/` for debugging — it is NOT published as a release asset. Per-SBOM
+signatures are intentionally omitted: every SBOM hash is already in the
+signed checksum file, so a single signature transitively covers all
+artifacts.
+
+Verify the checksum file against the release's OIDC identity, then verify
+every artifact against the signed checksum file:
 
 ```bash
-# GitLab release SBOM (signed by GitLab CI release job)
+# Step 1: verify checksums.txt was signed by this repo's release job.
+# GitLab release (signed by GitLab CI release job)
 cosign verify-blob \
   --certificate-identity 'https://gitlab.com/amoconst/twiggit//.gitlab-ci.yml@refs/tags/<TAG>' \
   --certificate-oidc-issuer 'https://gitlab.com' \
-  twiggit_<VERSION>_linux_amd64_sbom.spdx.json
+  twiggit_<VERSION>_checksums.txt
 
-# GitHub release SBOM (signed by GitHub Actions release workflow)
+# GitHub release (signed by GitHub Actions release workflow)
 cosign verify-blob \
   --certificate-identity 'https://github.com/amauryconstant/twiggit/.github/workflows/release.yml@refs/tags/<TAG>' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-  twiggit_<VERSION>_linux_amd64_sbom.spdx.json
+  twiggit_<VERSION>_checksums.txt
+
+# Step 2: verify every downloaded archive + SBOM against the signed
+# checksum file. This proves every artifact matches what was published.
+sha256sum -c --ignore-missing twiggit_<VERSION>_checksums.txt
 ```
 
 For OIDC-keyless verification cosign uses the ambient identity from the

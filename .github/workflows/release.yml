@@ -56,10 +56,3 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: goreleaser release --clean -f .goreleaser.github.yml
-
-      - name: Sign SBOMs (OIDC keyless)
-        run: |
-          for sbom in dist/*_sbom.spdx.json; do
-            [ -e "$sbom" ] || continue
-            cosign sign-blob --yes --output-signature "${sbom}.sig" "$sbom"
-          done

@@ -52,6 +52,23 @@ sboms:
     documents:
       - "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}_sbom.spdx.json"
 
+# Sign the checksums file with cosign keyless (OIDC). Goreleaser invokes
+# cosign as a child process; the CI runner's ambient OIDC tokens (GitLab
+# SIGSTORE_ID_TOKEN, GitHub ACTIONS_ID_TOKEN_REQUEST_TOKEN) flow through.
+# cosign v3 writes a single .sigstore.json bundle (signature + cert +
+# Rekor inclusion) per artifact. Bundles land in dist/ for debugging but
+# are NOT published as release assets. Per-SBOM signing is intentionally
+# omitted: SBOMs are transitively protected by the checksum file.
+signs:
+  - cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - "sign-blob"
+      - "--bundle=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+
 changelog:
   sort: asc
   use: git

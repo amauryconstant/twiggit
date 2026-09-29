@@ -68,10 +68,16 @@ the `goreleaser/goreleaser:v2.18.2` Docker image as its container
 so that `goreleaser`, `syft`, `cosign`, and `gh` are on `$PATH`
 without per-step installation, check out the repo with full history,
 validate the tag format (`vX.Y.Z`), preflight any existing GitHub
-release via `gh release view`, run
-`goreleaser release --clean -f .goreleaser.github.yml`, and sign
-every `dist/*_sbom.spdx.json` artifact with
-`cosign sign-blob --yes --output-signature <file>.sig`.
+release via `gh release view`, and run
+`goreleaser release --clean -f .goreleaser.github.yml`. A goreleaser
+`signs:` block SHALL sign the generated `checksums.txt` via
+`cosign sign-blob --bundle` (cosign v3's single-file format, combining
+signature + cert + Rekor inclusion). The bundle SHALL land in `dist/`
+as `checksums.txt.sigstore.json` for debugging but SHALL NOT be
+published as a release asset. Per-SBOM signing SHALL be omitted:
+every SBOM hash is already in the signed checksum file, so a single
+signature transitively covers all published artifacts. Per-SBOM
+signing and separate cosign installation steps SHALL NOT be added.
 
 #### Scenario: Tag push triggers the workflow
 
@@ -88,12 +94,16 @@ every `dist/*_sbom.spdx.json` artifact with
 - **AND** goreleaser SHALL NOT be invoked
 - **AND** no GitHub release artifact SHALL be overwritten
 
-#### Scenario: SBOM signatures on GitHub
+#### Scenario: Checksum file signed on GitHub
 
 - **WHEN** goreleaser finishes on GitHub Actions
-- **THEN** every `dist/*_sbom.spdx.json` SHALL be signed with
-  `cosign sign-blob --yes --output-signature <file>.sig`
-- **AND** `cosign verify-blob` SHALL succeed for each signed SBOM
+- **THEN** the goreleaser `signs:` block SHALL sign
+  `dist/checksums.txt` via `cosign sign-blob --bundle`, producing
+  `dist/checksums.txt.sigstore.json`
+- **AND** `cosign verify-blob` against `checksums.txt` SHALL succeed
+  under the release's OIDC identity
+- **AND** `sha256sum -c checksums.txt` SHALL validate every archive
+  and SBOM published on the release
 
 #### Scenario: Tag format guard
 
@@ -326,13 +336,18 @@ The CI pipeline SHALL run `govulncheck` on twiggit's source code at the
   non-zero
 - **AND** the non-zero exit SHALL fail the `lint` job
 
-#### Scenario: cosign SBOM signature
+#### Scenario: Checksum file signed on release
 
 - **WHEN** `release` finishes `goreleaser release --clean`
-- **THEN** a `cosign sign-blob` step SHALL sign each
-  `*_sbom.spdx.json` artifact with a detached `.sig` sidecar
-- **AND** `cosign verify-blob` SHALL succeed for consumers verifying
-  the SBOM via the Rekor transparency log
+- **THEN** a goreleaser `signs:` block SHALL sign `checksums.txt` via
+  `cosign sign-blob --bundle`
+- **AND** the resulting `checksums.txt.sigstore.json` SHALL land in
+  `dist/` for debugging but SHALL NOT be published as a release asset
+- **AND** `cosign verify-blob` against `checksums.txt` SHALL succeed
+  via the Rekor transparency log for consumers using the release's
+  OIDC identity
+- **AND** `sha256sum -c checksums.txt` SHALL transitively validate
+  every archive and SBOM published on the release
 
 ### Requirement: Pinned CI tooling images
 
