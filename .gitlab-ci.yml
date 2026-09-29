@@ -258,7 +258,9 @@ release:
     GIT_DEPTH: 0
     GITLAB_TOKEN: "$GITLAB_RELEASE_TOKEN"
     GITHUB_TOKEN: "$GITHUB_ACCESS_TOKEN"
+    GORELEASER_FORCE_TOKEN: gitlab
   before_script:
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - |
       if [[ ! "$CI_COMMIT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
         echo "ERROR: Invalid tag format: $CI_COMMIT_TAG (expected vX.Y.Z)"
@@ -290,7 +292,7 @@ release:
       # at /usr/bin/cosign v3.1.3; no per-run install required.
       for sbom in dist/*_sbom.spdx.json; do
         [ -f "$sbom" ] || continue
-        cosign sign --yes "$sbom"
+        cosign sign-blob --yes --output-signature "${sbom}.sig" "$sbom"
       done
   rules:
     - if: "$CI_COMMIT_TAG"

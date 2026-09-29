@@ -7,7 +7,7 @@ set -e
 echo "Running GoReleaser dry-run (snapshot)..."
 echo ""
 
-goreleaser release --snapshot --clean --skip=archive,sbom,before,homebrew
+goreleaser release --snapshot --clean --skip=archive,sbom,before
 
 echo ""
 echo "✅ Dry-run completed successfully"

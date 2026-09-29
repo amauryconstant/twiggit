@@ -80,7 +80,7 @@ Adding a new tool: `go get -tool <path>@<version>` for Go-managed tools,
 | `test` | `go test -race ./...` | Race detector folds into the main test job |
 | `build-ci-image` | TLS DinD (`DOCKER_TLS_CERTDIR=/certs`, `DOCKER_HOST=tcp://docker:2376`) | Triggers on Dockerfile.ci, `.gitlab-ci.yml`, `.mise/config.toml`, `.goreleaser.yml`, go.mod/sum |
 | `goreleaser-dry-run` | path-filtered to release-affecting paths | Docs-only MRs skip the dry-run |
-| `release` | tag preflight via `/releases/v<tag>` API check, then `goreleaser release --clean`, then `cosign sign` (OIDC keyless or `$COSIGN_KEY`) | `interruptible: false`; `replace_existing_artifacts: false` |
+| `release` | tag preflight via `/releases/v<tag>` API check, then `goreleaser release --clean`, then `cosign sign-blob --yes --output-signature <file>.sig` (OIDC keyless via GitLab OIDC, or `$COSIGN_KEY` fallback) | `interruptible: false`; `replace_existing_artifacts: false` |
 | `mirror-to-github` | non-forced `git push` with `--tags` | Tag push routes through `when: never` |
 
 Pipeline defaults: `retry: { max: 2, when: [runner_system_failure, stuck_or_timeout_failure] }`, `interruptible: true` (release job overrides to `false`).
@@ -129,20 +129,25 @@ Pipeline defaults: `retry: { max: 2, when: [runner_system_failure, stuck_or_time
 ### SBOM verification
 
 Each release publishes SPDX SBOMs (`*_sbom.spdx.json`) signed by `cosign`
-(keyless via GitLab OIDC, image-bundled `cosign v3.1.3`). Consumers verify
-the SBOM integrity before relying on the inventory:
+keyless via OIDC (GitLab OIDC on the GitLab release, GitHub Actions OIDC
+on the GitHub release; image-bundled `cosign v3.1.3`). Detached `.sig`
+files are written to `dist/` locally for debugging but are NOT published
+as release assets — verification uses the Rekor transparency log via
+the keyless OIDC + identity flags:
 
 ```bash
-# Download the SBOM and its detached signature from the GitLab release page,
-# then verify with cosign (Rekor log entry URL prints on success):
+# GitLab release SBOM (signed by GitLab CI release job)
 cosign verify-blob \
-  --signature twiggit_<version>_linux_amd64_sbom.spdx.json.sig \
-  twiggit_<version>_linux_amd64_sbom.spdx.json
-```
+  --certificate-identity 'https://gitlab.com/amoconst/twiggit//.gitlab-ci.yml@refs/tags/<TAG>' \
+  --certificate-oidc-issuer 'https://gitlab.com' \
+  twiggit_<VERSION>_linux_amd64_sbom.spdx.json
 
-The same SBOM set is also published to the GitHub release page
-(since v0.13.3, via `.github/workflows/release.yml`); either URL is
-valid input to `cosign verify-blob`.
+# GitHub release SBOM (signed by GitHub Actions release workflow)
+cosign verify-blob \
+  --certificate-identity 'https://github.com/amauryconstant/twiggit/.github/workflows/release.yml@refs/tags/<TAG>' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+  twiggit_<VERSION>_linux_amd64_sbom.spdx.json
+```
 
 For OIDC-keyless verification cosign uses the ambient identity from the
 TUF/Rekor transparency log; no public-key fingerprint is needed because

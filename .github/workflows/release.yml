@@ -38,6 +38,20 @@ jobs:
             exit 1
           fi
 
+      - name: Allow git inside goreleaser container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Signing-mode fail-fast
+        run: |
+          if [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::notice::cosign: OIDC keyless signing (GitHub Actions OIDC)"
+          elif [ -n "${COSIGN_KEY:-}" ]; then
+            echo "::notice::cosign: keyful signing via COSIGN_KEY"
+          else
+            echo "::error::cosign requires id-token: write or COSIGN_KEY env var"
+            exit 1
+          fi
+
       - name: Run GoReleaser
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -47,5 +61,5 @@ jobs:
         run: |
           for sbom in dist/*_sbom.spdx.json; do
             [ -e "$sbom" ] || continue
-            cosign sign --yes "$sbom"
+            cosign sign-blob --yes --output-signature "${sbom}.sig" "$sbom"
           done

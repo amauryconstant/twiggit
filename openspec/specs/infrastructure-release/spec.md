@@ -72,7 +72,8 @@ without per-step installation, check out the repo with full history,
 validate the tag format (`vX.Y.Z`), preflight any existing GitHub
 release via `gh release view`, run
 `goreleaser release --clean -f .goreleaser.github.yml`, and sign
-every `dist/*_sbom.spdx.json` artifact with `cosign sign --yes`.
+every `dist/*_sbom.spdx.json` artifact with
+`cosign sign-blob --yes --output-signature <file>.sig`.
 
 #### Scenario: Tag push triggers the workflow
 
@@ -93,7 +94,7 @@ every `dist/*_sbom.spdx.json` artifact with `cosign sign --yes`.
 
 - **WHEN** goreleaser finishes on GitHub Actions
 - **THEN** every `dist/*_sbom.spdx.json` SHALL be signed with
-  `cosign sign --yes`
+  `cosign sign-blob --yes --output-signature <file>.sig`
 - **AND** `cosign verify-blob` SHALL succeed for each signed SBOM
 
 #### Scenario: Tag format guard
@@ -364,10 +365,10 @@ The CI pipeline SHALL run `govulncheck` on twiggit's source code at the
 #### Scenario: cosign SBOM signature
 
 - **WHEN** `release` finishes `goreleaser release --clean`
-- **THEN** a `cosign sign` step SHALL sign each
-  `*_sbom.spdx.json` artifact
-- **AND** `cosign verify-blob` SHALL succeed for consumers retrieving
-  the SBOM
+- **THEN** a `cosign sign-blob` step SHALL sign each
+  `*_sbom.spdx.json` artifact with a detached `.sig` sidecar
+- **AND** `cosign verify-blob` SHALL succeed for consumers verifying
+  the SBOM via the Rekor transparency log
 
 ### Requirement: Pinned CI tooling images
 
