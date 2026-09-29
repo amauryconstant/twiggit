@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.3] - 2026-09-29
+
+
+### Fixed
+
+- GitHub Actions release workflow: replace the `github_token:` step input (silently ignored by `goreleaser-action@v6` — only `distribution`, `version`, `args`, `workdir`, `install-only` are valid inputs) with a `GITHUB_TOKEN` env block on the goreleaser step. The action forwards step `env:` to the goreleaser subprocess; without it the subprocess bails at "missing GITHUB_TOKEN, GITLAB_TOKEN and GITEA_TOKEN" before any artifact is built.
+- Release pipeline: move `homebrew_casks` upload from `.goreleaser.yml` (GitLab) to `.goreleaser.github.yml`. Goreleaser OSS cannot cross-publish — the `homebrew_casks` branch existence pre-flight uses the inferred SCM's API, which is GitLab when `release.gitlab` is set. The target tap `amoconst/homebrew-tap` lives on GitHub, so the verify call hit `gitlab.com/api/v4/...` and returned 401 before the push. The `token_type` field that would unlock cross-SCM is Pro-only. GitHub Actions release job owns the push; the `homepage` and `url.template` still point at `gitlab.com/amoconst/twiggit` because that is where the binary artifacts actually live.
+
 ## [0.13.2] - 2026-09-29
 
 
