@@ -1,4 +1,9 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# GitLab release config. Self-contained: identical build/archive/sbom/
+# changelog blocks are also duplicated in .goreleaser.github.yml.
+# Drift between the two is a known cost of the override-file pattern;
+# v2.18.2 OSS has no `includes:` (Pro-only). Keep both files in sync.
+
 project_name: twiggit
 version: 2
 
@@ -66,6 +71,11 @@ changelog:
       order: 100
     - title: Other
       order: 999
+
+# Lock SCM inference to GitLab so the cross-platform GITHUB_TOKEN env var
+# (required by homebrew_casks.token template) does not trigger
+# "multiple tokens found" on the GitLab CI release job.
+force_token: gitlab
 
 release:
   gitlab:
