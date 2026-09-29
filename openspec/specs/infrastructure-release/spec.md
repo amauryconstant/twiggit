@@ -67,8 +67,8 @@ release with full artifacts when a `v*` tag is pushed. The workflow
 SHALL set `permissions: contents: write` and
 `permissions: id-token: write` (cosign keyless), check out the repo
 with full history, validate the tag format (`vX.Y.Z`), install `syft`
-at a pinned version into `$PATH` via
-`anchore/sbom-action/install@v0`, preflight any existing GitHub
+at a pinned version into `$PATH` via a direct GitHub release tarball
+download to `/usr/local/bin/syft`, preflight any existing GitHub
 release via `gh release view`, run
 `goreleaser release --clean -f .goreleaser.github.yml`, and sign
 every `dist/*_sbom.spdx.json` artifact with `cosign sign --yes`.

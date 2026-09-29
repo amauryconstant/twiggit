@@ -41,10 +41,13 @@ jobs:
           cosign-release: 'v3.1.3'
 
       - name: Install syft
-        uses: anchore/sbom-action/install@v0
-        with:
-          artifact-name: syft
-          version: v1.52.0
+        run: |
+          set -euo pipefail
+          curl -sSfLO https://github.com/anchore/syft/releases/download/v1.52.0/syft_1.52.0_linux_amd64.tar.gz
+          tar -xzf syft_1.52.0_linux_amd64.tar.gz syft
+          install -m 0755 syft /usr/local/bin/syft
+          rm -f syft_1.52.0_linux_amd64.tar.gz
+          syft version
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
