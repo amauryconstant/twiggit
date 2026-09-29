@@ -12,6 +12,9 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    container:
+      image: goreleaser/goreleaser:v2.18.2
+      options: --entrypoint /bin/sh
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -35,31 +38,12 @@ jobs:
             exit 1
           fi
 
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v4.1.0
-        with:
-          cosign-release: 'v3.1.3'
-
-      - name: Install syft
-        run: |
-          set -euo pipefail
-          curl -sSfLO https://github.com/anchore/syft/releases/download/v1.52.0/syft_1.52.0_linux_amd64.tar.gz
-          tar -xzf syft_1.52.0_linux_amd64.tar.gz syft
-          install -m 0755 syft /usr/local/bin/syft
-          rm -f syft_1.52.0_linux_amd64.tar.gz
-          syft version
-
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          version: v2.18.2
-          args: release --clean -f .goreleaser.github.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: goreleaser release --clean -f .goreleaser.github.yml
 
       - name: Sign SBOMs (OIDC keyless)
-        env:
-          COSIGN_EXPERIMENTAL: 'true'
         run: |
           for sbom in dist/*_sbom.spdx.json; do
             [ -e "$sbom" ] || continue

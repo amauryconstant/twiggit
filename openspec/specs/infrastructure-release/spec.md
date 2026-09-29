@@ -65,10 +65,11 @@ neither SHALL be a discoverability stub for the other.
 A `.github/workflows/release.yml` workflow SHALL publish a GitHub
 release with full artifacts when a `v*` tag is pushed. The workflow
 SHALL set `permissions: contents: write` and
-`permissions: id-token: write` (cosign keyless), check out the repo
-with full history, validate the tag format (`vX.Y.Z`), install `syft`
-at a pinned version into `$PATH` via a direct GitHub release tarball
-download to `/usr/local/bin/syft`, preflight any existing GitHub
+`permissions: id-token: write` (cosign keyless), run the job inside
+the `goreleaser/goreleaser:v2.18.2` Docker image as its container
+so that `goreleaser`, `syft`, `cosign`, and `gh` are on `$PATH`
+without per-step installation, check out the repo with full history,
+validate the tag format (`vX.Y.Z`), preflight any existing GitHub
 release via `gh release view`, run
 `goreleaser release --clean -f .goreleaser.github.yml`, and sign
 every `dist/*_sbom.spdx.json` artifact with `cosign sign --yes`.
