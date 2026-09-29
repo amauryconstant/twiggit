@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.6] - 2026-09-29
+
+
+
+### Fixed
+
+- GitLab CI release job: pin `GORELEASER_FORCE_TOKEN: gitlab` so the cross-platform `GITHUB_TOKEN` no longer collides with `GITLAB_TOKEN` at goreleaser startup ("multiple tokens found, but only one is allowed"); mark the workspace safe for in-container git (`git config --global --add safe.directory "$CI_PROJECT_DIR"` in `before_script`) so goreleaser can shell out to `git describe` under its root uid without hitting `dubious ownership`. Mirrors the GitHub Actions safe.directory fix shipped in v0.13.5.
+- Release pipeline (GitLab CI + GitHub Actions): replace `cosign sign --yes` with `cosign sign-blob --yes --output-signature <sbom>.sig`. `cosign sign` treats the SBOM filename as an OCI image reference and tries to push to Docker Hub (HTTP 401 against `index.docker.io/v2/<sbom-path>/manifests/latest`); `cosign sign-blob` is the correct verb for file signing, and `--output-signature` writes a detached `.sig` sidecar next to the SBOM (sign-blob default is stdout). Consumers verify via `cosign verify-blob` against Rekor using the keyless OIDC + identity flags — see `AGENTS.md` "SBOM verification" for the GitLab and GitHub cert-identity strings.
+- GitHub Actions release workflow: add a signing-mode fail-fast step that checks `ACTIONS_ID_TOKEN_REQUEST_TOKEN` (the GitHub Actions OIDC bearer — `SIGSTORE_ID_TOKEN` is not auto-populated here; cosign reads GitHub-native env vars directly) before goreleaser runs; exit 1 with `::error::` if neither that nor `COSIGN_KEY` is present. Mirrors the GitLab CI fail-fast guard in `before_script`.
+
+### Removed
+
+- Homebrew cask distribution: drop the `homebrew_casks` block from `.goreleaser.github.yml`, the Homebrew (macOS) install section from `README.md`, the `Homebrew tap` requirement from `openspec/specs/infrastructure-release/spec.md`, and the homebrew rows, cross-SCM invariant, and 401 troubleshooting entry from `AGENTS.md`. The pre-existing cask on `amoconst/homebrew-tap` will not auto-update; users who installed via `brew install amoconst/twiggit/twiggit` should switch to the install script or manual download before the next release.
+
 ## [0.13.5] - 2026-09-29
 
 
