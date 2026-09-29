@@ -118,12 +118,18 @@ context: |
 
 rules:
   proposal:
-    - Typically include: Why, What Changes, Capabilities, Impact
+    - "Typically include: Why, What Changes, Capabilities, Impact"
     - Focus on user value and problem statement first
     - Include "Non-goals" section to constrain scope
     - List all affected files organized by layer (cmd, service, domain, infrastructure)
     - Document breaking changes explicitly when applicable
     - Keep proposals concise and actionable
+    # Discipline (added)
+    - Impact MUST list affected files grouped by layer AND by role (production, tests, docs, CI, e2e golden)
+    - Include Risk-and-mitigation entries for significant changes within Impact
+    # Machine-readable (added; matches airk's bracketed convention)
+    - "[breaking-change-flag] Each user-visible break SHALL be prefixed **BREAKING** with a Migration note in the same bullet; non-breaking changes SHALL NOT carry the prefix"
+    - "[capability-owner-cross-ref] When a proposal declares a Modified Capability, it SHALL cross-reference the owning spec by bare name (e.g., `cli-output`) without restating that spec's content"
 
   specs:
     # Purity principles — reader-extractable by future tooling.
@@ -139,6 +145,13 @@ rules:
     - "[bare-cross-refs] Cross-spec references SHALL use bare directory names (e.g., `cli-prune`), never line-anchored paths (e.g., `cli-prune/spec.md:35`)"
     - "[no-code-refs] Requirements and scenarios SHALL NOT reference implementation files via `path:N` form (e.g., `internal/foo.go:42`)"
     - "[purpose-coherence] `## Purpose` SHALL match the requirement surface; fix the Purpose (broaden) or fix the Requirement (delete or move)"
+    # Layout pin (added; pulled from context block into rules for enforceability)
+    - "All specs MUST live at openspec/specs/<category>-<spec-name>/spec.md (one folder deep; no files directly under openspec/specs/, no category subdirectories); see the Spec organization section in this file's context block for the category reference"
+    # Purity rules (added)
+    - "[scope-disclaimer] Requirements SHALL NOT include scope-disclaimer prose (e.g., 'this spec covers only X; Y is out of scope here'); reshape the requirement to match its actual ownership instead"
+    - "[no-cross-spec-narrative] Requirements SHALL NOT include cross-spec narrative prose; a bare mention of the other spec's name is enough"
+    - "[modified-full-text] MODIFIED Requirements MUST include the full updated requirement block (header + body + scenarios); partial updates lose detail at archive time"
+    - "[purpose-min-length] When a delta introduces a NEW capability, its `## Purpose` MUST be at least 50 characters; archive copies it into the main spec it creates"
 
   design:
     - Include Context (current state, constraints, assumptions)
@@ -147,13 +160,24 @@ rules:
     - Use SHALL/SHOULD for architectural constraints
     - Include Risks/Trade-offs section with specific mitigations
     - Reference related specs, proposals, or design decisions
+    # Discipline (added)
+    - Document constraints explicitly (technical, schedule, compatibility, security, etc.) under Context
+    - Include Migration Plan (steps to deploy, rollback strategy if applicable); for source-only pre-1.0 changes, an explicit "no migration steps" line is acceptable
+    - Include Open Questions (unknowns deferrable without changing specs, approach, or task breakdown); write "None." when none
+    # Machine-readable (added)
+    - "[decision-shape] Each numbered Decision MUST include Choice, Rationale, and Alternatives considered in that order"
 
   tasks:
-    - Group by layer: cmd, service, domain, infrastructure, test
+    - "Group by layer: cmd, service, domain, infrastructure, test"
     - Use checkbox format for items
     - Tasks are small, clear, and independently verifiable
     - Tests written AFTER implementation to anchor code to specs
     - Include specific file paths and function/method names
-    - Add verification steps: mise run verify, mise run lint:fix, mise run test
+    - "Add verification steps: mise run verify, lint, test, test:coverage, vuln:check"
     - Mark completed items with [x]
     - Tasks ordered logically with dependencies clear
+    # Discipline (added)
+    - Tasks MUST be grouped; tests and documentation MUST be co-located with the implementation task, not deferred to a final group (the late-cascade trap)
+    - Use integer-N.M numbering (e.g., 2.1, 2.2, 2.3) — no letter-suffix ids (e.g., 2.0b); the apply phase parses checkbox format but readability suffers with mixed schemes
+    # Machine-readable (added)
+    - "[task-verify] Every checkbox MUST include a verification clause: 'verify by <cmd|test|observable|delivered:artifact>'; verification-only tasks only when they check integration behavior spanning multiple implementation tasks"
