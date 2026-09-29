@@ -73,9 +73,8 @@ changelog:
       order: 999
 
 # Lock SCM inference to GitLab. Goreleaser OSS cannot cross-publish to
-# GitHub (no `token_type` support; Pro-only), so the homebrew_casks
-# upload lives in .goreleaser.github.yml where the inferred SCM matches
-# the target tap repository host.
+# GitHub (no `token_type` support; Pro-only); the GitHub release lives
+# in .goreleaser.github.yml where the inferred SCM matches the target.
 force_token: gitlab
 
 release:

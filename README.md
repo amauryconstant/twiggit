@@ -7,13 +7,6 @@ Pragmatic git worktree management tool with focus on rebase workflows.
 
 ## Installation
 
-### Homebrew (macOS)
-
-```bash
-brew tap amoconst/homebrew-tap
-brew install twiggit
-```
-
 ### Quick Install (Linux/macOS)
 ```bash
 curl -fsSL https://gitlab.com/amoconst/twiggit/-/raw/main/install.sh | bash

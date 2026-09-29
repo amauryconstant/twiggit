@@ -3,7 +3,7 @@
 ## Purpose
 
 CI/CD pipeline, release artifact distribution (GitLab primary, GitHub
-discoverability, Homebrew tap), and contributor onboarding. This spec
+discoverability), and contributor onboarding. This spec
 is the canonical owner of release-process behavior; per-concern
 details are cross-referenced.
 
@@ -34,8 +34,6 @@ artifact upload run on tagged releases.
 - **AND** the GitHub Actions release workflow SHALL publish the
   GitHub release per the `GitHub Actions release workflow`
   requirement
-- **AND** the GitHub Actions release workflow SHALL publish the
-  Homebrew cask per the `Homebrew tap` requirement
 
 ### Requirement: GitLab primary + GitHub first-class distribution
 
@@ -109,40 +107,6 @@ every `dist/*_sbom.spdx.json` artifact with
 - **THEN** `syft` SHALL be installed at the pinned version on `$PATH`
 - **AND** goreleaser SHALL successfully catalog archives into
   `dist/*_sbom.spdx.json` artifacts
-
-### Requirement: Homebrew tap
-
-GoReleaser SHALL publish a `twiggit` cask to `amoconst/homebrew-tap`
-on every tag. The cask SHALL install the binary, and on macOS SHALL
-remove the quarantine attribute after install. The cask publish
-SHALL be performed by the GitHub Actions release workflow (running
-`.goreleaser.github.yml`); the GitLab CI `release` job SHALL NOT
-publish the cask.
-
-> Rationale: goreleaser OSS cannot cross-SCM publish — the
-> `token_type` field that would unlock it is Pro-only. The
-> `homebrew_casks` branch existence pre-flight uses the inferred
-> SCM's API, which is GitLab when `release.gitlab` is set. Calling
-> `gitlab.com/api/v4/projects/amoconst%2Fhomebrew-tap/...` on a
-> GitHub-hosted tap returns 401 before the cask push. Splitting
-> ownership between the two CI surfaces enforces this invariant at
-> the goreleaser config layer.
-
-#### Scenario: Tap formula updated
-
-- **WHEN** a `v*` tag is pushed and the GitHub Actions release
-  workflow runs
-- **THEN** `homebrew-tap` SHALL receive a `twiggit.rb` update via
-  goreleaser's `homebrew_casks:` block in `.goreleaser.github.yml`
-  under the `Casks/` directory
-- **AND** `brew upgrade twiggit` SHALL fetch the new version
-
-#### Scenario: macOS quarantine
-
-- **WHEN** a user installs via `brew install twiggit` on macOS
-- **THEN** the cask SHALL call `xattr -d com.apple.quarantine`
-  on the binary after install
-- **AND** `twiggit` SHALL run without a Gatekeeper prompt
 
 ### Requirement: Release validation hooks
 

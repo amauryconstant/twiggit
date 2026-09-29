@@ -117,10 +117,7 @@ Pipeline defaults: `retry: { max: 2, when: [runner_system_failure, stuck_or_time
 | ------- | -------- | ------ | ----------------- |
 | GitLab release | GitLab CI `release` job (`.gitlab-ci.yml`) | `.goreleaser.yml` (`force_token: gitlab`) | Tarballs, checksums, SBOMs to `gitlab.com/amoconst/twiggit/-/releases/v<tag>` |
 | GitHub release | GitHub Actions `release.yml` | `.goreleaser.github.yml` (`force_token: github`) | Tarballs, checksums, SBOMs to `github.com/amauryconstant/twiggit/releases/tag/<tag>` |
-| Homebrew cask | GitHub Actions `release.yml` | `.goreleaser.github.yml` `homebrew_casks:` block | `twiggit.rb` to `amoconst/homebrew-tap` `Casks/` directory |
 | Tag mirror to GitHub | GitLab CI `mirror-to-github` job | `.gitlab-ci.yml` | `git push --tags --force-with-lease` (tag pipelines: `when: never`) |
-
-**Invariant:** Goreleaser OSS cannot cross-SCM publish — the `token_type` field that would unlock it is Pro-only. The `homebrew_casks` branch existence pre-flight uses the inferred SCM's API (GitLab when `release.gitlab` is set, GitHub when `release.github` is set). Calling the wrong API on the wrong host returns 401 before the cask push. Therefore `homebrew_casks` MUST live in `.goreleaser.github.yml` only; putting it back into `.goreleaser.yml` re-introduces the v0.13.2 401. See `openspec/specs/infrastructure-release/spec.md` `Homebrew tap` requirement for the normative version.
 
 **Invariant:** The GitHub Actions release job MUST run inside the `goreleaser/goreleaser:v2.18.2` Docker image (via the `container:` directive), not via `goreleaser-action@v6`. `goreleaser-action@v6` installs only the goreleaser binary; goreleaser's `sboms:` step then shells out to `syft` and fails with `exec: "syft": executable file not found in $PATH`. Using the Docker image as the job container bundles `goreleaser`, `syft`, `cosign`, and `gh` — symmetric with the GitLab CI `release` job and with `airk`.
 
@@ -339,7 +336,6 @@ specs; the new-prefix ownership above is canonical for net-new specs. See
 | Context detection wrong | Check CWD, verify `.git` file in worktrees |
 | Mock not matching calls | Verify `On()` args match actual call signature |
 | Exit code 2 (usage) | Check command syntax, required arguments |
-| `homebrew cask: GET https://gitlab.com/api/v4/.../homebrew-tap/...: 401 Unauthorized` in `goreleaser` output | `homebrew_casks` is in `.goreleaser.yml` (GitLab release config). Goreleaser OSS cannot cross-SCM publish — move the `homebrew_casks` block to `.goreleaser.github.yml` so the GitHub Actions release workflow owns it. |
 
 Scripts and CI pipes historically keyed on exit codes 3-6 must update to
 the 3-code contract (0/1/2): all non-usage failures exit 1; per-resource
