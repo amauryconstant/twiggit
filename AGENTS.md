@@ -59,6 +59,7 @@ Toolchain pins and linter/formatter posture are owned by `.mise/config.toml`,
 | `golang.org/x/...` family | `go.mod` | Bump within `patch` scope on each release; reject major-version churn. `go.mod` is for code dependencies only — tool binaries (govulncheck, gocover-cobertura, etc.) live in `.mise/config.toml`. |
 | `govulncheck` | `.mise/config.toml` `tools` | Pinned. Pre-commit and `mise run vuln:check` invoke the mise-installed binary. Never `@latest`. |
 | `cosign` | `.mise/config.toml` `tools` | Pinned to match `goreleaser/goreleaser:v2.18.2` image bundle (`cosign v3.1.3`). CI `release` job signs SBOMs keyless via GitLab OIDC; local dev uses the mise-installed binary. Never `@latest`. |
+| `syft` | `.github/workflows/release.yml` | Pinned to `v1.52.0` via `anchore/sbom-action/install@v0`. CI-time only — not a local dev tool. Required because `goreleaser-action@v6` installs only the goreleaser binary, not `syft`; goreleaser's `sboms:` step shells out to `syft` and fails with `exec: "syft": executable file not found in $PATH` otherwise. The GitLab CI release job is unaffected (the `goreleaser/goreleaser:v2.18.2` Docker image bundles both). Bump in lockstep with goreleaser SBOM format expectations. |
 | `gocover-cobertura` | `.mise/config.toml` `tools` | Pinned. `mise run ci:coverage` invokes the mise-installed binary for cobertura conversion. |
 | `gocovmerge` | `.mise/config.toml` `tools` | Pinned. Available on PATH via `mise install` for downstream coverage merge workflows. |
 | `golangci-lint` | `.mise/config.toml` + `.pre-commit-config.yaml` | Pinned to a single version; pre-commit reads from PATH so `mise install` provisions the matching binary. Update in one PR. |
@@ -110,7 +111,19 @@ Pipeline defaults: `retry: { max: 2, when: [runner_system_failure, stuck_or_time
 | mise run release:check    | Release prerequisites |
 | mise run release:dry-run  | Test GoReleaser  |
 
-**Distribution**: Homebrew via `amoconst/homebrew-tap`, GitLab artifacts with GitHub discoverability pages
+**Distribution surface ownership** (split enforced at the goreleaser config layer):
+
+| Surface | CI owner | Config | What it publishes |
+| ------- | -------- | ------ | ----------------- |
+| GitLab release | GitLab CI `release` job (`.gitlab-ci.yml`) | `.goreleaser.yml` (`force_token: gitlab`) | Tarballs, checksums, SBOMs to `gitlab.com/amoconst/twiggit/-/releases/v<tag>` |
+| GitHub release | GitHub Actions `release.yml` | `.goreleaser.github.yml` (`force_token: github`) | Tarballs, checksums, SBOMs to `github.com/amauryconstant/twiggit/releases/tag/<tag>` |
+| Homebrew cask | GitHub Actions `release.yml` | `.goreleaser.github.yml` `homebrew_casks:` block | `twiggit.rb` to `amoconst/homebrew-tap` `Casks/` directory |
+| Tag mirror to GitHub | GitLab CI `mirror-to-github` job | `.gitlab-ci.yml` | `git push --tags --force-with-lease` (tag pipelines: `when: never`) |
+
+**Invariant:** Goreleaser OSS cannot cross-SCM publish — the `token_type` field that would unlock it is Pro-only. The `homebrew_casks` branch existence pre-flight uses the inferred SCM's API (GitLab when `release.gitlab` is set, GitHub when `release.github` is set). Calling the wrong API on the wrong host returns 401 before the cask push. Therefore `homebrew_casks` MUST live in `.goreleaser.github.yml` only; putting it back into `.goreleaser.yml` re-introduces the v0.13.2 401. See `openspec/specs/infrastructure-release/spec.md` `Homebrew tap` requirement for the normative version.
+
+**Invariant:** GitHub Actions MUST install `syft` into `$PATH` before goreleaser runs. `goreleaser-action@v6` provides only the goreleaser binary; goreleaser's `sboms:` step then shells out to `syft` and fails. The GitLab CI release job is unaffected because the `goreleaser/goreleaser:v2.18.2` Docker image bundles both tools.
+
 **CHANGELOG**: Auto-generated via `openspec-generate-changelog` after archiving changes.
 
 ### SBOM verification
@@ -126,6 +139,10 @@ cosign verify-blob \
   --signature twiggit_<version>_linux_amd64_sbom.spdx.json.sig \
   twiggit_<version>_linux_amd64_sbom.spdx.json
 ```
+
+The same SBOM set is also published to the GitHub release page
+(since v0.13.3, via `.github/workflows/release.yml`); either URL is
+valid input to `cosign verify-blob`.
 
 For OIDC-keyless verification cosign uses the ambient identity from the
 TUF/Rekor transparency log; no public-key fingerprint is needed because
@@ -317,6 +334,7 @@ specs; the new-prefix ownership above is canonical for net-new specs. See
 | Context detection wrong | Check CWD, verify `.git` file in worktrees |
 | Mock not matching calls | Verify `On()` args match actual call signature |
 | Exit code 2 (usage) | Check command syntax, required arguments |
+| `homebrew cask: GET https://gitlab.com/api/v4/.../homebrew-tap/...: 401 Unauthorized` in `goreleaser` output | `homebrew_casks` is in `.goreleaser.yml` (GitLab release config). Goreleaser OSS cannot cross-SCM publish — move the `homebrew_casks` block to `.goreleaser.github.yml` so the GitHub Actions release workflow owns it. |
 
 Scripts and CI pipes historically keyed on exit codes 3-6 must update to
 the 3-code contract (0/1/2): all non-usage failures exit 1; per-resource

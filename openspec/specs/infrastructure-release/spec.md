@@ -28,15 +28,23 @@ artifact upload run on tagged releases.
 #### Scenario: Tagged release
 
 - **WHEN** a tag matching `v*` is pushed
-- **THEN** CI SHALL run GoReleaser
+- **THEN** the GitLab CI `release` job SHALL run GoReleaser against
+  `.goreleaser.yml`
 - **AND** SHALL publish artifacts to GitLab releases
-- **AND** SHALL push a Homebrew formula to `amoconst/homebrew-tap`
+- **AND** the GitHub Actions release workflow SHALL publish the
+  GitHub release per the `GitHub Actions release workflow`
+  requirement
+- **AND** the GitHub Actions release workflow SHALL publish the
+  Homebrew cask per the `Homebrew tap` requirement
 
-### Requirement: GitLab primary distribution
+### Requirement: GitLab primary + GitHub first-class distribution
 
-GitLab releases SHALL host the primary artifacts (binary tarballs,
-checksums, packages). GitHub SHALL host a discoverability page that
-mirrors the release notes but SHALL NOT be the source of truth.
+GitLab releases SHALL host the canonical release artifacts (binary
+tarballs, checksums, SBOMs) and SHALL be the first publisher per
+tag. GitHub releases SHALL also host the full release artifacts
+(tarballs, checksums, SBOMs) as a parallel first-class target. The
+two providers SHALL publish the same artifact set for the same tag;
+neither SHALL be a discoverability stub for the other.
 
 #### Scenario: Primary artifact on GitLab
 
@@ -44,29 +52,93 @@ mirrors the release notes but SHALL NOT be the source of truth.
 - **THEN** the primary tarball, checksum, and SBOM SHALL be on
   GitLab releases
 
-#### Scenario: GitHub discoverability
+#### Scenario: GitHub first-class target
 
 - **WHEN** a user visits the GitHub repo
-- **THEN** releases page SHALL link to the GitLab release
+- **THEN** the GitHub release SHALL host the same tarballs, checksums,
+  and SBOMs as the GitLab release for the tag
+- **AND** the GitHub release SHALL NOT be a discoverability stub
+  pointing only at GitLab
+
+### Requirement: GitHub Actions release workflow
+
+A `.github/workflows/release.yml` workflow SHALL publish a GitHub
+release with full artifacts when a `v*` tag is pushed. The workflow
+SHALL set `permissions: contents: write` and
+`permissions: id-token: write` (cosign keyless), check out the repo
+with full history, validate the tag format (`vX.Y.Z`), install `syft`
+at a pinned version into `$PATH` via
+`anchore/sbom-action/install@v0`, preflight any existing GitHub
+release via `gh release view`, run
+`goreleaser release --clean -f .goreleaser.github.yml`, and sign
+every `dist/*_sbom.spdx.json` artifact with `cosign sign --yes`.
+
+#### Scenario: Tag push triggers the workflow
+
+- **WHEN** a tag matching `v[0-9]+\.[0-9]+\.[0-9]+$` is pushed
+- **THEN** the workflow SHALL run on the tag commit
+- **AND** SHALL publish tarballs, checksums, and SBOMs to the GitHub
+  release for that tag
+
+#### Scenario: Replay of an existing tag fails cleanly
+
+- **WHEN** the workflow runs for a tag whose GitHub release already
+  exists
+- **THEN** the preflight step SHALL exit non-zero
+- **AND** goreleaser SHALL NOT be invoked
+- **AND** no GitHub release artifact SHALL be overwritten
+
+#### Scenario: SBOM signatures on GitHub
+
+- **WHEN** goreleaser finishes on GitHub Actions
+- **THEN** every `dist/*_sbom.spdx.json` SHALL be signed with
+  `cosign sign --yes`
+- **AND** `cosign verify-blob` SHALL succeed for each signed SBOM
+
+#### Scenario: Tag format guard
+
+- **WHEN** a tag not matching `vX.Y.Z` is pushed
+- **THEN** the workflow SHALL exit non-zero before goreleaser runs
+- **AND** no GitHub release SHALL be created
+
+#### Scenario: syft present for SBOM cataloging
+
+- **WHEN** the workflow runs the goreleaser step
+- **THEN** `syft` SHALL be installed at the pinned version on `$PATH`
+- **AND** goreleaser SHALL successfully catalog archives into
+  `dist/*_sbom.spdx.json` artifacts
 
 ### Requirement: Homebrew tap
 
-GoReleaser SHALL publish a `twiggit` formula to
-`amoconst/homebrew-tap` on every tag. The formula SHALL install the
-binary, and on macOS SHALL remove the quarantine attribute after
-install.
+GoReleaser SHALL publish a `twiggit` cask to `amoconst/homebrew-tap`
+on every tag. The cask SHALL install the binary, and on macOS SHALL
+remove the quarantine attribute after install. The cask publish
+SHALL be performed by the GitHub Actions release workflow (running
+`.goreleaser.github.yml`); the GitLab CI `release` job SHALL NOT
+publish the cask.
+
+> Rationale: goreleaser OSS cannot cross-SCM publish — the
+> `token_type` field that would unlock it is Pro-only. The
+> `homebrew_casks` branch existence pre-flight uses the inferred
+> SCM's API, which is GitLab when `release.gitlab` is set. Calling
+> `gitlab.com/api/v4/projects/amoconst%2Fhomebrew-tap/...` on a
+> GitHub-hosted tap returns 401 before the cask push. Splitting
+> ownership between the two CI surfaces enforces this invariant at
+> the goreleaser config layer.
 
 #### Scenario: Tap formula updated
 
-- **WHEN** a `v*` tag is released
+- **WHEN** a `v*` tag is pushed and the GitHub Actions release
+  workflow runs
 - **THEN** `homebrew-tap` SHALL receive a `twiggit.rb` update via
-  GoReleaser's `brews:` block
+  goreleaser's `homebrew_casks:` block in `.goreleaser.github.yml`
+  under the `Casks/` directory
 - **AND** `brew upgrade twiggit` SHALL fetch the new version
 
 #### Scenario: macOS quarantine
 
 - **WHEN** a user installs via `brew install twiggit` on macOS
-- **THEN** the formula SHALL call `xattr -d com.apple.quarantine`
+- **THEN** the cask SHALL call `xattr -d com.apple.quarantine`
   on the binary after install
 - **AND** `twiggit` SHALL run without a Gatekeeper prompt
 
@@ -239,28 +311,41 @@ remote state. GitLab is the canonical reference; GitHub follows.
 
 ### Requirement: Release publish is non-overwriting on tag reuse
 
-The `release` job SHALL verify the tag has no existing GitLab release
-before invoking goreleaser. `.goreleaser.yml` SHALL set
-`release.replace_existing_artifacts: false` so goreleaser never silently
-overwrites artifacts when invoked.
+Each release pipeline SHALL verify the tag has no existing release on
+its target provider before invoking goreleaser. The GitLab CI
+`release` job SHALL preflight the GitLab Releases API; the GitHub
+Actions `release.yml` workflow SHALL preflight via `gh release view`.
+Both `.goreleaser.yml` and `.goreleaser.github.yml` SHALL set
+`release.replace_existing_artifacts: false` so goreleaser never
+silently overwrites artifacts when invoked.
 
-#### Scenario: First release of a tag
+#### Scenario: First release of a tag on GitLab
 
-- **WHEN** CI runs `release` for a previously-unreleased `v*` tag
+- **WHEN** CI runs the GitLab `release` job for a previously-unreleased
+  `v*` tag
 - **THEN** the GitLab Releases API preflight SHALL return non-200 for
   the tag
 - **AND** goreleaser SHALL publish artifacts to the GitLab release URL
 - **AND** the artifacts SHALL be downloadable from
   `gitlab.com/amoconst/twiggit/-/releases/v<tag>`
 
-#### Scenario: Re-tag of an existing release
+#### Scenario: First release of a tag on GitHub
 
-- **WHEN** CI runs `release` for a tag that already has a published
-  release
-- **THEN** the GitLab Releases API preflight SHALL return 200 for the
+- **WHEN** the GitHub Actions `release.yml` workflow runs for a
+  previously-unreleased `v*` tag
+- **THEN** `gh release view` SHALL report no existing release for the
   tag
-- **AND** CI SHALL fail the `release` job before goreleaser is invoked
-- **AND** no artifact SHALL be silently overwritten
+- **AND** goreleaser SHALL publish artifacts to the GitHub release
+- **AND** the artifacts SHALL be downloadable from
+  `github.com/amauryconstant/twiggit/releases/tag/<tag>`
+
+#### Scenario: Re-tag of an existing release on either provider
+
+- **WHEN** CI runs release for a tag that already has a published
+  release on either provider
+- **THEN** that provider's preflight SHALL fail
+- **AND** goreleaser SHALL NOT be invoked for that provider
+- **AND** no artifact SHALL be silently overwritten on that provider
 
 ### Requirement: CI supply-chain signals
 
