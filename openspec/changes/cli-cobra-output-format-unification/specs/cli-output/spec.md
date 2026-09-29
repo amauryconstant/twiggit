@@ -4,7 +4,7 @@
 
 ### Requirement: --output accepts json, table, plain, jsonl values
 
-The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-style command. The accepted values SHALL be exactly `json`, `table`, `plain`, and `jsonl`. The `jsonl` value emits one JSON object per line for streaming consumers; `json` emits a single JSON document. The `table` value renders aligned columns with headers; `plain` emits raw human-readable rendering without table borders. The system SHALL NOT accept any other value; values outside this set (including the legacy `text` value) SHALL cause the command to return a `core.UsageError` and exit with code 2.
+The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-style command. The accepted values SHALL be exactly `json`, `table`, `plain`, and `jsonl`. The `jsonl` value emits one JSON object per line for streaming consumers; `json` emits a single JSON document. The `table` value renders aligned columns with headers; `plain` emits headerless TSV. The system SHALL NOT accept any other value; values outside this set (including the legacy `text` value) SHALL cause the command to return a `core.UsageError` and exit with code 2.
 
 #### Scenario: --output json emits a single JSON document
 
@@ -24,7 +24,7 @@ The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-st
 #### Scenario: --output plain emits raw human-readable rendering
 
 - **WHEN** the user runs `twiggit list -o plain`
-- **THEN** the output is unbordered human-readable rendering without table borders or JSON quoting
+- **THEN** the output is tab-separated rows (one record per line, no header row, no borders) suitable for `cut` / `awk` consumption
 
 #### Scenario: Unknown --output value is rejected
 
@@ -47,8 +47,8 @@ The `output.Formatter` interface SHALL declare exactly one method: `Write(w io.W
 
 #### Scenario: TableFormatter accepts structured data
 
-- **WHEN** a command calls `formatter.Write(w, TableData{Headers: []string{"Name", "Branch"}, Rows: [][]string{{"feat/foo", "main"}, {"feat/bar", "main"}}})`
-- **THEN** `TableFormatter` renders the aligned columns to `w`
+- **WHEN** a command calls `formatter.Write(w, worktreeRows)` where `worktreeRows` is a `Tabular` with `Header() = {"BRANCH","PATH"}` and `Rows() = [][]string{{"feat/foo","/tmp/feat/foo"}}`
+- **THEN** `TableFormatter` renders the header row followed by the aligned data rows
 
 #### Scenario: JSONLinesFormatter emits one object per line
 
@@ -65,7 +65,31 @@ The `output.Formatter` interface SHALL declare exactly one method: `Write(w io.W
 - **WHEN** a command calls `NewFormatter("text")`
 - **THEN** the constructor returns `(nil, *core.UsageError)` so the legacy value does not silently alias to plain
 
+#### Scenario: Empty format returns PlainFormatter
+
+- **WHEN** a command calls `NewFormatter("")`
+- **THEN** the constructor returns `(PlainFormatter{}, nil)` to honor the global default
+
 ## ADDED Requirements
+
+### Requirement: Tabular projection interface
+
+The system SHALL define a `Tabular` interface in `internal/output/tabular.go` with exactly two methods: `Header() []string` returning the column titles, and `Rows() [][]string` returning the data rows. Both `TableFormatter` and `PlainFormatter` SHALL accept `Tabular` data. A non-`Tabular` argument SHALL cause the formatter to return a `*core.UsageError` and exit 2. Each list-style command SHALL provide a per-command adapter that projects its domain slice (`[]*core.WorktreeInfo`, etc.) to a `Tabular` shape. The first column SHALL be the most-stable identifier (e.g., `BRANCH`); subsequent columns SHALL follow the same order in `Header()` and `Rows()`.
+
+#### Scenario: TableFormatter renders header + aligned rows
+
+- **WHEN** a command calls `formatter.Write(w, worktreeRows)` where `worktreeRows` is a `Tabular` with `Header() = {"BRANCH","PATH","STATUS"}`
+- **THEN** `TableFormatter` writes a header row followed by one row per worktree, columns aligned with `text/tabwriter`
+
+#### Scenario: PlainFormatter renders headerless TSV
+
+- **WHEN** a command calls `formatter.Write(w, worktreeRows)` where `worktreeRows` is a `Tabular`
+- **THEN** `PlainFormatter` writes one tab-separated row per record with no header line
+
+#### Scenario: Non-tabular data rejected
+
+- **WHEN** a command calls `formatter.Write(w, "raw string")` against `TableFormatter` or `PlainFormatter`
+- **THEN** the formatter returns `(nil, *core.UsageError)` and the caller exits 2
 
 ### Requirement: --output json emits a bare collection
 

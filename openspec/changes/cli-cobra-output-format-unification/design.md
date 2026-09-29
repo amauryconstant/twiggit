@@ -6,26 +6,29 @@ Two parallel output subsystems exist. `internal/output/` (the canonical home) pr
 
 Three spec-mandated behaviors live only in the dead code: (1) the per-sentinel hint table in `cli-error-formatting/spec.md:79-91`, (2) the "Specific matcher wins" registration order at `cli-error-formatting/spec.md:64-78` (the implementation has the reverse order in `internal/output/errors.go:34-53`), (3) the "Quiet mode strips hints" scenario at `cli-error-formatting/spec.md:107-111`. Consolidating onto `internal/output` and absorbing the dead-code behavior is one mechanical pass.
 
-A separate output-vocabulary drift exists between `cli-output/spec.md:13-44` (mandates `json|jsonl|table|plain`) and `cmd/list.go:67-69` (accepts `text|json`, rejects everything else as a plain `fmt.Errorf` exit 1). The bespoke JSON path in `cmd/output.go:43-65` wraps worktrees in `{"worktrees":[…]}` — no spec ever required the envelope.
+A separate output-vocabulary drift exists between `cli-output/spec.md` (mandates `json|jsonl|table|plain`, rejects `text`) and `cmd/list.go:62-74` (accepts `text|json`, rejects everything else as a plain `fmt.Errorf` exit 1). The bespoke JSON path in `cmd/output.go:43-65` wraps worktrees in `{"worktrees":[…]}` — no spec ever required the envelope.
 
-The project targets Go 1.25.5 today (`go.mod`); the foundation change `cli-foundation-toolchain-and-lints` bumps to ≥1.26.2 to close a stdlib CVE window, which unlocks `errors.AsType[T]` (Go 1.26+). This change assumes the foundation change has landed first.
+`internal/output.PlainFormatter` (formatter.go:91-112) emits `fmt.Sprintln` per slice element, which is "raw human-readable" per existing `cli-output-formats:23` but not the canonical CLI shape from `golang-cli/references/output.md:49` ("plain = headerless TSV, one record per line"). Migrating to `Tabular` projection + TSV aligns the implementation with the skill's table and makes list-style output scriptable via `cut`/`awk`.
+
+The module targets Go 1.27.1 (`go.mod`); `errors.AsType[T]` (Go 1.26+) is available without prerequisite changes.
 
 ## Goals / Non-Goals
 
 **Goals:**
 - Make `internal/output/errors.go` honor every requirement in `cli-error-formatting`.
-- Make `cmd/list.go` honor every requirement in `cli-output`, with output produced via the canonical `internal/output.NewFormatter`.
+- Make `cmd/list.go` honor every requirement in the modified `cli-output` capability, with output produced via the canonical `internal/output.NewFormatter` and the `Tabular` projection.
+- Introduce the `Tabular` interface so both `TableFormatter` and `PlainFormatter` share the same input shape; `PlainFormatter` emits headerless TSV.
 - Remove dead production code (`cmd/error_formatter.go`, `cmd/output.go`, `ProgressReporter.ReportProgress`, `CreateOptions.HookRunner`, redundant `ValidArgsFunction`) and the test code that targets it.
 - Provide a `cobra/doc`-based generation path so help output is regenerable from a single `mise` task.
 - Add `cmd.AddGroup` labels so `--help` output is scannable for the seven live subcommands.
 
 **Non-Goals:**
 - Switching all `opts.IO.Out` writes to `cmd.OutOrStdout()` — would regress the `iostreams.Test()` injection seam that 30+ test files depend on; `cmd/AGENTS.md` codifies the divergence.
-- Renaming the `cmd/util.go` file or migrating to the testkit package layout — belongs in a separate refactor change.
+- Renaming the `cmd/util.go` file or migrating to the testkit package layout.
 - Reordering the `cli-error-formatting` dispatch table to put `OperationError` first — the spec mandates the current order, the implementation was wrong; no spec change.
-- Reintroducing the legacy shell sentinels (`ErrShellAlreadyInstalled`, etc.) — belongs in the in-progress `test-observability-error-discipline` change (task 4.1).
-- Bumping the module path from `twiggit` to a URL-shaped identifier — deferred to a separate change.
-- Bulk migration of `cli-`/`application-`/`domain-`/`infrastructure-` spec prefixes to the new `cli-`/`core-`/`git-`/`testing-` set per AGENTS.md — deferred; current spec catalog carries both prefixes coexisting.
+- Bumping the module path from `twiggit` to a URL-shaped identifier.
+- Bulk migration of `cli-`/`application-`/`domain-`/`infrastructure-` spec prefixes to the new `cli-`/`core-`/`git-`/`testing-` set; the current spec catalog carries both prefixes coexisting.
+- Adopting `Tabular` for every list-style command. Only `list` adopts the projection here; `prune`/`cd`/etc. opt in when their output formatting is otherwise revisited.
 
 ## Decisions
 
@@ -33,7 +36,7 @@ The project targets Go 1.25.5 today (`go.mod`); the foundation change `cli-found
 
 **Choice**: Delete `cmd/error_formatter.go` (~180 lines), delete `cmd/error_formatter_test.go` (~260 lines), move `hintFor` into `internal/output/errors.go`, add quiet-mode gating, reorder dispatch, switch to `errors.AsType[T]`. Port the four unique test scenarios to `internal/output/errors_test.go`.
 
-**Rationale**: The strategy-pattern types in `cmd/error_formatter.go` are unreachable from production (`main.go` calls `output.FormatError`). The three live spec behaviors (hint table, dispatch order, quiet suppression) are reachable only after the move. Deletion removes ~340 lines of orphan code; the four ported test scenarios (~80 lines) cover the same behavior with less indirection.
+**Rationale**: The strategy-pattern types in `cmd/error_formatter.go` are unreachable from production (`main.go` calls `output.FormatError`). Three live spec behaviors live only in the dead code: (1) the hint table in `cli-error-formatting/spec.md:79-91`, (2) the "Specific matcher wins" registration order at `cli-error-formatting/spec.md:64-78` (the implementation has the reverse order in `internal/output/errors.go:34-53`), (3) the "Quiet mode strips hints" scenario at `cli-error-formatting/spec.md:107-111`. The fourth absorbed behavior is the `errors.AsType[T]` adoption (Go 1.26+) which drops the `asType[T error]` helper in `cmd/error_formatter.go:13-19`. Deletion removes ~340 lines of orphan code; the four ported test scenarios (~80 lines) cover the same behavior with less indirection.
 
 **Alternatives considered**:
 - *Keep both formatters, route production through `cmd`*: would require changing `main.go` to call `cmd.ErrorFormatter` instead of `output.FormatError`. Violates the canonical-home rule (errors formatted beside their origin) and creates two type families to maintain.
@@ -41,9 +44,9 @@ The project targets Go 1.25.5 today (`go.mod`); the foundation change `cli-found
 
 ### Decision 2: Delete `cmd/output.go` and migrate `cmd/list.go` to `internal/output.NewFormatter`
 
-**Choice**: Delete `cmd/output.go` (~88 lines). Rewrite `cmd/list.go:129-138` to call `internal/output.NewFormatter(format)` and pass the `[]*core.WorktreeInfo` slice directly to `formatter.Write(w, worktrees)`. Keep bespoke plain-text rendering inline in `cmd/list.go`'s `displayWorktrees`.
+**Choice**: Delete `cmd/output.go` (~88 lines). Rewrite `cmd/list.go:130-138` to call `internal/output.NewFormatter(format)` and pass the `Tabular` adapter directly to `formatter.Write(w, worktreeRows)`. Keep the bespoke plain-text rendering inline in `cmd/list.go`'s `displayWorktrees` for the empty-`--output` human default (Decision 5).
 
-**Rationale**: `internal/output/formatter.go` already implements all four spec-mandated formatters (`json|jsonl|table|plain`). The `cmd/output.go` `JSONFormatter` adds a top-level `{"worktrees":[…]}` envelope that no spec requires and that breaks `jq '.[]'` consumption; `internal/output.JSONFormatter` emits a bare array, which matches the JSON-shape table in `golang-cli/references/output.md`. Bespoke text rendering ("branch -> path (modified)") is one-command-specific; per `golang-cli/references/commands.md` ("output beside the logic"), it stays beside `cmd/list.go`.
+**Rationale**: `internal/output/formatter.go` already implements all four spec-mandated formatters (`json|jsonl|table|plain`). The `cmd/output.go` `JSONFormatter` adds a top-level `{"worktrees":[…]}` envelope that no spec requires and that breaks `jq '.[]'` consumption; `internal/output.JSONFormatter` emits a bare array, which matches the JSON-shape table in `golang-cli/references/output.md:54-65`. The `WorktreeJSON{Branch, Path, Status}` projection is preserved: `cmd/list.go` builds a `worktreeRows` `Tabular` adapter that produces the same three fields. Bespoke text rendering for the empty-`--output` case stays beside `cmd/list.go`.
 
 **Alternatives considered**:
 - *Move bespoke rendering to `internal/output` as a `WorktreeFormatter`*: would require defining a `String() string` method on `*core.WorktreeInfo`, changing global representation (ripples into logs, debug output, test failure dumps). Too invasive for a one-command use case.
@@ -53,7 +56,7 @@ The project targets Go 1.25.5 today (`go.mod`); the foundation change `cli-found
 
 **Choice**: At each dispatch arm in `internal/output/errors.go:FormatError`, call `errors.AsType[*core.X](err)`. Drop the `asType[T error]` helper from `cmd/error_formatter.go:13-19` without porting it.
 
-**Rationale**: Go 1.26+ adds `errors.AsType[T](err)` which returns the typed error directly (no double-allocation, no nil guard needed). The foundation change `cli-foundation-toolchain-and-lints` bumps `go.mod` to ≥1.26.2 to close the stdlib CVE window, so by the time this change lands the primitive is available. Porting the `asType` helper would keep a Go 1.25 workaround in place for no benefit.
+**Rationale**: Go 1.26+ adds `errors.AsType[T](err)` which returns the typed error directly (no double-allocation, no nil guard needed). The module targets Go 1.27.1 (`go.mod`), so the primitive is available without prerequisite changes. Porting the `asType` helper would keep a Go 1.25 workaround in place for no benefit.
 
 **Alternatives considered**:
 - *Keep `asType[T error]` helper in `internal/output`*: works but adds an indirection layer that the stdlib already provides natively.
@@ -68,20 +71,20 @@ The project targets Go 1.25.5 today (`go.mod`); the foundation change `cli-found
 - *Walk to find carapace's `completion` and remove it, leaving cobra's*: cobra's auto-completion lacks the per-shell help text the custom command provides (see `getShellInstructions` at `cmd/completion.go:57-91`). Worse UX.
 - *Replace the dance with an `addPreRun` hook*: doesn't solve the issue; the conflict is at command-registration time, not hook-chain time.
 
-### Decision 5: Bespoke plain-text rendering stays inline in `cmd/list.go`
+### Decision 5: Bespoke plain-text rendering stays inline in `cmd/list.go` for the empty-`--output` human default; `--output plain` goes through `PlainFormatter` TSV
 
-**Choice**: The "branch -> path (modified)(detached)" output stays in `cmd/list.go:displayWorktrees`. No new `internal/output.WorktreeFormatter` type.
+**Choice**: The "branch -> path (modified)(detached)" output stays in `cmd/list.go:displayWorktrees` and fires only when `--output` is empty. `--output plain` flows through `output.NewFormatter("plain")` → `PlainFormatter` → headerless TSV from the `worktreeRows` `Tabular` adapter.
 
-**Rationale**: `golang-cli/references/commands.md`: "Output beside the logic — the command knows what it produced and formats it with shared helpers from `internal/output`". The bespoke text shape is specific to one command; promoting it to `internal/output` would force a global `Stringer` on `core.WorktreeInfo` that affects logging and debug dumps everywhere.
+**Rationale**: List-style commands keep `table` as the human default when `--output` is not supplied; `--output plain` is the scriptable override. The two paths serve different audiences (interactive vs pipeline) and warrant different rendering strategies. `golang-cli/references/commands.md`: "Output beside the logic — the command knows what it produced and formats it with shared helpers from `internal/output`". The bespoke text shape is specific to one command's interactive default; promoting it to `internal/output` would force a global `Stringer` on `core.WorktreeInfo` that affects logging and debug dumps everywhere.
 
 **Alternatives considered**:
-- *Implement `String() string` on `*core.WorktreeInfo`, use `internal/output.PlainFormatter`*: would work, but the global `Stringer` affects every site that formats a `WorktreeInfo` value (slog messages, debug `fmt.Sprintf`, test failure dumps). Out-of-scope side effects.
+- *Implement `String() string` on `*core.WorktreeInfo`, use `internal/output.PlainFormatter` for everything*: would work, but the global `Stringer` affects every site that formats a `WorktreeInfo` value (slog messages, debug `fmt.Sprintf`, test failure dumps). Out-of-scope side effects.
 
 ### Decision 6: `NewFormatter` returns `(Formatter, error)` instead of `Formatter`
 
-**Choice**: Change signature to `NewFormatter(format string) (Formatter, error)`. Unknown/empty values return `(nil, *core.UsageError)`.
+**Choice**: Change signature to `NewFormatter(format string) (Formatter, error)`. Unknown values (including the legacy `text`) return `(nil, *core.UsageError)`. Empty returns `(PlainFormatter{}, nil)` per the modified `cli-output` spec.
 
-**Rationale**: `golang-cli/references/output.md`: "NewFormatter(format) returns a Formatter or a UsageError for unknown values — resolve it **before** doing any work". The current nil-returning signature forces callers to nil-check and emit their own UsageError, which `cmd/list.go` does correctly but with a plain `fmt.Errorf` (wrong type). Pushing the error into the constructor makes the spec contract enforceable and removes the divergence at the call site.
+**Rationale**: `golang-cli/references/output.md:40`: "NewFormatter(format) returns a Formatter or a UsageError for unknown values — resolve it **before** doing any work". The current nil-returning signature forces callers to nil-check and emit their own UsageError, which `cmd/list.go` does correctly but with a plain `fmt.Errorf` (wrong type). Pushing the error into the constructor makes the spec contract enforceable and removes the divergence at the call site.
 
 **Alternatives considered**:
 - *Keep nil-for-unknown, fix only `cmd/list.go`*: smaller diff, but the next caller will re-introduce the same bug (plain `fmt.Errorf` instead of `UsageError`). The signature is the right place to enforce.
@@ -100,7 +103,7 @@ The project targets Go 1.25.5 today (`go.mod`); the foundation change `cli-found
 
 **Choice**: The `text` value is rejected with `core.UsageError` (exit 2). No alias to `plain`.
 
-**Rationale**: `cli-output/spec.md:13-44` specifies the accepted values; `text` is not among them. The implementation accepts it as a legacy quirk. The clean break is to reject per spec; scripts using `--output text` must switch to `--output plain`. Project is pre-1.0; no deprecation cycle needed.
+**Rationale**: `cli-output/spec.md` specifies the accepted values; `text` is not among them. The implementation accepts it as a legacy quirk. The clean break is to reject per spec; scripts using `--output text` must switch to `--output plain`. Project is pre-1.0; no deprecation cycle needed.
 
 **Alternatives considered**:
 - *Accept `text` as an alias for `plain`*: preserves existing scripts but entrenches a value that the spec does not recognize. The change should make the implementation match the spec, not paper over the drift.
@@ -123,12 +126,33 @@ The project targets Go 1.25.5 today (`go.mod`); the foundation change `cli-found
 **Alternatives considered**:
 - *No groups*: simpler, but `--help` output degrades as more commands land.
 
+### Decision 11: Introduce `Tabular` interface in `internal/output/tabular.go`
+
+**Choice**: Define `Tabular interface { Header() []string; Rows() [][]string }`. Both `TableFormatter` and `PlainFormatter` consume `Tabular` data. `cmd/list.go` provides a `worktreeRows` adapter that projects `[]*core.WorktreeInfo` to `Tabular` with `Header() = {"BRANCH","PATH","STATUS"}` and `Rows() = []string{branch, path, status}` per worktree.
+
+**Rationale**: `golang-cli/references/output.md:42`: "`table` and `plain` need data implementing `Tabular` (`Header()`, `Rows()`); build that adapter in `cmd/` so presentation stays out of the core." The `Tabular` shape unifies the two formatters and gives scripts a stable contract for `cut`/`awk` consumption of `plain` output. The first column is the most-stable identifier (`BRANCH`) per the skill convention; subsequent columns follow the same order in `Header()` and `Rows()`. Only `list` adopts the adapter here; other list-style commands opt in when their output formatting is otherwise revisited, so this change stays scoped.
+
+**Alternatives considered**:
+- *Keep raw `[][]string` for `TableFormatter` and add a separate `PlainTSVFormatter`*: leaves the two formatters with different input contracts and bypasses the canonical `Tabular` projection.
+- *Define `Tabular` in `internal/core` and add a `String() string` method on `*core.WorktreeInfo`*: forces a global `Stringer` (see Decision 5) that ripples into logging and debug output.
+
+### Decision 12: `PlainFormatter` accepts only `Tabular`
+
+**Choice**: `PlainFormatter.Write(w, data any)` requires `data` to satisfy `Tabular`. Non-`Tabular` data returns `(nil, *core.UsageError)`. Single-object commands that need raw text (e.g., `cd` printing a path to stdout) call `fmt.Fprintln(opts.IO.Out, path)` directly without going through `PlainFormatter`.
+
+**Rationale**: Aligns with `golang-cli/references/output.md:42` ("`table` and `plain` need data implementing `Tabular`") and prevents the previous behavior where `PlainFormatter` emitted `fmt.Sprintln` per slice element (non-tabular, non-scriptable). One-object commands emit exactly one line; there is no row-vs-row distinction to script. Forcing them through `Tabular` would require a degenerate single-row `Tabular` adapter for no benefit.
+
+**Alternatives considered**:
+- *Keep `PlainFormatter` accepting `any` and dispatch on shape*: hidden complexity; TSV path requires a `[]string` projection; the spec gets ambiguous.
+
 ## Risks / Trade-offs
 
-- **Public API breaking change (envelope drop, `text` rejection)**: scripts using the old shape break. Mitigation: documented in `proposal.md` under "Impact > Breaking changes"; pre-1.0 status means no deprecation cycle. Force-fail tests pin the new shape so a regression to envelope is caught at CI.
+- **Public API breaking change (envelope drop, `text` rejection, `plain` TSV shape)**: scripts using the old shape break. Mitigation: documented in `proposal.md` under "Impact > Breaking changes"; pre-1.0 status means no deprecation cycle. Force-fail tests pin each new shape so a regression is caught at CI.
 - **Dispatch reorder changes visible output for `OperationError{Cause: ValidationError}` wrappers**: previously rendered as `OperationError` (no field/value context); now renders as `ValidationError` (with field/value context). This IS the spec-mandated behavior. Mitigation: force-fail test `TestFormatError_ValidationWinsOverOperation` pins the new dispatch order.
 - **`internal/output.NewFormatter` signature change ripples to every caller**: currently only `cmd/list.go` calls it; no other callers exist in the repo per `grep -r "output.NewFormatter"`. Mitigation: signature change is mechanical (one-line update per call site).
 - **`DisableDefaultCmd = true` interacts with cobra version**: a future cobra major that renames the option breaks compilation. Mitigation: low risk; the option is stable since cobra v1.4 (2022).
+- **`Tabular` interface ripples to every list-style command**. Mitigation: each adapter is one struct per command; the `Tabular` interface contract is stable.
+- **`--output plain` shape change breaks existing scripts**: any pipeline consuming the previous `fmt.Sprintln`-per-element output must adopt TSV. Mitigation: e2e golden tests pin the new shape; pre-1.0 status means no deprecation cycle.
 - **Bespoke plain-text rendering in `cmd/list.go` is now coupled to `core.WorktreeInfo` field changes**: if `WorktreeInfo` gains/loses fields, `displayWorktrees` must follow. Mitigation: low risk; the project is the only consumer of `WorktreeInfo`.
 - **The `docgen` task requires `cobra/doc` import**: already a transitive of `github.com/spf13/cobra`, no new dependency.
 - **Hidden `docgen` command shows in `twiggit --help` only when explicitly invoked**: cobra's `Hidden: true` flag suppresses the entry from help; the task is the discoverable surface.
@@ -136,8 +160,8 @@ The project targets Go 1.25.5 today (`go.mod`); the foundation change `cli-found
 
 ## Migration Plan
 
-This change has no deployment steps. It is a pre-1.0 source-only change. The two breaking changes (`-o text` rejection, JSON envelope removal) take effect on the next release; no flag-gated compatibility path. Rollback is a `git revert` of the merge commit.
+This change has no deployment steps. It is a pre-1.0 source-only change. The three breaking changes (`-o text` rejection, JSON envelope removal, `-o plain` TSV shape) take effect on the next published build; no flag-gated compatibility path. Rollback is `git revert` of the change's merge commit.
 
 ## Open Questions
 
-None. All decisions above are resolved; remaining unknowns (module path rename, spec prefix migration, error-kind taxonomy) belong to other changes.
+None. All decisions above are resolved.
