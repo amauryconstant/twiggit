@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 #MISE description="Validate release prerequisites and preview what would happen"
-#MISE sources=["CHANGELOG.md", "{{cwd}}/.mise/tasks/lib/release-lib.sh"]
 #USAGE arg "<bump_type>" help="Version bump type" {
 #USAGE   choices "patch" "minor" "major"
 #USAGE }

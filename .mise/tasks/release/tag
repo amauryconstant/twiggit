@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 #MISE description="Create and push git tag for release"
-#MISE sources=["CHANGELOG.md", "{{cwd}}/.mise/tasks/lib/release-lib.sh"]
 #MISE confirm="This will create and push a git tag. Continue?"
 #USAGE arg "<bump_type>" help="Version bump type" {
 #USAGE   choices "patch" "minor" "major"
