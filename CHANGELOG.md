@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.2] - 2026-09-29
+
+
+### Fixed
+
+- GitLab release job: pin `force_token: gitlab` in `.goreleaser.yml` so the cross-platform `GITHUB_TOKEN` env var (required by `homebrew_casks.token` template for the `amoconst/homebrew-tap` push) no longer triggers "multiple tokens found, but only one is allowed"
+- GitHub Actions release workflow: pass `github_token: ${{ secrets.GITHUB_TOKEN }}` to `goreleaser-action@v6` (the v6 release dropped the auto-injection of `${{ github.token }}`, so the action saw zero SCM tokens and bailed at "missing GITHUB_TOKEN, GITLAB_TOKEN and GITEA_TOKEN"); switch to a single `-f .goreleaser.github.yml` arg and bump `actions/checkout` to `@v5` to silence the Node 20 deprecation warning
+- `.goreleaser.github.yml`: self-contained (duplicates the shared build/archive/sbom/changelog blocks from `.goreleaser.yml`). v2.18.2 OSS has no `includes:` directive (Pro-only) and the `-f` flag takes only the last value via cobra `StringVarP`, so the previous override-file pattern silently loaded the stub and fell back to goreleaser defaults — `paths=.`, default arch including `linux_386`/`windows_386`, no SBOMs, no archive `name_template`. Keep both files in sync when touching the shared blocks.
+
 ## [0.13.1] - 2026-09-29
 
 
