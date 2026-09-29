@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.5] - 2026-09-29
+
+
+
+### Fixed
+
+- GitHub Actions release workflow: run the release job inside the `goreleaser/goreleaser:v2.18.2` Docker image as the job container (`container:` directive, `--entrypoint /bin/sh`). v0.13.4 attempted to install `syft` via `anchore/sbom-action/install@v0`, but that action path doesn't exist (`anchore/sbom-action` is a single composite, no `/install` subdirectory) and the workflow errored at download time with `Can't find 'action.yml', 'action.yaml' or 'Dockerfile'`. A follow-up tarball-download step (`a595ad0`) was itself superseded by the container approach, which mirrors the GitLab CI release job and the sibling `airk` project's release job — the image bundles `goreleaser`, `syft`, `cosign`, and `gh`, so no per-tool install is needed. Drops the now-redundant `Install cosign` step and the `COSIGN_EXPERIMENTAL: 'true'` env flag (cosign v3 ships OIDC keyless signing out of experimental).
+
 ## [0.13.4] - 2026-09-29
 
 
