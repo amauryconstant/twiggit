@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.7] - 2026-09-29
+
+
+### Fixed
+
+- Release pipeline (GitLab CI + GitHub Actions): cosign v3 removed the `--output-signature` flag; the post-release shell loop that signed each `dist/*_sbom.spdx.json` with `cosign sign-blob --output-signature <sbom>.sig` failed on v0.13.5 (GitHub hard-aborted with `Error: must specify --bundle with --new-bundle-format`; GitLab misread the local file as an OCI image reference and hit Docker Hub `UNAUTHORIZED`). Move signing into goreleaser's native `signs:` block targeting `checksums.txt` via `cosign sign-blob --bundle` (cosign v3's single-file format combining signature + cert + Rekor inclusion into a `<file>.sigstore.json` JSON bundle). Per-SBOM signing is dropped because every SBOM hash is already in the signed checksum file, so a single signature transitively covers all artifacts. Consumers verify via `cosign verify-blob` against `checksums.txt` using the keyless OIDC + identity flags, then `sha256sum -c --ignore-missing checksums.txt` to transitively validate every archive and SBOM — see `AGENTS.md` "Release verification" for the GitLab and GitHub cert-identity strings. Drops the per-SBOM cosign shell loop from `.gitlab-ci.yml` and the `Sign SBOMs (OIDC keyless)` step from `.github/workflows/release.yml`; both pipelines now rely on goreleaser to invoke cosign as a child process with the runner's ambient OIDC token. AGENTS documents the transitive verification chain; `infrastructure-release` spec rewrites the GitHub Actions workflow requirement and the supply-chain-signal scenario around the new model.
+
+### Changed
+
+- Pin `syft = "latest"` in `.mise/config.toml` so `goreleaser release --snapshot` runs locally without going through the `goreleaser/goreleaser:v2.18.2` Docker image. Both surfaces pin to a moving `latest`; CI uses the image-bundled binary. AGENTS toolchain row updated to reflect the dual-surface pin.
+
 ## [0.13.6] - 2026-09-29
 
 
