@@ -104,66 +104,8 @@ Pipeline defaults: `retry: { max: 2, when: [runner_system_failure, stuck_or_time
 | mise run build         | Build binary                                  |
 | mise tasks             | List all tasks                                |
 
-## Release
-
-| Command                   | Purpose          |
-| ------------------------- | ---------------- |
-| mise run release:check    | Release prerequisites |
-| mise run release:dry-run  | Test GoReleaser  |
-
-**Distribution surface ownership** (split enforced at the goreleaser config layer):
-
-| Surface | CI owner | Config | What it publishes |
-| ------- | -------- | ------ | ----------------- |
-| GitLab release | GitLab CI `release` job (`.gitlab-ci.yml`) | `.goreleaser.yml` (`force_token: gitlab`) | Tarballs, checksums, SBOMs to `gitlab.com/amoconst/twiggit/-/releases/v<tag>` |
-| GitHub release | GitHub Actions `release.yml` | `.goreleaser.github.yml` (`force_token: github`) | Tarballs, checksums, SBOMs to `github.com/amauryconstant/twiggit/releases/tag/<tag>` |
-| Tag mirror to GitHub | GitLab CI `mirror-to-github` job | `.gitlab-ci.yml` | `git push --tags --force-with-lease` (tag pipelines: `when: never`) |
-
-**Invariant:** The GitHub Actions release job MUST run inside the `goreleaser/goreleaser:v2.18.2` Docker image (via the `container:` directive), not via `goreleaser-action@v6`. `goreleaser-action@v6` installs only the goreleaser binary; goreleaser's `sboms:` step then shells out to `syft` and fails with `exec: "syft": executable file not found in $PATH`. Using the Docker image as the job container bundles `goreleaser`, `syft`, `cosign`, and `gh` — symmetric with the GitLab CI `release` job and with `airk`.
-
-**CHANGELOG**: Auto-generated via `openspec-generate-changelog` after archiving changes.
-
-### Release verification
-
-Each release publishes:
-- `twiggit_<VERSION>_<OS>_<ARCH>.<ext>` archives (tar.gz / zip)
-- `twiggit_<VERSION>_<OS>_<ARCH>_sbom.spdx.json` SPDX SBOMs (one per archive)
-- `twiggit_<VERSION>_checksums.txt` containing sha256 of every archive and SBOM
-
-The checksum file is signed by `cosign` keyless via OIDC (GitLab OIDC on
-the GitLab release, GitHub Actions OIDC on the GitHub release;
-image-bundled `cosign v3.1.3`). cosign v3 writes a single
-`checksums.txt.sigstore.json` bundle (signature + cert + Rekor inclusion)
-in `dist/` for debugging — it is NOT published as a release asset. Per-SBOM
-signatures are intentionally omitted: every SBOM hash is already in the
-signed checksum file, so a single signature transitively covers all
-artifacts.
-
-Verify the checksum file against the release's OIDC identity, then verify
-every artifact against the signed checksum file:
-
-```bash
-# Step 1: verify checksums.txt was signed by this repo's release job.
-# GitLab release (signed by GitLab CI release job)
-cosign verify-blob \
-  --certificate-identity 'https://gitlab.com/amoconst/twiggit//.gitlab-ci.yml@refs/tags/<TAG>' \
-  --certificate-oidc-issuer 'https://gitlab.com' \
-  twiggit_<VERSION>_checksums.txt
-
-# GitHub release (signed by GitHub Actions release workflow)
-cosign verify-blob \
-  --certificate-identity 'https://github.com/amauryconstant/twiggit/.github/workflows/release.yml@refs/tags/<TAG>' \
-  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
-  twiggit_<VERSION>_checksums.txt
-
-# Step 2: verify every downloaded archive + SBOM against the signed
-# checksum file. This proves every artifact matches what was published.
-sha256sum -c --ignore-missing twiggit_<VERSION>_checksums.txt
-```
-
-For OIDC-keyless verification cosign uses the ambient identity from the
-TUF/Rekor transparency log; no public-key fingerprint is needed because
-the signing cert is short-lived and rooted in Fulcio.
+See [docs/release/AGENTS.md](docs/release/AGENTS.md) for the release process,
+distribution surface ownership, and cosign verification commands.
 
 ## Twiggit CLI Commands
 
@@ -222,125 +164,8 @@ twiggit _carapace fish | source
 | WILL/WILL NOT | System facts         | Behavior declarations  |
 | MAY/MAY NOT   | Optional             | Extensibility points   |
 
-## OpenSpec Foundation
-
-**Invoke `openspec-concepts` skill when:**
-- Starting your first OpenSpec task in this project
-- Confused about workflow, artifacts, or state transitions
-- Multiple active changes exist and you need guidance choosing
-- User asks "how does OpenSpec work?"
-
-**How:** Use the skill tool with name `openspec-concepts`
-
-## OpenSpec Workflow
-
-**Config**: `openspec/config.yaml` (spec-driven schema)
-
-### When to Use
-
-| Situation | Action |
-| --------- | ------ |
-| Multi-step change (3+ tasks) | Use OpenSpec |
-| Refactor / architectural change | Use OpenSpec |
-| Quick fix (1-2 lines) | Skip OpenSpec |
-| Unclear requirements | `openspec-explore` first |
-
-### Lifecycle
-
-```mermaid
-graph TB
-    subgraph Exploration["Exploration"]
-        E1[openspec-explore]
-    end
-    
-    subgraph Planning["Planning"]
-        P1[openspec-new-change]
-        P2[openspec-continue-change<br/>or openspec-ff-change]
-        P3[openspec-review-artifacts]
-        P4[openspec-modify-artifacts]
-    end
-    
-    subgraph Implementation["Implementation"]
-        I1[openspec-apply-change]
-        I2[openspec-review-test-compliance]
-    end
-    
-    subgraph Completion["Completion"]
-        C1[openspec-verify-change]
-        C2[openspec-maintain-ai-docs]
-        C3[openspec-sync-specs]
-        C4[openspec-archive-change<br/>or bulk-archive]
-        C5[openspec-generate-changelog]
-    end
-    
-    E1 --> P1 --> P2 --> P3 --> I1 --> C1 --> C2 --> C4 --> C5
-    C2 -.->|optional| C3 --> C4
-    
-    P3 -.->|issues found| P4
-    P4 -.-> P3
-    I1 -.->|reality diverges| P4
-    I1 -.->|test gaps| I2
-    I2 -.->|implement tests| I1
-    C1 -.->|with| I2
-```
-
-### Skills by Phase
-
-| Phase | Skill | Purpose |
-| ----- | ----- | ------- |
-| **Exploration** | `openspec-explore` | Think through ideas |
-| **Planning** | `openspec-new-change` | Create change folder |
-| | `openspec-continue-change` | Create one artifact |
-| | `openspec-ff-change` | Create all artifacts at once |
-| | `openspec-review-artifacts` | Review for quality |
-| | `openspec-modify-artifacts` | Update artifacts *(also in Implementation)* |
-| **Implementation** | `openspec-apply-change` | Implement tasks |
-| | `openspec-review-test-compliance` | Check spec→test alignment *(also in Completion)* |
-| **Completion** | `openspec-verify-change` | Validate implementation |
-| | `openspec-maintain-ai-docs` | Update AGENTS.md |
-| | `openspec-sync-specs` | Merge delta specs (optional) |
-| | `openspec-archive-change` | Finalize single change |
-| | `openspec-bulk-archive-change` | Archive multiple changes |
-| | `openspec-generate-changelog` | Generate CHANGELOG.md |
-
-### Project Conventions
-
-| Rule | Detail |
-| ---- | ------ |
-| Tests | Written AFTER implementation (per config.yaml) |
-| Progress | `openspec status --change <name> --json` |
-| Artifacts | See `openspec/config.yaml` rules section |
-| Spec categories | `cli-` / `core-` / `git-` / `testing-` (see below) |
-
-## OpenSpec Spec Organization
-
-Specs live under `openspec/specs/<category>-<name>/spec.md`. After `cli-functional-core-shell` lands, the prefixes map to source-tree layers as:
-
-| Prefix | Layer | Owner |
-| ------ | ----- | ----- |
-| `cli-` | `cmd/` + `internal/cmdutil/` | Cobra command specs, Factory, IOStreams, exit codes, output, error formatting |
-| `core-` | `internal/core/` | Value objects, errors, validation, path utilities, shell types |
-| `git-` | `internal/git/` + `internal/config/` | Git client, resolver, hooks, shell-detect, config loading |
-| `testing-` | `test/` | Test organization and patterns |
-
-The legacy `application-`, `domain-`, `infrastructure-` prefixes persist in
-`openspec/changes/*/specs/` only for changes that MODIFIED existing legacy
-specs; the new-prefix ownership above is canonical for net-new specs. See
-`openspec/config.yaml` for the full mapping and `openspec/changes/cli-functional-core-shell/proposal.md` §Non-goals for the deferred rename.
-
-**Layout**: one folder per spec, single `spec.md` inside. Use `# Capability:` + `## Purpose` + `## Requirements` headers.
-
-**Purity rules** (enforced by `openspec validate --specs`):
-
-| Rule | Meaning |
-| ---- | ------- |
-| `[no-code-refs]` | No `path:N` or `pkg.Type` references inside spec prose; describe intent, not implementation |
-| `[bare-cross-refs]` | Cross-references to other specs use bare names (`cli-create`), not folder paths |
-| `[purpose-coherence]` | Each `### Requirement:` SHALL/MUST declare a single testable contract |
-
-**Canonical ownership** for each prefix and the full rules live in `openspec/config.yaml`; consult it before adding or renaming specs.
-
-**Dead code**: orphan fields, types, or behaviors that no spec claims are tracked in `openspec/dead-code.md`. Add an entry there when discovering unowned symbols; do not fold them silently into a related spec.
+See [openspec/AGENTS.md](openspec/AGENTS.md) for the OpenSpec workflow,
+lifecycle, skill taxonomy, project conventions, and spec organization rules.
 
 ## Troubleshooting
 
@@ -367,6 +192,8 @@ NotFound distinction is preserved in the formatter's hint layer.
 | ---- | ------- |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Development setup, testing, and contribution guide |
 | [cmd/AGENTS.md](cmd/AGENTS.md) | CLI commands, Cobra patterns, command specs |
+| [docs/release/AGENTS.md](docs/release/AGENTS.md) | Release process, distribution surfaces, cosign verification |
+| [openspec/AGENTS.md](openspec/AGENTS.md) | OpenSpec workflow, lifecycle, skills by phase, spec organization |
 | [internal/version/AGENTS.md](internal/version/AGENTS.md) | Build-time version injection pattern |
 | [test/AGENTS.md](test/AGENTS.md) | Test organization, quality requirements |
 | [test/mocks/AGENTS.md](test/mocks/AGENTS.md) | Mock patterns, testify/mock usage |
