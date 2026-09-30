@@ -75,12 +75,13 @@ var _ = Describe("list command", func() {
 		}
 	})
 
-	It("shows 'No worktrees found' for empty project", func() {
+	It("emits no lines for empty project", func() {
 		fixture.SetupSingleProject("empty-project")
 
 		session := ctxHelper.FromProjectDir("empty-project", "list")
 		cli.ShouldSucceed(session)
-		cli.ShouldOutput(session, "No worktrees found")
+		Expect(cli.GetOutput(session)).To(BeEmpty(),
+			"empty project must emit no lines per cli-list spec; got %q", cli.GetOutput(session))
 	})
 
 	It("shows (modified) status for modified worktree", func() {
@@ -170,6 +171,18 @@ var _ = Describe("list command", func() {
 		session := ctxHelper.FromProjectDir("empty-project", "list", "--output", "json")
 		cli.ShouldSucceed(session)
 		cli.ShouldContain(session, `[]`)
+	})
+
+	It("outputs JSON array with --all and --output json", func() {
+		fixture.SetupMultiProject()
+
+		session := cli.Run("list", "--all", "--output", "json")
+		cli.ShouldSucceed(session)
+		out := cli.GetOutput(session)
+		Expect(out).To(HavePrefix("["),
+			"--all -o json must emit a bare JSON array; got %q", out)
+		Expect(out).NotTo(ContainSubstring(`"worktrees"`),
+			"--all -o json must not wrap in legacy envelope; got %q", out)
 	})
 
 	It("fails with invalid output format", func() {

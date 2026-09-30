@@ -64,6 +64,17 @@ across multiple projects.`,
 	// Persistent --output / --quiet / --verbose (slice 10 contract).
 	cmdutil.AddPersistentFlags(cmd, globalOpts)
 
+	// Shell completion for the persistent --output flag. The legacy
+	// "text" and the dropped "jsonl" values are intentionally absent
+	// so completion-driven callers cannot reintroduce them. The
+	// completion function MUST be registered on the root command
+	// because pflag does not propagate Flag.Annotations to
+	// subcommand copies of persistent flags; a per-subcommand
+	// RegisterFlagCompletionFunc would silently be ignored.
+	_ = cmd.RegisterFlagCompletionFunc("output", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{"json", "table", "plain"}, cobra.ShellCompDirectiveNoFileComp
+	})
+
 	// AddGroup labels surface in `twiggit --help` to keep the
 	// command tree navigable as it grows. Cobra does not
 	// retroactively assign groups, so register the group

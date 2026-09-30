@@ -78,13 +78,6 @@ Examples:
 
 	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "List worktrees from all projects")
 
-	// Shell completion for the inherited --output flag. The legacy
-	// "text" and the dropped "jsonl" values are intentionally absent
-	// so completion-driven callers cannot reintroduce them.
-	_ = cmd.RegisterFlagCompletionFunc("output", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-		return []string{"json", "table", "plain"}, cobra.ShellCompDirectiveNoFileComp
-	})
-
 	return cmd
 }
 
@@ -214,17 +207,11 @@ func worktreeStatus(wt *core.WorktreeInfo) string {
 // for the requested format, otherwise falls back to the bespoke
 // human-readable rendering defined by the cli-list spec for the
 // empty --output default. The bespoke shape is `branch -> path`
-// with optional `(modified)` / `(detached)` suffixes, and an empty
-// collection surfaces a `No worktrees found` line for parity with
-// the legacy TextFormatter.
+// with optional `(modified)` / `(detached)` suffixes. An empty
+// collection emits no lines per the cli-list spec
+// (`Status indicators / Empty project renders no lines`).
 func renderWorktrees(out io.Writer, worktrees []*core.WorktreeInfo, formatter output.Formatter) error {
 	if formatter == nil {
-		if len(worktrees) == 0 {
-			if _, err := fmt.Fprintln(out, "No worktrees found"); err != nil {
-				return fmt.Errorf("failed to display worktrees: %w", err)
-			}
-			return nil
-		}
 		for _, wt := range worktrees {
 			suffix := ""
 			if wt.IsDetached {

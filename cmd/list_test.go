@@ -62,7 +62,14 @@ func iosStdoutBytes(t *testing.T, ios *iostreams.IOStreams) string {
 
 // TestList_NewCmdListInvalidOutputFormat checks the NewCmdList
 // flag-parse path: an invalid `--output` value fails RunE with the
-// expected error rather than falling through to runList.
+// expected error rather than falling through to runList, and the
+// dispatched exit code is 2 (UsageError) per cli-output spec
+// `Unknown --output value is rejected`.
+//
+// Cannot use t.Parallel: NewRootCommand triggers
+// carapace.Gen → cobra.OnInitialize which mutates cobra's
+// package-level initializer slice. Parallel tests that build a
+// root tree race on that global state.
 func TestList_NewCmdListInvalidOutputFormat(t *testing.T) {
 	f := newTestFactory(t)
 	root := newRootForTest(f)
@@ -71,10 +78,33 @@ func TestList_NewCmdListInvalidOutputFormat(t *testing.T) {
 	err := root.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid output format")
+	assert.Equal(t, cmdutil.ExitUsage, cmdutil.ExitCodeFor(err),
+		"unknown --output must dispatch to UsageError / exit 2")
+}
+
+// TestList_NewCmdList_JSONLReturnsExitUsage pins the dropped-format
+// scenario from cli-output spec: `--output jsonl` is rejected as a
+// usage error with exit code 2. The constructor returns
+// (nil, *core.UsageError); the wrap preserves the typed chain so
+// ExitCodeFor still classifies it.
+//
+// Cannot use t.Parallel: see TestList_NewCmdListInvalidOutputFormat.
+func TestList_NewCmdList_JSONLReturnsExitUsage(t *testing.T) {
+	f := newTestFactory(t)
+	root := newRootForTest(f)
+	root.SetArgs([]string{"list", "--output", "jsonl"})
+
+	err := root.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid output format")
+	assert.Equal(t, cmdutil.ExitUsage, cmdutil.ExitCodeFor(err),
+		"--output jsonl must exit 2 (UsageError)")
 }
 
 // TestList_NewCmdListNoArgs pins the cobra args guard: list takes
 // zero positional arguments.
+//
+// Cannot use t.Parallel: see TestList_NewCmdListInvalidOutputFormat.
 func TestList_NewCmdListNoArgs(t *testing.T) {
 	f := newTestFactory(t)
 	root := newRootForTest(f)
@@ -86,37 +116,75 @@ func TestList_NewCmdListNoArgs(t *testing.T) {
 	require.ErrorAs(t, err, &ue)
 }
 
-// TestList_NewCmdListAcceptsTextAndJSON confirms the recognised
-// --output values pass the validator and reach the run body.
-func TestList_NewCmdListAcceptsTextAndJSON(t *testing.T) {
-	f := newTestFactory(t)
-	root := newRootForTest(f)
-
-	called := false
-	customList := NewCmdList(f, func(opts *ListOptions) error {
-		called = true
-		assert.Equal(t, "json", opts.GlobalOptions.Output)
-		return nil
-	})
-
-	for _, sub := range root.Commands() {
-		if sub.Name() == "list" {
-			root.RemoveCommand(sub)
-			break
-		}
+// TestList_OutputFlagCompletion drives cobra's `__complete` verb
+// against the list command and asserts the three accepted values
+// (json, table, plain) are offered while the legacy `text` value
+// and the dropped `jsonl` value are NOT. This covers
+// cli-output/Shell-completable S1 and cli-output-formats duplicate.
+// Cobra's `__complete` request emits candidates on stdout
+// separated by newlines; we join and match against the captured
+// buffer.
+//
+// Cannot use t.Parallel: NewRootCommand triggers
+// carapace.Gen → cobra.OnInitialize which mutates cobra's
+// package-level initializer slice. Parallel tests that build a
+// root tree race on that global state.
+func TestList_OutputFlagCompletion(t *testing.T) {
+	cases := []struct {
+		name     string
+		toType   string
+		wantSubs []string
+		denySubs []string
+	}{
+		{
+			name:     "empty prefix offers the three accepted values",
+			toType:   "",
+			wantSubs: []string{"json", "table", "plain"},
+			denySubs: []string{"text", "jsonl", "yaml", "xml"},
+		},
+		{
+			name:     "json prefix still offers all accepted values",
+			toType:   "j",
+			wantSubs: []string{"json", "table", "plain"},
+			denySubs: []string{"text", "jsonl", "yaml", "xml"},
+		},
 	}
-	root.AddCommand(customList)
-	root.SetArgs([]string{"list", "--output", "json"})
 
-	require.NoError(t, root.Execute())
-	assert.True(t, called, "runF override must have been invoked")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newTestFactory(t)
+			root := newRootForTest(f)
+			stdout := new(bytes.Buffer)
+			root.SetOut(stdout)
+			root.SetErr(stdout)
+			root.SetArgs([]string{"__complete", "list", "--output", tc.toType})
+
+			require.NoError(t, root.Execute(),
+				"cobra __complete must not error for --output %q", tc.toType)
+
+			got := stdout.String()
+			for _, w := range tc.wantSubs {
+				assert.Contains(t, got, w,
+					"completion candidates must include %q; got %q", w, got)
+			}
+			for _, d := range tc.denySubs {
+				assert.NotContains(t, got, d,
+					"completion must not offer legacy/dropped format %q; got %q", d, got)
+			}
+		})
+	}
 }
 
-// TestList_OutputsNoWorktreesEmptyProjects covers the empty-projects
-// happy path: when the projects directory has no git repositories,
-// runList still succeeds and writes a "No worktrees found" line.
-func TestList_OutputsNoWorktreesEmptyProjects(t *testing.T) {
-	projects := t.TempDir() // empty
+// TestList_EmptyProjectEmitsNoLines covers cli-list/Status
+// indicators/Empty project renders no lines: an empty project must
+// emit no stdout lines when no `--output` flag is supplied. After
+// the renderWorktrees production fix, the bespoke empty path emits
+// zero lines (the for-loop runs zero iterations).
+//
+// Cannot use t.Parallel: t.Chdir requires a non-parallel test
+// (Go testing rule — t.Chdir mutates process-global state).
+func TestList_EmptyProjectEmitsNoLines(t *testing.T) {
+	projects := t.TempDir()
 	worktrees := t.TempDir()
 
 	// Move out of any git working tree so the context detector
@@ -129,32 +197,76 @@ func TestList_OutputsNoWorktreesEmptyProjects(t *testing.T) {
 	require.NoError(t, runList(opts))
 
 	written := iosStdoutBytes(t, ios)
-	assert.Contains(t, written, "No worktrees found",
-		"empty projects dir must surface a friendly 'No worktrees found' line; got %q", written)
+	assert.Empty(t, written,
+		"empty project must emit no lines per cli-list spec; got %q", written)
 }
 
-// TestList_DefaultOutputFallsThroughToPlain pins cli-output-formats
-// "default empty --output = plain". With no --output flag the run body
-// must render human-readable text, not JSON or table borders.
-func TestList_DefaultOutputFallsThroughToPlain(t *testing.T) {
-	projects := t.TempDir()
-	worktrees := t.TempDir()
+// TestRenderWorktrees_BespokeShape pins the cli-list/Status
+// indicators contract for the empty `--output` path: each worktree
+// renders as `branch -> path` with a single conditional suffix
+// (`(modified)`, `(detached)`, or no suffix for clean attached).
+// Exercises renderWorktrees directly with synthetic worktrees so
+// the test does not depend on a real git repository fixture.
+func TestRenderWorktrees_BespokeShape(t *testing.T) {
+	t.Parallel()
 
-	t.Chdir(t.TempDir())
+	cases := []struct {
+		name      string
+		wt        *core.WorktreeInfo
+		wantLines []string
+		denyLines []string
+	}{
+		{
+			name: "dirty worktree carries (modified) suffix",
+			wt: &core.WorktreeInfo{
+				Branch:     "feat/foo",
+				Path:       "/tmp/feat/foo",
+				IsModified: true,
+			},
+			wantLines: []string{"feat/foo -> /tmp/feat/foo (modified)"},
+			denyLines: []string{"(detached)", "[", "\t"},
+		},
+		{
+			name: "detached HEAD carries (detached) suffix",
+			wt: &core.WorktreeInfo{
+				Branch:     "feat/bar",
+				Path:       "/tmp/feat/bar",
+				IsDetached: true,
+			},
+			wantLines: []string{"feat/bar -> /tmp/feat/bar (detached)"},
+			denyLines: []string{"(modified)", "[", "\t"},
+		},
+		{
+			name: "clean attached worktree has no suffix",
+			wt: &core.WorktreeInfo{
+				Branch: "feat/baz",
+				Path:   "/tmp/feat/baz",
+			},
+			wantLines: []string{"feat/baz -> /tmp/feat/baz"},
+			denyLines: []string{"(modified)", "(detached)", "[", "\t"},
+		},
+	}
 
-	opts, ios := listTestOpts(t, projects, worktrees)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 
-	require.NoError(t, runList(opts))
+			var buf bytes.Buffer
+			require.NoError(t, renderWorktrees(&buf, []*core.WorktreeInfo{tc.wt}, nil))
 
-	written := iosStdoutBytes(t, ios)
-	// plain text has no JSON or table markers; assert the absence of
-	// both so a future refactor that accidentally wires a JSON or
-	// table formatter into the empty-flag path is caught.
-	assert.NotContains(t, written, "{", "empty --output must not render JSON")
-	assert.NotContains(t, written, "[", "empty --output must not render JSON arrays")
-	assert.NotContains(t, written, "│", "empty --output must not render table borders")
-	assert.Contains(t, written, "No worktrees found",
-		"empty --output must still surface the human-readable empty-state message")
+			got := buf.String()
+			lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
+			require.Len(t, lines, len(tc.wantLines),
+				"bespoke shape must emit exactly one line per worktree; got %q", got)
+			for _, w := range tc.wantLines {
+				assert.Contains(t, got, w)
+			}
+			for _, d := range tc.denyLines {
+				assert.NotContains(t, got, d,
+					"bespoke shape must not render %q markers; got %q", d, got)
+			}
+		})
+	}
 }
 
 // keep strings import referenced for future tests without noise.

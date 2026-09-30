@@ -165,3 +165,40 @@ func TestNewFormatter_TextReturnsUsageError(t *testing.T) {
 		"legacy 'text' must NOT alias to plain; must produce *core.UsageError, got %T", err)
 	assert.Contains(t, ue.Message, "text")
 }
+
+// TestNewFormatter_JSONLReturnsUsageError pins the cli-output
+// spec scenario `Dropped --output jsonl is rejected`: the
+// vocabulary drops jsonl (the JSONLinesFormatter type is removed);
+// the constructor must reject the value with a *core.UsageError
+// so cmdutil.ExitCodeFor classifies it as exit 2.
+func TestNewFormatter_JSONLReturnsUsageError(t *testing.T) {
+	t.Parallel()
+
+	f, err := output.NewFormatter("jsonl")
+	assert.Nil(t, f)
+	require.Error(t, err, "vocabulary drops jsonl; constructor must reject")
+
+	var ue *core.UsageError
+	require.ErrorAs(t, err, &ue,
+		"rejection must surface as *core.UsageError so cmd exits 2; got %T", err)
+	assert.Contains(t, ue.Message, "jsonl")
+	assert.Contains(t, ue.Message, "'json', 'table', or 'plain'")
+}
+
+// TestTableFormatter_NonTabularReturnsUsageError covers the
+// cli-output spec scenario `Non-tabular data rejected` for
+// TableFormatter (PlainFormatter is covered separately at
+// TestPlainFormatter_NonTabularReturnsUsageError). Both formatters
+// must reject non-Tabular input with a *core.UsageError so the
+// caller exits 2.
+func TestTableFormatter_NonTabularReturnsUsageError(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+	err := output.TableFormatter{}.Write(&buf, "raw string")
+	require.Error(t, err)
+
+	var ue *core.UsageError
+	require.ErrorAs(t, err, &ue,
+		"TableFormatter must reject non-Tabular input with *core.UsageError; got %T", err)
+}
