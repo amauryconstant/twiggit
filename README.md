@@ -155,3 +155,19 @@ cat .twiggit.toml
 ```
 
 Hooks are opt-in only—without a `.twiggit.toml` file, no commands are executed.
+
+## Debugging
+
+`twiggit` honours the standard `TWIGGIT_DEBUG=1` env var to enable structured
+debug logs (Go's `slog.Default` writes to the binary's stderr). For deeper
+runtime diagnostics, the standard `GODEBUG` knob is also available and useful
+when investigating `twiggit` itself:
+
+| Env var | Purpose |
+| --- | --- |
+| `GODEBUG=gctrace=1` | Print GC traces to stderr at every collection; useful when `twiggit` is slow and you suspect GC pressure. |
+| `GODEBUG=schedtrace=10000` | Emit a scheduler trace every 10 000 ms; pairs well with `schedtrace=` to profile goroutine scheduling under concurrent worktree operations. |
+| `GODEBUG=asyncpreemptoff=1` | Disable async preemption; surfaces data races that preemption would otherwise hide when running `go test -race`. |
+
+Example: `TWIGGIT_DEBUG=1 GODEBUG=gctrace=1 ./twiggit list` prints both the
+structured debug channel and GC traces on stderr.

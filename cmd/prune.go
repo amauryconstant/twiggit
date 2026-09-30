@@ -26,6 +26,7 @@ type PruneOptions struct {
 	GitClient     func() (cmdutil.Client, error)
 	Ctx           context.Context
 	GlobalOptions *cmdutil.GlobalOptions
+	Logger        *slog.Logger
 
 	// Per-command fields.
 	Force            bool
@@ -73,7 +74,8 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Logger = BoundaryLogger(f, cmd)
 			if len(args) > 0 {
 				opts.SpecificWorktree = args[0]
 			}
@@ -126,6 +128,7 @@ func runPrune(opts *PruneOptions) error {
 
 	currentCtx, err := detector.DetectContext(wd)
 	if err != nil {
+		opts.Logger.Debug("detect failed", "err", err)
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 

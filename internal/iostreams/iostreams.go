@@ -6,8 +6,14 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sync"
 
 	"golang.org/x/term"
+)
+
+var (
+	loggerMu    sync.Mutex
+	loggerCache = map[io.Writer]*slog.Logger{}
 )
 
 // IOStreams abstracts terminal I/O so commands never touch
@@ -52,7 +58,7 @@ func System() *IOStreams {
 		isStdoutTTY:  stdoutTTY,
 		isStderrTTY:  stderrTTY,
 		isStdinTTY:   stdinTTY,
-		Logger:       NewLogger(),
+		Logger:       NewLogger(os.Stderr),
 		styles:       NewStyles(colorEnabled),
 	}
 }
@@ -73,7 +79,7 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 		isStdoutTTY:  false,
 		isStderrTTY:  false,
 		isStdinTTY:   false,
-		Logger:       slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})),
+		Logger:       NewLogger(errOut),
 		styles:       NewStyles(false),
 	}, in, out, errOut
 }
@@ -120,14 +126,28 @@ func (s *IOStreams) SetColorEnabled(enabled bool) {
 // when color is on.
 func (s *IOStreams) Styles() *Styles { return s.styles }
 
-// NewLogger wires a *slog.Logger channel for TWIGGIT_DEBUG:
-// LevelDebug when TWIGGIT_DEBUG is non-empty, else LevelWarn.
-// Output goes to os.Stderr so debug logs bypass the iostreams
-// ErrOut (which is reserved for user-facing error rendering).
-func NewLogger() *slog.Logger {
+// NewLogger returns the slog logger channel for TWIGGIT_DEBUG:
+// LevelDebug when TWIGGIT_DEBUG is non-empty at construction time,
+// else LevelWarn. Output goes through the supplied writer so the
+// test buffer path (iostreams.Test) captures debug output for
+// assertions and the production path (iostreams.System) routes
+// through os.Stderr.
+//
+// Caches the constructed *slog.Logger per writer so subsequent
+// calls with the same writer return the same pointer — the
+// singleton guarantee mandated by cli-iostreams (Factory.Logger,
+// IOStreams.Logger, and slog.Default share one instance).
+func NewLogger(w io.Writer) *slog.Logger {
+	loggerMu.Lock()
+	defer loggerMu.Unlock()
+	if l, ok := loggerCache[w]; ok {
+		return l
+	}
 	level := slog.LevelWarn
 	if os.Getenv("TWIGGIT_DEBUG") != "" {
 		level = slog.LevelDebug
 	}
-	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	l := slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: level}))
+	loggerCache[w] = l
+	return l
 }

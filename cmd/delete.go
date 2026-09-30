@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"time"
 	"twiggit/internal/cmdutil"
@@ -22,6 +23,7 @@ type DeleteOptions struct {
 	GitClient     func() (cmdutil.Client, error)
 	Ctx           context.Context
 	GlobalOptions *cmdutil.GlobalOptions
+	Logger        *slog.Logger
 
 	// Per-command fields.
 	Target     string
@@ -59,7 +61,8 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.ExactArgs(1)),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Logger = BoundaryLogger(f, cmd)
 			opts.Target = args[0]
 			if runF != nil {
 				return runF(opts)
@@ -112,6 +115,7 @@ func runDelete(opts *DeleteOptions) error {
 
 	currentCtx, err := detector.DetectContext(wd)
 	if err != nil {
+		opts.Logger.Debug("detect failed", "err", err)
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 

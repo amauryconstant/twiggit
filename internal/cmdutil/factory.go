@@ -3,8 +3,6 @@ package cmdutil
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -217,7 +215,7 @@ func NewFactory(opts ...FactoryOption) *Factory {
 	}
 
 	f.Logger = sync.OnceValue(func() *slog.Logger {
-		return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
+		return iostreams.NewLogger(f.IOStreams.ErrOut)
 	})
 
 	for _, opt := range opts {
@@ -239,28 +237,28 @@ func (f *Factory) Init() error {
 	var errs []error
 
 	if _, err := f.Config(); err != nil {
-		errs = append(errs, fmt.Errorf("cmdutil: config init: %w", err))
+		errs = append(errs, err)
 	}
 	if _, err := f.GitClient(); err != nil {
-		errs = append(errs, fmt.Errorf("cmdutil: git client init: %w", err))
+		errs = append(errs, err)
 	}
 	if _, err := f.RepoOpener(); err != nil {
-		errs = append(errs, fmt.Errorf("cmdutil: repo opener init: %w", err))
+		errs = append(errs, err)
 	}
 	if _, err := f.BranchReader(); err != nil {
-		errs = append(errs, fmt.Errorf("cmdutil: branch reader init: %w", err))
+		errs = append(errs, err)
 	}
 	if _, err := f.RepositoryReader(); err != nil {
-		errs = append(errs, fmt.Errorf("cmdutil: repository reader init: %w", err))
+		errs = append(errs, err)
 	}
 	if _, err := f.RemoteReader(); err != nil {
-		errs = append(errs, fmt.Errorf("cmdutil: remote reader init: %w", err))
+		errs = append(errs, err)
 	}
 	if _, err := f.WorktreeWriter(); err != nil {
-		errs = append(errs, fmt.Errorf("cmdutil: worktree writer init: %w", err))
+		errs = append(errs, err)
 	}
 	if _, err := f.BranchWriter(); err != nil {
-		errs = append(errs, fmt.Errorf("cmdutil: branch writer init: %w", err))
+		errs = append(errs, err)
 	}
 	if f.Logger() == nil {
 		errs = append(errs, errors.New("cmdutil: logger init: returned nil"))

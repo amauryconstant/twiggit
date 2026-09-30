@@ -55,7 +55,7 @@ func TestWorktreeInfo_IsModifiedBooleanSemantics(t *testing.T) {
 
 func TestWorktreeInfo_UsedInGitRepositoryList(t *testing.T) {
 	is := assert.New(t)
-	require := require.New(t)
+	must := require.New(t)
 
 	repo := GitRepository{
 		Path: "/repos/example",
@@ -64,7 +64,7 @@ func TestWorktreeInfo_UsedInGitRepositoryList(t *testing.T) {
 			{Path: "/repos/example/feat", Branch: "feature/x", Commit: "def5678", IsModified: true},
 		},
 	}
-	require.Len(repo.Worktrees, 2)
+	must.Len(repo.Worktrees, 2)
 	is.False(repo.Worktrees[0].IsModified)
 	is.True(repo.Worktrees[1].IsModified)
 }

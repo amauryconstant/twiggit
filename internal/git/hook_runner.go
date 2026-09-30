@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,7 +57,7 @@ func (r *HookRunner) Run(ctx context.Context, req *core.HookRunRequest) (*core.H
 
 	config, err := r.readHookConfig(req.ConfigFilePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to parse %s: %v\n", req.ConfigFilePath, err)
+		slog.Default().Warn("hook config parse warning", "path", req.ConfigFilePath, "err", err)
 		return noOpResult(req), nil
 	}
 

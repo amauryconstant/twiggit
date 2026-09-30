@@ -134,7 +134,7 @@ func (c *cliClient) CreateWorktree(ctx context.Context, repoPath, branchName, so
 	}
 
 	if result.ExitCode != 0 {
-		return NewWorktreeError("create", "git worktree add failed: "+result.Stderr, nil)
+		return NewWorktreeError("create", "git worktree add failed: "+result.Stderr, result.Err)
 	}
 
 	parentDir := filepath.Dir(worktreePath)
@@ -180,7 +180,7 @@ func (c *cliClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath s
 		if strings.Contains(result.Stderr, "not found") || strings.Contains(result.Stderr, "does not exist") {
 			return nil // No-op if already deleted
 		}
-		return NewWorktreeError("delete", "git worktree remove failed: "+result.Stderr, nil)
+		return NewWorktreeError("delete", "git worktree remove failed: "+result.Stderr, result.Err)
 	}
 
 	return nil
@@ -203,7 +203,7 @@ func (c *cliClient) ListWorktrees(ctx context.Context, repoPath string) ([]core.
 	}
 
 	if result.ExitCode != 0 {
-		return nil, NewWorktreeError("list", "git worktree list failed: "+result.Stderr, nil)
+		return nil, NewWorktreeError("list", "git worktree list failed: "+result.Stderr, result.Err)
 	}
 
 	// Parse output
@@ -227,7 +227,7 @@ func (c *cliClient) PruneWorktrees(ctx context.Context, repoPath string) error {
 	}
 
 	if result.ExitCode != 0 {
-		return NewWorktreeError("prune", "git worktree prune failed: "+result.Stderr, nil)
+		return NewWorktreeError("prune", "git worktree prune failed: "+result.Stderr, result.Err)
 	}
 
 	return nil
@@ -254,7 +254,7 @@ func (c *cliClient) DeleteBranch(ctx context.Context, repoPath, branchName strin
 		if strings.Contains(result.Stderr, "not found") {
 			return nil
 		}
-		return NewBranchError("delete", "git branch -D failed: "+result.Stderr, nil)
+		return NewBranchError("delete", "git branch -D failed: "+result.Stderr, result.Err)
 	}
 
 	return nil
@@ -280,7 +280,7 @@ func (c *cliClient) IsBranchMerged(ctx context.Context, repoPath, branchName str
 	}
 
 	if result.ExitCode != 0 {
-		return false, NewBranchError("merged", "git branch --merged failed: "+result.Stderr, nil)
+		return false, NewBranchError("merged", "git branch --merged failed: "+result.Stderr, result.Err)
 	}
 
 	// Check if branch name appears in merged branches output

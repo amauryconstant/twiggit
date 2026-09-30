@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"twiggit/internal/cmdutil"
@@ -22,6 +23,7 @@ type CdOptions struct {
 	GitClient     func() (cmdutil.Client, error)
 	Ctx           context.Context
 	GlobalOptions *cmdutil.GlobalOptions
+	Logger        *slog.Logger
 
 	// Per-command field.
 	Target string
@@ -55,7 +57,8 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Logger = BoundaryLogger(f, cmd)
 			if len(args) > 0 {
 				opts.Target = args[0]
 			}
@@ -99,6 +102,7 @@ func runCd(opts *CdOptions) error {
 
 	currentCtx, err := detector.DetectContext(wd)
 	if err != nil {
+		opts.Logger.Debug("detect failed", "err", err)
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 

@@ -33,8 +33,7 @@ default_source_branch = "develop"
 	require.NoError(t, err)
 
 	// Set XDG_CONFIG_HOME to temp directory
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	config, err := manager.Load()
 	require.NoError(t, err)
@@ -64,9 +63,8 @@ default_source_branch = "main"
 	require.NoError(t, err)
 
 	// Set HOME to temp directory, but not XDG_CONFIG_HOME
-	os.Setenv("HOME", tempDir)
-	os.Unsetenv("XDG_CONFIG_HOME")
-	defer os.Unsetenv("HOME")
+	t.Setenv("HOME", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", "")
 
 	config, err := manager.Load()
 	require.NoError(t, err)
@@ -94,8 +92,7 @@ projects_dir = "relative/path"
 	require.NoError(t, err)
 
 	// Set XDG_CONFIG_HOME to temp directory
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	_, err = manager.Load()
 	require.Error(t, err)
@@ -122,8 +119,7 @@ worktrees_dir = "/test/worktrees"
 	require.NoError(t, err)
 
 	// Set XDG_CONFIG_HOME to temp directory
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 
 	_, err = manager.Load()
 	require.Error(t, err)
@@ -133,21 +129,10 @@ worktrees_dir = "/test/worktrees"
 func TestConfigManager_Integration_NoConfigFile(t *testing.T) {
 	tempDir := t.TempDir()
 
-	// Ensure clean environment state
-	originalHome := os.Getenv("HOME")
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-
-	// Set XDG_CONFIG_HOME to empty temp directory (no config file)
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	os.Unsetenv("HOME")
-	defer func() {
-		os.Setenv("XDG_CONFIG_HOME", originalXDG)
-		if originalHome != "" {
-			os.Setenv("HOME", originalHome)
-		} else {
-			os.Unsetenv("HOME")
-		}
-	}()
+	// Ensure clean environment state. t.Setenv auto-restores after the test.
+	// Set XDG_CONFIG_HOME to empty temp directory (no config file).
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("HOME", "")
 
 	// Create a fresh manager after setting environment variable
 	manager := config.NewManager()

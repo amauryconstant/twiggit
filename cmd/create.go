@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,6 +28,7 @@ type CreateOptions struct {
 	GitClient     func() (cmdutil.Client, error)
 	Ctx           context.Context
 	GlobalOptions *cmdutil.GlobalOptions
+	Logger        *slog.Logger
 
 	// Per-command fields.
 	Spec   string
@@ -61,7 +63,8 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.ExactArgs(1)),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.Logger = BoundaryLogger(f, cmd)
 			opts.Spec = args[0]
 			// Use config default source branch if available, otherwise fallback to "main"
 			if opts.Source == "" {
@@ -125,6 +128,7 @@ func runCreate(opts *CreateOptions) error {
 
 	currentCtx, err := detector.DetectContext(wd)
 	if err != nil {
+		opts.Logger.Debug("detect failed", "err", err)
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 

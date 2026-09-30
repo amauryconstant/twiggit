@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"io"
 	"log/slog"
+	"os"
 	"testing"
 	"twiggit/internal/iostreams"
 
@@ -132,7 +133,7 @@ func TestColorEnabled_ToggleViaAccessor(t *testing.T) {
 
 func TestNewLogger_DefaultLevelIsWarn(t *testing.T) {
 	t.Setenv("TWIGGIT_DEBUG", "")
-	logger := iostreams.NewLogger()
+	logger := iostreams.NewLogger(&bytes.Buffer{})
 	require.NotNil(t, logger)
 	assert.True(t, logger.Enabled(t.Context(), slog.LevelWarn))
 	assert.False(t, logger.Enabled(t.Context(), slog.LevelInfo))
@@ -140,8 +141,24 @@ func TestNewLogger_DefaultLevelIsWarn(t *testing.T) {
 
 func TestNewLogger_DebugLevelWhenEnvSet(t *testing.T) {
 	t.Setenv("TWIGGIT_DEBUG", "1")
-	logger := iostreams.NewLogger()
+	logger := iostreams.NewLogger(&bytes.Buffer{})
 	require.NotNil(t, logger)
 	assert.True(t, logger.Enabled(t.Context(), slog.LevelDebug))
 	assert.True(t, logger.Enabled(t.Context(), slog.LevelInfo))
+}
+
+// TestLoggerPointer asserts the singleton guarantee: NewLogger
+// returns the same *slog.Logger pointer when called repeatedly
+// with the same writer, so System() / Test() / Factory.Logger all
+// share one instance and main.go's slog.SetDefault binds to it.
+func TestLoggerPointer(t *testing.T) {
+	t.Run("system path", func(t *testing.T) {
+		sys := iostreams.System()
+		assert.Same(t, sys.Logger, iostreams.NewLogger(os.Stderr))
+	})
+
+	t.Run("test path", func(t *testing.T) {
+		ios, _, _, errOut := iostreams.Test()
+		assert.Same(t, ios.Logger, iostreams.NewLogger(errOut))
+	})
 }

@@ -51,7 +51,7 @@ func TestHookResult_NoOpResultShape(t *testing.T) {
 
 func TestHookResult_PartialFailureShape(t *testing.T) {
 	is := assert.New(t)
-	require := require.New(t)
+	must := require.New(t)
 
 	r := HookResult{
 		HookType:     HookPostCreate,
@@ -62,7 +62,7 @@ func TestHookResult_PartialFailureShape(t *testing.T) {
 		},
 	}
 
-	require.Len(r.Failures, 1, "only one failed command recorded")
+	must.Len(r.Failures, 1, "only one failed command recorded")
 	is.True(r.HasExecuted)
 	is.False(r.IsSuccessful)
 	is.Equal("npm install", r.Failures[0].Command)

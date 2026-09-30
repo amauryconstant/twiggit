@@ -27,12 +27,6 @@ func loadConfig() (*core.Config, error) {
 }
 
 func main() {
-	slogLevel := slog.LevelInfo
-	if os.Getenv("TWIGGIT_DEBUG") != "" {
-		slogLevel = slog.LevelDebug
-	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slogLevel})))
-
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -54,6 +48,7 @@ func main() {
 			return git.NewClient()
 		}),
 	)
+	slog.SetDefault(factory.Logger())
 	if err := factory.Init(); err != nil {
 		output.FormatError(os.Stderr, err, nil)
 		//nolint:gocritic // exitAfterDefer: factory init failure aborts the process; pending defers (slog, signal) are non-essential.

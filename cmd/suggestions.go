@@ -191,6 +191,7 @@ func pickProjectPath(_ context.Context, f *CommandConfig, cfg *core.Config) stri
 	}
 	ctx, err := detector.DetectContext(wd)
 	if err != nil || ctx == nil || ctx.ProjectName == "" {
+		f.Logger().Debug("detect failed, falling back", "err", err)
 		// Fallback to the first discovered project.
 		finder := git.NewRepoFinder(gitClient)
 		gitDirs, err := finder.FindGitRepositories(cfg.ProjectsDirectory)

@@ -216,10 +216,10 @@ func resolveShellType(opts *InitOptions) (core.ShellType, error) {
 }
 
 // isAlreadyInstalled reports whether err is the typed shell-already-installed
-// sentinel from output.InstallWrapper.
+// sentinel from output.InstallWrapper. Matches via errors.Is per
+// domain-typed-errors req 8.
 func isAlreadyInstalled(err error) bool {
-	var oe *core.OperationError
-	return errors.As(err, &oe) && oe.Op == "shell.already_installed"
+	return errors.Is(err, core.ErrShellAlreadyInstalled)
 }
 
 // displayInitResults outputs installation results (for install mode only)

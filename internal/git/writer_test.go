@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"os"
+	"os/exec"
 	"testing"
 	"twiggit/internal/core"
 
@@ -139,6 +140,7 @@ func TestCLIClient_CreateWorktree(t *testing.T) {
 		}
 		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
 	}())
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", worktreeDir)
@@ -155,6 +157,7 @@ func TestCLIClient_CreateWorktree_WithExistingBranch(t *testing.T) {
 		}
 		return &CommandResult{ExitCode: 0, Stdout: ""}, nil
 	}())
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	err := client.CreateWorktree(context.Background(), "/test/repo", "existing-branch", "", worktreeDir)
@@ -165,6 +168,7 @@ func TestCLIClient_CreateWorktree_Failure(t *testing.T) {
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"show-ref", "--verify", "--quiet", "refs/heads/feature"}).Return(&CommandResult{ExitCode: 1, Stdout: ""}, nil)
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "add", "-b", "feature", "/path/to/worktree", "main"}).Return(&CommandResult{ExitCode: 1, Stderr: "fatal: Invalid path"}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
@@ -174,9 +178,36 @@ func TestCLIClient_CreateWorktree_Failure(t *testing.T) {
 	require.Equal(t, "git.worktree.create", worktreeErr.Op)
 }
 
+// TestCLIClient_NonZeroExit_PreservesExecError asserts the cause
+// chain mandated by golang-error-handling rule 5: a non-zero git
+// exit code must remain reachable via errors.As(err, &*exec.ExitError)
+// after the writer wraps it as *core.OperationError. If a future
+// change drops result.Err from the NewWorktreeError cause, this
+// test fails loudly.
+func TestCLIClient_NonZeroExit_PreservesExecError(t *testing.T) {
+	// Produce a real *exec.ExitError to seed the chain.
+	cmd := exec.Command("sh", "-c", "exit 7")
+	runErr := cmd.Run()
+	require.Error(t, runErr)
+	var seed *exec.ExitError
+	require.ErrorAs(t, runErr, &seed)
+
+	mockExecutor := NewMockCommandExecutor()
+	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(&CommandResult{ExitCode: 1, Stderr: "boom", Err: seed}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
+	client := NewCLIClient(mockExecutor)
+
+	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
+	require.Error(t, err)
+
+	var extracted *exec.ExitError
+	require.ErrorAs(t, err, &extracted, "exec.ExitError must remain reachable through the cause chain")
+}
+
 func TestCLIClient_DeleteWorktree(t *testing.T) {
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "remove", "/path/to/worktree"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	err := client.DeleteWorktree(context.Background(), "/test/repo", "/path/to/worktree", false)
@@ -186,6 +217,7 @@ func TestCLIClient_DeleteWorktree(t *testing.T) {
 func TestCLIClient_DeleteWorktree_WithForce(t *testing.T) {
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "remove", "--force", "/path/to/worktree"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	err := client.DeleteWorktree(context.Background(), "/test/repo", "/path/to/worktree", true)
@@ -204,6 +236,7 @@ worktree /path/to/worktree2
 HEAD cdef3ab
 detached`
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "list", "--porcelain"}).Return(&CommandResult{ExitCode: 0, Stdout: mockOutput}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	worktrees, err := client.ListWorktrees(context.Background(), "/test/repo")
@@ -231,6 +264,7 @@ detached`
 func TestCLIClient_PruneWorktrees(t *testing.T) {
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "prune"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	err := client.PruneWorktrees(context.Background(), "/test/repo")
@@ -272,6 +306,7 @@ func TestCLIClient_IsBranchMerged(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockExecutor := NewMockCommandExecutor()
 			mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"branch", "--merged"}).Return(&CommandResult{ExitCode: 0, Stdout: tt.output}, nil)
+			t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 			client := NewCLIClient(mockExecutor)
 
 			isMerged, err := client.IsBranchMerged(context.Background(), "/test/repo", tt.branchName)
@@ -340,6 +375,7 @@ func TestCLIClient_DeleteBranch(t *testing.T) {
 			if tt.repoPath != "" && tt.branchName != "" {
 				mockExecutor.On("ExecuteWithTimeout", mock.Anything, tt.repoPath, "git", mock.AnythingOfType("time.Duration"), []string{"branch", "-D", tt.branchName}).Return(tt.mockResult, tt.mockError)
 			}
+			t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 			client := NewCLIClient(mockExecutor)
 
 			err := client.DeleteBranch(context.Background(), tt.repoPath, tt.branchName)
@@ -359,6 +395,7 @@ func TestCLIClient_DeleteBranch(t *testing.T) {
 func TestCLIClient_Timeout(t *testing.T) {
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "list", "--porcelain"}).Return(&CommandResult{ExitCode: 0, Stdout: ""}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor, 5)
 
 	_, err := client.ListWorktrees(context.Background(), "/test/repo")
@@ -511,6 +548,7 @@ func TestWriteSideFailure_OpIsGitWorktree(t *testing.T) {
 
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, mock.Anything, "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(&CommandResult{ExitCode: 1, Stderr: "fatal: not a git repository"}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	err := client.CreateWorktree(context.Background(),
@@ -532,6 +570,7 @@ func TestWriteSideFailure_OpIsGitBranch(t *testing.T) {
 
 	mockExecutor := NewMockCommandExecutor()
 	mockExecutor.On("ExecuteWithTimeout", mock.Anything, mock.Anything, "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(&CommandResult{ExitCode: 1, Stderr: "fatal: not a git repository"}, nil)
+	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
 	err := client.DeleteBranch(context.Background(),

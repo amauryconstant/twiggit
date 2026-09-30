@@ -11,22 +11,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"twiggit/internal/core"
 )
 
 // ErrorKind classifies ExternalError instances for callers that need to
-// branch on failure shape without walking the cause chain.
+// branch on failure shape without walking the cause chain. Only the kinds
+// actually produced by classifyKind are exported; ErrorKindNotFound and
+// ErrorKindPermission were retired in the test-observability-error-discipline
+// change (NotFound dispatch walks through *core.NotFoundError.Is() over the
+// cause chain instead).
 type ErrorKind int
 
 const (
 	// ErrorKindOther is the default for failures that don't map cleanly to
 	// one of the named kinds (network blips, malformed CLI output, etc.).
 	ErrorKindOther ErrorKind = iota
-	// ErrorKindNotFound marks a missing resource (branch, ref, worktree).
-	ErrorKindNotFound
-	// ErrorKindPermission marks EACCES / sandbox / hook-permission failures.
-	ErrorKindPermission
 	// ErrorKindTimeout marks context-deadline or command-timeout failures.
 	ErrorKindTimeout
 )
@@ -75,28 +74,14 @@ func (e *ExternalError) Unwrap() []error {
 	return nil
 }
 
-// Is matches target against the wrapped NotFound sentinels when the
-// ExternalError's Kind is ErrorKindNotFound. This preserves the contract
-// callers had with the legacy core.NewGitRepositoryError /
-// core.NewGitWorktreeError constructors so errors.Is(err,
-// core.ErrGitRepoNotFound) keeps working across the migration.
-// Uses HasPrefix so dot-concatenated Op values like "git.repository.open"
-// still match the namespace sentinel.
-func (e *ExternalError) Is(target error) bool {
-	if e.Kind != ErrorKindNotFound {
-		return false
-	}
-	if e.OperationError == nil {
-		return false
-	}
-	switch target {
-	case core.ErrGitRepoNotFound:
-		return strings.HasPrefix(e.OperationError.Op, "git.repository")
-	case core.ErrWorktreeNotFound:
-		return strings.HasPrefix(e.OperationError.Op, "git.worktree")
-	}
-	return false
-}
+// Is is intentionally absent: NotFound dispatch walks through
+// *core.OperationError.Is() (embedded) over the cause chain so
+// errors.Is(extErr, core.ErrGitRepoNotFound) reaches the right
+// sentinel via the dot-prefixed Op mapping in OperationError.Is.
+// The retired *ExternalError.Is method short-circuited on
+// ErrorKindNotFound, but no caller ever set that kind, so the
+// method was unreachable. Removing it eliminates the dead branch
+// while preserving the contract for every live NotFound path.
 
 // NewRepoError constructs an ExternalError tagged with Op="git.repository"
 // and a Kind derived from Cause. This is the canonical repo-level error

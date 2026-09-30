@@ -14,9 +14,8 @@ import (
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/goleak"
 )
 
 // ConcurrentTestSuite provides concurrent operation testing
@@ -31,14 +30,19 @@ func TestConcurrentSuite(t *testing.T) {
 	suite.Run(t, new(ConcurrentTestSuite))
 }
 
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(m)
+	os.Exit(m.Run())
+}
+
 func (s *ConcurrentTestSuite) SetupTest() {
 	s.tempDir = s.T().TempDir()
 
 	// Create directories
 	projectsDir := filepath.Join(s.tempDir, "projects")
 	worktreesDir := filepath.Join(s.tempDir, "worktrees")
-	require.NoError(s.T(), os.MkdirAll(projectsDir, 0o755))
-	require.NoError(s.T(), os.MkdirAll(worktreesDir, 0o755))
+	s.Require().NoError(os.MkdirAll(projectsDir, 0o755))
+	s.Require().NoError(os.MkdirAll(worktreesDir, 0o755))
 
 	// Create config
 	s.config = &core.Config{
@@ -147,7 +151,7 @@ func (s *ConcurrentTestSuite) TestConcurrentListOperations() {
 
 	// Check for errors
 	for err := range errChan {
-		assert.NoError(s.T(), err, "Concurrent list operation failed")
+		s.Assert().NoError(err, "Concurrent list operation failed")
 	}
 }
 
@@ -195,7 +199,7 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateOperations() {
 	}
 
 	// All 5 should succeed since we're creating different branches
-	assert.Equal(s.T(), 0, errorCount, "All create operations should succeed")
+	s.Assert().Equal(0, errorCount, "All create operations should succeed")
 }
 
 // TestConcurrentDeleteOperations tests concurrent delete operations on different worktrees
@@ -245,7 +249,7 @@ func (s *ConcurrentTestSuite) TestConcurrentDeleteOperations() {
 
 	// Check for errors - all deletes should succeed
 	for err := range errChan {
-		assert.NoError(s.T(), err, "Delete operation should succeed")
+		s.Assert().NoError(err, "Delete operation should succeed")
 	}
 }
 
@@ -315,7 +319,7 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateDeleteOperations() {
 
 	// Check for errors - both operations should succeed
 	for err := range errChan {
-		assert.NoError(s.T(), err, "Concurrent create/delete should succeed")
+		s.Assert().NoError(err, "Concurrent create/delete should succeed")
 	}
 }
 
@@ -396,6 +400,6 @@ func (s *ConcurrentTestSuite) TestConcurrentPruneWhileList() {
 
 	// Check for errors - operations should not race
 	for err := range errChan {
-		assert.NoError(s.T(), err, "Concurrent prune/list should not race")
+		s.Assert().NoError(err, "Concurrent prune/list should not race")
 	}
 }

@@ -130,6 +130,7 @@ commands = ["mise trust", "npm install", "echo done"]
 	assert.Len(t, result.Failures, 1)
 	assert.Equal(t, "npm install", result.Failures[0].Command)
 	assert.Equal(t, 1, result.Failures[0].ExitCode)
+	mockExec.AssertExpectations(t)
 }
 
 func TestHookRunner_Run_MalformedTOML_LogsWarningAndReturnsNotExecuted(t *testing.T) {
@@ -247,6 +248,7 @@ commands = ["echo test"]
 	assert.Contains(t, fullCmd, "main")
 	assert.Contains(t, fullCmd, "TWIGGIT_MAIN_REPO_PATH")
 	assert.Contains(t, fullCmd, "/repo/main")
+	mockExec.AssertExpectations(t)
 }
 
 func defaultTimeout() time.Duration {

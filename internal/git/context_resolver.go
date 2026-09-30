@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -580,10 +579,6 @@ func (cr *contextResolver) discoverProjects() ([]core.ProjectSummary, error) {
 
 	gitDirs, err := cr.repoFinder.FindGitRepositories(projectsDir)
 	if err != nil {
-		slog.Error("discover projects failed",
-			slog.String("op", "context.resolve"),
-			slog.String("dir", projectsDir),
-			slog.Any("err", err))
 		return nil, &core.OperationError{
 			Op:      "context.resolve",
 			Entity:  projectsDir,

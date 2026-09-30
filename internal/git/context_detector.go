@@ -3,7 +3,6 @@ package git
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,10 +72,6 @@ func parseTTL(ttlStr string, defaultTTL time.Duration) time.Duration {
 
 // detectOpError wraps a detection failure as *core.OperationError with Op = "context.detect".
 func detectOpError(path, message string, cause error) error {
-	slog.Error("context detect failed",
-		slog.String("op", "context.detect"),
-		slog.String("path", path),
-		slog.Any("err", cause))
 	return &core.OperationError{
 		Op:      "context.detect",
 		Entity:  path,

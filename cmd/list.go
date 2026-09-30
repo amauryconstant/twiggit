@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"path/filepath"
 	"slices"
 	"twiggit/internal/cmdutil"
@@ -26,6 +27,7 @@ type ListOptions struct {
 	GitClient     func() (cmdutil.Client, error)
 	Ctx           context.Context
 	GlobalOptions *cmdutil.GlobalOptions
+	Logger        *slog.Logger
 
 	// Per-command flag fields.
 	All bool
@@ -61,7 +63,8 @@ Examples:
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.NoArgs),
-		RunE: func(_ *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			opts.Logger = BoundaryLogger(f, cmd)
 			out := ""
 			if opts.GlobalOptions != nil {
 				out = opts.GlobalOptions.Output
@@ -112,6 +115,7 @@ func runList(opts *ListOptions) error {
 
 	currentCtx, err := detector.DetectContext(wd)
 	if err != nil {
+		opts.Logger.Debug("detect failed", "err", err)
 		return fmt.Errorf("context detection failed: %w", err)
 	}
 

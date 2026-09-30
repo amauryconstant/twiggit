@@ -32,11 +32,11 @@ func TestNewResult_NonSliceValuePassesThrough(t *testing.T) {
 func TestNewResult_SliceValueCloned(t *testing.T) {
 	t.Run("mutating returned slice does not affect caller", func(t *testing.T) {
 		is := assert.New(t)
-		require := require.New(t)
+		must := require.New(t)
 
 		original := []string{"a", "b", "c"}
 		r := NewResult(original)
-		require.Equal(original, r.Value, "result value should match input")
+		must.Equal(original, r.Value, "result value should match input")
 
 		r.Value[0] = "MUTATED"
 
@@ -45,7 +45,7 @@ func TestNewResult_SliceValueCloned(t *testing.T) {
 
 	t.Run("different slice types cloned independently", func(t *testing.T) {
 		is := assert.New(t)
-		require := require.New(t)
+		must := require.New(t)
 
 		ints := []int{1, 2, 3}
 		rInts := NewResult(ints)
@@ -56,8 +56,8 @@ func TestNewResult_SliceValueCloned(t *testing.T) {
 		rStrs := NewResult(strs)
 		rStrs.Value[1] = "MUTATED"
 		is.Equal("y", strs[1])
-		require.NotNil(rInts.Value)
-		require.NotNil(rStrs.Value)
+		must.NotNil(rInts.Value)
+		must.NotNil(rStrs.Value)
 	})
 
 	t.Run("empty slice is cloned without panic", func(t *testing.T) {

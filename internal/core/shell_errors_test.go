@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -11,10 +12,15 @@ import (
 
 func TestSentinels_Messages(t *testing.T) {
 	expected := map[error]string{
-		ErrGitRepoNotFound:    "core: git repository not found",
-		ErrWorktreeNotFound:   "core: worktree not found",
-		ErrProjectNotFound:    "core: project not found",
-		ErrResolutionNotFound: "core: resolution target not found",
+		ErrGitRepoNotFound:       "core: git repository not found",
+		ErrWorktreeNotFound:      "core: worktree not found",
+		ErrProjectNotFound:       "core: project not found",
+		ErrResolutionNotFound:    "core: resolution target not found",
+		ErrShellAlreadyInstalled: "core: shell wrapper already installed",
+		ErrShellNotInstalled:     "core: shell wrapper not installed",
+		ErrInvalidShellType:      "core: invalid shell type",
+		ErrInferenceFailed:       "core: could not infer shell type",
+		ErrDetectionFailed:       "core: shell detection failed",
 	}
 	for sentinel, msg := range expected {
 		assert.Equal(t, msg, sentinel.Error(), "sentinel message mismatch")
@@ -22,22 +28,26 @@ func TestSentinels_Messages(t *testing.T) {
 }
 
 func TestSentinels_Count(t *testing.T) {
-	// Hard contract: only 4 NotFound sentinels. The shell / config /
-	// usage sentinels are deleted by the spec.
 	sentinels := []error{
 		ErrGitRepoNotFound,
 		ErrWorktreeNotFound,
 		ErrProjectNotFound,
 		ErrResolutionNotFound,
+		ErrShellAlreadyInstalled,
+		ErrShellNotInstalled,
+		ErrInvalidShellType,
+		ErrInferenceFailed,
+		ErrDetectionFailed,
 	}
-	assert.Len(t, sentinels, 4)
+	assert.Len(t, sentinels, 9)
 }
 
 func TestShellAlreadyInstalledError_OpAndUnwrap(t *testing.T) {
 	cause := errors.New("disk full")
 	err := NewShellAlreadyInstalledError("bash", "installing wrapper", cause)
 	assert.Equal(t, "shell.already_installed", err.Op)
-	assert.Equal(t, cause, err.Unwrap())
+	assert.ErrorIs(t, err, ErrShellAlreadyInstalled)
+	assert.ErrorIs(t, err, cause)
 	msg := err.Error()
 	assert.Contains(t, msg, "shell.already_installed")
 	assert.Contains(t, msg, "bash")
@@ -48,7 +58,8 @@ func TestShellNotInstalledError_OpAndUnwrap(t *testing.T) {
 	cause := errors.New("file missing")
 	err := NewShellNotInstalledError("zsh", "missing block", cause)
 	assert.Equal(t, "shell.not_installed", err.Op)
-	assert.Equal(t, cause, err.Unwrap())
+	assert.ErrorIs(t, err, ErrShellNotInstalled)
+	assert.ErrorIs(t, err, cause)
 	msg := err.Error()
 	assert.Contains(t, msg, "shell.not_installed")
 	assert.Contains(t, msg, "zsh")
@@ -58,18 +69,20 @@ func TestShellNotInstalledError_OpAndUnwrap(t *testing.T) {
 func TestShellInvalidTypeError_Op(t *testing.T) {
 	err := NewShellInvalidTypeError("powershell", "unsupported shell", nil)
 	assert.Equal(t, "shell.invalid_type", err.Op)
-	require.NoError(t, err.Unwrap())
+	assert.ErrorIs(t, err, ErrInvalidShellType)
 	msg := err.Error()
 	assert.Contains(t, msg, "invalid shell type")
 	assert.Contains(t, msg, "powershell")
 	assert.NotRegexp(t, `\.$`, msg)
+	_ = require.NoError
 }
 
 func TestShellInferenceError_OpAndUnwrap(t *testing.T) {
 	cause := errors.New("path unknown")
 	err := NewShellInferenceError("fish", "from /etc/config", cause)
 	assert.Equal(t, "shell.inference", err.Op)
-	assert.Equal(t, cause, err.Unwrap())
+	assert.ErrorIs(t, err, ErrInferenceFailed)
+	assert.ErrorIs(t, err, cause)
 	msg := err.Error()
 	assert.Contains(t, msg, "could not infer shell type")
 	assert.Contains(t, msg, "fish")
@@ -79,7 +92,7 @@ func TestShellInferenceError_OpAndUnwrap(t *testing.T) {
 func TestShellDetectionError_Op(t *testing.T) {
 	err := NewShellDetectionError("SHELL env unset", nil)
 	assert.Equal(t, "shell.detection", err.Op)
-	require.NoError(t, err.Unwrap())
+	assert.ErrorIs(t, err, ErrDetectionFailed)
 	msg := err.Error()
 	assert.Contains(t, msg, "shell.detection")
 	assert.Contains(t, msg, "SHELL env unset")
@@ -106,6 +119,26 @@ func TestShellConfigError_OpAndUnwrap(t *testing.T) {
 	assert.Contains(t, msg, "config file error")
 	assert.Contains(t, msg, "/home/u/.bashrc")
 	assert.NotRegexp(t, `\.$`, msg)
+}
+
+// TestShellAlreadyInstalled_Is asserts the sentinel-match contract
+// mandated by domain-typed-errors req 8 and design Decision 4:
+// errors.Is(opErr, ErrShellAlreadyInstalled) must return true when
+// the OperationError carries Op = "shell.already_installed" (whether
+// the constructor joined the sentinel into Cause or the caller wraps
+// further), and false for unrelated errors.
+func TestShellAlreadyInstalled_Is(t *testing.T) {
+	wrapped := NewShellAlreadyInstalledError("bash", "installing wrapper", errors.New("disk full"))
+	require.ErrorIs(t, wrapped, ErrShellAlreadyInstalled)
+	require.Contains(t, wrapped.Error(), "shell wrapper already installed")
+
+	// Layered wrap should still match.
+	doubled := fmt.Errorf("install bash wrapper: %w", wrapped)
+	require.ErrorIs(t, doubled, ErrShellAlreadyInstalled)
+
+	// Unrelated errors must not match.
+	require.NotErrorIs(t, errors.New("nope"), ErrShellAlreadyInstalled)
+	require.NotErrorIs(t, NewShellNotInstalledError("bash", "ctx", nil), ErrShellAlreadyInstalled)
 }
 
 func TestShellErrors_NoEmoji(t *testing.T) {

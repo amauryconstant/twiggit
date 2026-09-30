@@ -16,6 +16,7 @@ type CommandResult struct {
 	Stdout   string        // Standard output
 	Stderr   string        // Standard error
 	Duration time.Duration // Command execution duration
+	Err      error         // Raw execution error (e.g. *exec.ExitError); preserved so callers can wrap without losing the chain
 }
 
 // CommandExecutor defines the interface for executing external commands
@@ -74,7 +75,7 @@ func (e *commandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd strin
 
 	// For non-zero exit codes, return the result with an error (original behavior)
 	if result.ExitCode != 0 {
-		return result, NewCommandError("non-zero-exit", "command exited with non-zero status", nil)
+		return result, NewCommandError("non-zero-exit", "command exited with non-zero status", result.Err)
 	}
 
 	return result, nil
@@ -135,6 +136,7 @@ func createCommandResult(_ string, _ []string, output []byte, err error, duratio
 			Stdout:   strings.Join(stdoutLines, "\n"),
 			Stderr:   strings.Join(stderrLines, "\n"),
 			Duration: duration,
+			Err:      err,
 		}
 	}
 
@@ -143,6 +145,7 @@ func createCommandResult(_ string, _ []string, output []byte, err error, duratio
 		Stdout:   outputStr,
 		Stderr:   "",
 		Duration: duration,
+		Err:      err,
 	}
 }
 

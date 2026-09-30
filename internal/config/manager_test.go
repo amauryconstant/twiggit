@@ -10,19 +10,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// unsetEnv removes key from the process environment and auto-restores
+// its prior state on test cleanup. Needed for tests that assert on
+// "variable unset" semantics (e.g. NO_COLOR lookup vs. get), which
+// t.Setenv(key, "") cannot express because the variable remains
+// present (just empty) in os.LookupEnv.
+func unsetEnv(t *testing.T, key string) {
+	t.Helper()
+	orig, had := os.LookupEnv(key)
+	os.Unsetenv(key)
+	t.Cleanup(func() {
+		if had {
+			os.Setenv(key, orig)
+		} else {
+			os.Unsetenv(key)
+		}
+	})
+}
+
 func setupConfigManagerTest(t *testing.T) (*Manager, string, string) {
 	t.Helper()
 	originalXDG := os.Getenv("XDG_CONFIG_HOME")
 	tempDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
 	manager := NewManager()
-	t.Cleanup(func() {
-		if originalXDG != "" {
-			os.Setenv("XDG_CONFIG_HOME", originalXDG)
-		} else {
-			os.Unsetenv("XDG_CONFIG_HOME")
-		}
-	})
 	return manager, tempDir, originalXDG
 }
 
@@ -194,11 +205,8 @@ func TestConfigManager_LoadDefaultsErrorHandling(t *testing.T) {
 }
 
 func TestConfigManager_ExpandConfigPath(t *testing.T) {
-	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-
-	os.Setenv("HOME", "/home/testuser")
-	os.Setenv("TEST_VAR", "/custom/path")
+	t.Setenv("HOME", "/home/testuser")
+	t.Setenv("TEST_VAR", "/custom/path")
 
 	tests := []struct {
 		name     string
@@ -273,9 +281,7 @@ func TestConfigManager_ExpandConfigPathFallbacks(t *testing.T) {
 }
 
 func TestConfigManager_NormalizeConfigPaths(t *testing.T) {
-	originalHome := os.Getenv("HOME")
-	defer os.Setenv("HOME", originalHome)
-	os.Setenv("HOME", "/home/testuser")
+	t.Setenv("HOME", "/home/testuser")
 
 	tests := []struct {
 		name              string
@@ -346,18 +352,11 @@ func TestConfigManager_NormalizeConfigPaths(t *testing.T) {
 }
 
 func TestConfigManager_LoadWithEnvVarExpansion(t *testing.T) {
-	originalHome := os.Getenv("HOME")
-	originalXDG := os.Getenv("XDG_CONFIG_HOME")
-	defer func() {
-		os.Setenv("HOME", originalHome)
-		os.Setenv("XDG_CONFIG_HOME", originalXDG)
-	}()
-
 	tempDir := t.TempDir()
-	os.Setenv("HOME", tempDir)
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	os.Setenv("TWIGGIT_TEST_PROJECTS", "/custom/projects")
-	os.Setenv("TWIGGIT_TEST_WORKTREES", "/custom/worktrees")
+	t.Setenv("HOME", tempDir)
+	t.Setenv("XDG_CONFIG_HOME", tempDir)
+	t.Setenv("TWIGGIT_TEST_PROJECTS", "/custom/projects")
+	t.Setenv("TWIGGIT_TEST_WORKTREES", "/custom/worktrees")
 
 	configDir := filepath.Join(tempDir, "twiggit")
 	require.NoError(t, os.MkdirAll(configDir, 0o755))
@@ -384,28 +383,19 @@ backup_dir = "~/backups"
 }
 
 func TestConfigManager_NoColorRespected(t *testing.T) {
-	originalNoColor, hadNoColor := os.LookupEnv("NO_COLOR")
-	t.Cleanup(func() {
-		if hadNoColor {
-			os.Setenv("NO_COLOR", originalNoColor)
-		} else {
-			os.Unsetenv("NO_COLOR")
-		}
-	})
-
 	manager, _, _ := setupConfigManagerTest(t)
 	config, err := manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, config)
 	assert.True(t, config.ColorEnabled, "ColorEnabled should default to true when NO_COLOR is unset")
 
-	os.Setenv("NO_COLOR", "1")
+	t.Setenv("NO_COLOR", "1")
 	config, err = manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, config)
 	assert.False(t, config.ColorEnabled, "ColorEnabled should be false when NO_COLOR is set")
 
-	os.Unsetenv("NO_COLOR")
+	unsetEnv(t, "NO_COLOR")
 	config, err = manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, config)
@@ -413,17 +403,8 @@ func TestConfigManager_NoColorRespected(t *testing.T) {
 }
 
 func TestConfigManager_ColorEnabledPropagatesToCopy(t *testing.T) {
-	originalNoColor, hadNoColor := os.LookupEnv("NO_COLOR")
-	t.Cleanup(func() {
-		if hadNoColor {
-			os.Setenv("NO_COLOR", originalNoColor)
-		} else {
-			os.Unsetenv("NO_COLOR")
-		}
-	})
-
 	manager, _, _ := setupConfigManagerTest(t)
-	os.Setenv("NO_COLOR", "1")
+	t.Setenv("NO_COLOR", "1")
 	loaded, err := manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
@@ -433,7 +414,7 @@ func TestConfigManager_ColorEnabledPropagatesToCopy(t *testing.T) {
 	require.NotNil(t, cached)
 	assert.False(t, cached.ColorEnabled, "GetConfig copy should preserve ColorEnabled=false")
 
-	os.Unsetenv("NO_COLOR")
+	unsetEnv(t, "NO_COLOR")
 	reloaded, err := manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, reloaded)
