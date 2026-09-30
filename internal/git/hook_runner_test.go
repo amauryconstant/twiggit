@@ -73,6 +73,7 @@ commands = ["mise trust", "npm install"]
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
 	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Twice()
+	t.Cleanup(func() { mockExec.AssertExpectations(t) })
 
 	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
@@ -90,7 +91,6 @@ commands = ["mise trust", "npm install"]
 	assert.True(t, result.HasExecuted)
 	assert.True(t, result.IsSuccessful)
 	assert.Empty(t, result.Failures)
-	mockExec.AssertExpectations(t)
 }
 
 func TestHookRunner_Run_CommandFailure_ContinuesAndCollectsFailures(t *testing.T) {
@@ -115,6 +115,7 @@ commands = ["mise trust", "npm install", "echo done"]
 	mockExec.On("ExecuteWithTimeout",
 		mock.Anything, tempDir, "sh", defaultTimeout(), mock.AnythingOfType("[]string"),
 	).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil).Once()
+	t.Cleanup(func() { mockExec.AssertExpectations(t) })
 
 	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
@@ -130,7 +131,6 @@ commands = ["mise trust", "npm install", "echo done"]
 	assert.Len(t, result.Failures, 1)
 	assert.Equal(t, "npm install", result.Failures[0].Command)
 	assert.Equal(t, 1, result.Failures[0].ExitCode)
-	mockExec.AssertExpectations(t)
 }
 
 func TestHookRunner_Run_MalformedTOML_LogsWarningAndReturnsNotExecuted(t *testing.T) {
@@ -221,6 +221,7 @@ commands = ["echo test"]
 	).Run(func(args mock.Arguments) {
 		capturedArgs = args.Get(4).([]string)
 	}).Return(&CommandResult{ExitCode: 0, Stdout: "", Stderr: ""}, nil)
+	t.Cleanup(func() { mockExec.AssertExpectations(t) })
 
 	req := &core.HookRunRequest{
 		HookType:       core.HookPostCreate,
@@ -248,7 +249,6 @@ commands = ["echo test"]
 	assert.Contains(t, fullCmd, "main")
 	assert.Contains(t, fullCmd, "TWIGGIT_MAIN_REPO_PATH")
 	assert.Contains(t, fullCmd, "/repo/main")
-	mockExec.AssertExpectations(t)
 }
 
 func defaultTimeout() time.Duration {
