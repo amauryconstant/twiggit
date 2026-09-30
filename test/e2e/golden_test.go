@@ -53,6 +53,17 @@ var _ = Describe("Golden file tests", func() {
 			output := cli.GetOutput(session)
 			compareGolden("list/empty_output.golden", output)
 		})
+
+		It("matches golden file for plain output with worktrees", func() {
+			fixture.CreateWorktreeSetup("test")
+
+			session := ctxHelper.FromProjectDir("test", "list", "--output", "plain")
+			cli.ShouldSucceed(session)
+
+			output := cli.GetOutput(session)
+			sanitized := sanitizeOutput(output, fixture.GetTempDir())
+			compareGolden("list/plain_output.golden", sanitized)
+		})
 	})
 
 	Context("list command JSON output golden tests", func() {

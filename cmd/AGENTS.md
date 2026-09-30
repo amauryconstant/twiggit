@@ -87,8 +87,17 @@ scenarios. `cmd.isQuiet(cmd)` reads the bound flag value or falls back to
 ## Error handling
 
 `output.FormatError(ios.ErrOut, err, ios)` is the single formatter entry
-point; dispatch is `errors.As`-driven across the four `core.Error` types
-(`ValidationError`, `NotFoundError`, `OperationError`, `UsageError`).
+point. Dispatch is `errors.AsType`-driven across the four `core.Error`
+types in the order mandated by `openspec/specs/cli-error-formatting/spec.md`
+§ Type-matched dispatch (most specific first):
+
+| Order | Type | Notes |
+| ----- | ---- | ----- |
+| 1 | `*core.ValidationError` | leaf argument / input validation; wins over wrapper types |
+| 2 | `*core.NotFoundError` | resource missing; per-sentinel hint appended (see `cli-error-formatting/spec.md` § Actionable hints) |
+| 3 | `*core.OperationError` | runtime wrapper for shell/navigation/git failures |
+| 4 | `*core.UsageError` | invocation-level usage failure; renders `Usage:` prefix |
+
 Exit-code mapping is centralised in `cmdutil.ExitCodeFor(err)`:
 
 | Error class | Exit code |

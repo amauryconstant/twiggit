@@ -104,7 +104,11 @@ var _ = Describe("init command", func() {
 		session := cli.Run("init")
 		cli.ShouldFailWithExit(session, 1)
 
-		cli.ShouldErrorOutput(session, "shell auto-detection failed")
+		// Dispatch order places ValidationError before OperationError
+		// (cli-error-formatting § Specific matcher wins), so the
+		// inner validation message "unsupported shell type" renders
+		// instead of the legacy outer "shell auto-detection failed".
+		cli.ShouldErrorOutput(session, "unsupported shell type")
 	})
 
 	// ========================================

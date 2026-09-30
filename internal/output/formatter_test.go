@@ -3,8 +3,8 @@ package output_test
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
 	"testing"
+	"twiggit/internal/core"
 	"twiggit/internal/output"
 
 	"github.com/stretchr/testify/assert"
@@ -40,82 +40,68 @@ func TestJSONFormatter_SliceYieldsJSONArray(t *testing.T) {
 	assert.Equal(t, data, got)
 }
 
-func TestJSONLinesFormatter_OneObjectPerLine(t *testing.T) {
+type tabularAdapter struct {
+	header []string
+	rows   [][]string
+}
+
+func (t tabularAdapter) Header() []string { return t.header }
+func (t tabularAdapter) Rows() [][]string { return t.rows }
+
+func TestTableFormatter_Tabular(t *testing.T) {
 	t.Parallel()
 
-	data := []sample{{Name: "a"}, {Name: "b"}, {Name: "c"}}
-	var buf bytes.Buffer
-	require.NoError(t, output.JSONLinesFormatter{}.Write(&buf, data))
-
-	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
-	require.Len(t, lines, 3, "each slice element must produce exactly one line")
-
-	for i, line := range lines {
-		var got sample
-		require.NoError(t, json.Unmarshal([]byte(line), &got), "line %d invalid", i)
-		assert.Equal(t, data[i], got)
+	data := tabularAdapter{
+		header: []string{"BRANCH", "PATH"},
+		rows:   [][]string{{"feat/foo", "/tmp/feat/foo"}, {"feat/bar", "/tmp/feat/bar"}},
 	}
+	var buf bytes.Buffer
+	require.NoError(t, output.TableFormatter{}.Write(&buf, data))
+
+	out := buf.String()
+	assert.Contains(t, out, "BRANCH")
+	assert.Contains(t, out, "feat/foo")
+	assert.Contains(t, out, "feat/bar")
 }
 
-func TestJSONLinesFormatter_SingleValueYieldsOneLine(t *testing.T) {
+func TestPlainFormatter_TabularTSV(t *testing.T) {
 	t.Parallel()
 
-	data := sample{Name: "solo", Age: 1}
+	data := tabularAdapter{
+		header: []string{"BRANCH", "PATH"},
+		rows:   [][]string{{"feat/foo", "/tmp/feat/foo"}, {"feat/bar", "/tmp/feat/bar"}},
+	}
 	var buf bytes.Buffer
-	require.NoError(t, output.JSONLinesFormatter{}.Write(&buf, data))
+	require.NoError(t, output.PlainFormatter{}.Write(&buf, data))
 
-	lines := strings.Split(strings.TrimRight(buf.String(), "\n"), "\n")
-	require.Len(t, lines, 1)
+	out := buf.String()
+	lines := bytes.Split(bytes.TrimRight(buf.Bytes(), "\n"), []byte("\n"))
+	require.Len(t, lines, 2, "headerless: no header row emitted")
+	for _, line := range lines {
+		assert.Contains(t, string(line), "\t", "rows must be tab-separated")
+	}
+	assert.NotContains(t, out, "BRANCH\n", "header row must not be emitted")
 }
 
-func TestJSONLinesFormatter_ByteSliceYieldsSingleLine(t *testing.T) {
-	t.Parallel()
-
-	// []byte is treated as primitive (one line, not element-by-element)
-	// to avoid base64-streaming aliasing that would look like multiple
-	// records when piped through jq/grep.
-	var buf bytes.Buffer
-	require.NoError(t, output.JSONLinesFormatter{}.Write(&buf, []byte("hi")))
-
-	trimmed := strings.TrimRight(buf.String(), "\n")
-	lines := strings.Split(trimmed, "\n")
-	require.Len(t, lines, 1, "[]byte must produce exactly one line, got %d", len(lines))
-	assert.Equal(t, `"aGk="`, lines[0], "encoding/json base64-encodes []byte")
-}
-
-func TestPlainFormatter_OneLinePerElement(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	require.NoError(t, output.PlainFormatter{}.Write(&buf, []string{"a", "b", "c"}))
-
-	assert.Equal(t, "a\nb\nc\n", buf.String())
-}
-
-func TestPlainFormatter_SingleValue(t *testing.T) {
+func TestPlainFormatter_NonTabularReturnsUsageError(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	require.NoError(t, output.PlainFormatter{}.Write(&buf, "hello"))
-
-	assert.Equal(t, "hello\n", buf.String())
-}
-
-func TestTableFormatter_RejectsWrongType(t *testing.T) {
-	t.Parallel()
-
-	var buf bytes.Buffer
-	err := output.TableFormatter{Headers: []string{"a"}}.Write(&buf, "not-a-table")
+	err := output.PlainFormatter{}.Write(&buf, "raw string")
 	require.Error(t, err)
+
+	var ue *core.UsageError
+	require.ErrorAs(t, err, &ue,
+		"expected *core.UsageError, got %T", err)
 }
 
-func TestTableFormatter_EmptyRowsDoNotPanic(t *testing.T) {
+func TestNewFormatter_EmptyReturnsNil(t *testing.T) {
 	t.Parallel()
 
-	var buf bytes.Buffer
-	require.NoError(t, output.TableFormatter{
-		Headers: []string{"a", "b"},
-	}.Write(&buf, [][]string{}))
+	f, err := output.NewFormatter("")
+	assert.Nil(t, f)
+	assert.NoError(t, err,
+		"empty format must return (nil, nil) so commands can defer to their per-command default")
 }
 
 func TestNewFormatter_KnownNames(t *testing.T) {
@@ -129,11 +115,6 @@ func TestNewFormatter_KnownNames(t *testing.T) {
 		{"json", output.FormatJSON, func(t *testing.T, f output.Formatter) {
 			t.Helper()
 			_, ok := f.(output.JSONFormatter)
-			assert.True(t, ok)
-		}},
-		{"jsonl", output.FormatJSONL, func(t *testing.T, f output.Formatter) {
-			t.Helper()
-			_, ok := f.(output.JSONLinesFormatter)
 			assert.True(t, ok)
 		}},
 		{"plain", output.FormatPlain, func(t *testing.T, f output.Formatter) {
@@ -150,16 +131,37 @@ func TestNewFormatter_KnownNames(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			f := output.NewFormatter(tc.format)
+			f, err := output.NewFormatter(tc.format)
+			require.NoError(t, err)
 			require.NotNil(t, f)
 			tc.assert(t, f)
 		})
 	}
 }
 
-func TestNewFormatter_EmptyOrUnknownReturnsNil(t *testing.T) {
+func TestNewFormatter_UnknownReturnsUsageError(t *testing.T) {
 	t.Parallel()
 
-	assert.Nil(t, output.NewFormatter(""))
-	assert.Nil(t, output.NewFormatter("yaml"))
+	f, err := output.NewFormatter("xml")
+	assert.Nil(t, f)
+	require.Error(t, err)
+
+	var ue *core.UsageError
+	require.ErrorAs(t, err, &ue,
+		"unknown format must produce *core.UsageError, got %T", err)
+	assert.Contains(t, ue.Message, "xml")
+	assert.Contains(t, ue.Message, "'json', 'table', or 'plain'")
+}
+
+func TestNewFormatter_TextReturnsUsageError(t *testing.T) {
+	t.Parallel()
+
+	f, err := output.NewFormatter("text")
+	assert.Nil(t, f)
+	require.Error(t, err)
+
+	var ue *core.UsageError
+	require.ErrorAs(t, err, &ue,
+		"legacy 'text' must NOT alias to plain; must produce *core.UsageError, got %T", err)
+	assert.Contains(t, ue.Message, "text")
 }

@@ -11,17 +11,19 @@ import (
 )
 
 // FormatError dispatches err to a per-type renderer that writes
-// to w. Dispatch order matches spec 3.5: errors.As walks the chain
-// to the first matching canonical type, so a wrapper that embeds a
-// ValidationError in its Cause still renders via the wrapper's own
-// Message + Op context.
+// to w. Dispatch order matches `cli-error-formatting/spec.md` §
+// "Type-matched dispatch": errors.As walks the chain to the first
+// matching canonical type, with the most specific matchers
+// registered first.
 //
-//  1. core.OperationError  (runtime wrapper, dispatched first so it
-//     catches shell/navigation/git wrappers before their inner
-//     ValidationError gets a chance to match)
-//  2. core.UsageError      (invocation-level usage failure)
-//  3. core.NotFoundError   (resource missing)
-//  4. core.ValidationError (leaf argument / input validation)
+//  1. core.ValidationError  (leaf argument / input validation)
+//  2. core.NotFoundError     (resource missing)
+//  3. core.OperationError    (runtime wrapper for shell/navigation/git)
+//  4. core.UsageError        (invocation-level usage failure)
+//
+// A wrapper that embeds a more-specific type in its Cause still
+// renders via the more-specific branch (e.g. OperationError wrapping
+// a ValidationError renders as ValidationError).
 //
 // Anything else falls through to a one-line "Error: <msg>"
 // rendering. When TWIGGIT_DEBUG is set the full error chain is
@@ -31,24 +33,15 @@ func FormatError(w io.Writer, err error, ios *iostreams.IOStreams) {
 	if err == nil {
 		return
 	}
-	switch {
-	case errors.As(err, new(*core.OperationError)):
-		var oe *core.OperationError
-		_ = errors.As(err, &oe)
-		formatOperationError(w, oe, ios)
-	case errors.As(err, new(*core.UsageError)):
-		var ue *core.UsageError
-		_ = errors.As(err, &ue)
+	if ve, ok := errors.AsType[*core.ValidationError](err); ok {
+		formatValidationError(w, ve, ios, err)
+	} else if nf, ok := errors.AsType[*core.NotFoundError](err); ok {
+		formatNotFoundError(w, nf, ios, err)
+	} else if oe, ok := errors.AsType[*core.OperationError](err); ok {
+		formatOperationError(w, oe, ios, err)
+	} else if ue, ok := errors.AsType[*core.UsageError](err); ok {
 		formatUsageError(w, ue, ios)
-	case errors.As(err, new(*core.NotFoundError)):
-		var nf *core.NotFoundError
-		_ = errors.As(err, &nf)
-		formatNotFoundError(w, nf, ios)
-	case errors.As(err, new(*core.ValidationError)):
-		var ve *core.ValidationError
-		_ = errors.As(err, &ve)
-		formatValidationError(w, ve, ios)
-	default:
+	} else {
 		writeGenericError(w, err, ios)
 	}
 	if os.Getenv("TWIGGIT_DEBUG") != "" {
@@ -63,7 +56,68 @@ func style(ios *iostreams.IOStreams) *iostreams.Styles {
 	return ios.Styles()
 }
 
-func formatValidationError(w io.Writer, e *core.ValidationError, ios *iostreams.IOStreams) {
+// shouldEmitHints is the single source for the quiet gate. Hint
+// lines render only when ios is non-nil AND ios.Quiet is false.
+func shouldEmitHints(ios *iostreams.IOStreams) bool {
+	return ios != nil && !ios.Quiet
+}
+
+// writeFieldContext renders the op=/entity=/field=/value= context
+// line shared by ValidationError and OperationError. Empty fields
+// are omitted from the rendered output; the whole line is skipped
+// when every field is empty.
+func writeFieldContext(w io.Writer, op, entity, field, value string, st *iostreams.Styles) {
+	if op == "" && entity == "" && field == "" && value == "" {
+		return
+	}
+	var parts []string
+	if op != "" {
+		parts = append(parts, "op="+op)
+	}
+	if entity != "" {
+		parts = append(parts, "entity="+entity)
+	}
+	if field != "" {
+		parts = append(parts, "field="+field)
+	}
+	if value != "" {
+		parts = append(parts, "value="+value)
+	}
+	_, _ = fmt.Fprintf(w, "  %s\n", st.Hint(strings.Join(parts, " ")))
+}
+
+// hintFor returns the resource-specific hint for a NotFound sentinel
+// reachable via errors.Is from err, or an empty string if no
+// registered sentinel matches. The returned string is one of the
+// four constants declared in `cli-error-formatting/spec.md`
+// § Actionable hints.
+func hintFor(err error) string {
+	if nf, ok := errors.AsType[*core.NotFoundError](err); ok {
+		switch nf.Entity {
+		case "project":
+			return "Use 'twiggit list --all' to see available projects"
+		case "worktree":
+			return "Use 'twiggit list' to see available worktrees"
+		case "resolution", "navigation", "navigation target", "resolution target":
+			return "Use 'twiggit list' to see available navigation targets"
+		case "git repository", "repository", "git repo":
+			return "Verify the repository path"
+		}
+	}
+	switch {
+	case errors.Is(err, core.ErrProjectNotFound):
+		return "Use 'twiggit list --all' to see available projects"
+	case errors.Is(err, core.ErrWorktreeNotFound):
+		return "Use 'twiggit list' to see available worktrees"
+	case errors.Is(err, core.ErrResolutionNotFound):
+		return "Use 'twiggit list' to see available navigation targets"
+	case errors.Is(err, core.ErrGitRepoNotFound):
+		return "Verify the repository path"
+	}
+	return ""
+}
+
+func formatValidationError(w io.Writer, e *core.ValidationError, ios *iostreams.IOStreams, chain error) {
 	st := style(ios)
 	header := st.Error("Error:")
 	msg := e.Message
@@ -71,34 +125,27 @@ func formatValidationError(w io.Writer, e *core.ValidationError, ios *iostreams.
 		msg = "validation failed"
 	}
 	_, _ = fmt.Fprintf(w, "%s %s\n", header, msg)
-	if e.Op != "" || e.Entity != "" || e.Field != "" {
-		var parts []string
-		if e.Op != "" {
-			parts = append(parts, "op="+e.Op)
-		}
-		if e.Entity != "" {
-			parts = append(parts, "entity="+e.Entity)
-		}
-		if e.Field != "" {
-			parts = append(parts, "field="+e.Field)
-		}
-		if e.Value != "" {
-			parts = append(parts, "value="+e.Value)
-		}
-		if len(parts) > 0 {
-			_, _ = fmt.Fprintf(w, "  %s\n", st.Hint(strings.Join(parts, " ")))
+	writeFieldContext(w, e.Op, e.Entity, e.Field, e.Value, st)
+	if shouldEmitHints(ios) {
+		writeSuggestions(w, e.Suggestions, st)
+		if hint := hintFor(chain); hint != "" {
+			_, _ = fmt.Fprintf(w, "  %s %s\n", st.Hint("hint:"), hint)
 		}
 	}
-	writeSuggestions(w, e.Suggestions, st)
 }
 
-func formatNotFoundError(w io.Writer, e *core.NotFoundError, ios *iostreams.IOStreams) {
+func formatNotFoundError(w io.Writer, e *core.NotFoundError, ios *iostreams.IOStreams, chain error) {
 	st := style(ios)
 	header := st.Error("Not found:")
 	_, _ = fmt.Fprintf(w, "%s %s %s\n", header, e.Entity, e.Name)
+	if shouldEmitHints(ios) {
+		if hint := hintFor(chain); hint != "" {
+			_, _ = fmt.Fprintf(w, "  %s %s\n", st.Hint("hint:"), hint)
+		}
+	}
 }
 
-func formatOperationError(w io.Writer, e *core.OperationError, ios *iostreams.IOStreams) {
+func formatOperationError(w io.Writer, e *core.OperationError, ios *iostreams.IOStreams, chain error) {
 	st := style(ios)
 	header := st.Error("Error:")
 	msg := e.Message
@@ -106,25 +153,16 @@ func formatOperationError(w io.Writer, e *core.OperationError, ios *iostreams.IO
 		msg = "operation failed"
 	}
 	_, _ = fmt.Fprintf(w, "%s %s\n", header, msg)
-	if e.Op != "" || e.Entity != "" || e.Field != "" {
-		var parts []string
-		if e.Op != "" {
-			parts = append(parts, "op="+e.Op)
-		}
-		if e.Entity != "" {
-			parts = append(parts, "entity="+e.Entity)
-		}
-		if e.Field != "" {
-			parts = append(parts, "field="+e.Field)
-		}
-		if len(parts) > 0 {
-			_, _ = fmt.Fprintf(w, "  %s\n", st.Hint(strings.Join(parts, " ")))
-		}
-	}
+	writeFieldContext(w, e.Op, e.Entity, e.Field, "", st)
 	if e.Cause != nil {
 		_, _ = fmt.Fprintf(w, "  %s %s\n", st.Hint("cause:"), e.Cause.Error())
 	}
-	writeSuggestions(w, e.Suggestions, st)
+	if shouldEmitHints(ios) {
+		writeSuggestions(w, e.Suggestions, st)
+		if hint := hintFor(chain); hint != "" {
+			_, _ = fmt.Fprintf(w, "  %s %s\n", st.Hint("hint:"), hint)
+		}
+	}
 }
 
 func formatUsageError(w io.Writer, e *core.UsageError, ios *iostreams.IOStreams) {

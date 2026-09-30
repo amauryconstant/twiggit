@@ -159,7 +159,7 @@ var _ = Describe("list command", func() {
 
 		session := ctxHelper.FromProjectDir("test", "list", "--output", "json")
 		cli.ShouldSucceed(session)
-		cli.ShouldContain(session, `{"worktrees":[`)
+		cli.ShouldContain(session, `[{`)
 		cli.ShouldContain(session, `"branch":"`+result.Feature1Branch+`"`)
 		cli.ShouldContain(session, `"status":"clean"`)
 	})
@@ -169,14 +169,14 @@ var _ = Describe("list command", func() {
 
 		session := ctxHelper.FromProjectDir("empty-project", "list", "--output", "json")
 		cli.ShouldSucceed(session)
-		cli.ShouldContain(session, `{"worktrees":[]}`)
+		cli.ShouldContain(session, `[]`)
 	})
 
 	It("fails with invalid output format", func() {
 		fixture.SetupSingleProject("test-project")
 
 		session := ctxHelper.FromProjectDir("test-project", "list", "--output", "yaml")
-		cli.ShouldFailWithExit(session, 1) // ExitCodeValidation
+		cli.ShouldFailWithExit(session, 2) // ExitCodeUsage
 		cli.ShouldErrorOutput(session, "invalid output format")
 	})
 

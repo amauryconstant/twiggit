@@ -195,3 +195,115 @@ func TestFormatError_NoDebugByDefault(t *testing.T) {
 	assert.Equal(t, 1, strings.Count(out, "\n"))
 	require.NotEmpty(t, out)
 }
+
+func TestFormatError_ValidationWinsOverOperation(t *testing.T) {
+	t.Parallel()
+
+	// OperationError wraps a ValidationError in its Cause. Per
+	// cli-error-formatting § "Specific matcher wins", ValidationError
+	// (registered first) wins regardless of the OperationError wrapper.
+	inner := core.NewValidationError("branch", "feat/x", "invalid characters")
+	outer := &core.OperationError{
+		Op:      "git.worktree",
+		Entity:  "feat/x",
+		Message: "add failed",
+		Cause:   inner,
+	}
+
+	ios, _, _, _ := iostreams.Test()
+	var buf bytes.Buffer
+
+	output.FormatError(&buf, outer, ios)
+
+	out := buf.String()
+	assert.Contains(t, out, "Error:")
+	assert.Contains(t, out, "invalid characters")
+	assert.Contains(t, out, "field=branch")
+	assert.NotContains(t, out, "op=git.worktree",
+		"OperationError wrapper must not render its Op when the chain reaches ValidationError first")
+	assert.NotContains(t, out, "add failed",
+		"OperationError message must not render when ValidationError wins")
+}
+
+func TestFormatError_NotFoundHints(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		err      *core.NotFoundError
+		wantHint string
+	}{
+		{
+			name:     "project",
+			err:      &core.NotFoundError{Entity: "project", Name: "demo"},
+			wantHint: "Use 'twiggit list --all' to see available projects",
+		},
+		{
+			name:     "worktree",
+			err:      &core.NotFoundError{Entity: "worktree", Name: "ghost"},
+			wantHint: "Use 'twiggit list' to see available worktrees",
+		},
+		{
+			name:     "resolution",
+			err:      &core.NotFoundError{Entity: "resolution target", Name: "missing"},
+			wantHint: "Use 'twiggit list' to see available navigation targets",
+		},
+		{
+			name:     "git repo",
+			err:      &core.NotFoundError{Entity: "git repository", Name: "/tmp/nope"},
+			wantHint: "Verify the repository path",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ios, _, _, _ := iostreams.Test()
+			var buf bytes.Buffer
+
+			output.FormatError(&buf, tc.err, ios)
+
+			out := buf.String()
+			a := assert.New(t)
+			a.Contains(out, "Not found:")
+			a.Contains(out, tc.wantHint)
+		})
+	}
+}
+
+func TestFormatError_QuietStripsHints(t *testing.T) {
+	t.Parallel()
+
+	ios, _, _, _ := iostreams.Test()
+	ios.Quiet = true
+	var buf bytes.Buffer
+
+	err := &core.OperationError{
+		Op:          "git.worktree",
+		Message:     "add failed",
+		Suggestions: []string{"check your branch name"},
+		Cause:       fmt.Errorf("wrap: %w", core.ErrWorktreeNotFound),
+	}
+
+	output.FormatError(&buf, err, ios)
+
+	out := buf.String()
+	assert.Contains(t, out, "add failed")
+	assert.NotContains(t, out, "hint:",
+		"quiet mode must strip hint lines, including sentinel hints and suggestions")
+}
+
+func TestFormatError_UsageErrorFirst(t *testing.T) {
+	t.Parallel()
+
+	err := core.NewUsageError("missing flag", nil)
+	ios, _, _, _ := iostreams.Test()
+	var buf bytes.Buffer
+
+	output.FormatError(&buf, err, ios)
+
+	out := buf.String()
+	assert.True(t, strings.HasPrefix(out, "Usage:"),
+		"UsageError must render with a Usage: prefix, got %q", out)
+	assert.Contains(t, out, "missing flag")
+}

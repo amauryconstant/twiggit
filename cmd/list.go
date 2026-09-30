@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
+	"twiggit/internal/output"
 
 	"github.com/spf13/cobra"
 )
@@ -64,8 +66,8 @@ Examples:
 			if opts.GlobalOptions != nil {
 				out = opts.GlobalOptions.Output
 			}
-			if out != "" && out != "text" && out != "json" {
-				return fmt.Errorf("invalid output format '%s': must be 'text' or 'json'", out)
+			if _, err := output.NewFormatter(out); err != nil {
+				return fmt.Errorf("list: %w", err)
 			}
 			if runF != nil {
 				return runF(opts)
@@ -75,6 +77,13 @@ Examples:
 	}
 
 	cmd.Flags().BoolVarP(&opts.All, "all", "a", false, "List worktrees from all projects")
+
+	// Shell completion for the inherited --output flag. The legacy
+	// "text" and the dropped "jsonl" values are intentionally absent
+	// so completion-driven callers cannot reintroduce them.
+	_ = cmd.RegisterFlagCompletionFunc("output", func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
+		return []string{"json", "table", "plain"}, cobra.ShellCompDirectiveNoFileComp
+	})
 
 	return cmd
 }
@@ -131,17 +140,107 @@ func runList(opts *ListOptions) error {
 	if opts.GlobalOptions != nil {
 		format = opts.GlobalOptions.Output
 	}
-	var formatter OutputFormatter
-	if format == "json" {
-		formatter = &JSONFormatter{}
-	} else {
-		formatter = &TextFormatter{}
+	formatter, err := output.NewFormatter(format)
+	if err != nil {
+		return fmt.Errorf("list: %w", err)
 	}
-
-	if err := displayWorktrees(opts.IO.Out, worktrees, formatter); err != nil {
+	if err := renderWorktrees(opts.IO.Out, worktrees, formatter); err != nil {
 		return err
 	}
 
+	return nil
+}
+
+// worktreeRows projects a slice of *core.WorktreeInfo into the
+// Tabular interface consumed by TableFormatter and PlainFormatter
+// and the JSON shape consumed by JSONFormatter via MarshalJSON.
+// The Header is the canonical column order for list-style output;
+// Rows projects each worktree to the matching string triplet, with
+// status ∈ {clean, modified, detached} per the spec.
+type worktreeRows struct {
+	worktrees []*core.WorktreeInfo
+}
+
+func (w worktreeRows) Header() []string {
+	return []string{"BRANCH", "PATH", "STATUS"}
+}
+
+func (w worktreeRows) Rows() [][]string {
+	rows := make([][]string, 0, len(w.worktrees))
+	for _, wt := range w.worktrees {
+		rows = append(rows, []string{wt.Branch, wt.Path, worktreeStatus(wt)})
+	}
+	return rows
+}
+
+// MarshalJSON emits the projection as a bare JSON array of
+// `{branch,path,status}` objects per the cli-output spec JSON
+// shape table. This lets JSONFormatter.Write accept worktreeRows
+// without an envelope wrapper; the bare-array shape is required
+// for small collections per the spec.
+func (w worktreeRows) MarshalJSON() ([]byte, error) {
+	type entry struct {
+		Branch string `json:"branch"`
+		Path   string `json:"path"`
+		Status string `json:"status"`
+	}
+	entries := make([]entry, 0, len(w.worktrees))
+	for _, wt := range w.worktrees {
+		entries = append(entries, entry{
+			Branch: wt.Branch,
+			Path:   wt.Path,
+			Status: worktreeStatus(wt),
+		})
+	}
+	data, err := json.Marshal(entries)
+	if err != nil {
+		return nil, fmt.Errorf("marshal worktree rows: %w", err)
+	}
+	return data, nil
+}
+
+func worktreeStatus(wt *core.WorktreeInfo) string {
+	switch {
+	case wt.IsDetached:
+		return "detached"
+	case wt.IsModified:
+		return "modified"
+	default:
+		return "clean"
+	}
+}
+
+// renderWorktrees dispatches to the formatter if one was resolved
+// for the requested format, otherwise falls back to the bespoke
+// human-readable rendering defined by the cli-list spec for the
+// empty --output default. The bespoke shape is `branch -> path`
+// with optional `(modified)` / `(detached)` suffixes, and an empty
+// collection surfaces a `No worktrees found` line for parity with
+// the legacy TextFormatter.
+func renderWorktrees(out io.Writer, worktrees []*core.WorktreeInfo, formatter output.Formatter) error {
+	if formatter == nil {
+		if len(worktrees) == 0 {
+			if _, err := fmt.Fprintln(out, "No worktrees found"); err != nil {
+				return fmt.Errorf("failed to display worktrees: %w", err)
+			}
+			return nil
+		}
+		for _, wt := range worktrees {
+			suffix := ""
+			if wt.IsDetached {
+				suffix = " (detached)"
+			} else if wt.IsModified {
+				suffix = " (modified)"
+			}
+			if _, err := fmt.Fprintf(out, "%s -> %s%s\n", wt.Branch, wt.Path, suffix); err != nil {
+				return fmt.Errorf("failed to display worktrees: %w", err)
+			}
+		}
+		return nil
+	}
+	if err := formatter.Write(out, worktreeRows{worktrees: worktrees}); err != nil {
+		return fmt.Errorf("render worktrees: %w", err)
+	}
 	return nil
 }
 
@@ -228,13 +327,4 @@ func filterNonMain(worktrees []core.WorktreeInfo, repoPath string) []core.Worktr
 		}
 	}
 	return slices.Clone(out)
-}
-
-// displayWorktrees displays the worktrees using the specified formatter
-func displayWorktrees(out io.Writer, worktrees []*core.WorktreeInfo, formatter OutputFormatter) error {
-	formatted := formatter.FormatWorktrees(worktrees)
-	if _, err := fmt.Fprint(out, formatted); err != nil {
-		return fmt.Errorf("failed to display worktrees: %w", err)
-	}
-	return nil
 }
