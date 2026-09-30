@@ -5,6 +5,7 @@
 package e2e
 
 import (
+	"encoding/json"
 	"twiggit/test/e2e/fixtures"
 	"twiggit/test/e2e/helpers"
 
@@ -12,6 +13,15 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/gbytes"
 )
+
+// worktreeJSON is the wire shape pinned by cli-output for the
+// `list -o json` payload: a bare JSON array of {branch,path,status}
+// objects. Used by the structural decode assertions below.
+type worktreeJSON struct {
+	Branch string `json:"branch"`
+	Path   string `json:"path"`
+	Status string `json:"status"`
+}
 
 var _ = Describe("list command", func() {
 	var fixture *fixtures.E2ETestFixture
@@ -183,6 +193,39 @@ var _ = Describe("list command", func() {
 			"--all -o json must emit a bare JSON array; got %q", out)
 		Expect(out).NotTo(ContainSubstring(`"worktrees"`),
 			"--all -o json must not wrap in legacy envelope; got %q", out)
+	})
+
+	It("emits -o json that decodes as a bare array of {branch,path,status}", func() {
+		result := fixture.CreateWorktreeSetup("test")
+
+		session := ctxHelper.FromProjectDir("test", "list", "--output", "json")
+		cli.ShouldSucceed(session)
+
+		var got []worktreeJSON
+		Expect(json.Unmarshal([]byte(cli.GetOutput(session)), &got)).To(Succeed(),
+			"list -o json must decode as []worktreeJSON; got %q", cli.GetOutput(session))
+
+		Expect(got).ToNot(BeEmpty(),
+			"fixture must produce at least one worktree for this assertion to mean anything")
+		Expect(got[0].Branch).To(Equal(result.Feature1Branch),
+			"first element addressable as '.[0].branch' must yield the fixture branch")
+		Expect(got[0].Path).ToNot(BeEmpty(),
+			"first element must carry a non-empty path")
+		Expect(got[0].Status).To(BeElementOf("clean", "modified", "detached"),
+			"status enum must match the three values pinned by cli-list spec")
+	})
+
+	It("emits -o json over zero worktrees as an empty array", func() {
+		fixture.SetupSingleProject("empty-project")
+
+		session := ctxHelper.FromProjectDir("empty-project", "list", "--output", "json")
+		cli.ShouldSucceed(session)
+
+		var got []worktreeJSON
+		Expect(json.Unmarshal([]byte(cli.GetOutput(session)), &got)).To(Succeed(),
+			"empty list -o json must decode as []worktreeJSON; got %q", cli.GetOutput(session))
+		Expect(got).To(BeEmpty(),
+			"empty case must yield an empty array, not an envelope object")
 	})
 
 	It("fails with invalid output format", func() {

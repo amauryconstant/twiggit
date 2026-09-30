@@ -12,8 +12,8 @@
 - [x] 1.8 Add `TestFormatError_UsageErrorFirst` to `internal/output/errors_test.go` asserting that `core.NewUsageError("missing flag", nil)` renders with a `Usage:` prefix, and verify by `go test -run TestFormatError_UsageErrorFirst ./internal/output/...` passing.
 - [x] 1.9 Force-fail: temporarily swap the dispatch order in `FormatError` so `*core.OperationError` is checked first, run `go test ./internal/output/...`, confirm `TestFormatError_ValidationWinsOverOperation` fails, restore the order, confirm green; verify the dispatch-order gate is live.
 - [x] 1.10 Confirm no `log`/`slog` calls are introduced at the dispatch site (single-handling rule from `golang-error-handling`); verify by `grep -r "log\.\|slog\." internal/output/errors.go` returning no matches.
-- [x] 1.11 Extract `shouldEmitHints(ios *iostreams.IOStreams) bool` helper as the single source for the quiet gate; `formatNotFoundError` and `writeSuggestions` both consume it; verify by `grep -nE 'ios != nil && ios\.Quiet' internal/output/errors.go` returning exactly one match (the helper body).
-- [x] 1.12 Extract `writeFieldContext(w io.Writer, op, entity, field, value string, st *iostreams.Styles)` helper; `formatValidationError` and `formatOperationError` both consume it (DRY the duplicated 10-LOC block); verify by `grep -nE 'op=\+|entity=\+|field=\+|value=\+' internal/output/errors.go` returning matches only inside the helper.
+- [x] 1.11 Extract `shouldEmitHints(ios *iostreams.IOStreams) bool` helper as the single source for the quiet gate; `formatNotFoundError` and `writeSuggestions` both consume it; verify by `grep -nE 'ios != nil && !ios\.Quiet' internal/output/errors.go` returning exactly one match (the helper body).
+- [x] 1.12 Extract `writeFieldContext(w io.Writer, op, entity, field, value string, st *iostreams.Styles)` helper; `formatValidationError` and `formatOperationError` both consume it (DRY the duplicated 10-LOC block); verify by `grep -nE '"op="|"entity="|"field="|"value="' internal/output/errors.go` returning matches only inside the helper.
 
 ## 2. `internal/output/formatter.go` — Tabular migration + jsonl removal
 
