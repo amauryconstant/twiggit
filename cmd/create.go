@@ -27,7 +27,6 @@ type CreateOptions struct {
 	GitClient     func() (cmdutil.Client, error)
 	Ctx           context.Context
 	GlobalOptions *cmdutil.GlobalOptions
-	HookRunner    cmdutil.HookRunner
 
 	// Per-command fields.
 	Spec   string

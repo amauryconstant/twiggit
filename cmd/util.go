@@ -49,14 +49,6 @@ func (p *ProgressReporter) Report(format string, args ...any) {
 	_, _ = fmt.Fprintf(writeOrIgnore(p.out), format+"\n", args...)
 }
 
-// ReportProgress outputs progress for bulk operations
-func (p *ProgressReporter) ReportProgress(current, total int, item string) {
-	if p.quiet {
-		return
-	}
-	_, _ = fmt.Fprintf(writeOrIgnore(p.out), "[%d/%d] Processing %s\n", current, total, item)
-}
-
 // ignoreWriter wraps an io.Writer so its Write always reports success.
 //
 // Per the swallowed-error policy (modernization sweep, task 16.5),

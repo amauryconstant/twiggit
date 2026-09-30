@@ -56,25 +56,56 @@ across multiple projects.`,
 		return core.UsageWrap(err)
 	})
 
+	// Suppress Cobra's built-in `completion` subcommand so carapace's
+	// auto-registered one is the only completion surface. The legacy
+	// Find/RemoveCommand dance below is now redundant.
+	cmd.CompletionOptions.DisableDefaultCmd = true
+
 	// Persistent --output / --quiet / --verbose (slice 10 contract).
 	cmdutil.AddPersistentFlags(cmd, globalOpts)
 
-	// Add subcommands
-	cmd.AddCommand(NewCmdList(f, nil))
-	cmd.AddCommand(NewCmdCreate(f, nil))
-	cmd.AddCommand(NewCmdDelete(f, nil))
-	cmd.AddCommand(NewCmdPrune(f, nil))
-	cmd.AddCommand(NewCmdCd(f, nil))
-	cmd.AddCommand(NewCmdInit(f, nil))
-	cmd.AddCommand(NewCmdVersion(f, nil))
+	// AddGroup labels surface in `twiggit --help` to keep the
+	// command tree navigable as it grows. Cobra does not
+	// retroactively assign groups, so register the group
+	// definitions first and set GroupID on each subcommand before
+	// AddCommand.
+	cmd.AddGroup(
+		&cobra.Group{ID: "core", Title: "Core:"},
+		&cobra.Group{ID: "navigation", Title: "Navigation:"},
+		&cobra.Group{ID: "setup", Title: "Setup:"},
+		&cobra.Group{ID: "meta", Title: "Meta:"},
+	)
+
+	// Subcommand factories. Each command is assigned to its group
+	// via GroupID so `twiggit --help` shows the four group headers.
+	listCmd := NewCmdList(f, nil)
+	listCmd.GroupID = "core"
+	createCmd := NewCmdCreate(f, nil)
+	createCmd.GroupID = "core"
+	deleteCmd := NewCmdDelete(f, nil)
+	deleteCmd.GroupID = "core"
+	pruneCmd := NewCmdPrune(f, nil)
+	pruneCmd.GroupID = "core"
+	cdCmd := NewCmdCd(f, nil)
+	cdCmd.GroupID = "navigation"
+	initCmd := NewCmdInit(f, nil)
+	initCmd.GroupID = "setup"
+	versionCmd := NewCmdVersion(f, nil)
+	versionCmd.GroupID = "meta"
+	completionCmd := newCompletionCommand(cmd)
+	completionCmd.GroupID = "meta"
+	cmd.AddCommand(
+		listCmd,
+		createCmd,
+		deleteCmd,
+		pruneCmd,
+		cdCmd,
+		initCmd,
+		versionCmd,
+		completionCmd,
+	)
 
 	carapace.Gen(cmd)
-
-	// Replace Cobra's default completion command with Carapace's version
-	if completionCmd, _, err := cmd.Find([]string{"completion"}); err == nil {
-		cmd.RemoveCommand(completionCmd)
-	}
-	cmd.AddCommand(newCompletionCommand(cmd))
 
 	return cmd
 }

@@ -42,7 +42,7 @@ func (g *GlobalOptions) IsVerbose() bool { return g.Verbose > 0 }
 // flags (force, yes, dry-run, ...) are command-local and stay in the
 // cmd/ files.
 func AddPersistentFlags(cmd *cobra.Command, opts *GlobalOptions) {
-	cmd.PersistentFlags().StringVar(&opts.Output, "output", "", "Output format: text (default), json.")
+	cmd.PersistentFlags().StringVar(&opts.Output, "output", "", "Output format: json, table, plain. Empty falls through to the per-command default.")
 	cmd.PersistentFlags().BoolVar(&opts.Quiet, "quiet", false, "Suppress non-essential output for scripting scenarios.")
 	cmd.PersistentFlags().CountVarP(&opts.Verbose, "verbose", "v", "Increase verbosity (can be used multiple times: -v, -vv)")
 }

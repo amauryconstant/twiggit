@@ -38,9 +38,6 @@ To load completions:
 		SilenceErrors:         true,
 		Args:                  wrapArgsValidator(cobra.ExactArgs(1)),
 		DisableFlagsInUseLine: true,
-		ValidArgsFunction: func(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		},
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			snippet, err := carapace.Gen(rootCmd).Snippet(shell)
 			if err != nil {
