@@ -2,7 +2,7 @@
 
 ## MODIFIED Requirements
 
-### Requirement: Sentinel catalog and `errors.Is` matching contract
+### Requirement: Sentinel catalog
 
 The `core` package SHALL export the following sentinel errors as package variables of type `error`:
 | Sentinel | Message |
@@ -17,7 +17,12 @@ The `core` package SHALL export the following sentinel errors as package variabl
 | `ErrInferenceFailed` | `"core: could not infer shell type"` |
 | `ErrDetectionFailed` | `"core: shell detection failed"` |
 
-Each sentinel's `Error()` message SHALL be `"core: <resource> <state>"`. Callers SHALL identify these sentinels exclusively through `errors.Is`. Each shell sentinel SHALL be returned as the `Cause` (or wrapped via `*core.OperationError.Cause`) of a `*core.OperationError` whose `Op` field starts with the prefix `shell.` (specifically `shell.already_installed`, `shell.not_installed`, `shell.invalid_type`, `shell.inference`, `shell.detection`); callers SHALL detect the sentinel with `errors.Is(err, core.ErrShellAlreadyInstalled)` (and the corresponding sentinel for the other four cases) — string comparison against `OperationError.Op` SHALL NOT be used by callers. The shell sentinel design SHALL NOT reintroduce the seven shell error subtypes removed in the prior change; sentinels are returned via existing `*core.OperationError` wrappers, not via new concrete struct types. The previous `ErrWrapperGeneration`, `ErrWrapperInstallation`, `ErrConfigFileNotFound`, and `ErrUsageFlag` sentinels remain removed.
+Each sentinel's `Error()` message SHALL be `"core: <resource> <state>"`. Callers SHALL identify these sentinels exclusively through `errors.Is`. Each shell sentinel SHALL be returned as the `Cause` (or wrapped via `*core.OperationError.Cause`) of a `*core.OperationError` whose `Op` field starts with the prefix `shell.` (specifically `shell.already_installed`, `shell.not_installed`, `shell.invalid_type`, `shell.inference`, `shell.detection`); callers SHALL detect the sentinel with `errors.Is(err, core.ErrShellAlreadyInstalled)` (and the corresponding sentinel for the other four cases) — string comparison against `OperationError.Op` SHALL NOT be used by callers.
+
+#### Scenario: Sentinel catalog is exported and stable
+- **WHEN** a caller imports the `core` package
+- **THEN** the sentinel identifiers and their messages SHALL match the table above exactly
+- **AND** no sentinel SHALL be unexported, renamed, or repurposed without a capability-level spec change
 
 #### Scenario: shell sentinel match via errors.Is
 - **WHEN** a `*core.OperationError` is returned with `Op = "shell.already_installed"` and `Cause = core.ErrShellAlreadyInstalled`

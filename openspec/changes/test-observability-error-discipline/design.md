@@ -123,7 +123,7 @@ The single most consequential file is `cmd/init.go:222`, which string-matches `o
 
 ### 9. `t.Setenv` migration and `must := require.New(t)` rename
 
-**Choice.** Replace `os.Setenv` + `defer os.Setenv(origKey, origVal)` patterns in `test/integration/config_test.go` and `internal/config/manager_test.go` with `t.Setenv` (auto-restored on test cleanup). Rename `require := require.New(t)` to `must := require.New(t)` in the four `_test.go` files where the import is shadowed. Suite methods in `test/concurrent/concurrent_test.go` switch `require(s.T(), ...)` to `s.Require()` and `assert(s.T(), ...)` to `s.Assert()`.
+**Choice.** Replace `os.Setenv` + `defer os.Setenv(origKey, origVal)` patterns in `test/integration/config_test.go` and `internal/config/manager_test.go` with `t.Setenv` (auto-restored on test cleanup). Rename `require := require.New(t)` to `must := require.New(t)` in the three `_test.go` files where the import is shadowed. Suite methods in `test/concurrent/concurrent_test.go` switch `require(s.T(), ...)` to `s.Require()` and `assert(s.T(), ...)` to `s.Assert()`.
 
 **Rationale.** `golang-testing` SKILL: `t.Setenv` is the standard library replacement that "automatically restores" the original value, plays correctly with `t.Parallel()`, and removes the manual defer boilerplate. `golang-stretchr-testify` SKILL: "Name them `is` and `must`" is the skill convention; the shadowing of the `require` import is the antithesis of that convention.
 
@@ -141,6 +141,18 @@ The single most consequential file is `cmd/init.go:222`, which string-matches `o
 
 - Hand-rolled goroutine leak detection via `runtime.NumGoroutine()` snapshots: rejected — flaky, race-prone, no stack attribution.
 
+### 11. Remove `ErrorKindNotFound` and `ExternalError.Is()`
+
+**Choice.** Drop the `ErrorKindNotFound` constant from the `ErrorKind` iota in `internal/git/errors.go` and remove the `Is(target error) bool` method on `*ExternalError` in its entirety. `classifyKind` keeps the `context.DeadlineExceeded` → `ErrorKindTimeout` mapping and otherwise returns `ErrorKindOther`. The four per-resource NotFound sentinels continue to match via `*core.NotFoundError.Is()` walking the cause chain — exactly the path the baseline spec already mandates.
+
+**Rationale.** `grep -nE 'Kind\s*[:=]\s*ErrorKindNotFound'` finds no setter anywhere in the module. The `Is()` method at `internal/git/errors.go:85-99` short-circuits with `if e.Kind != ErrorKindNotFound { return false }`, so it can never match `core.ErrGitRepoNotFound` or `core.ErrWorktreeNotFound` in practice. Removing the constant alone leaves `Is()` as dead code; removing `Is()` alone leaves an unreachable constant. Both go. The typed-error path the baseline spec mandates (`*core.NotFoundError.Is()` over the cause chain) already covers every concrete call site: `ExternalError.Unwrap()` returns `[OperationError, Cause]`; when `Cause` is a `*core.NotFoundError`, `errors.Is(err, core.ErrXNotFound)` walks to it directly. Same logic as Decision 5 for `ErrorKindPermission` — declared but never assigned, fragile across platforms, and the typed `OperationError` mapping already covers the only legitimate caller path.
+
+**Alternatives considered.**
+
+- Wire a read-side method (e.g. `OpenRepository`) to set `Kind = ErrorKindNotFound` when the go-git error chain indicates a missing repo — rejected; the typed-error path already covers callers, and adding a `Kind` bridge duplicates the `*core.NotFoundError.Is()` work.
+- Mark `Is()` deprecated — rejected; no caller to migrate (no setter = no path that produces a working match).
+- Move `Is()` to a method on `*core.OperationError` keyed on `Op` prefix — rejected; spec rule says NotFound dispatch is solely a `*core.NotFoundError` property, and the indirection table grows for no observable gain.
+
 ## Risks / Trade-offs
 
 - **Logger writer change is observable in test stderr capture**: tests that previously relied on debug output going to the host's `os.Stderr` will now see it in the test buffer instead. → Mitigation: tests that assert on debug output must read `iostreams.Test()`'s stderr buffer, not `os.Stderr`.
@@ -149,6 +161,7 @@ The single most consequential file is `cmd/init.go:222`, which string-matches `o
 - **Cause-chain test (`errors.As` on `*exec.ExitError`) is sensitive to `command_executor.go` preserving the error**: if a future change drops the cause again, the test fails loudly. → Mitigation: the test is part of the verifier gate (`go test -run TestNonZeroExit ./internal/git/...`).
 - **`Factory.Init` no longer prefixes init failures with `cmdutil:`**: a script or test that greps stderr for `cmdutil:` will break. → Mitigation: no such consumer exists in the repo (`grep -r "cmdutil:" .` returns no callers); the formatter already shows the underlying error's `Op` which carries the same diagnostic value.
 - **`ErrorKindPermission` removal is a no-op today** but could surprise a future caller expecting the enum to include a permission class. → Mitigation: this is a single-file deletion in `internal/git/errors.go`; the diff is reviewable and the package's CHANGELOG / archive history can document the removal.
+- **`slog.Default()` test-buffer bypass in `internal/git/hook_runner.go`** — the hook production-write warning is logged via `slog.Default()` (production code over test-buffer observability, per the user's intent). Test-side assertions on this path read host stderr, not the test buffer. → Accepted gap; tests that need to assert on this path are authored as E2E tests with stderr captured at the process boundary.
 
 ## Migration Plan
 
@@ -158,7 +171,7 @@ This is a code-only change with no deployable artifacts, schema, or wire-format 
 2. Land single-handling rule fixes (`detectOpError`, `discoverProjects`); cmd-side logging at the boundary replaces the dropped adapter logs.
 3. Land cause-chain fix (`NewCommandError` + six writer.go sites); add `TestCLIClient_NonZeroExit_PreservesExecError`.
 4. Land shell sentinels restoration; migrate `cmd/init.go:222`.
-5. Land `ErrorKindPermission` removal.
+5. Land `ErrorKindPermission` and `ErrorKindNotFound` removal (drop the constant + the `Is()` method).
 6. Land `Factory.Init` double-wrap removal.
 7. Land `hook_runner.go:60` `slog.Warn` migration.
 8. Land test discipline changes (14 AssertExpectations + t.Setenv + goleak + `must` rename).

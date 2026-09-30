@@ -12,7 +12,7 @@
 
 - [ ] 2.1 Remove the `slog.Error` call from `detectOpError` in `internal/git/context_detector.go` and verify by `go build ./internal/git/...` and `go test ./internal/git/...` passing.
 - [ ] 2.2 Remove the `slog.Error` call from `discoverProjects` in `internal/git/context_resolver.go` and verify by `go build ./internal/git/...` and `go test ./internal/git/...` passing.
-- [ ] 2.3 Add a debug-log call at the cmd boundary in `cmd/list.go` (and any other callers that need it) using `opts.IO.Logger.With("command", cmd.Name()).Debug("detect failed", "err", err)` and verify by `TWIGGIT_DEBUG=1 ./twiggit list` producing one debug line per failed detection (not two).
+- [ ] 2.3 Trace the cmd-side callers of `detector.DetectContext` and apply boundary debug logging at each site. Confirmed call sites: `cmd/list.go:113`, `cmd/cd.go:100`, `cmd/create.go:126`, `cmd/delete.go:113`, `cmd/prune.go:127`, `cmd/suggestions.go:192`. Each site SHALL add `opts.IO.Logger.With("command", cmd.Name()).Debug("detect failed", "err", err)` immediately after the `DetectContext` error check (or be refactored through a small `cmd` helper that adds the boundary logger once); verify by `TWIGGIT_DEBUG=1 ./twiggit list`, `cd`, `create`, `delete`, `prune` each producing one debug line per failed detection (not two).
 
 ## 3. Cause-chain preservation
 
@@ -27,10 +27,11 @@
 - [ ] 4.3 Replace the `errors.As+Op` match at `cmd/init.go:222` with `errors.Is(err, core.ErrShellAlreadyInstalled)` and verify by `go build ./cmd/...` and `go test ./cmd/...` passing.
 - [ ] 4.4 Add `TestShellAlreadyInstalled_Is` in `internal/core/shell_errors_test.go` asserting `errors.Is(err, core.ErrShellAlreadyInstalled)` returns true for a wrapped `OperationError` and false for an unrelated error; verify by `go test -run TestShellAlreadyInstalled ./internal/core/...` passing.
 
-## 5. `ErrorKindPermission` removal
+## 5. `ErrorKindPermission` and `ErrorKindNotFound` removal
 
 - [ ] 5.1 Drop the `ErrorKindPermission` constant from the `ErrorKind` iota in `internal/git/errors.go` and remove the constant from any references and verify by `go build ./...` succeeding with no unused-constant warnings.
-- [ ] 5.2 Run `go test ./internal/git/...` and verify all tests still pass after the enum shrink.
+- [ ] 5.2 Drop the `ErrorKindNotFound` constant from the `ErrorKind` iota and remove the `Is(target error) bool` method on `*ExternalError` entirely. NotFound dispatch continues to walk through `*core.NotFoundError.Is()` over the cause chain (the baseline path); verify by `go build ./...` succeeding with no unused-constant or unused-method warnings and `go vet ./...` clean.
+- [ ] 5.3 Run `go test ./internal/git/...`, `go test ./cmd/...`, and `go test -tags=integration ./test/integration/...` and verify all tests still pass after the enum + method shrink.
 
 ## 6. `Factory.Init` double-wrap removal
 
@@ -61,7 +62,7 @@
 ## 11. Suite helper and shadowed-import cleanup
 
 - [ ] 11.1 Replace `require(s.T(), ...)` with `s.Require()` and `assert(s.T(), ...)` with `s.Assert()` across all suite methods in `test/concurrent/concurrent_test.go` and verify by `go test -tags=concurrent ./test/concurrent/...` passing.
-- [ ] 11.2 Rename `require := require.New(t)` to `must := require.New(t)` in `internal/core/hook_types_test.go`, `internal/core/git_types_test.go`, `internal/core/service_results_test.go`, and `internal/core/service_errors_test.go`; update each call site to use `must.NoError(...)` etc. and verify by `go test ./internal/core/...` passing.
+- [ ] 11.2 Rename `require := require.New(t)` to `must := require.New(t)` in `internal/core/hook_types_test.go`, `internal/core/git_types_test.go`, and `internal/core/service_results_test.go`; update each call site to use `must.NoError(...)` etc. and verify by `go test ./internal/core/...` passing.
 
 ## 12. Documentation and IDE
 
