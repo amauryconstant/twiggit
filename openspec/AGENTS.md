@@ -93,23 +93,15 @@ graph TB
 
 ## Spec Organization
 
-Specs live under `openspec/specs/<category>-<name>/spec.md`. After
-`cli-functional-core-shell` lands, the prefixes map to source-tree layers
-as:
+Specs live under `openspec/specs/<category>-<name>/spec.md`. The prefixes map
+to source-tree layers as:
 
 | Prefix | Layer | Owner |
 | ------ | ----- | ----- |
-| `cli-` | `cmd/` + `internal/cmdutil/` | Cobra command specs, Factory, IOStreams, exit codes, output, error formatting |
-| `core-` | `internal/core/` | Value objects, errors, validation, path utilities, shell types |
-| `git-` | `internal/git/` + `internal/config/` | Git client, resolver, hooks, shell-detect, config loading |
+| `cli-` | `cmd/` + `internal/cmdutil/` + `internal/iostreams/` | Cobra command specs, Factory, IOStreams, exit codes, output, error formatting |
+| `core-` | `internal/core/` | Value objects, errors, validation, path utilities, shell types, hook types, role-interface segregation |
+| `git-` | `internal/git/` + `internal/config/` | Git client, resolver, hooks, shell-detect, config loading, command executor |
 | `testing-` | `test/` | Test organization and patterns |
-
-The legacy `application-`, `domain-`, `infrastructure-` prefixes persist in
-`openspec/changes/*/specs/` only for changes that MODIFIED existing legacy
-specs; the new-prefix ownership above is canonical for net-new specs. See
-`openspec/config.yaml` for the full mapping and
-`openspec/changes/cli-functional-core-shell/proposal.md` §Non-goals for the
-deferred rename.
 
 **Layout**: one folder per spec, single `spec.md` inside. Use `# Capability:`
 + `## Purpose` + `## Requirements` headers.
@@ -125,6 +117,71 @@ deferred rename.
 **Canonical ownership** for each prefix and the full rules live in
 `openspec/config.yaml`; consult it before adding or renaming specs.
 
-**Dead code**: orphan fields, types, or behaviors that no spec claims are
-tracked in `openspec/dead-code.md`. Add an entry there when discovering
-unowned symbols; do not fold them silently into a related spec.
+## Code conventions enforced via golang-* skills
+
+These bracketed keys codify the project-wide code conventions the AI agent
+should follow during the **apply** phase. They are **not** part of the
+OpenSpec `rules:` block (which is keyed by artifact ID; see
+`openspec/project-config.js` for the schema). Enforcement lives in
+`.golangci.yml` (mechanical) and human review (judgment); this section is
+the AI agent's situational-awareness layer.
+
+The `golang-how-to` orchestrator force-loads the relevant `golang-*` skill
+per task intent (see `golang-how-to` SKILL.md "Load skill X when Y" table).
+The keys below are the highest-value extractions from those skills,
+restated as a flat reference. When a skill rule and a project preference
+conflict, **project preference wins** (e.g., "NO comments in code unless
+explicitly requested" from the root `AGENTS.md` overrides the
+`golang-documentation` "every exported function MUST have a doc comment"
+norm; the project norm for this repo is the comment-light variant).
+
+### Error handling
+- **[errors-checked]** Returned errors MUST always be checked; never discard with `_`. (golang-error-handling)
+- **[errors-wrap-context]** Errors MUST be wrapped with `fmt.Errorf("{context}: %w", err)`. Exception: `core.ValidationError` and `core.UsageError` are returned unwrapped because their constructors already carry context. (golang-error-handling)
+- **[errors-lowercase-no-punct]** Error strings MUST be lowercase, without trailing punctuation, and MUST NOT duplicate context that wrapping adds. (golang-error-handling, golang-naming)
+- **[errors-is-as-only]** MUST use `errors.Is` for sentinel matching and `errors.As` / `errors.AsType[T]` (Go 1.26+) for typed chain inspection; string-matching on `err.Error()` is prohibited. (golang-error-handling)
+- **[single-handling-rule]** Errors MUST be either logged OR returned, never both. Adapter code in `internal/git/` returns wrapped errors only; logging happens at the cmd boundary via `opts.IO.Logger.With("command", cmd.Name()).Debug(..., "err", err)`. (golang-error-handling)
+- **[no-panic-expected-failures]** NEVER use `panic` for expected error conditions; panic is reserved for programmer errors, impossible invariants, and `Must*` constructors. (golang-error-handling, golang-design-patterns)
+
+### Lint discipline
+- **[nolint-name-required]** `//nolint` directives MUST specify the linter name (e.g., `//nolint:errcheck`); bare `//nolint` is prohibited. (golang-lint)
+- **[nolint-reason-required]** `//nolint` directives MUST include a justification comment immediately following the directive. (golang-lint)
+- **[no-security-nolint]** Security linters (`gosec`, `bodyclose`, `sqlclosecheck`) MUST NOT be suppressed without a strong reason documented in the directive. (golang-lint)
+
+### Cobra / CLI
+- **[run-e-only]** Cobra commands MUST use `RunE`, never `Run`; `Run` cannot return errors. (golang-spf13-cobra)
+- **[silent-usage-errors]** Root command MUST set `SilenceUsage: true` and `SilenceErrors: true` to avoid duplicate error printing. (golang-spf13-cobra, golang-cli)
+- **[cmd-out-or-stdout]** Command handlers MUST use `cmd.OutOrStdout()` / `cmd.ErrOrStderr()` (or `opts.IO.Out` / `opts.IO.ErrOut`); direct `os.Stdout` / `os.Stderr` usage is prohibited. (golang-spf13-cobra, golang-cli)
+- **[no-len-args-in-run-e]** Positional argument count MUST be validated via cobra `Args` validators (e.g., `cobra.ExactArgs(N)`); never inside `RunE`. (golang-spf13-cobra)
+
+### Lifecycle / safety
+- **[defer-close-immediate]** `defer Close()` MUST be placed immediately after a successful resource acquisition. (golang-design-patterns, golang-safety)
+- **[timeout-every-call]** Every external call SHOULD have a timeout via `context.WithTimeout` or per-call deadline. (golang-design-patterns)
+- **[safe-type-assertion]** Type assertions MUST use the comma-ok form `v, ok := x.(T)`; bare assertions panic on mismatch. (golang-safety)
+- **[no-nil-map-write]** Maps MUST be initialized before write; writing to a nil map panics. (golang-safety, golang-code-style)
+- **[defensive-copy-exports]** Exported functions returning slices or maps SHOULD return defensive copies (`slices.Clone`, `maps.Clone`) to prevent caller mutation of internal state. (golang-safety)
+- **[no-concurrent-map]** Maps MUST NOT be accessed concurrently without `sync.Map` or external synchronization. (golang-safety)
+- **[no-init-functions]** `init()` MUST be avoided; use explicit constructors or `sync.OnceValue` lazy initialization. (golang-design-patterns)
+
+### Interfaces / composition
+- **[interface-consumer-side]** Interfaces SHALL be defined where they are consumed, not where they are produced; concrete types return structs. (golang-structs-interfaces, golang-design-patterns)
+- **[canonical-method-signatures]** Role interfaces (`RepositoryOpener`, `BranchReader`, etc.) MUST have method sets enforced by a compile-time drift sentinel; signature changes ripple to all consumers. (golang-structs-interfaces, project-specific via `core-git`)
+
+### Naming
+- **[mixed-caps-only]** Identifiers MUST use `MixedCaps` or `mixedCaps`; underscores in identifiers are prohibited. (golang-naming)
+- **[no-stuttering]** Names MUST NOT repeat information present in the package or surrounding context. (golang-naming)
+- **[enum-unknown-zero]** Enum types MUST place an explicit `Unknown` or `Invalid` sentinel at `iota` position 0. (golang-naming, golang-design-patterns)
+- **[err-prefix-suffix]** Error variables use `Err` prefix; error types use `Error` suffix; constructors use `New` or `NewTypeName`. (golang-naming)
+
+### Testing
+- **[require-for-preconditions]** `require` MUST be used for preconditions (setup, error checks); `assert` for verifications; mixing randomly is prohibited. (golang-stretchr-testify, golang-testing)
+- **[assertion-expected-actual]** Testify argument order MUST be `(expected, actual)`; swapping produces confusing diff output. (golang-stretchr-testify)
+- **[mock-assert-expectations]** Every mock-based test MUST end with `mock.AssertExpectations(t)` to verify expected interactions. (golang-stretchr-testify)
+- **[test-observable-behavior]** Tests SHALL verify observable behavior, not internal implementation; refactor safety net requires this. (golang-testing)
+
+### Dependencies
+- **[go-sum-committed]** `go.sum` MUST be committed; it records cryptographic checksums of every dependency version. (golang-dependency-management)
+- **[mod-tidy-pre-commit]** `go mod tidy` MUST be run before every commit that changes dependencies; CI MUST fail on module drift via `go mod tidy && git diff --exit-code`. (golang-dependency-management, golang-continuous-integration)
+- **[stdlib-first]** Before proposing a new dependency, evaluate whether the standard library already covers the use case. (golang-dependency-management)
+- **[ai-asks-before-add]** AI agents MUST ask the user for confirmation before running `go get` to add any new dependency. (golang-dependency-management)
+- **[pin-binary-tools]** Executable tools MUST be pinned in `.mise/config.toml` (mise backends) or `go.mod` `tool` directives (Go 1.24+); `@latest` is prohibited for CI-affecting tools. (golang-dependency-management, project-specific)

@@ -1,35 +1,50 @@
 schema: spec-driven
 
 context: |
-  Domain: Pragmatic git worktree management tool with context-aware operations
-  optimized for rebase workflows across multiple projects.
+  Domain: Pragmatic git worktree management tool with context-aware
+  operations optimized for rebase workflows across multiple projects.
 
-  Architecture (DDD-Light, 5 layers):
-  - cmd/                    → Presentation (Cobra CLI, ServiceContainer, error formatting)
-  - internal/application/   → Interface contracts (service interfaces only, no implementations)
-  - internal/service/       → Business logic (implements application interfaces)
-  - internal/domain/        → Core domain (entities, value objects, errors, validation, NO external deps)
-  - internal/infrastructure/→ External integrations (git, config, shell, context detection)
+  Architecture (golang-cli Tier 2, "functional-core, imperative-shell"):
+  - cmd/                    → Presentation (Cobra commands; thin runF)
+  - internal/cmdutil/       → Composition root helper: Factory (functional
+                              options), ExitCodeFor, persistent flags, signal
+                              handling, HookRunner consumer interface
+  - internal/core/          → Pure functional core: value objects, errors,
+                              validation, path utils, shell types, hook types.
+                              No I/O. Imports stdlib + samber/lo.
+  - internal/git/           → I/O adapter: client, reader, writer, hook
+                              runner, context_detector, context_resolver,
+                              repo_finder, shell_detect, command_executor,
+                              errors
+  - internal/config/        → koanf-backed config manager + XDG resolution
+  - internal/output/        → Formatter registry, error renderer, table
+                              writer, shell wrapper (ComposeWrapper)
+  - internal/iostreams/     → IOStreams struct, lipgloss styles, slog logger
+                              singleton
+  - internal/version/       → Build-time version injection
+  - main.go                 → Composition root: Factory init, signal context,
+                              panic recover, cobra dispatch, exit-code mapping
 
   Dependency Flow:
-    cmd → application interfaces → service implementations → infrastructure → domain types
-                                ↘ domain (validation, errors) ↗
+    main.go → cmd → internal/{cmdutil,git,config,output,iostreams} → internal/core
+                                          ↓
+                                    internal/version
 
   Key Architectural Patterns:
-  - Interface-Implementation Separation: application/ defines contracts, service/ implements
-  - Composite GitClient: Routes to GoGitClient (read ops) or CLIClient (worktree ops)
-  - Constructor Injection: All dependencies passed via constructors
-  - Domain Error Wrapping: Each layer wraps errors with context using domain types
-  - Context-Aware Operations: Detection → Resolution → Execution
+  - Functional-core, imperative-shell: internal/core/ has zero I/O; everything
+    that touches the filesystem, network, or shell lives in adapter packages.
+  - Role-based interface segregation (core-git): interfaces defined
+    consumer-side in internal/core; the composite *git.Client satisfies all
+    six roles via embedded promotion. Drift sentinel enforces method-set
+    invariants.
+  - Constructor injection with interfaces; Factory is the only place where
+    infrastructure is instantiated (lazy function fields via sync.OnceValue).
+  - Context-aware operations: context_detector + context_resolver.
+  - Error wrapping: adapter code in internal/git/ returns wrapped errors only;
+    logging happens at the cmd boundary (single-handling rule). See
+    golang-error-handling.
 
-  Layer Responsibilities:
-  - cmd: Parse CLI args, call services, format output, handle exit codes
-  - application: Define service interfaces (WorktreeService, ProjectService, etc.)
-  - service: Orchestrate domain logic, validate requests, wrap infrastructure errors
-  - domain: Pure business rules, entities, validation, error types (NO imports from other layers)
-  - infrastructure: Git operations, config loading, shell integration, path utilities
-
-  Context Types (domain layer):
+  Context Types (internal/core):
   - ContextProject: Inside a project's main repository
   - ContextWorktree: Inside a worktree (subdirectory under Worktrees/)
   - ContextOutsideGit: Not in any git repository
@@ -39,54 +54,73 @@ context: |
   - Projects: $HOME/Projects/<project>/
   - Worktrees: $HOME/Worktrees/<project>/<branch>/
 
-  Tech stack: Go 1.21+, Cobra, go-git, Koanf, Testify, Ginkgo/Gomega, Carapace
-  Tooling: mise, golangci-lint, pre-commit, GoReleaser
+  Tech stack: Go 1.27.1, Cobra, go-git, Koanf, Testify, Ginkgo/Gomega,
+              Carapace, charm.land/lipgloss/v2, go.uber.org/goleak,
+              hashicorp/golang-lru/v2, golang.org/x/term, samber/lo
+  Tooling: mise, golangci-lint v2.14.0, goreleaser v2.18.2, govulncheck,
+           gopls, ginkgo, gocover-cobertura, gocovmerge, cosign, syft,
+           pre-commit. golangci-lint run enforces gofumpt + goimports.
 
   Code conventions:
-  - NO comments in code unless explicitly requested
+  - NO comments in code unless explicitly requested (project preference)
   - Tests written AFTER implementation to anchor behavior and specs
   - Table-driven tests with fixtures
   - Constructor injection with interfaces
-  - ValidationError returned directly (not wrapped); other errors wrapped with domain types
-  - Use errors.As() for type checking, not string matching
+  - ValidationError returned directly (NOT wrapped); other errors wrapped
+    with core.ValidationError / core.NotFoundError / core.OperationError
+    / core.UsageError, or git.New*Error for adapter failures
+  - Use errors.Is() and errors.As() / errors.AsType[T] for chain
+    inspection, never string matching
+  - Single-handling rule: errors are EITHER logged OR returned, never both
+  - Logger singleton: iostreams.NewLogger(io.Writer) is the one *slog.Logger
+    shared by IOStreams.Logger, Factory.Logger, slog.Default()
+  - All exported types, functions, methods MUST have doc comments (Go
+    ecosystem norm); package comment MUST exist
 
-  Error Handling:
-  - ValidationError: Return directly (already has context)
-  - Service errors: Wrap with domain.New*ServiceError()
-  - Infrastructure errors: Wrap with domain.NewGit*Error(), domain.NewConfigError()
-  - Use fmt.Errorf("operation failed: %w", err) only when no domain error applies
+  Exit Codes (canonical 3-code contract):
+  - 0 success
+  - 1 failure (any non-usage error, including ValidationError and
+    NotFoundError)
+  - 2 UsageError (bad flag, argument, missing input)
+  - 130 SIGINT / SIGTERM bypass ExitCodeFor
 
   Testing approach:
-  - Unit tests (Testify) in service/ and domain/ with mocks
+  - Unit tests (Testify) in internal/ with mocks; suite.Run pattern with
+    AssertExpectations(t)
   - Integration tests (Testify) in test/integration/ with real git repos
   - E2E tests (Ginkgo/Gomega) in test/e2e/ with built binary
   - cmd/ tested via E2E only (no unit tests)
+  - Race detector: go test -race ./...
+  - Module drift gate: go mod tidy && git diff --exit-code
+  - Golden-file tests: test/golden/ with UPDATE_GOLDEN toggle
+  - Concurrent suite: test/concurrent/ with goleak for goroutine leak
+    detection
 
   Development workflow:
   - Use mise run <task> for all operations
-  - Run mise run verify before committing
-  - Pre-commit hooks: whitespace, YAML/TOML validation, merge conflict detection
+  - Run mise run verify before committing (format + lint:fix + lint:gated +
+    vuln:check + test + build)
+  - Pre-commit hooks: whitespace, EOF/YAML/TOML/JSON validation, merge
+    conflict detection, gofmt, govet, golangci-lint, govulncheck
 
   Spec organization (project-specific):
-  - Layout: openspec/specs/<category>-<spec-name>/spec.md. Specs live one folder deep
-    under openspec/specs/. Files directly at openspec/specs/ are not permitted.
-  - Naming convention: lowercase, hyphen-separated, always prefixed with a category.
-    Pick the shortest unambiguous category; only invent a new prefix if none fit.
-  - Category prefixes (6 active, pick the shortest unambiguous one):
-    - `cli-` — command-line interface layer (alignment: cmd/). Examples: cobra
-      framework setup, exit codes, output formats, shell completion, error
+  - Layout: openspec/specs/<category>-<spec-name>/spec.md. Specs live one folder
+    deep under openspec/specs/. Files directly at openspec/specs/ are not
+    permitted.
+  - Naming convention: lowercase, hyphen-separated, always prefixed with a
+    category. Pick the shortest unambiguous category; only invent a new prefix
+    if none fit.
+  - Canonical category prefixes (4):
+    - `cli-` — command-line interface layer (alignment: cmd/,
+      internal/cmdutil/, internal/iostreams/). Examples: cobra framework
+      setup, exit codes, output formats, shell completion, error
       formatting, command surface, flag conventions, help examples.
-    - `application-` — service-layer architecture, wiring, configuration
-      (alignment: internal/application/, internal/service/). Examples:
-      dependency injection, service contracts, worktree/project/navigation/shell
-      service behavior.
-    - `domain-` — pure domain types, errors, validation (alignment:
-      internal/domain/). Examples: typed-error taxonomy, context types,
-      config knob types, hook types.
-    - `infrastructure-` — DevOps/CI/CD/release + external integrations
-      (alignment: internal/infrastructure/, .github/, .goreleaser.yml, contrib/,
-      project root). Examples: git client routing, context resolver, config
-      manager, path utilities, hook runner, CI, release management.
+    - `core-` — pure functional core (alignment: internal/core/).
+      Examples: typed-error taxonomy, context types, config knob types,
+      hook types, role-interface segregation, value objects.
+    - `git-` — git I/O adapter + config (alignment: internal/git/,
+      internal/config/). Examples: git client routing, context resolver,
+      hook runner, shell-detect, config loading, command executor.
     - `testing-` — test infrastructure (alignment: test/). Examples: e2e
       suite, helpers, golden files, fixtures, conventions.
   - Cross-spec references SHALL use bare directory names (e.g., `cli-prune`),
@@ -94,27 +128,29 @@ context: |
 
   Canonical spec ownership (consult before adding content; cross-reference the
   owner instead of restating):
-  - `domain-typed-errors` owns every `domain.*Error` definition (struct fields,
-    constructor signatures, `Error()`/`Unwrap()`/`MarshalJSON()` contracts,
-    builder methods) and the exit-code mapping table.
-  - `cli-error-formatting` owns cmd-side error-to-exit-code dispatch
-    (`GetExitCodeForError`, formatter registration order). Consumer specs use
+  - `core-errors` owns the four `core.Error` subtypes (ValidationError,
+    NotFoundError, OperationError, UsageError), their constructors,
+    `Error()`/`Unwrap()` contracts, and the canonical exit-code mapping
+    table.
+  - `cli-error-formatting` owns the cmd-side error-to-exit-code dispatch
+    (`ExitCodeFor`) and formatter registration order. Consumer specs use
     the symbolic exit-code names.
-  - `infrastructure-context-resolver` owns the context-detection priority
-    chain (worktree > project > outside git) and identifier resolution.
-  - `infrastructure-git-client` owns the GoGit/CLI composite routing decision
-    and the full GoGitClient read-side surface (OpenRepository, ListBranches,
-    BranchExists, GetRepositoryStatus, GetRepositoryInfo, ListRemotes,
-    GetCommitInfo, repository LRU cache).
-  - `application-shell-service` owns the GenerateWrapper + ValidateInstallation
-    service contracts.
+  - `git-context-resolver` owns the context-detection priority chain
+    (worktree > project > outside git) and identifier resolution.
+  - `git-client` owns the GoGit/CLI composite routing decision and the
+    worktree-lifecycle surface (CreateWorktree, DeleteWorktree, Prune,
+    MoveWorktree). Read-side method sets split by role per `core-git`.
+  - `core-git` owns the role-interface segregation (RepositoryOpener,
+    BranchReader, RepositoryReader, RemoteReader, WorktreeWriter,
+    BranchWriter) and the drift sentinel that enforces method-set
+    invariants.
   - `cli-init` owns the init command surface (positional shell arg,
-    `--install`, `--config`, `--force`).
-  - `domain-config-types` owns the full configuration knob surface
-    (ValidationConfig, NavigationConfig, ShellConfig, CompletionConfig,
-    ServiceConfig, GitConfig, ContextDetectionConfig).
-  - `application-worktree-service` owns the WorktreeService orchestration
-    contract and concurrency-safety guarantees for worktree mutations.
+    `--install`, `--force`; shell type selected via `--shell=<type>`).
+  - `git-config` owns the full configuration knob surface and the
+    koanf-backed load path (defaults → file → env → flags).
+  - `cli-prune`, `cli-delete`, `cli-create`, `cli-list` collectively own
+    the per-command worktree-mutation safety contracts (concurrency, dirty
+    checks, current-worktree refusal, merged check, branch deletion).
 
 rules:
   proposal:
@@ -130,6 +166,8 @@ rules:
     # Machine-readable (added; matches airk's bracketed convention)
     - "[breaking-change-flag] Each user-visible break SHALL be prefixed **BREAKING** with a Migration note in the same bullet; non-breaking changes SHALL NOT carry the prefix"
     - "[capability-owner-cross-ref] When a proposal declares a Modified Capability, it SHALL cross-reference the owning spec by bare name (e.g., `cli-output`) without restating that spec's content"
+    # Co-location (added)
+    - "[tests-with-impl] Proposal SHALL group tests, docs, and CI changes alongside the implementation task they verify; the late-cascade anti-pattern (deferred test/doc groups) is prohibited"
 
   specs:
     # Purity principles — reader-extractable by future tooling.
