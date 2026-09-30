@@ -147,6 +147,32 @@ func TestNewLogger_DebugLevelWhenEnvSet(t *testing.T) {
 	assert.True(t, logger.Enabled(t.Context(), slog.LevelInfo))
 }
 
+// TestLogger_DebugOutput asserts the user-observable contract from
+// cli-iostreams "Verbose and Logger are distinct channels": debug
+// writes land on the test buffer when TWIGGIT_DEBUG is set, and are
+// discarded when it is not. The level-gated tests above
+// (TestNewLogger_*) cover only the Enabled gate; this pins the
+// end-to-end output path against the test stderr buffer.
+func TestLogger_DebugOutput(t *testing.T) {
+	t.Run("emits when TWIGGIT_DEBUG is set", func(t *testing.T) {
+		t.Setenv("TWIGGIT_DEBUG", "1")
+		ios, _, _, errOut := iostreams.Test()
+
+		ios.Logger.Debug("hello", "key", "value")
+
+		assert.Contains(t, errOut.String(), "hello")
+	})
+
+	t.Run("silent when TWIGGIT_DEBUG is unset", func(t *testing.T) {
+		t.Setenv("TWIGGIT_DEBUG", "")
+		ios, _, _, errOut := iostreams.Test()
+
+		ios.Logger.Debug("hello")
+
+		assert.Empty(t, errOut.String())
+	})
+}
+
 // TestLoggerPointer asserts the singleton guarantee: NewLogger
 // returns the same *slog.Logger pointer when called repeatedly
 // with the same writer, so System() / Test() / Factory.Logger all
