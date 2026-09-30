@@ -118,6 +118,14 @@ distribution surface ownership, and cosign verification commands.
 | `cd` | - | Navigate to worktree | - |
 | `init` | - | Shell integration setup | `-i, --install` |
 
+## Conventions
+
+| Rule | Where | Enforcement |
+|---|---|---|
+| Logger singleton | `iostreams.NewLogger(io.Writer)` returns the one `*slog.Logger`; `IOStreams.Logger`, `Factory.Logger`, `slog.Default()` share that pointer | `TestLoggerPointer` in `internal/iostreams/iostreams_test.go` |
+| Single-handling | Adapter code in `internal/git/` returns wrapped errors only; logging happens at the cmd boundary via `opts.IO.Logger.With("command", cmd.Name()).Debug(..., "err", err)` | `golang-error-handling` rule 7 |
+| Shell sentinels | Five `core` sentinels (`ErrShellAlreadyInstalled`, `ErrShellNotInstalled`, `ErrInvalidShellType`, `ErrInferenceFailed`, `ErrDetectionFailed`); match exclusively via `errors.Is`, never by string-comparing `OperationError.Op` | `domain-typed-errors` req 8 |
+
 ## Pre-Commit Hooks
 
 A clean checkout provisions the full toolchain via:
@@ -185,6 +193,7 @@ NotFound distinction is preserved in the formatter's hint layer.
 - Set `TWIGGIT_DEBUG=1` to see internal error details and stack traces
 - Error messages include actionable hints for common issues
 - Exit codes enable reliable scripting with specific error handling
+- VS Code: `.vscode/launch.json` ships a Delve config (`twiggit (debug build)`) with `TWIGGIT_DEBUG=1` pre-set
 
 ## Location-Specific Guides
 
@@ -196,7 +205,6 @@ NotFound distinction is preserved in the formatter's hint layer.
 | [openspec/AGENTS.md](openspec/AGENTS.md) | OpenSpec workflow, lifecycle, skills by phase, spec organization |
 | [internal/version/AGENTS.md](internal/version/AGENTS.md) | Build-time version injection pattern |
 | [test/AGENTS.md](test/AGENTS.md) | Test organization, quality requirements |
-| [test/mocks/AGENTS.md](test/mocks/AGENTS.md) | Mock patterns, testify/mock usage |
 | [test/integration/AGENTS.md](test/integration/AGENTS.md) | Testify suite patterns |
 | [test/e2e/AGENTS.md](test/e2e/AGENTS.md) | Ginkgo/Gomega CLI testing |
 | [test/e2e/README.md](test/e2e/README.md) | E2E debugging, cleanup patterns |

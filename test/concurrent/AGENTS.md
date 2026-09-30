@@ -55,3 +55,7 @@ wg.Wait()
 | Concurrent delete | Deleting different worktrees simultaneously |
 | Mixed create/delete | Create and delete operations interleaved |
 | Prune while list | Prune operation during list |
+
+## Goroutine Leak Detection
+
+`TestMain(m)` calls `goleak.VerifyTestMain(m)` (strict, no `IgnoreTopFunction`). Tests that spawn goroutines MUST drain them via `sync.WaitGroup` or `errgroup.Group`; otherwise the verifier fails the suite.
