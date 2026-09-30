@@ -76,11 +76,7 @@ func main() {
 
 		ios := factory.IOStreams
 		exitCode := cmdutil.ExitCodeFor(err)
-		if exitCode == cmdutil.ExitUsage {
-			_, _ = fmt.Fprintf(ios.ErrOut, "Error: %s\n", err.Error())
-		} else {
-			output.FormatError(ios.ErrOut, err, ios)
-		}
+		output.FormatError(ios.ErrOut, err, ios)
 		if exitCode != 0 {
 			os.Exit(int(exitCode))
 		}
