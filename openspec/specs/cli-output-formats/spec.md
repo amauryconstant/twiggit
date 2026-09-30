@@ -2,49 +2,67 @@
 
 ## Purpose
 
-Text and JSON output for scripting. The `--output` flag selects the
-format; text is default, JSON is structured. Data goes to stdout;
-errors and progress go to stderr.
+Defines the `--output` vocabulary (`json|table|plain`), the per-command interactive default rule, and the shell-completion contract for the flag value. Stream discipline lives in `cli-error-formatting`.
 
 ## Requirements
 
-### Requirement: Text output (default)
+### Requirement: Per-command interactive default
 
-The system SHALL emit tabular text by default for commands that produce listings (`list`, etc.). When `--output` is not supplied, individual commands MAY override the default to `table` for explicit list views; the override is documented in the per-command spec. For every other command without `--output`, the default SHALL be `plain`.
+When `--output` is not supplied (the empty string), each list-style command SHALL own its interactive default. Per-command interactive defaults are declared in the owning command's spec. For non-list commands without `--output`, the default SHALL be `plain`. This spec no longer prescribes a global "tabular text by default for listings" rule.
 
-#### Scenario: Default text output
+#### Scenario: list with no --output uses its bespoke default
 
-- **WHEN** user runs `twiggit list` without `--output`
-- **THEN** system SHALL emit a table on stdout
-- **AND** errors and progress SHALL go to stderr
+- **WHEN** the user runs `twiggit list` with no `--output` flag
+- **THEN** the rendering matches the per-command default declared in `cli-list` (not a global rule in this spec)
 
-### Requirement: JSON output via `--output`
+#### Scenario: Non-list command without --output uses plain
 
-The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-style command. The accepted values SHALL be exactly `json`, `table`, `plain`, and `jsonl`. The `jsonl` value emits one JSON object per line for streaming consumers; `json` emits a single JSON document. The `table` value renders aligned columns with headers; `plain` emits raw human-readable rendering without table borders.
+- **WHEN** the user runs a non-list command (e.g., `twiggit create feature/x`) without `--output`
+- **THEN** the output is a plain human-readable success message on stdout
 
-#### Scenario: JSON list output
+### Requirement: JSON output shape and vocabulary
 
-- **WHEN** user runs `twiggit list -o json`
-- **THEN** system SHALL emit JSON with shape:
-  `{"worktrees": [{"branch": "...", "path": "...", "status": "clean|modified|detached"}]}`
+The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-style command. The accepted values SHALL be exactly `json`, `table`, and `plain`. The `json` value emits a single JSON document; collections emit bare JSON arrays. The `table` value renders aligned columns with headers; `plain` emits headerless TSV. The system SHALL NOT accept any other value; values outside this set (including the legacy `text` value, and the dropped `jsonl` value) SHALL cause the command to return a `core.UsageError` and exit with code 2.
+
+#### Scenario: JSON list output is a bare array
+
+- **WHEN** the user runs `twiggit list -o json` and three worktrees exist
+- **THEN** the system SHALL emit a bare JSON array on stdout with shape:
+  `[{branch, path, status}, ...]`
 - **AND** SHALL exit with status 0
 
-#### Scenario: JSON Lines output
+#### Scenario: Empty worktrees yields empty array
 
-- **WHEN** user runs `twiggit list -o jsonl | head`
-- **THEN** each line of the output SHALL be independently parseable JSON
+- **WHEN** the user runs `twiggit list -o json` and no worktrees exist
+- **THEN** the stdout payload is `[]` (an empty JSON array)
 
 #### Scenario: Unknown format rejected
 
-- **WHEN** user passes `--output=xml` (unsupported)
-- **THEN** system SHALL return `core.UsageError` naming supported formats (`json`, `table`, `plain`, `jsonl`)
+- **WHEN** the user passes `--output=xml` (unsupported)
+- **THEN** the system SHALL return `core.UsageError` naming supported formats (`json`, `table`, `plain`)
 - **AND** SHALL exit with code 2 (usage error)
 
-#### Scenario: Formatter interface contract
+#### Scenario: Legacy format text rejected
 
-- **WHEN** the `output.Formatter` interface is read
-- **THEN** it SHALL declare exactly one method `Write(w io.Writer, data any) error`
-- **AND** implementations SHALL NOT touch `iostreams.IOStreams` directly
+- **WHEN** the user runs `twiggit list -o text`
+- **THEN** the system SHALL emit a `core.UsageError` and exit 2
+
+#### Scenario: Dropped format jsonl rejected
+
+- **WHEN** the user runs `twiggit list -o jsonl`
+- **THEN** the system SHALL emit a `core.UsageError` and exit 2
+
+The Formatter interface contract (single `Write(w io.Writer, data any) error` method, no `IOStreams` access) is owned by `cli-output`.
+
+### Requirement: Output values are shell-completable
+
+The `--output` flag (and its short form `-o`) SHALL be shell-completable. The completion candidate list SHALL be exactly `json`, `table`, `plain`. File-path completion SHALL NOT be offered for the value position. The Formatter interface contract and the `NewFormatter` constructor behavior are owned by `cli-output`.
+
+#### Scenario: Tab completion offers the three accepted values
+
+- **WHEN** the user invokes shell completion after typing `--output ` or `-o `
+- **THEN** the shell SHALL offer `json`, `table`, `plain` as candidates
+- **AND** SHALL NOT offer file-path completion
 
 ### Requirement: Stream separation
 
