@@ -4,10 +4,13 @@
 
 ### Requirement: Factory exposes lazy function fields
 
-The `cmdutil.Factory` type SHALL expose one lazy `func() T` field per
-non-role dependency: `Config`, `GitClient`, `IOStreams`, `Logger`,
-`Formatter`, `FormatError`. The fields SHALL be assigned at construction
-time and invoked at first use. Role interfaces (`RepositoryOpener`,
+The `cmdutil.Factory` type SHALL expose the lazy `func() (T, error)`
+fields: `Config`, `GitClient`, `Logger`. The `IOStreams` SHALL be
+wired eagerly via the factory constructor (not lazy). The Factory
+SHALL NOT expose a `Formatter` or `FormatError` lazy field;
+formatters live in `internal/output/` and are constructed per call by
+the cmd layer. The fields SHALL be assigned at construction time and
+invoked at first use. Role interfaces (`RepositoryOpener`,
 `BranchReader`, `RepositoryReader`, `RemoteReader`, `WorktreeWriter`,
 `BranchWriter`) SHALL NOT appear as Factory fields; callers obtain
 role-narrowed access via type assertion on the value returned by
@@ -61,10 +64,13 @@ new identifier per call site and zero new lazy-cache surface.
 ### Requirement: Factory Init touches every lazy field exactly once
 
 `Factory.Init()` SHALL call each non-role lazy field (`Config`,
-`GitClient`, `IOStreams`, `Logger`, `Formatter`, `FormatError`) exactly
-once and SHALL join any errors with `errors.Join`. `Init` SHALL NOT
-iterate role interfaces because no role fields exist. Errors SHALL
-surface during `Init` rather than at first lazy access.
+`GitClient`, `Logger`) exactly once and SHALL join any errors with
+`errors.Join`. `Init` SHALL NOT iterate role interfaces because no role
+fields exist, SHALL NOT touch `IOStreams` (wired eagerly in the
+constructor per the MODIFIED requirement above), and SHALL NOT call
+`Formatter` or `FormatError` (those live in `internal/output/` and are
+constructed per call by the cmd layer). Errors SHALL surface during
+`Init` rather than at first lazy access.
 
 #### Scenario: Init surfaces composite construction failures
 

@@ -187,7 +187,12 @@ collapses to OperationError; Op names the source." The name
 actively called from `internal/output/shell_infra.go`,
 `internal/git/shell_detect.go`, and `cmd/create.go`. `errors_op.go`
 would over-narrow (file holds 5 constructors for different
-`Op` values, not just `OperationError`).
+  `Op` values, not just `OperationError`).
+
+**Alternatives considered**:
+- `errors_op.go`: over-narrows the file (5 constructors for distinct `Op` values, not just `OperationError`).
+- `errors.go`: collides with the existing `internal/core/errors.go`.
+- Keep `errors_legacy.go`: the file's own header says the demoted constructors are still actively called — the name implies dead code and misleads new readers.
 
 ### Decision 8: Bool fields use `is`/`has`/`can` prefix
 
@@ -209,20 +214,40 @@ bool fields. Aligns with existing `IOStreams.isStdoutTTY`,
 1. Leaf code in `core/validation.go` (`C11`, `C12`).
 2. Mechanical nits and godoc (`C13`, `C14`).
 3. Bool prefix (`C6`).
-4. Type rename (`C7`) → method rename (`C5`) → Factory collapse (`C1`)
-   in the same commit set so the role interfaces never reference
-   absent types.
-5. `errors_legacy.go` rename (`C8`).
-6. 5-step setup extraction (`C4`).
-7. Identical-twins delete (`C3`).
-8. `context_resolver.go` split (`C2`).
-9. `test/helpers` split (`C9`).
-10. `cmd/util.go` split (`C10`).
+4. Type rename (`C7`) split into atomic alias-driven commits per
+   Decision 11: 4a `GitBranch` → `Branch` via type alias; 4b
+   `BranchInfo` → `Branch` via type alias; 4c other type renames
+   (`GitRepository`, `GitDir`, `GitCommit`, `WorktreeInfo`,
+   `RemoteInfo`, `CommitInfo`); 4d compile-time data-type fixture in
+   `internal/core/`. `Get*` method names stay unchanged so the
+   composite `*reader` and `*cliClient` continue to satisfy the role
+   interfaces; the role interfaces now reference the new return
+   types.
+5. Method rename (`C5`) alone as a separate commit: `gopls rename`
+   for the 8 `Get*` methods on `*reader` + `*cliClient` plus the
+   role interface method names in `internal/core/git.go`. Returns
+   typecheck against the already-renamed `*core.Repository` etc.
+6. Factory collapse (`C1`) alone as a third commit: delete the 6
+   per-role lazy fields, update `Factory.Init()`, update
+   `factory_test.go` to use the specific role interface form.
+7. `errors_legacy.go` rename (`C8`).
+8. 5-step setup extraction (`C4`).
+9. Identical-twins delete (`C3`).
+10. `context_resolver.go` split (`C2`).
+11. `test/helpers` split (`C9`, single atomic PR per the user's
+    chosen sequencing).
+12. `cmd/util.go` split (`C10`).
 
-**Rationale**: Each step keeps `go build ./...` green. Renames
+**Rationale**: Each step keeps `go build ./...` green. Splitting the
+rename cluster into three atomic single-category commits (per the
+`golang-refactoring` skill's 100-500 LOC + single-category rules) keeps
+each PR reviewable and bisectable. The compile-safety argument for a
+single commit ("role interfaces never reference absent types") is
+preserved by sequencing: type renames come first, method renames use
+the new return types, Factory collapse uses the new method names. Renames
 that produce partial states (e.g., renaming `BranchInfo` before
 renaming `GetRepositoryInfo` to its new return type) would compile
-fail and force bisecting.
+fail and force bisecting — the sequencing above avoids that.
 
 **Alternatives considered**:
 - Rename everything in one commit. Rejected: bisection impossible
@@ -248,6 +273,80 @@ the param restores SIGINT propagation through suggestion building.
 - Leave `context.Background()` and rely on the suggestion timeout
   in `cmd/suggestions.go`. Rejected: the REVIEW finding stands;
   SIGINT should cancel work promptly.
+
+### Decision 11: Type aliases for `GitBranch` and `BranchInfo` collapse
+
+**Choice**: Rename `GitBranch` → `Branch` and `BranchInfo` →
+`Branch` via a two-step type-alias migration. In the first step,
+add `type GitBranch = Branch` to `internal/core/git_types.go`,
+update all `GitBranch` call sites in `internal/git/`, `cmd/`, and
+tests to use `Branch`, and drop the alias in a follow-up commit.
+Repeat for `BranchInfo` (which has a separate collision surface
+— its return type on `ListBranches` and its use in golden
+fixtures). The two sequences are independent and land in
+separate commits.
+
+**Rationale**: Both source types share the same target name.
+A direct rename would require one commit to break the build
+(the package would temporarily contain two `Branch` types in
+the same file, or a `Branch` and a stale `GitBranch` whose
+methods reference a not-yet-existing `Branch` field). A type
+alias (`type Old = New`) is the officially-blessed Go mechanism
+for gradual code repair: the old and new names stay
+interchangeable while callers migrate incrementally. Each
+commit stays green; `gopls rename` works against the alias
+without complaint.
+
+**Alternatives considered**:
+- Sequential commits, no aliases. Rejected: the intermediate
+  state has `GitBranch` referencing the new `Branch` while
+  `BranchInfo` is still being used, which compiles only if the
+  two old types share a field set. They don't (`BranchInfo` has
+  `IsCurrent`, `Remote`, `Commit`, `Author`, `Date`;
+  `GitBranch` has a narrower read-side shape). Without aliases,
+  one of the two renames has to land in a single big-bang
+  commit.
+- Big-bang single commit renaming both. Rejected: violates
+  the `golang-refactoring` rule against mixing structural and
+  behavioral changes, and the bisection cost is high.
+
+### Decision 12: Gopatch rewrite rules drive mechanical transforms
+
+**Choice**: Emit one `gopatch` rewrite rule per mechanical
+transform in this change: Get-prefix drop (group 5), each
+per-type rename (groups 4.1-4.3a-f), bool-field prefix (group
+3), and each modern idiom (groups 2.1-2.3: `sort.Strings` →
+`slices.Sort`, `wg.Add(1) + defer wg.Done()` → `wg.Go`,
+`strings.ReplaceAll` chain → `strings.NewReplacer`). Each rule
+ships with a golden test that asserts the rewrite against a
+representative input (sample fixture in
+`internal/cmdutil/factory_test.go` or `test/golden/`, named
+via the rule's `// +gopatch` marker).
+
+**Rationale**: The change touches ~50 production files with
+cross-cutting mechanical patterns. `gopls rename` per file
+leaves no cross-file audit trail and forces hand-checking each
+site; `gopatch` rules are reviewable as a single diff,
+re-runnable against the full tree, and testable against golden
+inputs — exactly what the `golang-refactoring` skill prescribes
+for "a change that recurs across many sites". The setup cost
+(generating one rule per transform, wiring the `// +gopatch`
+golden-test marker) pays back across the ~50-file blast radius.
+Sequencing: rules ship in task 0.6 (Migration Plan step 7),
+before any rename or modernize commit lands, so each commit
+can `gopatch apply` against its rule and `git grep` cross-check.
+
+**Alternatives considered**:
+- Stick with `gopls rename` per file. Rejected: no audit
+  trail for cross-cutting transforms; per-site risk on
+  golden fixtures and string-literal error messages; no
+  automated cross-check on tag/reflection references.
+- `gofmt -r` rewrites. Rejected: rule expressiveness is
+  too limited for the type-alias gradual repair and role-method
+  signature updates that this change requires.
+- One-off `sed`/`awk` scripts. Rejected: no AST awareness,
+  no golden-test mechanism, no Go-language-server-style
+  interface-satisfaction guard.
 
 ## Risks / Trade-offs
 
@@ -283,18 +382,67 @@ the param restores SIGINT propagation through suggestion building.
 1. Apply changes A through D in their existing OpenSpec change
    branches; merge them before E starts.
 2. Branch `naming-refactor-modernize` from `main` after A-D merge.
-3. Land commits in the order in Decision 9. Each commit:
+3. Run safety-net coverage gate: `go test -cover
+   ./internal/core/... ./internal/git/... ./internal/cmdutil/...`
+   and confirm ≥80% line coverage on each package. If below,
+   characterize-test the under-covered branches before group 4
+   starts.
+4. Run `golangci-lint run --enable-only modernize ./...` and
+   capture baseline output (`tmp/modernize-baseline.txt`) for
+   comparison after each modernization commit.
+5. Run `go mod tidy && git diff --exit-code` and confirm no
+   `godebug` lines in `go.mod` pin removed keys
+   (`asynctimerchan`, `tlsunsafeekm`, `tlsrsakex`, `tls3des`,
+   `tls10server`, `x509keypairleaf`, `gotypesalias`).
+6. Verify `git show main:openspec/specs/core-git/spec.md | grep
+   -c WorktreeWriter` returns ≥ 1 (the existing follow-up note
+   for the 4-method `WorktreeWriter` is present). If 0, manually
+   add a one-line follow-up to the existing `core-git` spec
+   before this change's delta applies.
+7. Install `gopatch` (Go rewrite-rule tool) per Decision 12 and
+   generate the rewrite rules named in task 0.6 (one per
+   mechanical transform: Get-drop, type rename per type, bool
+   prefix, modern idioms). Confirm each rule's golden test in
+   `internal/cmdutil/factory_test.go` and `test/golden/` passes
+   against a sample input before any rule ships in a commit.
+8. Land commits in the order in Decision 9, gated by Sign-off
+   Gates 1, 2, and 3 (per the user-chosen sequencing). Each
+   commit:
    - Compiles (`go build ./...`).
    - Passes tests (`go test ./...`).
    - Runs `mise run lint` clean.
    - Carries a single cluster (C1-C14) so bisection stays useful.
-4. After all commits land, run `openspec sync specs --change
+   - Includes its own tag/reflection grep verification.
+8. After all commits land, run `openspec sync specs --change
    naming-refactor-modernize` to merge the four delta files into
    the canonical specs.
-5. Run `openspec archive --change naming-refactor-modernize` to
+9. Run `openspec archive --change naming-refactor-modernize` to
    finalize.
-6. Run `osx-generate-changelog` to add the entry to `CHANGELOG.md`.
+10. Run `osx-generate-changelog` to add the entry to `CHANGELOG.md`.
+
+> Step 7 was renumbered: Pre-merge verification moves into the
+> existing step 6; `gopatch` tooling setup is the new step 7.
+> The follow-on steps 8-10 are renumbered from the previous 8-10.
 
 ## Open Questions
 
 None. All decisions locked in the explore-mode discussion above.
+
+## Deferred Work
+
+Out of scope for this change; tracked for future OpenSpec changes:
+
+- **`WorktreeWriter` interface split** — sits at 4 methods
+  (`CreateWorktree`, `DeleteWorktree`, `ListWorktrees`,
+  `PruneWorktrees`), exceeding the 1-3 method shape recommended by
+  the `golang-structs-interfaces` skill. The split is deferred to
+  a future OpenSpec change; this change keeps the 4-method shape
+  to limit blast radius. Already noted in the existing `core-git`
+  spec under the "WorktreeWriter exposes the four worktree-lifecycle
+  methods" requirement as a follow-up.
+- **`errors.AsType[T]` adoption** — Go 1.27+ generic API for
+  typed error chain inspection. Project target is ≥1.26.2
+  (Non-Goals); this change does not promote the bump. Defer until
+  the Go 1.27 toolchain upgrade lands.
+- **`strings.CutLast` / `reflect.TypeAssert[T]` adoption** — Go 1.27+
+  stdlib improvements. Same defer rationale as `errors.AsType[T]`.
