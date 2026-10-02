@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the 0/1/2 exit-code contract for the CLI binary so scripts that key on exit codes remain portable across this change. The constants and the dispatch helper live in `internal/cmdutil/`; the contract is owned by `cli-error-formatting`.
+Defines the 0/1/2 exit-code contract for the CLI binary so scripts that key on exit codes remain portable across this change. The constants and the dispatch helper live in `internal/cmdutil/`; the contract is owned by this spec, and the dispatch surface lives in `cli-error-formatting`.
 
 ## Requirements
 

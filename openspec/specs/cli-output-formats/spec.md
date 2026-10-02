@@ -52,7 +52,7 @@ The system SHALL accept `--output=<value>` (short `-o <value>`) on every list-st
 - **WHEN** the user runs `twiggit list -o jsonl`
 - **THEN** the system SHALL emit a `core.UsageError` and exit 2
 
-The Formatter interface contract (single `Write(w io.Writer, data any) error` method, no `IOStreams` access) is owned by `cli-output`.
+The Formatter interface contract (single `Write(w io.Writer, data any) error` method, no `IOStreams` access) lives in `cli-output`.
 
 ### Requirement: Output values are shell-completable
 

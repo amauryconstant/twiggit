@@ -115,4 +115,4 @@ The system SHALL expose a `Logger *slog.Logger` field on the `iostreams.IOStream
 
 - **WHEN** `main.go` constructs `iostreams.NewLogger(w)` where `w` is an `io.WriteCloser`
 - **THEN** the calling `RunE` SHALL `defer logger.Close()` immediately after the constructor returns
-- **AND** log records SHALL carry lowercase messages and lowercase attribute keys (per `errors-lowercase-no-punct`)
+- **AND** log records SHALL carry lowercase messages and lowercase attribute keys

@@ -138,6 +138,13 @@ context: |
   - `core-errors` owns the four `core.Error` subtypes (ValidationError,
     NotFoundError, OperationError, UsageError), their constructors, and
     the `Error()`/`Unwrap()` contracts.
+  - `style-enforcement` owns all 35 bracketed-key code-convention rules
+    (`errors-lowercase-no-punct`, `defer-close-immediate`, etc.). The
+    `openspec/AGENTS.md` rules section mirrors this spec for AI
+    situational awareness; the AGENTS.md is not authoritative.
+  - `core-types` owns the value-object constructors (`NewBranchName`,
+    `NewProjectName`, `NewWorktreePath`, etc.) and the named-type surface
+    for `ShellType`, `ContextType`, `PathType`.
   - `cli-error-formatting` owns the cmd-side error-to-exit-code dispatch
     (`ExitCodeFor`), formatter registration order, and the canonical
     exit-code mapping table. Consumer specs use the symbolic exit-code
@@ -188,10 +195,12 @@ rules:
       Format: `# Capability: <Title>` then `## Purpose` then `## Requirements`
       with `### Requirement:` and `#### Scenario:` headings.
     - "[bare-cross-refs] Cross-spec references SHALL use bare directory names (e.g., `cli-prune`), never line-anchored paths (e.g., `cli-prune/spec.md:35`)"
-    - "[no-code-refs] Requirements and scenarios SHALL NOT reference implementation files via `path:N` form (e.g., `internal/foo.go:42`)"
+    - "[no-code-refs-narrative] Requirements and narrative prose SHALL NOT reference implementation via `path:N` form (e.g., `internal/foo.go:42`) or `pkg.Type` / `pkg.Func` identifiers; describe intent, not implementation. Scenarios MAY reference `pkg.Type` and `pkg.Func` names as the natural test surface"
     - "[purpose-coherence] `## Purpose` SHALL match the requirement surface; fix the Purpose (broaden) or fix the Requirement (delete or move)"
     # Layout pin (added; pulled from context block into rules for enforceability)
     - "All specs MUST live at openspec/specs/<category>-<spec-name>/spec.md (one folder deep; no files directly under openspec/specs/, no category subdirectories); see the Spec organization section in this file's context block for the category reference"
+    # Style-enforcement pin (added)
+    - "[style-enforcement-is-authority] Bracketed-key code-convention rules (`errors-lowercase-no-punct`, `defer-close-immediate`, etc.) live in `style-enforcement`; `openspec/AGENTS.md` is the prose mirror for AI situational awareness, not the source of truth"
     # Purity rules (added)
     - "[scope-disclaimer] Requirements SHALL NOT include scope-disclaimer prose (e.g., 'this spec covers only X; Y is out of scope here'); reshape the requirement to match its actual ownership instead"
     - "[no-cross-spec-narrative] Requirements SHALL NOT include cross-spec narrative prose; a bare mention of the other spec's name is enough"

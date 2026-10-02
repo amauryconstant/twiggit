@@ -47,7 +47,7 @@ for the full prune behavior.
 ### Requirement: Short-flag coverage
 
 Every common operation flag SHALL have a short alias. The full mapping
-is owned by `cli-command-options-pattern`; this requirement restates
+lives in `cli-command-options-pattern`; this requirement restates
 that ergonomic short forms SHALL be available on the four high-traffic
 flags: `-f`, `-y`, `-a`, `-n`.
 

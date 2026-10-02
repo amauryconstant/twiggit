@@ -4,7 +4,7 @@
 
 User-friendly error rendering on stderr with actionable hints, exit-code
 dispatch, and panic recovery. This spec is the cmd-side surface;
-the error-type taxonomy itself is owned by `core-errors`.
+the error-type taxonomy itself lives in `core-errors`.
 
 ## Requirements
 

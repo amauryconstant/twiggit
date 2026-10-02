@@ -12,8 +12,7 @@ that users can predict `--help` output and tab completion behavior.
 ### Requirement: `--quiet` global flag (long only)
 
 The system SHALL expose `--quiet` as a global persistent flag on the
-root command. Per `internal/cmdutil/global_flags.go:46`, this flag is
-a `BoolVar` (no short form). When set, the system SHALL suppress
+root command. This flag is a `BoolVar` (no short form). When set, the system SHALL suppress
 non-essential output (success messages, hints, progress) but SHALL
 preserve errors on stderr and any essential output (paths printed for
 `-C` mode) on stdout. See `cli-quiet-mode`. The flag rejection path SHALL emit lowercase, no-trailing-punctuation errors.
@@ -66,14 +65,14 @@ subcommands where the concept applies:
 | `--yes` | `-y` |
 | `--all` | `-a` |
 | `--dry-run` | `-n` |
-| `--output` | (none; long-only per `internal/cmdutil/global_flags.go:45`) |
+| `--output` | (none; long-only) |
 | `--cd` | `-C` |
 | `--config` | `-c` |
 | `--install` | `-i` |
 | `--delete-branches` | `-d` |
 | `--source` | (none; long-only) |
 | `--merged-only` | `-m` |
-| `--quiet` | (none; long-only per `internal/cmdutil/global_flags.go:46`) |
+| `--quiet` | (none; long-only) |
 | `--verbose` | `-v` (count: `-vv` = level 2) |
 
 #### Scenario: Short flag accepted

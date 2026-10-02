@@ -42,7 +42,7 @@ Errors SHALL go to stderr with an actionable hint.
 
 The system SHALL assume the shell wrapper is installed when `twiggit cd`
 is invoked; the wrapper intercepts the path on stdout and `cd`s to it.
-The wrapper runtime behavior is owned by `cli-init`.
+The wrapper runtime behavior lives in `cli-init`.
 
 
 
@@ -53,7 +53,7 @@ The wrapper runtime behavior is owned by `cli-init`.
 - **AND** the implementation SHALL compile against the contract
 ### Requirement: Resolution via context resolver
 
-The system SHALL delegate identifier resolution to `(*git.contextResolver).ResolveIdentifier(currentCtx, target)` constructed via `git.NewContextResolver(cfg, gitClient, gitClient)`. The resolution contract itself (detection priority, identifier parsing, suggestion generation) is owned by `git-context-resolver`; the cmd-layer wiring is owned here. Every error returned by the resolution path SHALL be lowercase with no trailing punctuation. The resolved `string` SHALL be returned as a defensive copy so the caller cannot mutate the resolver's internal buffer.
+The system SHALL delegate identifier resolution to `(*git.contextResolver).ResolveIdentifier(currentCtx, target)` constructed via `git.NewContextResolver(cfg, gitClient, gitClient)`. The resolution contract itself lives in `git-context-resolver`; the cmd-layer wiring is owned here. Every error returned by the resolution path SHALL be lowercase with no trailing punctuation. The resolved `string` SHALL be returned as a defensive copy so the caller cannot mutate the resolver's internal buffer.
 
 #### Scenario: Resolution delegates to git.NewContextResolver
 

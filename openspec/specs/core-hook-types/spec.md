@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Defines the hook-domain value objects used by the post-create hook runner. Types live in `internal/core/hook_types.go`; the runner that consumes them lives in `internal/git/hook_runner.go` and is owned by `git-hook-runner`.
+Defines the hook-domain value objects used by the post-create hook runner. Types live in `internal/core/hook_types.go`; the runner that consumes them lives in `git-hook-runner`.
 
 ## Requirements
 

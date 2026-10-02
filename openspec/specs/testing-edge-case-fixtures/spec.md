@@ -87,5 +87,5 @@ Every fixture's `t.TempDir()` and `git.PlainOpen` handle SHALL be `Close()`d via
 #### Scenario: Fixture teardown contract holds
 
 - **WHEN** a fixture constructor opens a `git.PlainOpen` handle to build the fixture
-- **THEN** the constructor SHALL `defer repo.Close()` immediately after acquisition (per `defer-close-immediate`)
+- **THEN** the constructor SHALL `defer repo.Close()` immediately after acquisition
 - **AND** `t.Cleanup` SHALL remove the extracted `t.TempDir()` once the test ends

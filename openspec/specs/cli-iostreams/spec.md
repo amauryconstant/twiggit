@@ -108,6 +108,6 @@ Data output (tables, JSON, JSON Lines, paths printed for `-C`) SHALL go to `IOSt
 #### Scenario: IOStreams resource hygiene contracts hold
 
 - **WHEN** `main.go` constructs `iostreams.System()`
-- **THEN** `defer ios.In.Close()` SHALL be placed immediately after the constructor returns (per `defer-close-immediate`)
+- **THEN** `defer ios.In.Close()` SHALL be placed immediately after the constructor returns
 - **AND** `ios.Styles()` SHALL return a defensive copy of the singleton's styles (mutating one returned copy SHALL NOT affect a subsequent call)
 - **AND** the `*slog.Logger` returned by `iostreams.NewLogger` SHALL be reachable from `slog.Default()` after `slog.SetDefault` is called once in `main`

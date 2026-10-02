@@ -139,7 +139,7 @@ norm; the project norm for this repo is the comment-light variant).
 - **[errors-checked]** Returned errors MUST always be checked; never discard with `_`. (golang-error-handling)
 - **[errors-wrap-context]** Errors MUST be wrapped with `fmt.Errorf("{context}: %w", err)`. Exception: `core.ValidationError` and `core.UsageError` are returned unwrapped because their constructors already carry context. (golang-error-handling)
 - **[errors-lowercase-no-punct]** Error strings MUST be lowercase, without trailing punctuation, and MUST NOT duplicate context that wrapping adds. (golang-error-handling, golang-naming)
-- **[errors-is-as-only]** MUST use `errors.Is` for sentinel matching and `errors.As` / `errors.AsType[T]` (Go 1.26+) for typed chain inspection; string-matching on `err.Error()` is prohibited. (golang-error-handling)
+- **[errors-is-as-only]** MUST use `errors.Is` for sentinel matching and `errors.AsType[T]` (Go 1.27+ generic API) for typed chain inspection; string-matching on `err.Error()` is prohibited. (golang-error-handling)
 - **[single-handling-rule]** Errors MUST be either logged OR returned, never both. Adapter code in `internal/git/` returns wrapped errors only; logging happens at the cmd boundary via `opts.IO.Logger.With("command", cmd.Name()).Debug(..., "err", err)`. (golang-error-handling)
 - **[no-panic-expected-failures]** NEVER use `panic` for expected error conditions; panic is reserved for programmer errors, impossible invariants, and `Must*` constructors. (golang-error-handling, golang-design-patterns)
 
@@ -159,9 +159,9 @@ norm; the project norm for this repo is the comment-light variant).
 - **[timeout-every-call]** Every external call SHOULD have a timeout via `context.WithTimeout` or per-call deadline. (golang-design-patterns)
 - **[safe-type-assertion]** Type assertions MUST use the comma-ok form `v, ok := x.(T)`; bare assertions panic on mismatch. (golang-safety)
 - **[no-nil-map-write]** Maps MUST be initialized before write; writing to a nil map panics. (golang-safety, golang-code-style)
-- **[defensive-copy-exports]** Exported functions returning slices or maps SHOULD return defensive copies (`slices.Clone`, `maps.Clone`) to prevent caller mutation of internal state. (golang-safety)
+- **[defensive-copy-exports]** Exported functions returning slices or maps whose backing storage is shared with the caller MUST return defensive copies (`slices.Clone`, `maps.Clone`); incidental per-call returns SHOULD return defensive copies. (golang-safety)
 - **[no-concurrent-map]** Maps MUST NOT be accessed concurrently without `sync.Map` or external synchronization. (golang-safety)
-- **[no-init-functions]** `init()` MUST be avoided; use explicit constructors or `sync.OnceValue` lazy initialization. (golang-design-patterns)
+- **[no-init-functions]** `init()` MUST be avoided; use explicit constructors or `sync.OnceValue[T]` / `sync.OnceValues[T]` lazy initialization. (golang-design-patterns)
 
 ### Interfaces / composition
 - **[interface-consumer-side]** Interfaces SHALL be defined where they are consumed, not where they are produced; concrete types return structs. (golang-structs-interfaces, golang-design-patterns)

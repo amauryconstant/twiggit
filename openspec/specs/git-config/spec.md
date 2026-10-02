@@ -69,4 +69,4 @@ Config-loading errors SHALL be lowercase without trailing punctuation (e.g., `co
 
 - **WHEN** the loader fails to parse `config.toml`
 - **THEN** the wrapped error's message SHALL be lowercase without trailing period
-- **AND** the loader SHALL return a `*core.OperationError` walking to the typed-walk per `errors-is-as-only`
+- **AND** the loader SHALL return a `*core.OperationError` walking to the typed-walk

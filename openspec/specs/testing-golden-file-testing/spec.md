@@ -99,5 +99,5 @@ Pre-`CompareGolden` setup SHALL use `require.NoError` (never `assert`) so failin
 #### Scenario: Golden testify hygiene contracts hold
 
 - **WHEN** a golden test reads `goldenBytes := os.ReadFile(path)`
-- **THEN** the precondition SHALL use `require.NoError(t, err, ...)` rather than `assert.NoError` (per `require-for-preconditions`)
+- **THEN** the precondition SHALL use `require.NoError(t, err, ...)` rather than `assert.NoError`
 - **AND** any `require.Equal` call SHALL preserve `(expected, actual)` argument order so diff output reads golden-first

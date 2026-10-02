@@ -3,7 +3,7 @@
 ## Purpose
 
 Global `--quiet` flag (long form only; no `-q` short flag is bound
-per `internal/cmdutil/global_flags.go:46`) that suppresses non-essential
+per the `--quiet` flag wiring in `internal/cmdutil/global_flags.go`) that suppresses non-essential
 output for cleaner scripting, while preserving errors and essential
 data (navigation paths, JSON output).
 
