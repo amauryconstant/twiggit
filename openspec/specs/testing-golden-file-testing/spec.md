@@ -91,3 +91,13 @@ mismatch) and `mise run test:golden:update` (run with
 - **WHEN** developer runs `mise run test:golden:update`
 - **THEN** all golden-file tests SHALL run with `UPDATE_GOLDEN=true`
 - **AND** goldens SHALL be updated in place
+
+### Requirement: Golden testify hygiene
+
+Pre-`CompareGolden` setup SHALL use `require.NoError` (never `assert`) so failing prior steps abort the test rather than produce noisy diff output for tests that would have failed anyway. `require.Equal(t, expected, actual)` (or the testify equivalent for golden-file comparison) SHALL preserve the `(expected, actual)` argument order so diff output is read top-to-bottom (`expected` first).
+
+#### Scenario: Golden testify hygiene contracts hold
+
+- **WHEN** a golden test reads `goldenBytes := os.ReadFile(path)`
+- **THEN** the precondition SHALL use `require.NoError(t, err, ...)` rather than `assert.NoError` (per `require-for-preconditions`)
+- **AND** any `require.Equal` call SHALL preserve `(expected, actual)` argument order so diff output reads golden-first

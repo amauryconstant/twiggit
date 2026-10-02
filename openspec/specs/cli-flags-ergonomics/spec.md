@@ -84,3 +84,13 @@ SHALL NOT print progress to stdout (stdout is reserved for data and
 
 - **WHEN** user runs `twiggit prune --all --quiet`
 - **THEN** progress messages SHALL NOT appear on stderr
+
+### Requirement: Cobra ergonomic-flag contract
+
+Ergonomic-flag commands SHALL set `SilenceUsage: true` so a malformed ergonomic input does not spam the user with `--help`, and positional argument counts SHALL be enforced by `cobra.ExactArgs` (never inside `RunE`). The flag values SHALL flow through `cmd.OutOrStdout()` and `cmd.ErrOrStderr()`.
+
+#### Scenario: Ergonomic flag commands silence usage on bad input
+
+- **WHEN** a user supplies a malformed ergonomic flag value
+- **THEN** the cobra `--help` output SHALL NOT auto-render (suppressed via `SilenceUsage`)
+- **AND** the user SHALL receive a single lowercase, no-trailing-punctuation error per the `errors-lowercase-no-punct` rule

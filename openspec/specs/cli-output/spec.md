@@ -145,3 +145,12 @@ The `--output` flag (and its short form `-o`) SHALL be shell-completable. The co
 - **WHEN** the user invokes shell completion after typing `--output ` or `-o `
 - **THEN** the shell SHALL offer `json`, `table`, `plain` as candidates
 - **AND** SHALL NOT offer file-path completion
+### Requirement: Formatter error and copy contract
+
+`Formatter.Write` errors SHALL be lowercase without trailing punctuation. Any helper returning the row data (e.g., `Tabular.Rows()`) SHALL return a defensive copy (`slices.Clone`) of the source slice so callers cannot mutate internal state. The `JSONFormatter`, `TableFormatter`, and `PlainFormatter` implementations SHALL all satisfy this.
+
+#### Scenario: Formatter error and copy contract holds
+
+- **WHEN** `formatter.Write(w, "raw string")` is invoked against `TableFormatter` (non-tabular input)
+- **THEN** the returned error SHALL be a `*core.UsageError` with lowercase message and no trailing punctuation
+- **AND** when `tabular.Rows()` is called twice, mutating the slice returned by the first call SHALL NOT affect the slice returned by the second call

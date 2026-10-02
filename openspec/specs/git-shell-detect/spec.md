@@ -2,18 +2,18 @@
 
 ## Purpose
 
-Documents the Tier 2 split of shell-related logic. Pure derivation helpers (`DetectShellFromEnv`, `InferShellTypeFromPath`, `core.ShellType`, `core.IsValidShellType`) live in `internal/core/shell_detect.go`; filesystem probing of config files lives in `internal/git/shell_detect.go` (I/O adapter); the `ComposeWrapper` renderer lives in `internal/output/wrapper.go`. The legacy `infrastructure-shell-detect` spec is left intact per the deferred-migration non-goal in the proposal.
+Documents the Tier 2 split of shell-related logic. Pure derivation helpers (`DetectShellFromEnv`, `InferShellTypeFromPath`, `core.ShellType`, `core.IsValidShellType`) live in `internal/core/shell.go`; filesystem probing of config files lives in `internal/git/shell_detect.go` (I/O adapter); the `ComposeWrapper` renderer lives in `internal/output/wrapper.go`.
 
 ## Requirements
 
 ### Requirement: Pure shell derivation lives in internal/core
 
-`core.ShellType` SHALL be a string type defined in `internal/core/shell_detect.go`. The system SHALL recognize exactly three values: `bash`, `zsh`, `fish`. Other values SHALL be rejected by `core.IsValidShellType`. The derivation helpers `core.DetectShellFromEnv()` (reads `$SHELL`) and `core.InferShellTypeFromPath(path)` (maps config-file basename to shell type) SHALL live in `internal/core/shell_detect.go` and SHALL NOT touch the filesystem.
+`core.ShellType` SHALL be a string type defined in `internal/core/shell.go`. The system SHALL recognize exactly three values: `bash`, `zsh`, `fish`. The type SHALL declare an explicit `Unknown` sentinel at `iota` position 0 per the `enum-unknown-zero` rule. Other non-Unknown values SHALL be rejected by `core.IsValidShellType`. The derivation helpers `core.DetectShellFromEnv()` (reads `$SHELL`) and `core.InferShellTypeFromPath(path)` (maps config-file basename to shell type) SHALL live in `internal/core/shell.go` and SHALL NOT touch the filesystem.
 
 #### Scenario: Shell-detect file path is internal/core
 
 - **WHEN** the pure-derivation shell-detect source file is located
-- **THEN** it SHALL be `internal/core/shell_detect.go`
+- **THEN** it SHALL be `internal/core/shell.go`
 
 #### Scenario: ShellType is core.ShellType
 
@@ -45,7 +45,7 @@ Stat failures SHALL be wrapped as `*core.OperationError` with `Op = "shell.probe
 #### Scenario: Probe failure wraps as *core.OperationError
 
 - **WHEN** every file in the preference list errors on stat
-- **THEN** the returned error implements `errors.As(err, &*core.OperationError{})` with `Op = "shell.probe"`
+- **THEN** `errors.AsType[*core.OperationError](err)` SHALL return a non-nil result with `Op == "shell.probe"`
 
 ### Requirement: ComposeWrapper lives in internal/output
 

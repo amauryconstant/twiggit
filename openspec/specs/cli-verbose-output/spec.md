@@ -106,3 +106,13 @@ The system SHALL expose a `Logger *slog.Logger` field on the `iostreams.IOStream
 - **THEN** `ios.Verbosef("cloning %s", src)` SHALL emit the dim-styled human line
 - **AND** `ios.Logger.Debug(...)` SHALL emit the structured record
 - **AND** the two outputs SHALL be distinguishable by content shape (structured key=value vs dim plain text)
+
+### Requirement: Logger resource contract
+
+`iostreams.NewLogger(w io.Writer)` SHALL `defer Close()` the underlying writer (when it implements `io.Closer`) immediately after the writer is acquired. Emitted log records SHALL carry lowercase messages without trailing punctuation. The `*slog.Logger` returned SHALL be a singleton reachable from `slog.Default()` after the binary entry point's `SetDefault` call (per `cli-iostreams`).
+
+#### Scenario: Logger resource and lowercase contracts hold
+
+- **WHEN** `main.go` constructs `iostreams.NewLogger(w)` where `w` is an `io.WriteCloser`
+- **THEN** the calling `RunE` SHALL `defer logger.Close()` immediately after the constructor returns
+- **AND** log records SHALL carry lowercase messages and lowercase attribute keys (per `errors-lowercase-no-punct`)

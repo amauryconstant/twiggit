@@ -86,3 +86,14 @@ owns display.
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
+### Requirement: Hook timeout and resource contract
+
+Every hook command SHALL execute under a `context.WithTimeout(Config.Shell.HookTimeout)` deadline. Any `*exec.Cmd` used by the runner SHALL be `Close()`d via `defer` immediately after `Wait` returns (so file descriptors are released even on early returns). Hook failure messages SHALL be lowercase without trailing punctuation. Per `git-hook-runner`, the runner reuses the `git.CommandExecutor` for `os/exec` invocations.
+
+#### Scenario: Hook timeout and resource contracts hold
+
+- **WHEN** a hook command exceeds `Config.Shell.HookTimeout` seconds
+- **THEN** the runner SHALL send `Process.Kill()` and record `HookFailure{TimedOut: true}`
+- **AND** the next hook SHALL still execute
+- **AND** every `*exec.Cmd` SHALL be `Close()`d via `defer` immediately after `Wait()` returns

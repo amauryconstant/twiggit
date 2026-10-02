@@ -9,13 +9,14 @@ that users can predict `--help` output and tab completion behavior.
 
 ## Requirements
 
-### Requirement: `--quiet` / `-q` global flag
+### Requirement: `--quiet` global flag (long only)
 
-The system SHALL expose `--quiet` (short `-q`) as a global persistent
-flag on the root command. When set, the system SHALL suppress
+The system SHALL expose `--quiet` as a global persistent flag on the
+root command. Per `internal/cmdutil/global_flags.go:46`, this flag is
+a `BoolVar` (no short form). When set, the system SHALL suppress
 non-essential output (success messages, hints, progress) but SHALL
 preserve errors on stderr and any essential output (paths printed for
-`-C` mode) on stdout. See `cli-quiet-mode`.
+`-C` mode) on stdout. See `cli-quiet-mode`. The flag rejection path SHALL emit lowercase, no-trailing-punctuation errors.
 
 
 
@@ -65,13 +66,15 @@ subcommands where the concept applies:
 | `--yes` | `-y` |
 | `--all` | `-a` |
 | `--dry-run` | `-n` |
-| `--output` | `-o` |
+| `--output` | (none; long-only per `internal/cmdutil/global_flags.go:45`) |
 | `--cd` | `-C` |
 | `--config` | `-c` |
 | `--install` | `-i` |
 | `--delete-branches` | `-d` |
 | `--source` | (none; long-only) |
 | `--merged-only` | `-m` |
+| `--quiet` | (none; long-only per `internal/cmdutil/global_flags.go:46`) |
+| `--verbose` | `-v` (count: `-vv` = level 2) |
 
 #### Scenario: Short flag accepted
 
@@ -101,9 +104,9 @@ The system SHALL expose Unix-style aliases:
 ### Requirement: Context-aware argument inference
 
 The system SHALL infer project names from CWD when the user is inside a
-project or worktree, using `application.ContextService`. When CWD is
-outside any git context, an explicit project argument SHALL be
-required.
+project or worktree, using `(*git.contextDetector).DetectContext(dir)`
+composed in `cmd/<command>.go`. When CWD is outside any git context,
+an explicit project argument SHALL be required. Positional argument counts SHALL be enforced by `cobra.ExactArgs` validators, never inside `RunE`.
 
 #### Scenario: Infer from project context
 

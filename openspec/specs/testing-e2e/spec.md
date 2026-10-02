@@ -27,14 +27,15 @@ command: `list_test.go`, `create_test.go`, `delete_test.go`,
 The project's test pyramid SHALL be, in order of increasing scope and
 decreasing volume:
 
-1. **Unit** (most tests, fastest) — `internal/service/` and
-   `internal/domain/` with mocks
+1. **Unit** (most tests, fastest) — `internal/core/` with mocks and
+   `cmd/*_test.go` covering per-command logic
 2. **Integration** — `test/integration/` with real git repos
 3. **E2E** (fewest tests, slowest) — `test/e2e/` against the built
    binary
 
-The cmd layer is tested exclusively via E2E; see
-`infrastructure-release` for the rationale.
+The cmd layer is covered by both unit tests in `cmd/*_test.go` and
+end-to-end tests in `test/e2e/`; the E2E suite verifies the full CLI
+contract including cobra wiring and exit codes.
 
 
 
@@ -85,8 +86,10 @@ cd, init, completion, version. Each command SHALL have at least one
 ### Requirement: Fixtures
 
 Common git scenarios SHALL be available as fixtures:
-`test/fixtures/` provides a corrupted repo, a bare repo, a repo with
-submodules, and a detached-HEAD repo. See `testing-edge-case-fixtures`.
+`test/e2e/fixtures/repos/` provides a corrupted repo (`corrupted.tar.gz`),
+a bare repo (`bare-main.tar.gz`), a repo with submodules
+(`submodule.tar.gz`), and a detached-HEAD repo (`detached.tar.gz`). See
+`testing-edge-case-fixtures`.
 
 
 
@@ -101,6 +104,27 @@ Tests SHALL inject a fake IOStreams when testing the cmd layer in
 isolation (without building the binary). The injection pattern uses
 `runF` injection at the command constructor. See
 `testing-helpers`.
+
+#### Scenario: IOStreams injection via runF
+
+- **WHEN** a test invokes `NewCmdList(testFactory, runF)` with a `runF` that reads from an `iostreams.Test()` instance
+- **THEN** the command SHALL write data to the test stdout buffer (not `os.Stdout`)
+- **AND** the test asserts on the buffer contents without touching the host process's stdio
+
+### Requirement: E2E testify hygiene
+
+Ginkgo `BeforeEach` setup SHALL use `require.NoError` / `require.NotNil` for preconditions (never `assert`). Every mock injected via `WithMocks` SHALL be verified by `mock.AssertExpectations(GinkgoT())` at suite teardown so missing expectations fail the suite rather than pass silently.
+
+#### Scenario: Ginkgo BeforeEach uses require
+
+- **WHEN** a Ginkgo `BeforeEach` reads `mockClient.SomeCall(...)` setup
+- **THEN** the precondition checks SHALL use `Expect(err).NotTo(HaveOccurred())` (Gomega equivalent of `require`) — silent failures SHALL NOT be tolerated
+
+#### Scenario: Mock expectations verified at teardown
+
+- **WHEN** a Ginkgo `AfterEach` runs after a suite that injected mocks via `WithMocks`
+- **THEN** `mock.AssertExpectations(GinkgoT())` SHALL be called
+- **AND** missing expectations SHALL fail the suite
 
 
 #### Scenario: Definition holds

@@ -178,7 +178,7 @@ inside, with an actionable hint.
 The system SHALL load `ValidationConfig.ProtectedBranches` from
 configuration (default: `main`, `master`, `develop`, `staging`,
 `production`) and SHALL use this list for prune safety checks.
-See `domain-config-types`.
+See `git-config`.
 
 
 #### Scenario: Definition holds
@@ -186,3 +186,13 @@ See `domain-config-types`.
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
+### Requirement: Prune timeout and error contract
+
+Every bulk-prune `git` invocation SHALL carry a per-worktree `context.WithTimeout` deadline (the same `Config.Shell.HookTimeout` family or a dedicated prune budget). Returned errors SHALL be lowercase without trailing punctuation.
+
+#### Scenario: Prune timeout and error contract holds
+
+- **WHEN** a prune operation fails (dirty worktree without `--force`) or a per-worktree git call exceeds its deadline
+- **THEN** the rendered message SHALL be lowercase without trailing period
+- **AND** the runner SHALL cancel the running git subprocess via `ctx.Err()` and continue with the next worktree

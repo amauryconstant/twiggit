@@ -18,7 +18,7 @@ The system SHALL map error categories to exit codes via the `cmdutil.ExitCodeFor
 | 1 | `ExitError` | General unclassified error, runtime failure, or recovered panic |
 | 2 | `ExitUsage` | Usage error (invalid command syntax) |
 
-The cmd layer SHALL NOT define additional exit-code constants. See `core-errors` for the canonical definitions; per-resource NotFound categories are distinguished in user-facing output by the per-resource NotFound hints requirement, not by exit code. `ExitCodeFor` SHALL dispatch first via `errors.As(err, &*core.UsageError{})`, returning `ExitUsage`; otherwise returning `ExitError` for any non-nil error and `ExitOK` for nil.
+The cmd layer SHALL NOT define additional exit-code constants. See `core-errors` for the canonical definitions; per-resource NotFound categories are distinguished in user-facing output by the per-resource NotFound hints requirement, not by exit code. `ExitCodeFor` SHALL dispatch first via `errors.AsType[*core.UsageError](err)`, returning `ExitUsage`; otherwise returning `ExitError` for any non-nil error and `ExitOK` for nil.
 
 #### Scenario: Validation error → ExitCodeError
 
@@ -43,7 +43,7 @@ The cmd layer SHALL NOT define additional exit-code constants. See `core-errors`
 
 #### Scenario: Cobra usage error → ExitCodeUsage
 
-- **WHEN** an error matching `*core.UsageError` via `errors.As` reaches the formatter
+- **WHEN** an error matching `*core.UsageError` via `errors.AsType[*core.UsageError](err)` reaches the formatter
 - **THEN** system SHALL exit with code `ExitUsage` (2)
 
 ### Requirement: User-friendly messages
@@ -63,12 +63,12 @@ The system SHALL format error messages for users, omitting internal operation na
 
 ### Requirement: Type-matched dispatch
 
-The system SHALL dispatch formatters via an explicit matcher strategy using `errors.As()` rather than reflection. Registration order SHALL place more specific matchers before generic ones. Formatters SHALL extract typed errors via a single `errors.As` check. The registry SHALL register formatters for the four core types in this order: `*core.ValidationError`, `*core.NotFoundError`, `*core.OperationError`, `*core.UsageError`. A generic fallback renders unknown error types without dereferencing a nil pointer.
+The system SHALL dispatch formatters via an explicit matcher strategy using `errors.AsType[T](err)` (Go 1.27 generic API) rather than reflection. Registration order SHALL place more specific matchers before generic ones. Formatters SHALL extract typed errors via a single `errors.AsType[*T]` call. The registry SHALL register formatters for the four core types in this order: `*core.ValidationError`, `*core.NotFoundError`, `*core.OperationError`, `*core.UsageError`. A generic fallback renders unknown error types without dereferencing a nil pointer. `output.FormatError` SHALL return the error without logging so the cmd boundary is the sole logging site. `FormatError` SHALL return a `*core.OperationError` or `*core.UsageError` for every expected failure; it SHALL never `panic`.
 
 #### Scenario: Specific matcher wins
 
-- **WHEN** `errors.As(err, &*core.ValidationError{})` is true
-- **AND** `errors.As(err, &*core.OperationError{})` is also true
+- **WHEN** `errors.AsType[*core.ValidationError](err)` returns a non-nil result
+- **AND** `errors.AsType[*core.OperationError](err)` also returns a non-nil result
 - **THEN** the ValidationError formatter SHALL win because it is registered first
 
 #### Scenario: asType helper guards nil dereference

@@ -73,3 +73,12 @@ The system SHALL send all data output to stdout and all diagnostic output (error
 - **WHEN** user runs `twiggit list -o json | jq .`
 - **THEN** `jq` SHALL receive only the JSON document on stdin
 - **AND** progress messages SHALL NOT corrupt the JSON stream
+
+### Requirement: Output format validator emits lowercase errors
+
+The `--output` flag validator SHALL return lowercase error strings without trailing punctuation for every rejected value (including the legacy `text` alias and the dropped `jsonl` alias). The error message SHALL list the accepted values (`json`, `table`, `plain`) without uppercase letters or punctuation at the end.
+
+#### Scenario: Rejection message is lowercase
+
+- **WHEN** the user runs `twiggit list -o XML`
+- **THEN** the rendered error SHALL read e.g. `unknown output format "xml": accepted values are json, table, plain` (lowercase, no trailing period)

@@ -89,7 +89,7 @@ context: |
     AssertExpectations(t)
   - Integration tests (Testify) in test/integration/ with real git repos
   - E2E tests (Ginkgo/Gomega) in test/e2e/ with built binary
-  - cmd/ tested via E2E only (no unit tests)
+  - cmd/ covered by unit tests under `cmd/*_test.go` and by `test/e2e/`
   - Race detector: go test -race ./...
   - Module drift gate: go mod tidy && git diff --exit-code
   - Golden-file tests: test/golden/ with UPDATE_GOLDEN toggle
@@ -114,32 +114,39 @@ context: |
     - `cli-` — command-line interface layer (alignment: cmd/,
       internal/cmdutil/, internal/iostreams/). Examples: cobra framework
       setup, exit codes, output formats, shell completion, error
-      formatting, command surface, flag conventions, help examples.
+      formatting, command surface, flag conventions, help examples,
+      factory wiring.
     - `core-` — pure functional core (alignment: internal/core/).
       Examples: typed-error taxonomy, context types, config knob types,
-      hook types, role-interface segregation, value objects.
+      hook types, role-interface segregation, value objects, service
+      requests/results, validation pipeline, shell types, git types,
+      service-error constructors.
     - `git-` — git I/O adapter + config (alignment: internal/git/,
       internal/config/). Examples: git client routing, context resolver,
-      hook runner, shell-detect, config loading, command executor.
+      hook runner, shell-detect, config loading, command executor,
+      repo finder.
     - `testing-` — test infrastructure (alignment: test/). Examples: e2e
       suite, helpers, golden files, fixtures, conventions.
+    - Cross-package: `output-progress` (cmd/suggestions.go) and
+      `version-package` (internal/version/) live under `cli-` and `core-`
+      respectively; both names retain their descriptive suffix.
   - Cross-spec references SHALL use bare directory names (e.g., `cli-prune`),
     never line-anchored paths (e.g., `cli-prune/spec.md:35`).
 
   Canonical spec ownership (consult before adding content; cross-reference the
   owner instead of restating):
   - `core-errors` owns the four `core.Error` subtypes (ValidationError,
-    NotFoundError, OperationError, UsageError), their constructors,
-    `Error()`/`Unwrap()` contracts, and the canonical exit-code mapping
-    table.
+    NotFoundError, OperationError, UsageError), their constructors, and
+    the `Error()`/`Unwrap()` contracts.
   - `cli-error-formatting` owns the cmd-side error-to-exit-code dispatch
-    (`ExitCodeFor`) and formatter registration order. Consumer specs use
-    the symbolic exit-code names.
+    (`ExitCodeFor`), formatter registration order, and the canonical
+    exit-code mapping table. Consumer specs use the symbolic exit-code
+    names.
   - `git-context-resolver` owns the context-detection priority chain
     (worktree > project > outside git) and identifier resolution.
   - `git-client` owns the GoGit/CLI composite routing decision and the
-    worktree-lifecycle surface (CreateWorktree, DeleteWorktree, Prune,
-    MoveWorktree). Read-side method sets split by role per `core-git`.
+    worktree-lifecycle surface (CreateWorktree, DeleteWorktree,
+    PruneWorktrees). Read-side method sets split by role per `core-git`.
   - `core-git` owns the role-interface segregation (RepositoryOpener,
     BranchReader, RepositoryReader, RemoteReader, WorktreeWriter,
     BranchWriter) and the drift sentinel that enforces method-set

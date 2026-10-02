@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Documents the context-detection priority chain (worktree > project > outside git) for the Tier 2 layout. Path-traversal protection uses `core.NormalizePath` and `core.IsPathUnder` from `internal/core/`. The legacy `infrastructure-context-resolver` spec is left intact per the deferred-migration non-goal in the proposal.
+Documents the context-detection priority chain (worktree > project > outside git) for the Tier 2 layout. Path-traversal protection uses `core.NormalizePath` and `core.IsPathUnder` from `internal/core/`.
 
 ## Requirements
 
@@ -42,3 +42,13 @@ When checking whether `dir` is under `core.Config.ProjectsDirectory` or `core.Co
 
 - **WHEN** `dir = /tmp/sneaky` is a symlink to `/tmp/real` and `/tmp/real` is inside `core.Config.ProjectsDirectory`
 - **THEN** the resolver classifies `dir` as `core.ContextProject` after symlink resolution
+
+### Requirement: Context resolver resource contract
+
+Every `git.PlainOpen` handle acquired during context resolution SHALL be `Close()`d via `defer` immediately after acquisition (so leaked repository handles cannot pile up across resolutions). Emitted errors SHALL be lowercase without trailing punctuation. The resolver reuses `*git.reader`'s existing LRU cache via `core.WithCacheSize`/`WithCacheDisabled` (per `git-client`).
+
+#### Scenario: Resolver resource and lowercase contracts hold
+
+- **WHEN** `(*contextResolver).ResolveIdentifier(...)` runs
+- **THEN** `defer repo.Close()` SHALL be placed immediately after the `git.PlainOpen(...)` call returns
+- **AND** emitted errors SHALL be lowercase without trailing period (e.g., `core: worktree not found: feat/missing`)

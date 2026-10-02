@@ -25,11 +25,11 @@ The `cmdutil` package SHALL define `type ExitCode int` and SHALL export three co
 - **WHEN** a command returns a `*core.UsageError`
 - **THEN** `ExitCodeFor` returns `ExitUsage` and `main` exits 2
 
-### Requirement: ExitCodeFor dispatches on error type via errors.As
+### Requirement: ExitCodeFor dispatches on error type via errors.AsType
 
-`cmdutil.ExitCodeFor(err error) ExitCode` SHALL dispatch first via `errors.As(err, &*core.UsageError{})`, returning `ExitUsage` for any match; otherwise returning `ExitError` for any non-nil error and `ExitOK` for nil. The previous `GetExitCodeForError` name is not used.
+`cmdutil.ExitCodeFor(err error) ExitCode` SHALL dispatch first via `errors.AsType[*core.UsageError](err)` (Go 1.27 generic AsType), returning `ExitUsage` for any non-nil result; otherwise returning `ExitError` for any non-nil error and `ExitOK` for nil. The previous `GetExitCodeForError` name is not used. The dispatcher SHALL NOT log or re-wrap the error before returning the `ExitCode`. Every error message that reaches `ExitCodeFor` SHALL already be lowercase with no trailing punctuation.
 
-#### Scenario: errors.As walk reaches UsageError through wrapping
+#### Scenario: errors.AsType walk reaches UsageError through wrapping
 
 - **WHEN** the error chain is `fmt.Errorf("wrapped: %w", core.NewUsageError("bad arg"))`
 - **THEN** `ExitCodeFor` returns `ExitUsage` (2)

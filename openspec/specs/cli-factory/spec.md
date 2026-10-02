@@ -8,7 +8,7 @@ Defines the Factory composition pattern with lazy initialization for CLI command
 
 ### Requirement: Factory exposes lazy function fields
 
-The `cmdutil.Factory` type SHALL expose one lazy `func() T` field per dependency (`Config`, `GitClient`, `IOStreams`, `Formatter`, `FormatError`). The fields SHALL be assigned at construction time and invoked at first use.
+The `cmdutil.Factory` type SHALL expose the lazy `func() (T, error)` fields: `Config`, `GitClient`, `Logger`. The `IOStreams` is wired eagerly via the factory constructor (not lazy). There is no `Formatter` or `FormatError` lazy field on the factory — formatters live in `internal/output/` and are constructed per call by the cmd layer. The fields SHALL be assigned at construction time and invoked at first use. Every resource acquired inside a Factory lazy function SHALL be `Close()`d via `defer` immediately. The per-role interface method sets SHALL be guarded by a `var _ T = (*Impl)(nil)` drift sentinel that fails compilation when signatures change.
 
 #### Scenario: Lazy field is nil before first call
 
@@ -20,9 +20,9 @@ The `cmdutil.Factory` type SHALL expose one lazy `func() T` field per dependency
 - **WHEN** a command calls `f.Config()` twice during one binary invocation
 - **THEN** the second call SHALL return the same `*core.Config` pointer as the first call
 
-### Requirement: Config is cached via sync.OnceValue
+### Requirement: Config is cached via sync.OnceValues
 
-`Factory.Config` SHALL use `sync.OnceValue(func() (*core.Config, error))` to guarantee the config file is read and parsed exactly once per binary invocation, even when multiple commands access it.
+`Factory.Config` SHALL use `sync.OnceValues(func() (*core.Config, error))` to guarantee the config file is read and parsed exactly once per binary invocation, even when multiple commands access it. `Factory.GitClient` and `Factory.Logger` SHALL also use `sync.OnceValues` for the same caching guarantee.
 
 #### Scenario: Config file is read at most once
 

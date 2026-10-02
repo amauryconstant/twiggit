@@ -6,8 +6,12 @@ Generate or install the shell wrapper that intercepts `twiggit cd` to
 enable navigation between worktrees and projects. Two modes:
 **stdout** (default, eval-safe) for `eval "$(twiggit init)"` activation,
 and **install** (`--install`) for persistent writes to the user's shell
-config file. Service-layer generation and validation contracts are owned
-by `application-shell-service`.
+config file. Wrapper composition, validation, and config-file probing
+live in `internal/output/` (`output.ComposeWrapper`,
+`output.InstallWrapper`, `output.ValidateInstallation`,
+`output.DetectConfigFile`); shell-type derivation lives in
+`internal/core/shell.go`; shell-type filesystem probing lives in
+`internal/git/shell_detect.go`.
 
 ## Requirements
 
@@ -207,10 +211,17 @@ modify any other commands.
 
 ### Requirement: Service contract
 
-The cmd layer SHALL delegate wrapper generation, installation, and
-validation to `application-shell-service`. The service contract is owned
-by `application-shell-service`. This spec is silent on service-layer
-internals.
+The cmd layer SHALL delegate wrapper composition to
+`output.ComposeWrapper(template, shellType)`, installation to
+`output.InstallWrapper(path, blocks, isOld=false)` /
+`output.InstallWrapper(path, blocks, isOld=true)` (force mode),
+validation to `output.ValidateInstallation(path, shellType)`, and
+config-file probing to `output.DetectConfigFile(shellType)`. Shell-type
+derivation SHALL use `core.DetectShellFromEnv()` /
+`core.InferShellTypeFromPath(path)`; filesystem probing for shell
+config files SHALL use `git.ProbeShellConfigFile(shellType)`. Any
+`defer Close()` SHALL be applied immediately after resource
+acquisition. Emitted errors SHALL be lowercase with no trailing punctuation.
 
 
 #### Scenario: Definition holds

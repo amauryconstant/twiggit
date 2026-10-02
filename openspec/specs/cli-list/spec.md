@@ -74,18 +74,23 @@ When `--output` is not supplied (the empty string), `list` SHALL render each wor
 
 ### Requirement: JSON array output via --output
 
-The system SHALL accept `--output=json`/`-o json` to emit a bare JSON array suitable for scripting. Collections SHALL be emitted as a bare JSON array on stdout; the empty case yields `[]`. Data SHALL go to stdout; errors and progress SHALL go to stderr.
+The system SHALL accept `--output=json` (long form only; no `-o`
+short on `list` per `cli-command-options-pattern`) to emit a bare
+JSON array suitable for scripting. Collections SHALL be emitted as a
+bare JSON array on stdout; the empty case yields `[]`. Data SHALL
+go to stdout; errors and progress SHALL go to stderr. Emitted errors SHALL be lowercase without
+trailing punctuation. Every git query SHALL execute under a `context.WithTimeout`.
 
 #### Scenario: JSON list output is a bare array
 
-- **WHEN** the user runs `twiggit list -o json` from a project context
+- **WHEN** the user runs `twiggit list --output=json` from a project context
 - **THEN** the system SHALL emit a bare JSON array on stdout with shape:
   `[{branch, path, status}, ...]`
 - **AND** SHALL exit with status 0
 
 #### Scenario: JSON list with --all is a bare array
 
-- **WHEN** the user runs `twiggit list --all -o json`
+- **WHEN** the user runs `twiggit list --all --output=json`
 - **THEN** the system SHALL emit a bare JSON array with project context per worktree
 - **AND** main worktrees SHALL be excluded
 

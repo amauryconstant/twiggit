@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Documents the composite `git.GitClient` for the Tier 2 layout: a single client type that routes read operations to `GoGitClient` and mutation operations to `CLIClient`. The legacy `infrastructure-git-client` spec retains the two-role-interface design per the deferred-migration non-goal in the proposal; this new spec is the Tier 2 path going forward and the canonical surface for new code.
+Documents the composite `git.Client` for the Tier 2 layout: a single client type that routes read operations to `GoGitClient` and mutation operations to `CLIClient`.
 
 ## Requirements
 
@@ -81,7 +81,7 @@ All failures SHALL be wrapped via `git.NewRepoError`, `git.NewWorktreeError`, `g
 #### Scenario: Failure surfaces as *core.OperationError
 
 - **WHEN** `git.PlainOpen(path)` fails
-- **THEN** the returned error's `errors.As(err, &*core.OperationError{})` returns `true` with `Op = "git.open"`, `Message` naming the path, and `Cause` set via `%w`
+- **THEN** `errors.AsType[*core.OperationError](err)` SHALL return a non-nil result whose `Op == "git.open"`, `Message` names the path, and `Cause` is set via `%w`
 
 ### Requirement: Per-role Factory fields are additive to composite
 
@@ -164,16 +164,16 @@ SHALL return raw `go-git` or `os/exec` errors.
 
 - **WHEN** `git.PlainOpen(path)` fails inside the read-side concrete
   client
-- **THEN** the returned error's `errors.As(err, &*core.OperationError{})`
-  SHALL be true with `Op = "git.repository"`, `Message` naming the
-  path, and `Cause` set via `%w`
+- **THEN** `errors.AsType[*core.OperationError](err)` SHALL return a non-nil
+  result with `Op = "git.repository"`, `Message` naming the path, and
+  `Cause` set via `%w`
 
 #### Scenario: Write-side failure surfaces as *core.OperationError
 
 - **WHEN** the git CLI subprocess returns a non-zero exit code
   inside the write-side concrete client
-- **THEN** the returned error's `errors.As(err, &*core.OperationError{})`
-  SHALL be true with `Op = "git.worktree.<command>"` (or `Op =
+- **THEN** `errors.AsType[*core.OperationError](err)` SHALL return a non-nil
+  result with `Op = "git.worktree.<command>"` (or `Op =
   "git.branch.<command>"`) and a `Cause` wrapping the underlying
   exit-code error
 
@@ -195,3 +195,13 @@ re-deriving them from concrete-client signatures.
   signatures of any role
 - **THEN** the source of truth SHALL be `core-git`
 - **AND** this capability SHALL NOT redefine them
+
+### Requirement: Git client resource and copy contract
+
+Every `*go-git.Repository` handle acquired by `*git.reader` SHALL be `Close()`d via `defer` immediately after acquisition. Read methods returning `[]string` or `[]core.*Info` SHALL return `slices.Clone` defensive copies so callers cannot mutate internal cache state.
+
+#### Scenario: Repository handle close and copy contracts hold
+
+- **WHEN** `*git.reader.GetRepositoryStatus(ctx, repoPath)` runs
+- **THEN** `defer repo.Close()` SHALL be placed immediately after `git.PlainOpen` returns (within the reader's internal helper)
+- **AND** the returned `[]string` (modified files) SHALL be a defensive copy: mutating it SHALL NOT affect subsequent reads

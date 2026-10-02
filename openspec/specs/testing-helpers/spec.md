@@ -16,9 +16,11 @@ cleanup, plus error handling. Coverage SHALL exceed 70%.
 
 #### Scenario: Create test worktree
 
-- **WHEN** `CreateTestWorktree` is called with a valid repo and branch
-- **THEN** a worktree SHALL be created at the expected path
-- **AND** the worktree SHALL point to the correct branch
+- **WHEN** `NewWorktreeTestHelper()` is invoked and then
+  `(*WorktreeTestHelper).CreateWorktree(repoPath, worktreePath, branch)` is called
+- **THEN** a worktree SHALL be created at `worktreePath` inside `repoPath`
+- **AND** the worktree SHALL point to the specified branch
+- **AND** the helper SHALL register a `t.Cleanup` callback so the worktree is removed when the test ends
 
 #### Scenario: Validate worktree
 
@@ -75,7 +77,10 @@ test fails or panics. Multiple cleanups SHALL execute in LIFO order.
 
 All helper functions SHALL call `t.Helper()` so that test failures
 report the calling line, not the helper internals. Nested helpers
-SHALL each call `t.Helper()`.
+SHALL each call `t.Helper()`. Precondition checks SHALL use `require.NoError`
+/ `require.NotNil` (never `assert`). Helper builders returning `[]string` or `map[string]string` SHALL
+return `slices.Clone` / `maps.Clone` defensive copies so callers cannot
+mutate internal fixture state.
 
 #### Scenario: Helper marks itself
 

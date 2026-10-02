@@ -26,3 +26,14 @@ The root `twiggit` command SHALL assign subcommands to groups via `cobra.Command
 
 - **WHEN** `cmd.AddGroup` is called after `cmd.AddCommand` for a subcommand
 - **THEN** that subcommand does NOT appear under the group in `--help` output (cobra does not retroactively assign groups)
+
+### Requirement: Cobra group rules
+
+Every subcommand SHALL set `RunE` (never `Run`), `SilenceUsage: true`, `SilenceErrors: true`, and SHALL validate positional argument counts via `cobra.ExactArgs` (never inside `RunE`). The cobra group rendering SHALL be the only visible effect of `--help`; per-group rules SHALL NOT duplicate cobra's auto-rendering.
+
+#### Scenario: Grouped subcommands respect cobra hygiene rules
+
+- **WHEN** any subcommand under `core`, `navigation`, `setup`, or `meta` is inspected
+- **THEN** `cmd.RunE != nil` (never `cmd.Run`)
+- **AND** `cmd.SilenceUsage == true` and `cmd.SilenceErrors == true`
+- **AND** `cmd.Args` SHALL be a `cobra.Args` validator (e.g., `cobra.ExactArgs(N)`) — never a length check inside `RunE`

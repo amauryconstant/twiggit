@@ -19,7 +19,7 @@ defined consumer-side and SHALL NOT include `OpenRepository`. The
 godoc SHALL explain that `OpenRepository` is intentionally excluded: no
 command consumes it directly, and `*go-git.Repository` is not an
 exportable return type in `internal/core/` (`core-isolation` depguard
-permits only `$gostd + samber/lo`).
+permits only `$gostd`).
 
 #### Scenario: RepositoryOpener declares one method
 
@@ -188,18 +188,16 @@ all 14 role methods.
 
 Each role interface declared in `internal/core/git.go` SHALL be
 importable from `twiggit/internal/core` without importing any package
-other than the Go standard library and `github.com/samber/lo`. No role
-interface SHALL introduce a dependency on `internal/git/`,
-`internal/cmdutil/`, `internal/config/`, `internal/output/`,
-`internal/iostreams/`, or `cmd/`. The Tier 2 depguard rule from
-`openspec/config.yaml` (`core-isolation: $gostd + samber/lo`)
-governs this contract.
+other than the Go standard library. No role interface SHALL introduce
+a dependency on `internal/git/`, `internal/cmdutil/`, `internal/config/`,
+`internal/output/`, `internal/iostreams/`, or `cmd/`. The Tier 2
+depguard rule from `openspec/config.yaml`
+(`core-isolation: $gostd`) governs this contract.
 
-#### Scenario: Role interfaces import nothing beyond stdlib and samber/lo
+#### Scenario: Role interfaces import only stdlib
 
 - **WHEN** the import graph of `internal/core/git.go` is computed
-- **THEN** every import SHALL be either a `$gostd` package or
-  `github.com/samber/lo`
+- **THEN** every import SHALL be a `$gostd` package
 - **AND** no role interface declared in that file SHALL reference
   `*go-git.Repository` or any other type from `internal/git/`
 
@@ -295,3 +293,14 @@ single-handling rule (logged OR returned, never both) SHALL apply.
 - **AND** the underlying `sync.OnceValues` cache SHALL retain its
   failure-or-success semantics for subsequent calls (per the
   `errors`-wrapped behavior of `sync.OnceValues`)
+
+### Requirement: Role interface naming follows no-stuttering
+
+Consumer-side role interfaces SHALL NOT repeat the `git` package qualifier in their identifiers (`BranchReader`, not `git.GitBranchReader`); sentinel errors returned by role methods SHALL use the `Err` prefix (`ErrBranchNotFound`, not `BranchNotFoundError`). The six role names declared in `internal/core/git.go` SHALL each match `^[A-Z][A-Za-z0-9]*Reader$` or `^[A-Z][A-Za-z0-9]*Writer$` (no `Git`/`Repository`/`Branch` prefix stutter).
+
+#### Scenario: Role-interface naming follows conventions
+
+- **WHEN** the package user enumerates the six role interfaces in `internal/core/git.go`
+- **THEN** no role SHALL begin with `Git` followed by the role's noun (e.g., `GitBranchReader` is forbidden)
+- **AND** no role SHALL carry the package qualifier inside its name
+- **AND** any sentinel error returned by a role method SHALL match `^Err[A-Z][A-Za-z0-9]*$` (per `err-prefix-suffix`)

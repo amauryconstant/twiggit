@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Documents the path-utility helpers in their new home at `internal/core/`, used by the context resolver and project discovery. The legacy `infrastructure-path-utils` spec is left intact per the deferred-migration non-goal in the proposal.
+Documents the path-utility helpers in `internal/core/pathutils.go`, used by the context resolver and project discovery.
 
 ## Requirements
 
@@ -50,7 +50,7 @@ Documents the path-utility helpers in their new home at `internal/core/`, used b
 
 ### Requirement: All failures returned as plain error (no domain wrapper)
 
-`core.ExtractProjectFromWorktreePath`, `core.NormalizePath`, and `core.IsPathUnder` SHALL return plain `error` values (no domain wrapper). The `infrastructure-path-utils` rule that wrapped failures via `domain.NewContextDetectionError` is removed; callers in `internal/git/context_resolver.go` wrap as needed.
+`core.ExtractProjectFromWorktreePath`, `core.NormalizePath`, and `core.IsPathUnder` SHALL return plain `error` values (no `domain.*` wrapper — the `domain` package does not exist in the Tier 2 layout). Callers in `internal/git/context_resolver.go` wrap as needed. Returned error strings SHALL be lowercase without trailing punctuation. Any error wrapper a caller adds SHALL use the `Error` suffix.
 
 #### Scenario: Helper returns plain error
 

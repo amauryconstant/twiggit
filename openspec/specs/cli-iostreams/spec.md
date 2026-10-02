@@ -99,3 +99,15 @@ Data output (tables, JSON, JSON Lines, paths printed for `-C`) SHALL go to `IOSt
 
 - **WHEN** `TWIGGIT_DEBUG=1` is set in the test process and `iostreams.Test()` is called
 - **THEN** calling `ios.Logger.Debug("hello")` writes "hello" into the stderr `bytes.Buffer` returned by `iostreams.Test()`, not to the host process's `os.Stderr`
+
+
+### Requirement: IOStreams resource hygiene
+
+`IOStreams.In` SHALL be `Close()`d via `defer` immediately after acquisition. `Styles()` SHALL return a defensive copy (`maps.Clone`) of the singleton's style table so callers cannot mutate the shared state. The `*slog.Logger` singleton SHALL be initialized exactly once per process via `iostreams.NewLogger` and SHALL be reachable from both `IOStreams.Logger` and `slog.Default()` after `main` calls `slog.SetDefault`.
+
+#### Scenario: IOStreams resource hygiene contracts hold
+
+- **WHEN** `main.go` constructs `iostreams.System()`
+- **THEN** `defer ios.In.Close()` SHALL be placed immediately after the constructor returns (per `defer-close-immediate`)
+- **AND** `ios.Styles()` SHALL return a defensive copy of the singleton's styles (mutating one returned copy SHALL NOT affect a subsequent call)
+- **AND** the `*slog.Logger` returned by `iostreams.NewLogger` SHALL be reachable from `slog.Default()` after `slog.SetDefault` is called once in `main`

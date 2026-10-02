@@ -25,7 +25,8 @@ when the user provides an explicit `project/branch` argument.
 
 When the user runs `twiggit create <branch>` without a project
 prefix, the system SHALL infer the project from CWD via
-`application.ContextService`. See `infrastructure-context-resolver`.
+`(*git.contextDetector).DetectContext(dir)` composed in
+`cmd/create.go`. See `git-context-resolver`.
 
 #### Scenario: Infer project
 
@@ -56,7 +57,7 @@ the default source branch.
 ### Requirement: Branch name validation
 
 The system SHALL validate the branch name before attempting creation
-and return a `domain.ValidationError` on invalid input.
+and return a `*core.ValidationError` on invalid input.
 
 #### Scenario: Invalid branch name
 
@@ -103,14 +104,16 @@ When the project has `.twiggit.toml` with `[hooks.post-create]`
 configured, the system SHALL execute the configured commands after a
 successful create. Failures SHALL be collected and reported but SHALL
 NOT roll back the worktree. The hook runner contract is owned by
-`infrastructure-hook-runner`.
+`git-hook-runner`. Each hook invocation SHALL execute under a
+`context.WithTimeout(Config.Shell.HookTimeout)`. Errors emitted
+by the cmd layer SHALL be lowercase with no trailing punctuation.
 
 #### Scenario: Hooks configured, all succeed
 
 - **WHEN** worktree creation succeeds
 - **AND** `.twiggit.toml` defines `[hooks.post-create].commands`
 - **THEN** system SHALL execute all commands in order
-- **AND** `CreateWorktreeResult.HookResult.Success` SHALL be `true`
+- **AND** `CreateWorktreeResult.HookResult.IsSuccessful` SHALL be `true`
 - **AND** `CreateWorktreeResult.HookResult.Failures` SHALL be empty
 
 #### Scenario: Hooks configured, one fails
@@ -125,7 +128,7 @@ NOT roll back the worktree. The hook runner contract is owned by
 
 - **WHEN** worktree creation succeeds
 - **AND** `.twiggit.toml` does not exist or has no `post-create` block
-- **THEN** `CreateWorktreeResult.HookResult` SHALL be `nil`
+- **THEN** `CreateWorktreeResult.HookResult.HasExecuted` SHALL be `false`
 - **AND** worktree info SHALL still be returned
 
 ### Requirement: `-C` / `--cd` navigation

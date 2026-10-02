@@ -151,13 +151,15 @@ emitting a trailing `/` suffix.
 
 ### Requirement: Existing-only filter
 
-The system SHALL support `WithExistingOnly()` (from `domain`) which
-filters completion suggestions to materialized worktrees, excluding
-remote branches and stale entries.
+The system SHALL support `git.WithExistingOnly()` (defined in
+`internal/git/context_resolver.go`) which filters completion
+suggestions to materialized worktrees, excluding remote branches and
+stale entries. There is no `domain` package in the Tier 2 layout; the
+option lives in `internal/git` and is the canonical narrowing.
 
 #### Scenario: Existing-only on delete
 
-- **WHEN** `delete` and `prune` use `WithExistingOnly()`
+- **WHEN** `delete` and `prune` use `git.WithExistingOnly()`
 - **THEN** only materialized worktrees SHALL be offered
 - **AND** branches without worktrees SHALL NOT be offered
 
@@ -165,8 +167,9 @@ remote branches and stale entries.
 
 When `twiggit init` auto-detects the shell from `$SHELL`, the system
 SHALL accept any path containing `bash`, `zsh`, or `fish` substring
-and SHALL map to the corresponding `domain.ShellType`. See
-`infrastructure-shell-detect` for the canonical detection rules.
+and SHALL map to the corresponding `core.ShellType`. See
+`git-shell-detect` for the canonical detection rules. Emitted errors
+SHALL be lowercase without trailing punctuation.
 
 
 

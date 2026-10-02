@@ -79,3 +79,13 @@ SHALL still list worktrees and SHALL report the detached state.
 - **WHEN** context detection runs in detached HEAD
 - **THEN** the system SHALL identify the context correctly
 - **AND** the branch name MAY be reported as `HEAD` or `detached`
+
+### Requirement: Fixture teardown contract
+
+Every fixture's `t.TempDir()` and `git.PlainOpen` handle SHALL be `Close()`d via `defer` inside the fixture constructor (or registered via `t.Cleanup`) so the next test starts from a clean repository state. Pre-extracted tarball archives (`test/e2e/fixtures/repos/*.tar.gz`) SHALL be extracted into a fresh `t.TempDir()` per test so no shared state leaks across the suite.
+
+#### Scenario: Fixture teardown contract holds
+
+- **WHEN** a fixture constructor opens a `git.PlainOpen` handle to build the fixture
+- **THEN** the constructor SHALL `defer repo.Close()` immediately after acquisition (per `defer-close-immediate`)
+- **AND** `t.Cleanup` SHALL remove the extracted `t.TempDir()` once the test ends

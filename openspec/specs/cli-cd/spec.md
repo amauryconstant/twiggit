@@ -51,13 +51,15 @@ The wrapper runtime behavior is owned by `cli-init`.
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
-### Requirement: Resolution via context service
+### Requirement: Resolution via context resolver
 
-The system SHALL delegate identifier resolution to
-`application.ContextService.ResolveIdentifier` (or
-`ResolveIdentifierFromContext`). The resolution contract itself is
-owned by `infrastructure-context-resolver` and
-`application-navigation-service`.
+The system SHALL delegate identifier resolution to `(*git.contextResolver).ResolveIdentifier(currentCtx, target)` constructed via `git.NewContextResolver(cfg, gitClient, gitClient)`. The resolution contract itself (detection priority, identifier parsing, suggestion generation) is owned by `git-context-resolver`; the cmd-layer wiring is owned here. Every error returned by the resolution path SHALL be lowercase with no trailing punctuation. The resolved `string` SHALL be returned as a defensive copy so the caller cannot mutate the resolver's internal buffer.
+
+#### Scenario: Resolution delegates to git.NewContextResolver
+
+- **WHEN** `twiggit cd <target>` runs
+- **THEN** the cmd layer SHALL compose `git.NewContextDetector(cfg)` and `git.NewContextResolver(cfg, gitClient, gitClient)`
+- **AND** SHALL invoke `(*contextResolver).ResolveIdentifier(ctx, target)` rather than any removed `application.*` API
 
 
 #### Scenario: Definition holds

@@ -2,16 +2,18 @@
 
 ## Purpose
 
-Global `--quiet` / `-q` flag that suppresses non-essential output for
-cleaner scripting, while preserving errors and essential data
-(navigation paths, JSON output).
+Global `--quiet` flag (long form only; no `-q` short flag is bound
+per `internal/cmdutil/global_flags.go:46`) that suppresses non-essential
+output for cleaner scripting, while preserving errors and essential
+data (navigation paths, JSON output).
 
 ## Requirements
 
 ### Requirement: Suppress success and hint messages
 
 The system SHALL suppress success messages, hint lines, and progress
-output when `--quiet`/`-q` is set.
+output when `--quiet` is set. Emitted errors SHALL be lowercase with no
+trailing punctuation. The quiet-mode output SHALL route data through `cmd.OutOrStdout()` and errors through `cmd.ErrOrStderr()` (never direct `os.Stdout`/`os.Stderr`).
 
 #### Scenario: Quiet list output
 

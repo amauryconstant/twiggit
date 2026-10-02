@@ -60,3 +60,13 @@ When the resolved config file does not exist, the loader SHALL fall back to `cor
 
 - **WHEN** the caller appends to the slice returned by `cfg.ProtectedBranches()`
 - **THEN** a subsequent call to `cfg.ProtectedBranches()` SHALL return the original slice without the appended element
+
+### Requirement: Config error contract
+
+Config-loading errors SHALL be lowercase without trailing punctuation (e.g., `core: parse failure at /path/to/config.toml`). Sentinel matching for not-found config SHALL use `errors.Is(err, core.ErrConfigNotFound)` (or the equivalent `core.NewConfigError` walk) — never `strings.Contains(err.Error(), "config")` or similar substring matching.
+
+#### Scenario: Config error lowercase and sentinel-match contracts hold
+
+- **WHEN** the loader fails to parse `config.toml`
+- **THEN** the wrapped error's message SHALL be lowercase without trailing period
+- **AND** the loader SHALL return a `*core.OperationError` walking to the typed-walk per `errors-is-as-only`

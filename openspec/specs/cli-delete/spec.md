@@ -4,7 +4,7 @@
 
 Remove a worktree and (by default) its branch, with safety checks for
 uncommitted changes, the current worktree, and the `--merged-only`
-constraint. Alias: `rm`. Use `--keep-branch` to preserve the branch.
+constraint. Alias: `rm`.
 
 ## Requirements
 
@@ -49,18 +49,6 @@ unless `--force`/`-f` is set.
 - **THEN** system SHALL bypass the safety check
 - **AND** SHALL remove the worktree and branch
 - **AND** success message SHALL display the deleted path
-
-### Requirement: `--keep-branch`
-
-The system SHALL accept `--keep-branch` to remove the worktree without
-deleting its branch.
-
-#### Scenario: Keep branch
-
-- **WHEN** user runs `twiggit delete --keep-branch myproject/feature`
-- **THEN** system SHALL remove the worktree directory
-- **AND** SHALL NOT delete the corresponding branch
-- **AND** success message SHALL indicate the branch was preserved
 
 ### Requirement: `--merged-only`
 
@@ -114,9 +102,11 @@ directory path to stdout on success, so the shell wrapper can navigate.
 ### Requirement: Branch deletion routed through git client
 
 The system SHALL use the git client's `DeleteBranch` operation (CLI-backed
-per `infrastructure-git-client` routing) when removing a branch, so that
-branches currently checked out by other worktrees are handled correctly
-by `git branch -d`.
+per `git-client` routing) when removing a branch. The default behavior
+deletes the worktree AND its branch; callers that previously requested
+`--keep-branch` SHALL use a separate non-delete path (worktree removal
+only). Errors SHALL be lowercase without trailing punctuation. Each git
+invocation SHALL execute under a `context.WithTimeout`.
 
 
 
