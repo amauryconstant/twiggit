@@ -99,37 +99,20 @@ Examples:
 func runCreate(opts *CreateOptions) error {
 	ctx := opts.Ctx
 
-	cfg, err := opts.Config()
-	if err != nil {
-		return fmt.Errorf("config load failed: %w", err)
-	}
-
-	client, err := opts.GitClient()
-	if err != nil {
-		return fmt.Errorf("git client init failed: %w", err)
-	}
-	gitClient, _ := client.(*git.Client)
-
-	detector, err := git.NewContextDetector(cfg)
-	if err != nil {
-		return fmt.Errorf("context detector init failed: %w", err)
-	}
-
 	branchName := extractBranchNameForValidation(opts.Spec)
 	branchValidation := core.ValidateBranchName(branchName)
 	if branchValidation.IsError() {
 		return branchValidation.Error
 	}
 
-	wd, err := filepath.Abs(".")
+	currentCtx, gitClient, err := detectContext(opts.Config, opts.GitClient)
 	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
+		return err
 	}
 
-	currentCtx, err := detector.DetectContext(wd)
+	cfg, err := opts.Config()
 	if err != nil {
-		opts.Logger.Debug("detect failed", "err", err)
-		return fmt.Errorf("context detection failed: %w", err)
+		return fmt.Errorf("config load failed: %w", err)
 	}
 
 	projectName, branchName, err := parseProjectBranch(opts.Spec, currentCtx)

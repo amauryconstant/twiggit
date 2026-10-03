@@ -92,31 +92,14 @@ Examples:
 func runList(opts *ListOptions) error {
 	ctx := opts.Ctx
 
+	currentCtx, gitClient, err := detectContext(opts.Config, opts.GitClient)
+	if err != nil {
+		return err
+	}
+
 	cfg, err := opts.Config()
 	if err != nil {
 		return fmt.Errorf("config load failed: %w", err)
-	}
-
-	client, err := opts.GitClient()
-	if err != nil {
-		return fmt.Errorf("git client init failed: %w", err)
-	}
-	gitClient, _ := client.(*git.Client)
-
-	detector, err := git.NewContextDetector(cfg)
-	if err != nil {
-		return fmt.Errorf("context detector init failed: %w", err)
-	}
-
-	wd, err := filepath.Abs(".")
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-
-	currentCtx, err := detector.DetectContext(wd)
-	if err != nil {
-		opts.Logger.Debug("detect failed", "err", err)
-		return fmt.Errorf("context detection failed: %w", err)
 	}
 
 	worktrees, err := listWorktrees(ctx, gitClient, cfg, currentCtx, opts.All)

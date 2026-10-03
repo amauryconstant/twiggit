@@ -23,7 +23,7 @@ func TestSignalExitCode_NilCtx(t *testing.T) {
 func TestSignalExitCode_BackgroundCtx(t *testing.T) {
 	is := assert.New(t)
 
-	code, ok := cmdutil.SignalExitCode(context.Background())
+	code, ok := cmdutil.SignalExitCode(t.Context())
 
 	is.False(ok)
 	is.Zero(code)
@@ -32,7 +32,7 @@ func TestSignalExitCode_BackgroundCtx(t *testing.T) {
 func TestSignalExitCode_CanceledCtx(t *testing.T) {
 	is := assert.New(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	code, ok := cmdutil.SignalExitCode(ctx)
@@ -45,7 +45,7 @@ func TestSignalExitCode_DeadlineExceededCtx(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		is := assert.New(t)
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 		defer cancel()
 		time.Sleep(time.Second - time.Nanosecond)
 		synctest.Wait()
@@ -65,7 +65,7 @@ func TestSignalExitCode_DeadlineExceededCtx(t *testing.T) {
 func TestSignalExitCode_ParentCanceledPropagatesToChild(t *testing.T) {
 	is := assert.New(t)
 
-	parent, cancelParent := context.WithCancel(context.Background())
+	parent, cancelParent := context.WithCancel(t.Context())
 	child, cancelChild := context.WithCancel(parent)
 	defer cancelChild()
 

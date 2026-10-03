@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
@@ -78,33 +77,16 @@ Examples:
 // navigationService.ResolvePath and navigationService.ValidatePath.
 // It composes the context detector and resolver directly.
 func runCd(opts *CdOptions) error {
+	currentCtx, gitClient, err := detectContext(opts.Config, opts.GitClient)
+	if err != nil {
+		return err
+	}
+
 	cfg, err := opts.Config()
 	if err != nil {
 		return fmt.Errorf("config load failed: %w", err)
 	}
-
-	client, err := opts.GitClient()
-	if err != nil {
-		return fmt.Errorf("git client init failed: %w", err)
-	}
-	gitClient, _ := client.(*git.Client)
-
-	detector, err := git.NewContextDetector(cfg)
-	if err != nil {
-		return fmt.Errorf("context detector init failed: %w", err)
-	}
 	resolver := git.NewContextResolver(cfg, gitClient, gitClient)
-
-	wd, err := filepath.Abs(".")
-	if err != nil {
-		return fmt.Errorf("get working directory: %w", err)
-	}
-
-	currentCtx, err := detector.DetectContext(wd)
-	if err != nil {
-		opts.Logger.Debug("detect failed", "err", err)
-		return fmt.Errorf("context detection failed: %w", err)
-	}
 
 	target := opts.Target
 

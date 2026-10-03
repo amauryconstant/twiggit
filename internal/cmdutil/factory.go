@@ -18,10 +18,10 @@ type FactoryOption func(*Factory)
 // Client is the type of the composite git client exposed via Factory.GitClient.
 // Declared as `any` so `*git.Client` (in internal/git) satisfies it implicitly
 // without cmdutil importing internal/git — the depguard narrow relies on
-// this. Callers narrow via the per-role fields (RepoOpener, BranchReader,
-// ...) which already type as core.* interfaces, or cast to `*git.Client`
-// directly inside cmd/ which keeps the concrete type because cmd/ still
-// imports internal/git.
+// this. Callers cast to `*git.Client` directly inside cmd/ which keeps the
+// concrete type because cmd/ still imports internal/git, then narrow via a
+// local role-typed variable (e.g., `var br core.BranchReader = client`) so
+// the consumer contract (1-3 method roles) is still visible at the call site.
 type Client = any
 
 // Sentinel errors returned by the default lazy fields when their
@@ -80,20 +80,6 @@ type Factory struct {
 	// here rather than as a confused git-construction failure.
 	// Default is a sentinel-returning function; wire with WithGitClientFactory.
 	GitClient func() (Client, error)
-
-	// Per-role lazy fields. Each returns the cached composite typed as
-	// the requested role (Go interface satisfaction via embedded promotion
-	// on the composite). Bodies route through f.GitClient() so the
-	// sync.OnceValues cache on the composite is the only cache; per-role
-	// fields are additive narrowing for future read-only or write-only
-	// commands. See core-git spec "Factory per-role fields are additive
-	// to composite".
-	RepoOpener       func() (core.RepositoryOpener, error)
-	BranchReader     func() (core.BranchReader, error)
-	RepositoryReader func() (core.RepositoryReader, error)
-	RemoteReader     func() (core.RemoteReader, error)
-	WorktreeWriter   func() (core.WorktreeWriter, error)
-	BranchWriter     func() (core.BranchWriter, error)
 
 	// Logger returns the slog channel used for TWIGGIT_DEBUG output.
 	// sync.OnceFunc-cached; first call wires a text handler that
@@ -160,60 +146,6 @@ func NewFactory(opts ...FactoryOption) *Factory {
 		return nil, ErrNoGitClient
 	})
 
-	f.RepoOpener = func() (core.RepositoryOpener, error) {
-		c, err := f.GitClient()
-		if err != nil {
-			return nil, err
-		}
-		// Type assertion: f.GitClient returns Client (any); the wired
-		// implementation is always *git.Client which satisfies
-		// core.RepositoryOpener via embedded promotion. The assertion
-		// cannot fail under the wired path; tests inject f.GitClient
-		// directly so they control the asserted type.
-		client, _ := c.(core.RepositoryOpener)
-		return client, nil
-	}
-	f.BranchReader = func() (core.BranchReader, error) {
-		c, err := f.GitClient()
-		if err != nil {
-			return nil, err
-		}
-		client, _ := c.(core.BranchReader)
-		return client, nil
-	}
-	f.RepositoryReader = func() (core.RepositoryReader, error) {
-		c, err := f.GitClient()
-		if err != nil {
-			return nil, err
-		}
-		client, _ := c.(core.RepositoryReader)
-		return client, nil
-	}
-	f.RemoteReader = func() (core.RemoteReader, error) {
-		c, err := f.GitClient()
-		if err != nil {
-			return nil, err
-		}
-		client, _ := c.(core.RemoteReader)
-		return client, nil
-	}
-	f.WorktreeWriter = func() (core.WorktreeWriter, error) {
-		c, err := f.GitClient()
-		if err != nil {
-			return nil, err
-		}
-		client, _ := c.(core.WorktreeWriter)
-		return client, nil
-	}
-	f.BranchWriter = func() (core.BranchWriter, error) {
-		c, err := f.GitClient()
-		if err != nil {
-			return nil, err
-		}
-		client, _ := c.(core.BranchWriter)
-		return client, nil
-	}
-
 	f.Logger = sync.OnceValue(func() *slog.Logger {
 		return iostreams.NewLogger(f.IOStreams.ErrOut)
 	})
@@ -240,24 +172,6 @@ func (f *Factory) Init() error {
 		errs = append(errs, err)
 	}
 	if _, err := f.GitClient(); err != nil {
-		errs = append(errs, err)
-	}
-	if _, err := f.RepoOpener(); err != nil {
-		errs = append(errs, err)
-	}
-	if _, err := f.BranchReader(); err != nil {
-		errs = append(errs, err)
-	}
-	if _, err := f.RepositoryReader(); err != nil {
-		errs = append(errs, err)
-	}
-	if _, err := f.RemoteReader(); err != nil {
-		errs = append(errs, err)
-	}
-	if _, err := f.WorktreeWriter(); err != nil {
-		errs = append(errs, err)
-	}
-	if _, err := f.BranchWriter(); err != nil {
 		errs = append(errs, err)
 	}
 	if f.Logger() == nil {

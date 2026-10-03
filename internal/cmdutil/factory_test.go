@@ -168,11 +168,11 @@ func TestFactory_InitTouchesEveryLazyField(t *testing.T) {
 	})
 }
 
-// TestFactory_PerRoleFieldsReturnSameCompositeInstance pins the
-// "per-role fields re-use the composite's cached concrete" contract
-// from core-git R11.S1 / git-client R2.S2. Every per-role lazy field
-// must return the same underlying *git.Client pointer as f.GitClient().
-func TestFactory_PerRoleFieldsReturnSameCompositeInstance(t *testing.T) {
+// TestFactory_GitClientReturnsSameInstance pins the GitClient
+// singleton contract from core-git R11.S1. The composite is cached
+// across calls and across role-narrowed accesses (which now happen
+// via local var assignment rather than per-role Factory fields).
+func TestFactory_GitClientReturnsSameInstance(t *testing.T) {
 	t.Parallel()
 
 	stub := stubGitClient()
@@ -182,59 +182,30 @@ func TestFactory_PerRoleFieldsReturnSameCompositeInstance(t *testing.T) {
 	)
 	require.NoError(t, f.Init())
 
-	gc, err := f.GitClient()
+	gc1, err := f.GitClient()
 	require.NoError(t, err)
-	require.NotNil(t, gc)
-	gcConcrete, ok := gc.(*git.Client)
+	require.NotNil(t, gc1)
+	gc1Concrete, ok := gc1.(*git.Client)
 	require.True(t, ok, "GitClient must be *git.Client under the wired path")
 
-	ro, err := f.RepoOpener()
+	gc2, err := f.GitClient()
 	require.NoError(t, err)
-	br, err := f.BranchReader()
-	require.NoError(t, err)
-	rr, err := f.RepositoryReader()
-	require.NoError(t, err)
-	rm, err := f.RemoteReader()
-	require.NoError(t, err)
-	wt, err := f.WorktreeWriter()
-	require.NoError(t, err)
-	bw, err := f.BranchWriter()
-	require.NoError(t, err)
+	require.Same(t, gc1Concrete, gc2,
+		"two GitClient calls must return the same underlying *git.Client")
 
-	assert.Same(t, gcConcrete, ro, "RepoOpener must return same instance as GitClient")
-	assert.Same(t, gcConcrete, br, "BranchReader must return same instance as GitClient")
-	assert.Same(t, gcConcrete, rr, "RepositoryReader must return same instance as GitClient")
-	assert.Same(t, gcConcrete, rm, "RemoteReader must return same instance as GitClient")
-	assert.Same(t, gcConcrete, wt, "WorktreeWriter must return same instance as GitClient")
-	assert.Same(t, gcConcrete, bw, "BranchWriter must return same instance as GitClient")
+	// Role-narrowing assignment pattern: callers cast to the composite
+	// then assign to a role-typed local. The compile-time role
+	// satisfaction guarantees in internal/git/client.go enforce this.
+	var br core.BranchReader = gc1Concrete
+	require.NotNil(t, br)
 }
 
-// TestFactory_InitTouchesEveryPerRoleField covers core-git R11.S3:
-// Init must invoke each per-role field so construction failures
-// surface during startup rather than at first lazy access.
-func TestFactory_InitTouchesEveryPerRoleField(t *testing.T) {
-	t.Parallel()
-
-	f := cmdutil.NewFactory(
-		cmdutil.WithConfigLoader(func() (*core.Config, error) { return &core.Config{}, nil }),
-		cmdutil.WithGitClientFactory(func() (cmdutil.Client, error) { return stubGitClient(), nil }),
-	)
-
-	sentinel := errors.New("branch reader init sentinel")
-	f.BranchReader = func() (core.BranchReader, error) { return nil, sentinel }
-
-	err := f.Init()
-	require.Error(t, err)
-	assert.ErrorIs(t, err, sentinel,
-		"Init must touch BranchReader and surface its error via errors.Join")
-}
-
-// TestFactory_PerRoleErrorPropagation covers core-git R12.S1:
-// when the underlying GitClient returns a *git.ExternalError, the
-// per-role field must propagate the error unchanged — no wrap, no
-// log, no mutation. The single-handling rule requires the error to
-// reach the command layer once for the boundary formatter.
-func TestFactory_PerRoleErrorPropagation(t *testing.T) {
+// TestFactory_InitSurfacesCompositeFailure covers core-git R11.S3 /
+// R12.S1: when the underlying GitClient returns a *git.ExternalError,
+// Init must propagate the error unchanged — no wrap, no log, no
+// mutation. The single-handling rule requires the error to reach
+// the command layer once for the boundary formatter.
+func TestFactory_InitSurfacesCompositeFailure(t *testing.T) {
 	t.Parallel()
 
 	f := cmdutil.NewFactory(
@@ -253,7 +224,7 @@ func TestFactory_PerRoleErrorPropagation(t *testing.T) {
 	}
 	f.GitClient = func() (cmdutil.Client, error) { return nil, sentinel }
 
-	_, err := f.RepoOpener()
+	err := f.Init()
 	require.Error(t, err)
 
 	var oe *core.OperationError
@@ -261,6 +232,6 @@ func TestFactory_PerRoleErrorPropagation(t *testing.T) {
 		"errors.As must walk to embedded *core.OperationError")
 	assert.Equal(t, "git.repository", oe.Op,
 		"propagated error must preserve the original Op value")
-	assert.Same(t, sentinel, err,
-		"Factory must not wrap the GitClient error")
+	require.ErrorIs(t, err, sentinel,
+		"Init must join the GitClient error via errors.Join so errors.Is walks the chain")
 }

@@ -212,13 +212,13 @@ func TestRenderWorktrees_BespokeShape(t *testing.T) {
 
 	cases := []struct {
 		name      string
-		wt        *core.WorktreeInfo
+		wt        *core.Worktree
 		wantLines []string
 		denyLines []string
 	}{
 		{
 			name: "dirty worktree carries (modified) suffix",
-			wt: &core.WorktreeInfo{
+			wt: &core.Worktree{
 				Branch:     "feat/foo",
 				Path:       "/tmp/feat/foo",
 				IsModified: true,
@@ -228,7 +228,7 @@ func TestRenderWorktrees_BespokeShape(t *testing.T) {
 		},
 		{
 			name: "detached HEAD carries (detached) suffix",
-			wt: &core.WorktreeInfo{
+			wt: &core.Worktree{
 				Branch:     "feat/bar",
 				Path:       "/tmp/feat/bar",
 				IsDetached: true,
@@ -238,7 +238,7 @@ func TestRenderWorktrees_BespokeShape(t *testing.T) {
 		},
 		{
 			name: "clean attached worktree has no suffix",
-			wt: &core.WorktreeInfo{
+			wt: &core.Worktree{
 				Branch: "feat/baz",
 				Path:   "/tmp/feat/baz",
 			},
@@ -252,7 +252,7 @@ func TestRenderWorktrees_BespokeShape(t *testing.T) {
 			t.Parallel()
 
 			var buf bytes.Buffer
-			require.NoError(t, renderWorktrees(&buf, []*core.WorktreeInfo{tc.wt}, nil))
+			require.NoError(t, renderWorktrees(&buf, []*core.Worktree{tc.wt}, nil))
 
 			got := buf.String()
 			lines := strings.Split(strings.TrimRight(got, "\n"), "\n")
