@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,7 +8,8 @@ import (
 	"twiggit/internal/core"
 	"twiggit/internal/git"
 	"twiggit/internal/iostreams"
-	"twiggit/test/helpers"
+
+	githelpers "twiggit/test/git"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,7 +34,7 @@ func cdTestOpts(t *testing.T, worktreesDir, target string) (*CdOptions, *iostrea
 		IO:            ios,
 		Config:        func() (*core.Config, error) { return cfg, nil },
 		GitClient:     func() (cmdutil.Client, error) { return gitClient, nil },
-		Ctx:           context.Background(),
+		Ctx:           t.Context(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 		Target:        target,
 	}
@@ -83,7 +83,7 @@ func TestCd_NotFoundError(t *testing.T) {
 func TestCd_HappyPathEchoesTarget(t *testing.T) {
 	// Create a real git repository; cwd inside it so detector
 	// returns ContextProject.
-	gitHelper := helpers.NewGitTestHelper(t)
+	gitHelper := githelpers.NewGitTestHelper(t)
 	repoPath := gitHelper.CreateRepoWithCommits(1)
 
 	worktrees := t.TempDir()

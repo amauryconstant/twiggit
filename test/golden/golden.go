@@ -1,4 +1,5 @@
-package helpers
+// Package golden provides CompareGolden + UPDATE_GOLDEN toggle for snapshot-style golden file tests.
+package golden
 
 import (
 	"bytes"

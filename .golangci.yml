@@ -265,7 +265,7 @@ linters:
 
   exclusions:
     rules:
-      - path: "^.*_test\\.go$|test/(fixtures|helpers|mocks|integration)/.*\\.go|test/e2\
+      - path: "^.*_test\\.go$|test/(fixtures|git|golden|helpers|helpers_test|mocks|integration|perf|repo|shell|worktree)/.*\\.go|test/e2\
           e/(fixtures|helpers)/.*\\.go"
         linters:
           - funlen

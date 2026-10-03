@@ -14,7 +14,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	testhelpers "twiggit/test/helpers"
+	worktreehelpers "twiggit/test/worktree"
 )
 
 var _ = Describe("Infrastructure Verification", func() {
@@ -37,7 +37,7 @@ var _ = Describe("Infrastructure Verification", func() {
 	})
 
 	It("creates and removes worktree using git CLI", func() {
-		gitHelper := testhelpers.NewWorktreeTestHelper()
+		gitHelper := worktreehelpers.NewWorktreeTestHelper()
 		fixture.SetupSingleProject("test")
 		projectPath := fixture.GetProjectPath("test")
 

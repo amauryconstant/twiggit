@@ -1,4 +1,5 @@
-package helpers
+// Package shell provides ShellTestHelper utilities for driving shell commands in tests.
+package shell
 
 import (
 	"bytes"

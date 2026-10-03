@@ -1,10 +1,12 @@
-package helpers
+// Package repo provides RepoTestHelper utilities for managing multiple git repository fixtures in tests.
+package repo
 
 import (
 	"os"
 	"path/filepath"
 	"sync"
 	"testing"
+	"twiggit/test/git"
 )
 
 // RepoTestHelper provides functional repository management utilities
@@ -62,7 +64,7 @@ func (h *RepoTestHelper) SetupTestRepo(projectName string) string {
 	}
 
 	// Use GitTestHelper to create the repository directly in the target location
-	gitHelper := NewGitTestHelper(h.t)
+	gitHelper := git.NewGitTestHelper(h.t)
 	commitCount := h.commitCount
 	if commitCount == 0 {
 		commitCount = 1 // Default to 1 commit

@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -48,7 +47,7 @@ commands = ["echo hello"]
 		ConfigFilePath: configPath,
 	}
 
-	result, err := s.runner.Run(context.Background(), req)
+	result, err := s.runner.Run(s.T().Context(), req)
 
 	s.Require().NoError(err)
 	s.True(result.HasExecuted)
@@ -75,7 +74,7 @@ commands = [
 		ConfigFilePath: configPath,
 	}
 
-	result, err := s.runner.Run(context.Background(), req)
+	result, err := s.runner.Run(s.T().Context(), req)
 
 	s.Require().NoError(err)
 	s.True(result.HasExecuted)
@@ -102,7 +101,7 @@ commands = [
 		ConfigFilePath: configPath,
 	}
 
-	result, err := s.runner.Run(context.Background(), req)
+	result, err := s.runner.Run(s.T().Context(), req)
 
 	s.Require().NoError(err)
 	s.True(result.HasExecuted)
@@ -131,7 +130,7 @@ commands = ["printenv TWIGGIT_PROJECT_NAME"]
 		ConfigFilePath: configPath,
 	}
 
-	result, err := s.runner.Run(context.Background(), req)
+	result, err := s.runner.Run(s.T().Context(), req)
 
 	s.Require().NoError(err)
 	s.True(result.HasExecuted)
@@ -154,7 +153,7 @@ commands = ["touch marker.txt"]
 		ConfigFilePath: configPath,
 	}
 
-	result, err := s.runner.Run(context.Background(), req)
+	result, err := s.runner.Run(s.T().Context(), req)
 
 	s.Require().NoError(err)
 	s.True(result.HasExecuted, "Hooks should have executed")
@@ -171,7 +170,7 @@ func (s *HookRunnerIntegrationSuite) TestRun_NoConfigFile_ReturnsNotExecuted() {
 		ConfigFilePath: filepath.Join(s.configDir, "nonexistent.toml"),
 	}
 
-	result, err := s.runner.Run(context.Background(), req)
+	result, err := s.runner.Run(s.T().Context(), req)
 
 	s.Require().NoError(err)
 	s.False(result.HasExecuted)
@@ -193,7 +192,7 @@ key = "value"
 		ConfigFilePath: configPath,
 	}
 
-	result, err := s.runner.Run(context.Background(), req)
+	result, err := s.runner.Run(s.T().Context(), req)
 
 	s.Require().NoError(err)
 	s.False(result.HasExecuted)

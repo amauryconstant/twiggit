@@ -1,4 +1,5 @@
-package helpers
+// Package worktree provides git WorktreeTestHelper utilities used by E2E tests to drive git worktree operations through the CLI.
+package worktree
 
 import (
 	"context"
@@ -105,7 +106,7 @@ func (h *WorktreeTestHelper) RemoveWorktree(worktreePath string, force bool) err
 }
 
 // ListWorktrees returns all worktrees for the repository
-func (h *WorktreeTestHelper) ListWorktrees(repoPath string) ([]WorktreeInfo, error) {
+func (h *WorktreeTestHelper) ListWorktrees(repoPath string) ([]Worktree, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), h.timeout)
 	defer cancel()
 
@@ -120,8 +121,8 @@ func (h *WorktreeTestHelper) ListWorktrees(repoPath string) ([]WorktreeInfo, err
 	return h.parseWorktreeList(string(output))
 }
 
-// WorktreeInfo represents information about a worktree
-type WorktreeInfo struct {
+// Worktree represents information about a worktree
+type Worktree struct {
 	Path       string
 	Commit     string
 	Branch     string
@@ -129,9 +130,9 @@ type WorktreeInfo struct {
 }
 
 // parseWorktreeList parses the output of `git worktree list --porcelain`
-func (h *WorktreeTestHelper) parseWorktreeList(output string) ([]WorktreeInfo, error) {
-	var worktrees []WorktreeInfo
-	var currentWorktree *WorktreeInfo
+func (h *WorktreeTestHelper) parseWorktreeList(output string) ([]Worktree, error) {
+	var worktrees []Worktree
+	var currentWorktree *Worktree
 
 	lines := strings.SplitSeq(output, "\n")
 	for line := range lines {
@@ -151,7 +152,7 @@ func (h *WorktreeTestHelper) parseWorktreeList(output string) ([]WorktreeInfo, e
 				absPath = path
 			}
 
-			currentWorktree = &WorktreeInfo{
+			currentWorktree = &Worktree{
 				Path: absPath,
 			}
 		} else if currentWorktree != nil {
