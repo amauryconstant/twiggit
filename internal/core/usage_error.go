@@ -11,6 +11,9 @@ type UsageError struct {
 	Message string
 }
 
+// Error returns the constructed usage message. The Message field
+// already carries the underlying parser error context appended at
+// construction time, so no chain walking is required here.
 func (e *UsageError) Error() string { return e.Message }
 
 // Unwrap returns nil: UsageError is terminal.

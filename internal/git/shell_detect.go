@@ -1,13 +1,3 @@
-// Package git shell-detection helpers.
-//
-// DetectShellFromEnv reads the SHELL environment variable and infers the
-// shell type. InferShellTypeFromPath infers the shell type from a config
-// file path's filename. ProbeShellConfig stats the canonical config path
-// for the given shell type and reports whether it exists.
-//
-// These helpers live here (not in internal/core) because they touch the
-// environment and the filesystem; core is the pure functional core and
-// must not import "os".
 package git
 
 import (

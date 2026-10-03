@@ -1,10 +1,3 @@
-// Package git error type.
-//
-// ExternalError is the single error type returned by every public method in
-// internal/git. It wraps the underlying tool failure (go-git error chain or
-// os/exec output), exposes a stable Operation tag for cmd-side dispatch,
-// and embeds *core.OperationError so callers can keep using errors.As with
-// the existing core.OperationError target during the migration.
 package git
 
 import (

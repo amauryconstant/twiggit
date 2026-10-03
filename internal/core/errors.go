@@ -1,17 +1,8 @@
-// Package core error type hierarchy.
-//
-// Four canonical types collapse the legacy 20-type taxonomy. Errors are
-// distinguishable via Op/Entity fields, not via per-type concrete structs.
-//
-//	ValidationError — input / argument validation failure
-//	NotFoundError   — a referenced resource does not exist
-//	OperationError  — runtime operation failure (git, config, shell, etc.)
-//	UsageError      — invocation-level usage failure (cobra / pflag)
-//
+package core
+
 // Sentinels: only the four NotFound sentinels remain. Walk-to-sentinel
 // behavior is implemented by OperationError.Is / ValidationError.Is for
 // the resource they previously identified.
-package core
 
 import (
 	"errors"
@@ -36,6 +27,9 @@ type ValidationError struct {
 	Suggestions []string
 }
 
+// Error formats the validation failure as a single line: optional Op
+// namespace, optional Entity / Field path, the Message, and the offending
+// Value when set. Trailing whitespace is trimmed.
 func (e *ValidationError) Error() string {
 	var sb strings.Builder
 	sb.WriteString("validation failed")
@@ -113,6 +107,8 @@ type NotFoundError struct {
 	Name   string
 }
 
+// Error renders the missing-resource message: "Entity Name not found"
+// when Name is set, else "Entity not found".
 func (e *NotFoundError) Error() string {
 	if e.Name != "" {
 		return fmt.Sprintf("%s %q not found", e.Entity, e.Name)
@@ -147,6 +143,9 @@ type OperationError struct {
 	Suggestions []string
 }
 
+// Error formats the runtime-failure message: optional Op prefix,
+// Message body, optional Entity / Field qualifiers, and the chained
+// Cause when set.
 func (e *OperationError) Error() string {
 	var sb strings.Builder
 	if e.Op != "" {

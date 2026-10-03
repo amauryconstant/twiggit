@@ -1,10 +1,3 @@
-// Package git — composite GitClient construction.
-//
-// Client is the canonical git I/O surface for downstream consumers.
-// It composes a reader (read-side go-git operations) and a cliClient
-// (write-side git CLI operations) and exposes their methods through
-// embedded promotion. Callers that need only one half can use the
-// half-specific constructors (e.g. NewCLIClient for tests).
 package git
 
 import (
