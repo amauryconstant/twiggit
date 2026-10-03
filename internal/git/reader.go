@@ -20,8 +20,8 @@ import (
 // reader is an internal collaborator of Client; consumers interact
 // with the read-side methods through the embedded *Client.
 type reader struct {
-	cache        *lru.Cache[string, *git.Repository]
-	cacheEnabled bool
+	cache          *lru.Cache[string, *git.Repository]
+	isCacheEnabled bool
 }
 
 // goGitCacheFactory builds an LRU cache. Indirected so tests can inject

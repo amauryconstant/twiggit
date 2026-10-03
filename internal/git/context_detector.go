@@ -16,7 +16,7 @@ import (
 const contextDetectorCacheSize = 256
 
 type worktreeCacheEntry struct {
-	valid     bool
+	isValid   bool
 	expiresAt time.Time
 }
 
@@ -202,7 +202,7 @@ func (cd *contextDetector) isValidGitWorktree(dir string) bool {
 	cd.mu.RLock()
 	if entry, ok := cd.cache.Get(dir); ok && entry.expiresAt.After(now) {
 		cd.mu.RUnlock()
-		return entry.valid
+		return entry.isValid
 	}
 	cd.mu.RUnlock()
 
@@ -210,7 +210,7 @@ func (cd *contextDetector) isValidGitWorktree(dir string) bool {
 
 	cd.mu.Lock()
 	cd.cache.Add(dir, worktreeCacheEntry{
-		valid:     valid,
+		isValid:   valid,
 		expiresAt: now.Add(cd.ttl),
 	})
 	cd.mu.Unlock()

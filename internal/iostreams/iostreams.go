@@ -19,28 +19,28 @@ var (
 // IOStreams abstracts terminal I/O so commands never touch
 // os.Stdout / os.Stderr directly. The struct carries In / Out /
 // ErrOut streams, TTY detection state, the NO_COLOR-aware
-// colorEnabled flag, a Quiet gate for --quiet, a Verbose gate
+// isColorEnabled flag, a Quiet gate for --quiet, a Verbose gate
 // for --verbose, and a Logger channel for TWIGGIT_DEBUG.
 //
 // System() and Test() constructors cover production and unit-test
 // paths; Test() forces non-TTY / no-color / in-memory buffers.
 type IOStreams struct {
-	In           io.ReadCloser
-	Out          io.Writer
-	ErrOut       io.Writer
-	colorEnabled bool
-	isStdoutTTY  bool
-	isStderrTTY  bool
-	isStdinTTY   bool
-	Quiet        bool
-	Verbose      bool
-	Logger       *slog.Logger
-	styles       *Styles
+	In             io.ReadCloser
+	Out            io.Writer
+	ErrOut         io.Writer
+	isColorEnabled bool
+	isStdoutTTY    bool
+	isStderrTTY    bool
+	isStdinTTY     bool
+	Quiet          bool
+	Verbose        bool
+	Logger         *slog.Logger
+	styles         *Styles
 }
 
 // System constructs production-grade IOStreams backed by real
 // stdin / stdout / stderr file descriptors. TTY state is detected
-// via golang.org/x/term; colorEnabled is on only when stdout is
+// via golang.org/x/term; isColorEnabled is on only when stdout is
 // a TTY and NO_COLOR is unset.
 func System() *IOStreams {
 	stdoutFD := int(os.Stdout.Fd()) // #nosec G115 -- file descriptors bounded by OS limit
@@ -49,17 +49,17 @@ func System() *IOStreams {
 	stdoutTTY := term.IsTerminal(stdoutFD)
 	stderrTTY := term.IsTerminal(stderrFD)
 	stdinTTY := term.IsTerminal(stdinFD)
-	colorEnabled := stdoutTTY && os.Getenv("NO_COLOR") == ""
+	isColorEnabled := stdoutTTY && os.Getenv("NO_COLOR") == ""
 	return &IOStreams{
-		In:           os.Stdin,
-		Out:          os.Stdout,
-		ErrOut:       os.Stderr,
-		colorEnabled: colorEnabled,
-		isStdoutTTY:  stdoutTTY,
-		isStderrTTY:  stderrTTY,
-		isStdinTTY:   stdinTTY,
-		Logger:       NewLogger(os.Stderr),
-		styles:       NewStyles(colorEnabled),
+		In:             os.Stdin,
+		Out:            os.Stdout,
+		ErrOut:         os.Stderr,
+		isColorEnabled: isColorEnabled,
+		isStdoutTTY:    stdoutTTY,
+		isStderrTTY:    stderrTTY,
+		isStdinTTY:     stdinTTY,
+		Logger:         NewLogger(os.Stderr),
+		styles:         NewStyles(isColorEnabled),
 	}
 }
 
@@ -72,15 +72,15 @@ func Test() (*IOStreams, *bytes.Buffer, *bytes.Buffer, *bytes.Buffer) {
 	out := &bytes.Buffer{}
 	errOut := &bytes.Buffer{}
 	return &IOStreams{
-		In:           io.NopCloser(in),
-		Out:          out,
-		ErrOut:       errOut,
-		colorEnabled: false,
-		isStdoutTTY:  false,
-		isStderrTTY:  false,
-		isStdinTTY:   false,
-		Logger:       NewLogger(errOut),
-		styles:       NewStyles(false),
+		In:             io.NopCloser(in),
+		Out:            out,
+		ErrOut:         errOut,
+		isColorEnabled: false,
+		isStdoutTTY:    false,
+		isStderrTTY:    false,
+		isStdinTTY:     false,
+		Logger:         NewLogger(errOut),
+		styles:         NewStyles(false),
 	}, in, out, errOut
 }
 
@@ -94,12 +94,12 @@ func (s *IOStreams) IsStderrTTY() bool { return s.isStderrTTY }
 func (s *IOStreams) IsStdinTTY() bool { return s.isStdinTTY }
 
 // ColorEnabled reports whether styled output should be rendered.
-func (s *IOStreams) ColorEnabled() bool { return s.colorEnabled }
+func (s *IOStreams) ColorEnabled() bool { return s.isColorEnabled }
 
 // IsInteractive reports whether the user is in an interactive
 // session. Per spec 3.3: color on AND stdin + stdout TTY.
 func (s *IOStreams) IsInteractive() bool {
-	return s.colorEnabled && s.isStdinTTY && s.isStdoutTTY
+	return s.isColorEnabled && s.isStdinTTY && s.isStdoutTTY
 }
 
 // Verbosef writes a dim-styled line to ErrOut when Verbose is
@@ -117,7 +117,7 @@ func (s *IOStreams) Verbosef(format string, args ...any) {
 // helper; production paths read env at System() time. Re-creates
 // the underlying Styles set so styling flips immediately.
 func (s *IOStreams) SetColorEnabled(enabled bool) {
-	s.colorEnabled = enabled
+	s.isColorEnabled = enabled
 	s.styles = NewStyles(enabled)
 }
 

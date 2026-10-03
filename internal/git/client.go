@@ -18,8 +18,8 @@ const defaultCacheSize = 25
 type ClientOption func(*clientConfig)
 
 type clientConfig struct {
-	cacheSize    int
-	cacheEnabled bool
+	cacheSize      int
+	isCacheEnabled bool
 }
 
 // WithCacheSize sets the LRU cache capacity to n. Panics-equivalent
@@ -40,7 +40,7 @@ func WithCacheSize(n int) ClientOption {
 // fresh repository state.
 func WithCacheDisabled() ClientOption {
 	return func(c *clientConfig) {
-		c.cacheEnabled = false
+		c.isCacheEnabled = false
 	}
 }
 
@@ -69,8 +69,8 @@ type Client struct {
 // the lazy field on cmdutil.Factory.GitClient.
 func NewClient(opts ...ClientOption) (*Client, error) {
 	cfg := clientConfig{
-		cacheSize:    defaultCacheSize,
-		cacheEnabled: true,
+		cacheSize:      defaultCacheSize,
+		isCacheEnabled: true,
 	}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -85,8 +85,8 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 
 	return &Client{
 		reader: &reader{
-			cache:        cache,
-			cacheEnabled: cfg.cacheEnabled,
+			cache:          cache,
+			isCacheEnabled: cfg.isCacheEnabled,
 		},
 		cliClient: &cliClient{
 			executor:       executor,
@@ -107,8 +107,8 @@ func newClientWithCacheFactory(size int, enabled bool, factory goGitCacheFactory
 
 	return &Client{
 		reader: &reader{
-			cache:        cache,
-			cacheEnabled: enabled,
+			cache:          cache,
+			isCacheEnabled: enabled,
 		},
 		cliClient: &cliClient{
 			executor:       executor,

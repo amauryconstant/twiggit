@@ -5,7 +5,7 @@ import (
 )
 
 // Styles groups the styled-render functions used by the cmd layer.
-// When colorEnabled is false every method is the identity function:
+// When isColorEnabled is false every method is the identity function:
 // strings pass through unchanged. When true each method renders the
 // input through a lipgloss Style with the conventional 16-color
 // terminal palette:
@@ -18,7 +18,7 @@ import (
 //
 // lipgloss v2 detects color profile from the process environment
 // via colorprofile.Detect, so non-TTY contexts (CI, pipes) emit
-// plain text without ANSI codes regardless of the colorEnabled
+// plain text without ANSI codes regardless of the isColorEnabled
 // flag on the IOStreams struct.
 type Styles struct {
 	Error   func(string) string
@@ -28,12 +28,12 @@ type Styles struct {
 	Dim     func(string) string
 }
 
-// NewStyles builds a Styles set according to colorEnabled. When
+// NewStyles builds a Styles set according to isColorEnabled. When
 // false, every field is the identity function (string round-trip).
 // When true, each field wraps a lipgloss style; the renderer is
 // driven by lipgloss's global color profile detection.
-func NewStyles(colorEnabled bool) *Styles {
-	if !colorEnabled {
+func NewStyles(isColorEnabled bool) *Styles {
+	if !isColorEnabled {
 		return &Styles{
 			Error:   identity,
 			Success: identity,

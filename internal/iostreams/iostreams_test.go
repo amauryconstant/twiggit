@@ -68,7 +68,7 @@ func TestVerbosef_WritesDimLineWhenVerboseTrue(t *testing.T) {
 
 	ios.Verbosef("step %d of %d", 2, 5)
 
-	// colorEnabled false → Dim is identity, so raw line written.
+	// isColorEnabled false → Dim is identity, so raw line written.
 	assert.Equal(t, "step 2 of 5\n", errOut.String())
 }
 
@@ -102,7 +102,7 @@ func TestVerbosef_OmitsDebugPrefix(t *testing.T) {
 }
 
 // TestIsInteractive_TestDefaultIsFalse asserts the predicate returns
-// false when any of colorEnabled / isStdoutTTY / isStdinTTY is off,
+// false when any of isColorEnabled / isStdoutTTY / isStdinTTY is off,
 // matching cli-iostreams "IsInteractive (stdout AND stdin TTY)".
 // Test() forces all three to false, so the row this test pins is the
 // production path's worst case; System() probes the real FDs at
