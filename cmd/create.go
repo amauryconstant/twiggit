@@ -171,7 +171,7 @@ func runCreate(opts *CreateOptions) error {
 	}
 
 	result := &core.CreateWorktreeResult{
-		Worktree: &core.WorktreeInfo{Path: worktreePath, Branch: branchName},
+		Worktree: &core.Worktree{Path: worktreePath, Branch: branchName},
 	}
 
 	verbosef(opts.IO, "Creating worktree for %s/%s", project.Name, branchName)
@@ -277,9 +277,9 @@ func buildProjectInfo(ctx context.Context, client *git.Client, _ *core.Config, p
 		mainRepoPath = resolved
 	}
 
-	repoInfo, err := client.GetRepositoryInfo(ctx, mainRepoPath)
+	repoInfo, err := client.Repository(ctx, mainRepoPath)
 	if err != nil {
-		repoInfo = &core.GitRepository{Path: mainRepoPath}
+		repoInfo = &core.Repository{Path: mainRepoPath}
 	}
 
 	worktrees, err := client.ListWorktrees(ctx, mainRepoPath)
@@ -287,17 +287,17 @@ func buildProjectInfo(ctx context.Context, client *git.Client, _ *core.Config, p
 		worktrees = nil
 	}
 
-	worktreePtrs := make([]*core.WorktreeInfo, len(worktrees))
+	worktreePtrs := make([]*core.Worktree, len(worktrees))
 	for i := range worktrees {
 		worktreePtrs[i] = &worktrees[i]
 	}
 
-	branchPtrs := make([]*core.BranchInfo, len(repoInfo.Branches))
+	branchPtrs := make([]*core.Branch, len(repoInfo.Branches))
 	for i := range repoInfo.Branches {
 		branchPtrs[i] = &repoInfo.Branches[i]
 	}
 
-	remotePtrs := make([]*core.RemoteInfo, len(repoInfo.Remotes))
+	remotePtrs := make([]*core.Remote, len(repoInfo.Remotes))
 	for i := range repoInfo.Remotes {
 		remotePtrs[i] = &repoInfo.Remotes[i]
 	}
@@ -383,7 +383,7 @@ func extractBranchNameForValidation(spec string) string {
 }
 
 // displayCreateSuccess displays the success message for worktree creation
-func displayCreateSuccess(out io.Writer, worktree *core.WorktreeInfo) error {
+func displayCreateSuccess(out io.Writer, worktree *core.Worktree) error {
 	_, err := fmt.Fprintf(out, "Created worktree: %s -> %s\n", worktree.Branch, worktree.Path)
 	if err != nil {
 		return fmt.Errorf("failed to display success message: %w", err)

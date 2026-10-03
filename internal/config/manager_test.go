@@ -62,7 +62,7 @@ func TestConfigManager_GetConfigImmutable(t *testing.T) {
 
 	config.ProjectsDirectory = "/modified/path"
 
-	newConfig := manager.GetConfig()
+	newConfig := manager.Config()
 	assert.NotEqual(t, "/modified/path", newConfig.ProjectsDirectory)
 }
 
@@ -79,7 +79,7 @@ func TestConfigManager_GetConfigDeepCopy(t *testing.T) {
 	config.WorktreesDirectory = "/another/path"
 	config.DefaultSourceBranch = "modified"
 
-	originalConfig := manager.GetConfig()
+	originalConfig := manager.Config()
 	assert.Equal(t, originalProjectsDir, originalConfig.ProjectsDirectory)
 	assert.Equal(t, originalWorktreesDir, originalConfig.WorktreesDirectory)
 	assert.Equal(t, originalSourceBranch, originalConfig.DefaultSourceBranch)
@@ -410,9 +410,9 @@ func TestConfigManager_ColorEnabledPropagatesToCopy(t *testing.T) {
 	require.NotNil(t, loaded)
 	require.False(t, loaded.ColorEnabled)
 
-	cached := manager.GetConfig()
+	cached := manager.Config()
 	require.NotNil(t, cached)
-	assert.False(t, cached.ColorEnabled, "GetConfig copy should preserve ColorEnabled=false")
+	assert.False(t, cached.ColorEnabled, "Config copy should preserve ColorEnabled=false")
 
 	unsetEnv(t, "NO_COLOR")
 	reloaded, err := manager.Load()

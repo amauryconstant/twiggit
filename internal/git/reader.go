@@ -13,8 +13,8 @@ import (
 )
 
 // reader implements the read-side git operations (OpenRepository,
-// ListBranches, BranchExists, GetRepositoryStatus, ListRemotes,
-// GetCommitInfo, GetRepositoryInfo, ValidateRepository). It owns the
+// ListBranches, BranchExists, RepositoryStatus, ListRemotes,
+// Commit, Repository, ValidateRepository). It owns the
 // LRU cache that keeps go-git Repository handles hot.
 //
 // reader is an internal collaborator of Client; consumers interact
@@ -58,7 +58,7 @@ func (r *reader) OpenRepository(path string) (*git.Repository, error) {
 }
 
 // ListBranches lists all branches in repository (idempotent)
-func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.BranchInfo, error) {
+func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.Branch, error) {
 	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.Branch
 		return nil, NewRepoError("list-branches", "failed to list branches", err)
 	}
 
-	branchInfos := make([]core.BranchInfo, 0)
+	branchInfos := make([]core.Branch, 0)
 
 	// Get current branch reference
 	headRef, err := repo.Head()
@@ -80,7 +80,7 @@ func (r *reader) ListBranches(_ context.Context, repoPath string) ([]core.Branch
 	err = branches.ForEach(func(ref *plumbing.Reference) error {
 		branchName := ref.Name().Short()
 		if !strings.HasPrefix(branchName, "refs/") {
-			branchInfo := core.BranchInfo{
+			branchInfo := core.Branch{
 				Name:      branchName,
 				IsCurrent: ref.Name() == headRef.Name(),
 			}
@@ -131,8 +131,8 @@ func (r *reader) BranchExists(_ context.Context, repoPath, branchName string) (b
 	return true, nil
 }
 
-// GetRepositoryStatus returns repository status (idempotent)
-func (r *reader) GetRepositoryStatus(_ context.Context, repoPath string) (core.RepositoryStatus, error) {
+// RepositoryStatus returns repository status (idempotent)
+func (r *reader) RepositoryStatus(_ context.Context, repoPath string) (core.RepositoryStatus, error) {
 	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return core.RepositoryStatus{}, err
@@ -212,15 +212,15 @@ func (r *reader) ValidateRepository(path string) error {
 	return nil
 }
 
-// GetRepositoryInfo returns comprehensive repository information
-func (r *reader) GetRepositoryInfo(ctx context.Context, repoPath string) (*core.GitRepository, error) {
+// Repository returns comprehensive repository information
+func (r *reader) Repository(ctx context.Context, repoPath string) (*core.Repository, error) {
 	_, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get basic info
-	info := &core.GitRepository{
+	info := &core.Repository{
 		Path:   repoPath,
 		IsBare: false, // go-git doesn't expose IsBare directly, assume false for worktrees
 	}
@@ -238,7 +238,7 @@ func (r *reader) GetRepositoryInfo(ctx context.Context, repoPath string) (*core.
 	}
 
 	// Get status
-	status, err := r.GetRepositoryStatus(ctx, repoPath)
+	status, err := r.RepositoryStatus(ctx, repoPath)
 	if err == nil {
 		info.Status = status
 	}
@@ -255,7 +255,7 @@ func (r *reader) GetRepositoryInfo(ctx context.Context, repoPath string) (*core.
 }
 
 // ListRemotes lists all remotes in repository
-func (r *reader) ListRemotes(_ context.Context, repoPath string) ([]core.RemoteInfo, error) {
+func (r *reader) ListRemotes(_ context.Context, repoPath string) ([]core.Remote, error) {
 	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -266,10 +266,10 @@ func (r *reader) ListRemotes(_ context.Context, repoPath string) ([]core.RemoteI
 		return nil, NewRepoError("list-remotes", "failed to list remotes", err)
 	}
 
-	remoteInfos := make([]core.RemoteInfo, 0, len(remotes))
+	remoteInfos := make([]core.Remote, 0, len(remotes))
 
 	for _, remote := range remotes {
-		remoteInfo := core.RemoteInfo{
+		remoteInfo := core.Remote{
 			Name: remote.Config().Name,
 		}
 
@@ -285,8 +285,8 @@ func (r *reader) ListRemotes(_ context.Context, repoPath string) ([]core.RemoteI
 	return remoteInfos, nil
 }
 
-// GetCommitInfo returns information about a specific commit
-func (r *reader) GetCommitInfo(_ context.Context, repoPath, commitHash string) (*core.CommitInfo, error) {
+// Commit returns information about a specific commit
+func (r *reader) Commit(_ context.Context, repoPath, commitHash string) (*core.Commit, error) {
 	repo, err := r.OpenRepository(repoPath)
 	if err != nil {
 		return nil, err
@@ -302,7 +302,7 @@ func (r *reader) GetCommitInfo(_ context.Context, repoPath, commitHash string) (
 	}
 
 	hashStr := commit.Hash.String()
-	commitInfo := &core.CommitInfo{
+	commitInfo := &core.Commit{
 		Hash:      hashStr,
 		ShortHash: hashStr[:min(7, len(hashStr))],
 		Author:    commit.Author.Name,

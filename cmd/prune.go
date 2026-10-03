@@ -332,7 +332,7 @@ type pruneSkipResult struct {
 }
 
 // checkWorktreeSkip encodes the prune-skip decision tree.
-func checkWorktreeSkip(ctx context.Context, client *git.Client, cfg *core.Config, wt core.WorktreeInfo, project *core.ProjectInfo, cwd string, req *core.PruneWorktreesRequest) *pruneSkipResult {
+func checkWorktreeSkip(ctx context.Context, client *git.Client, cfg *core.Config, wt core.Worktree, project *core.ProjectInfo, cwd string, req *core.PruneWorktreesRequest) *pruneSkipResult {
 	if cwd != "" && (strings.HasPrefix(cwd, wt.Path+string(filepath.Separator)) || cwd == wt.Path) {
 		return &pruneSkipResult{reason: "cannot prune current worktree", category: "current"}
 	}
@@ -349,7 +349,7 @@ func checkWorktreeSkip(ctx context.Context, client *git.Client, cfg *core.Config
 	}
 
 	if !req.Force && !req.DryRun {
-		status, err := client.GetRepositoryStatus(ctx, wt.Path)
+		status, err := client.RepositoryStatus(ctx, wt.Path)
 		if err == nil && !status.IsClean {
 			return &pruneSkipResult{reason: "uncommitted changes (use --force to override)", category: "skipped"}
 		}
@@ -381,7 +381,7 @@ func addSkippedPrune(result *core.PruneWorktreesResult, entry *core.PruneWorktre
 }
 
 // deleteWorktreeAndBranch performs the actual delete + optional branch removal.
-func deleteWorktreeAndBranch(ctx context.Context, client *git.Client, logger *slog.Logger, project *core.ProjectInfo, wt core.WorktreeInfo, req *core.PruneWorktreesRequest, entry *core.PruneWorktreeResult, result *core.PruneWorktreesResult) {
+func deleteWorktreeAndBranch(ctx context.Context, client *git.Client, logger *slog.Logger, project *core.ProjectInfo, wt core.Worktree, req *core.PruneWorktreesRequest, entry *core.PruneWorktreeResult, result *core.PruneWorktreesResult) {
 	if err := client.DeleteWorktree(ctx, project.GitRepoPath, wt.Path, req.Force); err != nil {
 		entry.Error = err
 		result.SkippedWorktrees = append(result.SkippedWorktrees, entry)

@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -257,7 +256,7 @@ func TestExecuteWithTimeout_Integration(t *testing.T) {
 	executor := NewCommandExecutor(5 * time.Second)
 
 	t.Run("successful command", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		result, err := executor.ExecuteWithTimeout(ctx, "", "echo", 1*time.Second, "hello world")
 
 		require.NoError(t, err)
@@ -268,7 +267,7 @@ func TestExecuteWithTimeout_Integration(t *testing.T) {
 	})
 
 	t.Run("command failure", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		result, err := executor.ExecuteWithTimeout(ctx, "", "false", 1*time.Second)
 
 		require.Error(t, err) // Error expected for non-zero exit code
@@ -279,7 +278,7 @@ func TestExecuteWithTimeout_Integration(t *testing.T) {
 	})
 
 	t.Run("command not found", func(t *testing.T) {
-		ctx := context.Background()
+		ctx := t.Context()
 		_, err := executor.ExecuteWithTimeout(ctx, "", "nonexistent-command-12345", 1*time.Second)
 
 		require.Error(t, err)

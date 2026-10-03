@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"testing"
@@ -16,12 +15,12 @@ func TestCLIClient_ParseWorktreeLine(t *testing.T) {
 	testCases := []struct {
 		name           string
 		line           string
-		expectedResult *core.WorktreeInfo
+		expectedResult *core.Worktree
 	}{
 		{
 			name:           "worktree line",
 			line:           "worktree /path/to/worktree",
-			expectedResult: &core.WorktreeInfo{Path: "/path/to/worktree"},
+			expectedResult: &core.Worktree{Path: "/path/to/worktree"},
 		},
 		{
 			name:           "HEAD line",
@@ -143,7 +142,7 @@ func TestCLIClient_CreateWorktree(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", worktreeDir)
+	err := client.CreateWorktree(t.Context(), "/test/repo", "feature", "main", worktreeDir)
 	assert.NoError(t, err)
 }
 
@@ -160,7 +159,7 @@ func TestCLIClient_CreateWorktree_WithExistingBranch(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.CreateWorktree(context.Background(), "/test/repo", "existing-branch", "", worktreeDir)
+	err := client.CreateWorktree(t.Context(), "/test/repo", "existing-branch", "", worktreeDir)
 	assert.NoError(t, err)
 }
 
@@ -171,7 +170,7 @@ func TestCLIClient_CreateWorktree_Failure(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
+	err := client.CreateWorktree(t.Context(), "/test/repo", "feature", "main", "/path/to/worktree")
 	require.Error(t, err)
 	var worktreeErr *core.OperationError
 	require.ErrorAs(t, err, &worktreeErr)
@@ -197,7 +196,7 @@ func TestCLIClient_NonZeroExit_PreservesExecError(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
+	err := client.CreateWorktree(t.Context(), "/test/repo", "feature", "main", "/path/to/worktree")
 	require.Error(t, err)
 
 	var extracted *exec.ExitError
@@ -210,7 +209,7 @@ func TestCLIClient_DeleteWorktree(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.DeleteWorktree(context.Background(), "/test/repo", "/path/to/worktree", false)
+	err := client.DeleteWorktree(t.Context(), "/test/repo", "/path/to/worktree", false)
 	assert.NoError(t, err)
 }
 
@@ -220,7 +219,7 @@ func TestCLIClient_DeleteWorktree_WithForce(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.DeleteWorktree(context.Background(), "/test/repo", "/path/to/worktree", true)
+	err := client.DeleteWorktree(t.Context(), "/test/repo", "/path/to/worktree", true)
 	assert.NoError(t, err)
 }
 
@@ -239,7 +238,7 @@ detached`
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	worktrees, err := client.ListWorktrees(context.Background(), "/test/repo")
+	worktrees, err := client.ListWorktrees(t.Context(), "/test/repo")
 	require.NoError(t, err)
 	assert.Len(t, worktrees, 3)
 
@@ -267,7 +266,7 @@ func TestCLIClient_PruneWorktrees(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.PruneWorktrees(context.Background(), "/test/repo")
+	err := client.PruneWorktrees(t.Context(), "/test/repo")
 	assert.NoError(t, err)
 }
 
@@ -309,7 +308,7 @@ func TestCLIClient_IsBranchMerged(t *testing.T) {
 			t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 			client := NewCLIClient(mockExecutor)
 
-			isMerged, err := client.IsBranchMerged(context.Background(), "/test/repo", tt.branchName)
+			isMerged, err := client.IsBranchMerged(t.Context(), "/test/repo", tt.branchName)
 
 			if tt.expectErr {
 				assert.Error(t, err)
@@ -378,7 +377,7 @@ func TestCLIClient_DeleteBranch(t *testing.T) {
 			t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 			client := NewCLIClient(mockExecutor)
 
-			err := client.DeleteBranch(context.Background(), tt.repoPath, tt.branchName)
+			err := client.DeleteBranch(t.Context(), tt.repoPath, tt.branchName)
 
 			if tt.expectErr {
 				require.Error(t, err)
@@ -398,7 +397,7 @@ func TestCLIClient_Timeout(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor, 5)
 
-	_, err := client.ListWorktrees(context.Background(), "/test/repo")
+	_, err := client.ListWorktrees(t.Context(), "/test/repo")
 	assert.NoError(t, err)
 }
 
@@ -443,7 +442,7 @@ func TestCLIClient_NilResultGuards(t *testing.T) {
 		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), []string{"worktree", "add", "-b", "feature", "/path/to/worktree", "main"}).Return(nil, nil)
 		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 		client := NewCLIClient(mockExecutor)
-		err := client.CreateWorktree(context.Background(), "/test/repo", "feature", "main", "/path/to/worktree")
+		err := client.CreateWorktree(t.Context(), "/test/repo", "feature", "main", "/path/to/worktree")
 		must.Error(err)
 		is.Contains(err.Error(), "command executor returned nil result for worktree create")
 	})
@@ -455,7 +454,7 @@ func TestCLIClient_NilResultGuards(t *testing.T) {
 		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
 		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 		client := NewCLIClient(mockExecutor)
-		err := client.DeleteWorktree(context.Background(), "/test/repo", "/path/to/worktree", false)
+		err := client.DeleteWorktree(t.Context(), "/test/repo", "/path/to/worktree", false)
 		must.Error(err)
 		is.Contains(err.Error(), "command executor returned nil result for worktree delete")
 	})
@@ -467,7 +466,7 @@ func TestCLIClient_NilResultGuards(t *testing.T) {
 		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
 		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 		client := NewCLIClient(mockExecutor)
-		_, err := client.ListWorktrees(context.Background(), "/test/repo")
+		_, err := client.ListWorktrees(t.Context(), "/test/repo")
 		must.Error(err)
 		is.Contains(err.Error(), "command executor returned nil result for worktree list")
 	})
@@ -479,7 +478,7 @@ func TestCLIClient_NilResultGuards(t *testing.T) {
 		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
 		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 		client := NewCLIClient(mockExecutor)
-		err := client.PruneWorktrees(context.Background(), "/test/repo")
+		err := client.PruneWorktrees(t.Context(), "/test/repo")
 		must.Error(err)
 		is.Contains(err.Error(), "command executor returned nil result for worktree prune")
 	})
@@ -491,7 +490,7 @@ func TestCLIClient_NilResultGuards(t *testing.T) {
 		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
 		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 		client := NewCLIClient(mockExecutor)
-		err := client.DeleteBranch(context.Background(), "/test/repo", "feature")
+		err := client.DeleteBranch(t.Context(), "/test/repo", "feature")
 		must.Error(err)
 		is.Contains(err.Error(), "command executor returned nil result for branch delete")
 	})
@@ -503,13 +502,13 @@ func TestCLIClient_NilResultGuards(t *testing.T) {
 		mockExecutor.On("ExecuteWithTimeout", mock.Anything, "/test/repo", "git", mock.AnythingOfType("time.Duration"), mock.Anything).Return(nil, nil)
 		t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 		client := NewCLIClient(mockExecutor)
-		_, err := client.IsBranchMerged(context.Background(), "/test/repo", "feature")
+		_, err := client.IsBranchMerged(t.Context(), "/test/repo", "feature")
 		must.Error(err)
 		is.Contains(err.Error(), "command executor returned nil result for branch merge check")
 	})
 }
 
-func findWorktree(worktrees []core.WorktreeInfo, path string) *core.WorktreeInfo {
+func findWorktree(worktrees []core.Worktree, path string) *core.Worktree {
 	for _, worktree := range worktrees {
 		if worktree.Path == path {
 			return &worktree
@@ -551,7 +550,7 @@ func TestWriteSideFailure_OpIsGitWorktree(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.CreateWorktree(context.Background(),
+	err := client.CreateWorktree(t.Context(),
 		"/non/existent/path", "feature", "", "/tmp/wt-feature")
 	require.Error(t, err)
 
@@ -573,7 +572,7 @@ func TestWriteSideFailure_OpIsGitBranch(t *testing.T) {
 	t.Cleanup(func() { mockExecutor.AssertExpectations(t) })
 	client := NewCLIClient(mockExecutor)
 
-	err := client.DeleteBranch(context.Background(),
+	err := client.DeleteBranch(t.Context(),
 		"/non/existent/path", "feature")
 	require.Error(t, err)
 

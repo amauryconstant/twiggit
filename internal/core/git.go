@@ -33,20 +33,20 @@ type RepositoryOpener interface {
 
 // BranchReader exposes the branch-listing and branch-existence methods.
 type BranchReader interface {
-	ListBranches(ctx context.Context, repoPath string) ([]BranchInfo, error)
+	ListBranches(ctx context.Context, repoPath string) ([]Branch, error)
 	BranchExists(ctx context.Context, repoPath, branchName string) (bool, error)
 }
 
 // RepositoryReader exposes the repository-inspection methods.
 type RepositoryReader interface {
-	GetRepositoryStatus(ctx context.Context, repoPath string) (RepositoryStatus, error)
-	GetRepositoryInfo(ctx context.Context, repoPath string) (*GitRepository, error)
-	GetCommitInfo(ctx context.Context, repoPath, commitHash string) (*CommitInfo, error)
+	RepositoryStatus(ctx context.Context, repoPath string) (RepositoryStatus, error)
+	Repository(ctx context.Context, repoPath string) (*Repository, error)
+	Commit(ctx context.Context, repoPath, commitHash string) (*Commit, error)
 }
 
 // RemoteReader exposes the remote-listing method.
 type RemoteReader interface {
-	ListRemotes(ctx context.Context, repoPath string) ([]RemoteInfo, error)
+	ListRemotes(ctx context.Context, repoPath string) ([]Remote, error)
 }
 
 // WorktreeWriter exposes the worktree-lifecycle methods.
@@ -59,7 +59,7 @@ type RemoteReader interface {
 type WorktreeWriter interface {
 	CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch, worktreePath string) error
 	DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error
-	ListWorktrees(ctx context.Context, repoPath string) ([]WorktreeInfo, error)
+	ListWorktrees(ctx context.Context, repoPath string) ([]Worktree, error)
 	PruneWorktrees(ctx context.Context, repoPath string) error
 }
 

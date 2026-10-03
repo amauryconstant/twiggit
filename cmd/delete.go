@@ -228,7 +228,7 @@ func getWorktreeStatus(ctx context.Context, client *git.Client, worktreePath str
 		}
 	}
 
-	repoStatus, err := client.GetRepositoryStatus(ctx, worktreePath)
+	repoStatus, err := client.RepositoryStatus(ctx, worktreePath)
 	if err != nil {
 		return nil, &core.OperationError{
 			Op:      "status.worktree",
@@ -265,7 +265,7 @@ func now() time.Time {
 
 // clientGetWorktreeByPath returns the worktree info for worktreePath
 // under projectPath, or a NotFound sentinel.
-func clientGetWorktreeByPath(ctx context.Context, client *git.Client, projectPath, worktreePath string) (*core.WorktreeInfo, error) {
+func clientGetWorktreeByPath(ctx context.Context, client *git.Client, projectPath, worktreePath string) (*core.Worktree, error) {
 	worktrees, err := client.ListWorktrees(ctx, projectPath)
 	if err != nil {
 		return nil, &core.OperationError{

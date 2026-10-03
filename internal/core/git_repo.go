@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 )
 
-// GitDir is a minimal git-repository descriptor: its base name and
+// RepoDir is a minimal git-repository descriptor: its base name and
 // absolute filesystem path.
-type GitDir struct {
+type RepoDir struct {
 	Name string
 	Path string
 }

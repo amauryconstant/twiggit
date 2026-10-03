@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -30,7 +29,7 @@ func TestHookRunner_Run_NoConfigFile_ReturnsNotExecuted(t *testing.T) {
 		ConfigFilePath: "/nonexistent/.twiggit.toml",
 	}
 
-	result, err := runner.Run(context.Background(), req)
+	result, err := runner.Run(t.Context(), req)
 
 	require.NoError(t, err)
 	assert.False(t, result.HasExecuted)
@@ -52,7 +51,7 @@ func TestHookRunner_Run_EmptyConfigFile_ReturnsNotExecuted(t *testing.T) {
 	}
 
 	runner := NewHookRunner(mockExec)
-	result, err := runner.Run(context.Background(), req)
+	result, err := runner.Run(t.Context(), req)
 
 	require.NoError(t, err)
 	assert.False(t, result.HasExecuted)
@@ -85,7 +84,7 @@ commands = ["mise trust", "npm install"]
 		ConfigFilePath: configPath,
 	}
 
-	result, err := runner.Run(context.Background(), req)
+	result, err := runner.Run(t.Context(), req)
 
 	require.NoError(t, err)
 	assert.True(t, result.HasExecuted)
@@ -123,7 +122,7 @@ commands = ["mise trust", "npm install", "echo done"]
 		ConfigFilePath: configPath,
 	}
 
-	result, err := runner.Run(context.Background(), req)
+	result, err := runner.Run(t.Context(), req)
 
 	require.NoError(t, err)
 	assert.True(t, result.HasExecuted)
@@ -150,7 +149,7 @@ commands = ["mise trust"]
 		ConfigFilePath: configPath,
 	}
 
-	result, err := runner.Run(context.Background(), req)
+	result, err := runner.Run(t.Context(), req)
 
 	require.NoError(t, err)
 	assert.False(t, result.HasExecuted)
@@ -173,7 +172,7 @@ func TestHookRunner_Run_MissingCommandsArray_ReturnsNotExecuted(t *testing.T) {
 		ConfigFilePath: configPath,
 	}
 
-	result, err := runner.Run(context.Background(), req)
+	result, err := runner.Run(t.Context(), req)
 
 	require.NoError(t, err)
 	assert.False(t, result.HasExecuted)
@@ -197,7 +196,7 @@ commands = []
 		ConfigFilePath: configPath,
 	}
 
-	result, err := runner.Run(context.Background(), req)
+	result, err := runner.Run(t.Context(), req)
 
 	require.NoError(t, err)
 	assert.False(t, result.HasExecuted)
@@ -233,7 +232,7 @@ commands = ["echo test"]
 		ConfigFilePath: configPath,
 	}
 
-	_, err = runner.Run(context.Background(), req)
+	_, err = runner.Run(t.Context(), req)
 	require.NoError(t, err)
 
 	require.Len(t, capturedArgs, 2)

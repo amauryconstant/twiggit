@@ -53,7 +53,7 @@ func (r Result[T]) IsError() bool {
 
 // WorktreeStatus represents the status of a worktree
 type WorktreeStatus struct {
-	WorktreeInfo          *WorktreeInfo
+	Worktree              *Worktree
 	RepositoryStatus      *RepositoryStatus
 	LastChecked           time.Time
 	IsClean               bool
@@ -66,9 +66,9 @@ type ProjectInfo struct {
 	Name          string
 	Path          string
 	GitRepoPath   string
-	Worktrees     []*WorktreeInfo
-	Branches      []*BranchInfo
-	Remotes       []*RemoteInfo
+	Worktrees     []*Worktree
+	Branches      []*Branch
+	Remotes       []*Remote
 	DefaultBranch string
 	IsBare        bool
 	LastModified  time.Time
@@ -83,6 +83,6 @@ type ProjectSummary struct {
 
 // CreateWorktreeResult represents the result of a worktree creation operation
 type CreateWorktreeResult struct {
-	Worktree   *WorktreeInfo
+	Worktree   *Worktree
 	HookResult *HookResult
 }

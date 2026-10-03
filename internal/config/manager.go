@@ -235,8 +235,8 @@ func (m *koanfConfigManager) Load() (*core.Config, error) {
 	return copyConfig(config), nil
 }
 
-// GetConfig returns the loaded configuration (immutable copy)
-func (m *koanfConfigManager) GetConfig() *core.Config {
+// Config returns the loaded configuration (immutable copy)
+func (m *koanfConfigManager) Config() *core.Config {
 	if m.config == nil {
 		return nil
 	}

@@ -52,7 +52,7 @@ func NewCLIClient(executor CommandExecutor, timeoutSeconds ...int) *CLIClient {
 
 // parseWorktreeLine parses a single line from git worktree list output
 // (pure function, no I/O).
-func parseWorktreeLine(line string) *core.WorktreeInfo {
+func parseWorktreeLine(line string) *core.Worktree {
 	line = strings.TrimSpace(line)
 	if line == "" {
 		return nil
@@ -63,7 +63,7 @@ func parseWorktreeLine(line string) *core.WorktreeInfo {
 		if err != nil {
 			absPath = path
 		}
-		return &core.WorktreeInfo{
+		return &core.Worktree{
 			Path: absPath,
 		}
 	}
@@ -187,7 +187,7 @@ func (c *cliClient) DeleteWorktree(ctx context.Context, repoPath, worktreePath s
 }
 
 // ListWorktrees lists all worktrees using git CLI (idempotent)
-func (c *cliClient) ListWorktrees(ctx context.Context, repoPath string) ([]core.WorktreeInfo, error) {
+func (c *cliClient) ListWorktrees(ctx context.Context, repoPath string) ([]core.Worktree, error) {
 	// Validate input
 	if repoPath == "" {
 		return nil, NewWorktreeError("list", "repository path cannot be empty", nil)
@@ -299,9 +299,9 @@ func (c *cliClient) IsBranchMerged(ctx context.Context, repoPath, branchName str
 }
 
 // parseWorktreeList parses the output of `git worktree list --porcelain`
-func (c *cliClient) parseWorktreeList(output string) ([]core.WorktreeInfo, error) {
-	var worktrees []core.WorktreeInfo
-	var currentWorktree *core.WorktreeInfo
+func (c *cliClient) parseWorktreeList(output string) ([]core.Worktree, error) {
+	var worktrees []core.Worktree
+	var currentWorktree *core.Worktree
 
 	lines := strings.SplitSeq(output, "\n")
 	for line := range lines {
@@ -322,7 +322,7 @@ func (c *cliClient) parseWorktreeList(output string) ([]core.WorktreeInfo, error
 				absPath = path // Use original path if conversion fails
 			}
 
-			currentWorktree = &core.WorktreeInfo{
+			currentWorktree = &core.Worktree{
 				Path: absPath,
 			}
 		} else if currentWorktree != nil {

@@ -33,10 +33,10 @@ func NewRepoFinder(goGit RepoValidator) *RepoFinder {
 // dir. If goGit is set, candidates that fail ValidateRepository are
 // filtered out. The returned slice is defensively copied so callers may
 // mutate it without affecting subsequent calls.
-func (f *RepoFinder) FindGitRepositories(dir string) ([]core.GitDir, error) {
+func (f *RepoFinder) FindGitRepositories(dir string) ([]core.RepoDir, error) {
 	if _, err := os.Stat(dir); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return []core.GitDir{}, nil
+			return []core.RepoDir{}, nil
 		}
 		return nil, fmt.Errorf("failed to stat directory %s: %w", dir, err)
 	}
@@ -46,7 +46,7 @@ func (f *RepoFinder) FindGitRepositories(dir string) ([]core.GitDir, error) {
 		return nil, fmt.Errorf("failed to read directory %s: %w", dir, err)
 	}
 
-	repos := make([]core.GitDir, 0, len(entries))
+	repos := make([]core.RepoDir, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -57,7 +57,7 @@ func (f *RepoFinder) FindGitRepositories(dir string) ([]core.GitDir, error) {
 				continue
 			}
 		}
-		repos = append(repos, core.GitDir{
+		repos = append(repos, core.RepoDir{
 			Name: entry.Name(),
 			Path: candidate,
 		})

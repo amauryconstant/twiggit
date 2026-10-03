@@ -4,8 +4,8 @@ import (
 	"time"
 )
 
-// BranchInfo represents information about a git branch
-type BranchInfo struct {
+// Branch represents information about a git branch
+type Branch struct {
 	Name      string    // Branch name
 	IsCurrent bool      // Whether this is the current branch
 	Remote    string    // Remote tracking branch (if any)
@@ -14,8 +14,8 @@ type BranchInfo struct {
 	Date      time.Time // Date of latest commit
 }
 
-// WorktreeInfo represents information about a git worktree
-type WorktreeInfo struct {
+// Worktree represents information about a git worktree
+type Worktree struct {
 	Path       string // Absolute path to worktree
 	Branch     string // Branch name
 	Commit     string // Commit hash
@@ -36,15 +36,15 @@ type RepositoryStatus struct {
 	Behind    int      // Commits behind remote
 }
 
-// RemoteInfo represents information about a git remote
-type RemoteInfo struct {
+// Remote represents information about a git remote
+type Remote struct {
 	Name     string // Remote name
 	FetchURL string // Fetch URL
 	PushURL  string // Push URL
 }
 
-// CommitInfo represents information about a git commit
-type CommitInfo struct {
+// Commit represents information about a git commit
+type Commit struct {
 	Hash      string    // Commit hash
 	Author    string    // Author name
 	Email     string    // Author email
@@ -53,13 +53,13 @@ type CommitInfo struct {
 	ShortHash string    // Short commit hash (7 characters)
 }
 
-// GitRepository represents a git repository with metadata
-type GitRepository struct {
+// Repository represents a git repository with metadata
+type Repository struct {
 	Path          string           // Repository path
 	IsBare        bool             // Whether repository is bare
 	DefaultBranch string           // Default branch name
-	Remotes       []RemoteInfo     // List of remotes
-	Branches      []BranchInfo     // List of branches
-	Worktrees     []WorktreeInfo   // List of worktrees
+	Remotes       []Remote         // List of remotes
+	Branches      []Branch         // List of branches
+	Worktrees     []Worktree       // List of worktrees
 	Status        RepositoryStatus // Current status
 }

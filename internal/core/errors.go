@@ -183,7 +183,7 @@ func (e *OperationError) Is(target error) bool {
 		return true
 	}
 	switch {
-	case strings.HasPrefix(e.Op, "git.repository") || e.Op == "GitRepository":
+	case strings.HasPrefix(e.Op, "git.repository") || e.Op == "Repository":
 		return target == ErrGitRepoNotFound
 	case strings.HasPrefix(e.Op, "git.worktree") || e.Op == "GitWorktree":
 		return target == ErrWorktreeNotFound

@@ -148,14 +148,14 @@ func runList(opts *ListOptions) error {
 	return nil
 }
 
-// worktreeRows projects a slice of *core.WorktreeInfo into the
+// worktreeRows projects a slice of *core.Worktree into the
 // Tabular interface consumed by TableFormatter and PlainFormatter
 // and the JSON shape consumed by JSONFormatter via MarshalJSON.
 // The Header is the canonical column order for list-style output;
 // Rows projects each worktree to the matching string triplet, with
 // status ∈ {clean, modified, detached} per the spec.
 type worktreeRows struct {
-	worktrees []*core.WorktreeInfo
+	worktrees []*core.Worktree
 }
 
 func (w worktreeRows) Header() []string {
@@ -196,7 +196,7 @@ func (w worktreeRows) MarshalJSON() ([]byte, error) {
 	return data, nil
 }
 
-func worktreeStatus(wt *core.WorktreeInfo) string {
+func worktreeStatus(wt *core.Worktree) string {
 	switch {
 	case wt.IsDetached:
 		return "detached"
@@ -214,7 +214,7 @@ func worktreeStatus(wt *core.WorktreeInfo) string {
 // with optional `(modified)` / `(detached)` suffixes. An empty
 // collection emits no lines per the cli-list spec
 // (`Status indicators / Empty project renders no lines`).
-func renderWorktrees(out io.Writer, worktrees []*core.WorktreeInfo, formatter output.Formatter) error {
+func renderWorktrees(out io.Writer, worktrees []*core.Worktree, formatter output.Formatter) error {
 	if formatter == nil {
 		for _, wt := range worktrees {
 			suffix := ""
@@ -235,13 +235,13 @@ func renderWorktrees(out io.Writer, worktrees []*core.WorktreeInfo, formatter ou
 	return nil
 }
 
-// listWorktrees returns the slice of *core.WorktreeInfo matching the
+// listWorktrees returns the slice of *core.Worktree matching the
 // list request. When listAll is set every discovered project is
 // queried; otherwise the current context's project is used. When the
 // caller has no project context, plain `list` falls through to the
 // all-projects branch so an empty projects directory produces the
 // friendly "No worktrees found" line (matches `list --all`).
-func listWorktrees(ctx context.Context, client *git.Client, cfg *core.Config, currentCtx *core.Context, listAll bool) ([]*core.WorktreeInfo, error) {
+func listWorktrees(ctx context.Context, client *git.Client, cfg *core.Config, currentCtx *core.Context, listAll bool) ([]*core.Worktree, error) {
 	if listAll {
 		return listAllProjectsWorktrees(ctx, client, cfg)
 	}
@@ -271,7 +271,7 @@ func listWorktrees(ctx context.Context, client *git.Client, cfg *core.Config, cu
 	}
 
 	filtered := filterNonMain(worktrees, repoPath)
-	out := make([]*core.WorktreeInfo, len(filtered))
+	out := make([]*core.Worktree, len(filtered))
 	for i := range filtered {
 		out[i] = &filtered[i]
 	}
@@ -282,7 +282,7 @@ func listWorktrees(ctx context.Context, client *git.Client, cfg *core.Config, cu
 // cfg.ProjectsDirectory, lists worktrees for each, and returns the
 // flattened set (main worktrees are excluded to match the legacy
 // behavior).
-func listAllProjectsWorktrees(ctx context.Context, client *git.Client, cfg *core.Config) ([]*core.WorktreeInfo, error) {
+func listAllProjectsWorktrees(ctx context.Context, client *git.Client, cfg *core.Config) ([]*core.Worktree, error) {
 	finder := git.NewRepoFinder(client)
 	gitDirs, err := finder.FindGitRepositories(cfg.ProjectsDirectory)
 	if err != nil {
@@ -294,7 +294,7 @@ func listAllProjectsWorktrees(ctx context.Context, client *git.Client, cfg *core
 		}
 	}
 
-	var out []*core.WorktreeInfo
+	var out []*core.Worktree
 	for _, gitDir := range gitDirs {
 		worktrees, err := client.ListWorktrees(ctx, gitDir.Path)
 		if err != nil {
@@ -310,8 +310,8 @@ func listAllProjectsWorktrees(ctx context.Context, client *git.Client, cfg *core
 
 // filterNonMain returns the worktrees that are not the repo's main
 // checkout. Mirrors the legacy "IncludeMain: false" default.
-func filterNonMain(worktrees []core.WorktreeInfo, repoPath string) []core.WorktreeInfo {
-	out := make([]core.WorktreeInfo, 0, len(worktrees))
+func filterNonMain(worktrees []core.Worktree, repoPath string) []core.Worktree {
+	out := make([]core.Worktree, 0, len(worktrees))
 	for _, wt := range worktrees {
 		if wt.Path != repoPath {
 			out = append(out, wt)

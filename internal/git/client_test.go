@@ -1,7 +1,6 @@
 package git
 
 import (
-	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -44,7 +43,7 @@ func TestNewClient_DefaultCacheEnabled(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
-	assert.True(t, client.cacheEnabled, "default cache must be enabled")
+	assert.True(t, client.isCacheEnabled, "default cache must be enabled")
 	assert.NotNil(t, client.cache, "default cache handle must be non-nil")
 }
 
@@ -60,7 +59,7 @@ func TestWithCacheSize_Applies(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
-	assert.True(t, client.cacheEnabled)
+	assert.True(t, client.isCacheEnabled)
 	assert.NotNil(t, client.cache)
 }
 
@@ -94,7 +93,7 @@ func TestWithCacheSize_RejectsNonPositive(t *testing.T) {
 }
 
 // TestWithCacheDisabled_TurnsOffCache asserts WithCacheDisabled
-// produces a Client whose reader cacheEnabled is false but still
+// produces a Client whose reader isCacheEnabled is false but still
 // constructs a non-nil cache handle (the cache is allocated so
 // re-enabling via a later option would only require flipping the
 // boolean).
@@ -105,7 +104,7 @@ func TestWithCacheDisabled_TurnsOffCache(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, client)
 
-	assert.False(t, client.cacheEnabled, "WithCacheDisabled must disable the cache gate")
+	assert.False(t, client.isCacheEnabled, "WithCacheDisabled must disable the cache gate")
 	assert.NotNil(t, client.cache, "cache handle stays allocated for re-enable")
 }
 
@@ -150,12 +149,12 @@ func TestGoGitClient_ListBranches(t *testing.T) {
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
-	branches, err := client.ListBranches(context.Background(), "/non/existent/path")
+	branches, err := client.ListBranches(t.Context(), "/non/existent/path")
 	require.Error(t, err)
 	assert.Nil(t, branches)
 
 	repoPath := setupTestRepo(t, tempDir)
-	branches, err = client.ListBranches(context.Background(), repoPath)
+	branches, err = client.ListBranches(t.Context(), repoPath)
 	require.NoError(t, err)
 	assert.NotEmpty(t, branches)
 
@@ -169,17 +168,17 @@ func TestGoGitClient_BranchExists(t *testing.T) {
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
-	exists, err := client.BranchExists(context.Background(), "/non/existent/path", "main")
+	exists, err := client.BranchExists(t.Context(), "/non/existent/path", "main")
 	require.Error(t, err)
 	assert.False(t, exists)
 
 	repoPath := setupTestRepo(t, tempDir)
 
-	exists, err = client.BranchExists(context.Background(), repoPath, "main")
+	exists, err = client.BranchExists(t.Context(), repoPath, "main")
 	require.NoError(t, err)
 	assert.True(t, exists)
 
-	exists, err = client.BranchExists(context.Background(), repoPath, "non-existent")
+	exists, err = client.BranchExists(t.Context(), repoPath, "non-existent")
 	require.NoError(t, err)
 	assert.False(t, exists)
 }
@@ -189,12 +188,12 @@ func TestGoGitClient_GetRepositoryStatus(t *testing.T) {
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
-	status, err := client.GetRepositoryStatus(context.Background(), "/non/existent/path")
+	status, err := client.RepositoryStatus(t.Context(), "/non/existent/path")
 	require.Error(t, err)
 	assert.Equal(t, core.RepositoryStatus{}, status)
 
 	repoPath := setupTestRepo(t, tempDir)
-	status, err = client.GetRepositoryStatus(context.Background(), repoPath)
+	status, err = client.RepositoryStatus(t.Context(), repoPath)
 	require.NoError(t, err)
 	assert.True(t, status.IsClean)
 	assert.Equal(t, "main", status.Branch)
@@ -205,12 +204,12 @@ func TestGoGitClient_GetRepositoryInfo(t *testing.T) {
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
-	info, err := client.GetRepositoryInfo(context.Background(), "/non/existent/path")
+	info, err := client.Repository(t.Context(), "/non/existent/path")
 	require.Error(t, err)
 	assert.Nil(t, info)
 
 	repoPath := setupTestRepo(t, tempDir)
-	info, err = client.GetRepositoryInfo(context.Background(), repoPath)
+	info, err = client.Repository(t.Context(), repoPath)
 	require.NoError(t, err)
 	assert.NotNil(t, info)
 	assert.Equal(t, repoPath, info.Path)
@@ -223,12 +222,12 @@ func TestGoGitClient_ListRemotes(t *testing.T) {
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
-	remotes, err := client.ListRemotes(context.Background(), "/non/existent/path")
+	remotes, err := client.ListRemotes(t.Context(), "/non/existent/path")
 	require.Error(t, err)
 	assert.Nil(t, remotes)
 
 	repoPath := setupTestRepo(t, tempDir)
-	remotes, err = client.ListRemotes(context.Background(), repoPath)
+	remotes, err = client.ListRemotes(t.Context(), repoPath)
 	require.NoError(t, err)
 	assert.Empty(t, remotes)
 }
@@ -238,17 +237,17 @@ func TestGoGitClient_GetCommitInfo(t *testing.T) {
 	require.NoError(t, err)
 	tempDir := t.TempDir()
 
-	commit, err := client.GetCommitInfo(context.Background(), "/non/existent/path", "HEAD")
+	commit, err := client.Commit(t.Context(), "/non/existent/path", "HEAD")
 	require.Error(t, err)
 	assert.Nil(t, commit)
 
 	repoPath := setupTestRepo(t, tempDir)
-	commit, err = client.GetCommitInfo(context.Background(), repoPath, "HEAD")
+	commit, err = client.Commit(t.Context(), repoPath, "HEAD")
 	require.Error(t, err)
 	assert.Nil(t, commit)
 }
 
-func findBranch(branches []core.BranchInfo, name string) *core.BranchInfo {
+func findBranch(branches []core.Branch, name string) *core.Branch {
 	for _, branch := range branches {
 		if branch.Name == name {
 			return &branch
