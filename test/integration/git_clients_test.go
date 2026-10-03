@@ -3,7 +3,6 @@
 package integration
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,25 +30,25 @@ func TestGitOperations_Integration(t *testing.T) {
 	executor := git.NewCommandExecutor(30 * time.Second)
 
 	// Initialize repository
-	_, err := executor.Execute(context.Background(), repoPath, "git", "init")
+	_, err := executor.Execute(t.Context(), repoPath, "git", "init")
 	require.NoError(t, err)
 
 	// Configure user (required for commits)
-	_, err = executor.Execute(context.Background(), repoPath, "git", "config", "user.name", "Test User")
+	_, err = executor.Execute(t.Context(), repoPath, "git", "config", "user.name", "Test User")
 	require.NoError(t, err)
-	_, err = executor.Execute(context.Background(), repoPath, "git", "config", "user.email", "test@example.com")
+	_, err = executor.Execute(t.Context(), repoPath, "git", "config", "user.email", "test@example.com")
 	require.NoError(t, err)
 
 	// Create initial commit
 	testFile := filepath.Join(repoPath, "test.txt")
 	require.NoError(t, os.WriteFile(testFile, []byte("test content"), 0o644))
-	_, err = executor.Execute(context.Background(), repoPath, "git", "add", "test.txt")
+	_, err = executor.Execute(t.Context(), repoPath, "git", "add", "test.txt")
 	require.NoError(t, err)
-	_, err = executor.Execute(context.Background(), repoPath, "git", "commit", "-m", "Initial commit")
+	_, err = executor.Execute(t.Context(), repoPath, "git", "commit", "-m", "Initial commit")
 	require.NoError(t, err)
 
 	// Ensure we're on main branch (git might default to master)
-	_, err = executor.Execute(context.Background(), repoPath, "git", "branch", "-M", "main")
+	_, err = executor.Execute(t.Context(), repoPath, "git", "branch", "-M", "main")
 	require.NoError(t, err)
 
 	t.Run("GoGitClient_BasicOperations", func(t *testing.T) {
@@ -66,17 +65,17 @@ func TestGitOperations_Integration(t *testing.T) {
 		assert.NotNil(t, repo)
 
 		// Test listing branches
-		branches, err := client.ListBranches(context.Background(), repoPath)
+		branches, err := client.ListBranches(t.Context(), repoPath)
 		require.NoError(t, err)
 		assert.NotEmpty(t, branches)
 
 		// Test branch existence
-		exists, err := client.BranchExists(context.Background(), repoPath, "main")
+		exists, err := client.BranchExists(t.Context(), repoPath, "main")
 		require.NoError(t, err)
 		assert.True(t, exists)
 
 		// Test repository status
-		status, err := client.GetRepositoryStatus(context.Background(), repoPath)
+		status, err := client.RepositoryStatus(t.Context(), repoPath)
 		require.NoError(t, err)
 		assert.NotNil(t, status)
 	})
@@ -85,15 +84,15 @@ func TestGitOperations_Integration(t *testing.T) {
 		cliClient := git.NewCLIClient(executor, 30)
 
 		// Create a feature branch first
-		_, err := executor.Execute(context.Background(), repoPath, "git", "checkout", "-b", "feature-test")
+		_, err := executor.Execute(t.Context(), repoPath, "git", "checkout", "-b", "feature-test")
 		require.NoError(t, err)
 
 		// Go back to main before creating worktree
-		_, err = executor.Execute(context.Background(), repoPath, "git", "checkout", "main")
+		_, err = executor.Execute(t.Context(), repoPath, "git", "checkout", "main")
 		// Don't fail if we're already on main
 		if err != nil {
 			// Check if we're already on main
-			result, checkErr := executor.Execute(context.Background(), repoPath, "git", "branch", "--show-current")
+			result, checkErr := executor.Execute(t.Context(), repoPath, "git", "branch", "--show-current")
 			if checkErr == nil && strings.TrimSpace(result.Stdout) == "main" {
 				err = nil // We're already on main, so no error
 			}
@@ -102,19 +101,19 @@ func TestGitOperations_Integration(t *testing.T) {
 
 		// Create worktree
 		worktreePath := filepath.Join(tempDir, "feature-worktree")
-		err = cliClient.CreateWorktree(context.Background(), repoPath, "feature-test", "main", worktreePath)
+		err = cliClient.CreateWorktree(t.Context(), repoPath, "feature-test", "main", worktreePath)
 		require.NoError(t, err)
 
 		// Verify worktree was created
 		assert.DirExists(t, worktreePath)
 
 		// List worktrees
-		worktrees, err := cliClient.ListWorktrees(context.Background(), repoPath)
+		worktrees, err := cliClient.ListWorktrees(t.Context(), repoPath)
 		require.NoError(t, err)
 		assert.Len(t, worktrees, 2) // main + feature worktree
 
 		// Delete worktree
-		err = cliClient.DeleteWorktree(context.Background(), repoPath, worktreePath, false)
+		err = cliClient.DeleteWorktree(t.Context(), repoPath, worktreePath, false)
 		require.NoError(t, err)
 
 		// Verify worktree directory is removed (or at least worktree is pruned)
@@ -127,15 +126,15 @@ func TestGitOperations_Integration(t *testing.T) {
 		require.NoError(t, err)
 		cliClient := git.NewCLIClient(executor, 30)
 
-		branches, err := goGitClient.ListBranches(context.Background(), repoPath)
+		branches, err := goGitClient.ListBranches(t.Context(), repoPath)
 		require.NoError(t, err)
 		assert.NotEmpty(t, branches)
 
 		worktreePath := filepath.Join(tempDir, "routing-test")
-		err = cliClient.CreateWorktree(context.Background(), repoPath, "feature-test", "main", worktreePath)
+		err = cliClient.CreateWorktree(t.Context(), repoPath, "feature-test", "main", worktreePath)
 		require.NoError(t, err)
 
-		err = cliClient.DeleteWorktree(context.Background(), repoPath, worktreePath, false)
+		err = cliClient.DeleteWorktree(t.Context(), repoPath, worktreePath, false)
 		require.NoError(t, err)
 	})
 }

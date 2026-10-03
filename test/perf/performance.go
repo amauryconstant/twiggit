@@ -1,4 +1,5 @@
-package helpers
+// Package perf provides PerformanceTestHelper and BenchmarkResult types for performance measurement in tests.
+package perf
 
 import (
 	"runtime"

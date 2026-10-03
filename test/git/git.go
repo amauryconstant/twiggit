@@ -1,4 +1,5 @@
-package helpers
+// Package git provides GitTestHelper utilities for low-level go-git fixture creation in tests.
+package git
 
 import (
 	"fmt"

@@ -12,7 +12,8 @@ import (
 	"testing"
 	"time"
 	"twiggit/internal/git"
-	"twiggit/test/helpers"
+
+	githelpers "twiggit/test/git"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,7 +31,7 @@ const (
 type E2ETestFixture struct {
 	tempDir          string
 	configHelper     *e2ehelpers.ConfigHelper
-	gitHelper        *helpers.GitTestHelper
+	gitHelper        *githelpers.GitTestHelper
 	gitExecutor      git.CommandExecutor
 	projects         map[string]*ProjectInfo
 	testID           *e2ehelpers.TestIDGenerator
@@ -57,7 +58,7 @@ func NewE2ETestFixture() *E2ETestFixture {
 	return &E2ETestFixture{
 		tempDir:          tempDir,
 		configHelper:     e2ehelpers.NewConfigHelper().WithTempDir(tempDir),
-		gitHelper:        helpers.NewGitTestHelper(&testing.T{}),
+		gitHelper:        githelpers.NewGitTestHelper(&testing.T{}),
 		gitExecutor:      git.NewCommandExecutor(30 * time.Second),
 		projects:         make(map[string]*ProjectInfo),
 		testID:           e2ehelpers.NewTestIDGenerator(),
@@ -155,7 +156,7 @@ func (f *E2ETestFixture) GetTestID() *e2ehelpers.TestIDGenerator {
 }
 
 // GetGitHelper returns the git helper
-func (f *E2ETestFixture) GetGitHelper() *helpers.GitTestHelper {
+func (f *E2ETestFixture) GetGitHelper() *githelpers.GitTestHelper {
 	return f.gitHelper
 }
 

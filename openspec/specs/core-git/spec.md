@@ -57,24 +57,21 @@ be defined consumer-side.
 ### Requirement: RepositoryReader exposes GetRepositoryStatus, GetRepositoryInfo, and GetCommitInfo
 
 The system SHALL expose a `RepositoryReader` role interface with exactly
-three context-aware methods: `GetRepositoryStatus`,
-`GetRepositoryInfo`, and `GetCommitInfo`. The role SHALL be defined
-consumer-side.
+three context-aware methods: `RepositoryStatus(ctx context.Context, repoPath string) (core.RepositoryStatus, error)`, `Repository(ctx context.Context, repoPath string) (*core.Repository, error)`, and `Commit(ctx context.Context, repoPath, commitHash string) (*core.Commit, error)`. The role SHALL be defined consumer-side. Method names SHALL NOT carry a `Get` prefix; return types SHALL be the renamed data types from `core-types` (`Repository` not `GitRepository`, `Commit` not `CommitInfo`).
 
 #### Scenario: RepositoryReader groups repository inspection methods
 
-- **WHEN** a caller requires `GetRepositoryStatus`,
-  `GetRepositoryInfo`, and `GetCommitInfo`
+- **WHEN** a caller requires `RepositoryStatus`, `Repository`, and `Commit`
 - **THEN** the role SHALL be `RepositoryReader` and SHALL NOT include
   branch listing, remote listing, or repository opening
+- **AND** none of the three methods SHALL begin with `Get`
 
 #### Scenario: Composite *git.Client satisfies RepositoryReader
 
 - **WHEN** the composite `*git.Client` is type-asserted against
   `RepositoryReader`
 - **THEN** the assertion SHALL succeed at compile time via
-  `var _ core.RepositoryReader = (*git.Client)(nil)` in
-  `internal/git/client.go`
+  `var _ core.RepositoryReader = (*git.Client)(nil)`
 
 ### Requirement: RemoteReader exposes ListRemotes
 
@@ -231,69 +228,6 @@ consumer.
 - **THEN** `go build ./...` SHALL fail with a type-mismatch error
   naming the affected role
 
-### Requirement: Factory per-role fields are additive to composite
-
-The `cmdutil.Factory` SHALL expose one lazy `func() (core.Role,
-error)` field per role defined in this capability: `RepoOpener`,
-`BranchReader`, `RepositoryReader`, `RemoteReader`, `WorktreeWriter`,
-`BranchWriter`. Each per-role field SHALL return the same
-`*git.Client` instance as `f.GitClient()` (the composite field),
-because the per-role field's body routes through `f.GitClient()` and
-reuses its existing `sync.OnceValues` cache.
-
-The composite `f.GitClient() (*git.Client, error)` field SHALL remain
-unchanged and SHALL be the canonical injection point for any command
-that needs both read and write methods. Per-role fields are documented
-narrowing for future read-only (or write-only) commands; existing
-commands that use `f.GitClient()` SHALL keep working without
-modification.
-
-#### Scenario: Per-role call reuses the composite's cached concrete
-
-- **WHEN** a command calls `f.BranchReader()` and `f.WorktreeWriter()`
-  in sequence
-- **THEN** both calls SHALL return the same `*git.Client` instance
-  typed as the requested role
-- **AND** the underlying LRU cache SHALL be initialized exactly once
-  (the existing `sync.OnceValues` on `f.GitClient` is the only cache)
-
-#### Scenario: Composite field is retained
-
-- **WHEN** `internal/cmdutil/factory.go` is read
-- **THEN** the `GitClient func() (*git.Client, error)` field SHALL be
-  present with the same signature as before
-- **AND** every existing `f.GitClient()` call site in `cmd/*.go` SHALL
-  continue to compile unchanged
-
-#### Scenario: Init() touches every per-role field
-
-- **WHEN** `Factory.Init()` is invoked
-- **THEN** it SHALL call each of the six per-role fields once, joining
-  any errors with `errors.Join`, so a failed concrete construction
-  surfaces during `Init` rather than at first lazy access
-
-### Requirement: Factory lazy-field errors are propagated, not swallowed
-
-When a per-role lazy field's underlying composite construction returns
-an error, the field SHALL return that error to the caller wrapped via
-the canonical `git.New*Error` family (`git.NewRepoError`,
-`git.NewWorktreeError`, `git.NewCommandError`) per `git-client`'s
-"Routing table and error contract" requirement. The Factory SHALL NOT
-log, format, mutate, or swallow the error; the command layer is the
-single handling point that maps errors to exit codes and stderr. The
-single-handling rule (logged OR returned, never both) SHALL apply.
-
-#### Scenario: Per-role construction error reaches the command layer once
-
-- **WHEN** `f.BranchReader()` is called and the underlying
-  `git.NewClient()` returns a `*git.ExternalError`
-- **THEN** `f.BranchReader()` SHALL return the wrapped error to the
-  caller
-- **AND** no log line SHALL be emitted on the Factory path
-- **AND** the underlying `sync.OnceValues` cache SHALL retain its
-  failure-or-success semantics for subsequent calls (per the
-  `errors`-wrapped behavior of `sync.OnceValues`)
-
 ### Requirement: Role interface naming follows no-stuttering
 
 Consumer-side role interfaces SHALL NOT repeat the `git` package qualifier in their identifiers (`BranchReader`, not `git.GitBranchReader`); sentinel errors returned by role methods SHALL use the `Err` prefix (`ErrBranchNotFound`, not `BranchNotFoundError`). The six role names declared in `internal/core/git.go` SHALL each match `^[A-Z][A-Za-z0-9]*Reader$` or `^[A-Z][A-Za-z0-9]*Writer$` (no `Git`/`Repository`/`Branch` prefix stutter).
@@ -304,3 +238,21 @@ Consumer-side role interfaces SHALL NOT repeat the `git` package qualifier in th
 - **THEN** no role SHALL begin with `Git` followed by the role's noun (e.g., `GitBranchReader` is forbidden)
 - **AND** no role SHALL carry the package qualifier inside its name
 - **AND** any sentinel error returned by a role method SHALL match `^Err[A-Z][A-Za-z0-9]*$` (per `err-prefix-suffix`)
+
+### Requirement: Role method names follow the noun-only convention
+
+Every method on the six role interfaces SHALL be named after its return
+type, minus the `Get` prefix. Read methods (`RepositoryStatus`,
+`Repository`, `Commit`, `ListBranches`, `BranchExists`, `ListRemotes`,
+`ValidateRepository`) SHALL be callable without a verb prefix. Mutating
+methods (`CreateWorktree`, `DeleteWorktree`, `ListWorktrees`,
+`PruneWorktrees`, `DeleteBranch`, `IsBranchMerged`) MAY keep imperative
+verbs because their return is `error`, not a noun.
+
+#### Scenario: No Get-prefixed methods on role interfaces
+
+- **WHEN** the role interface declarations in the core package are
+  read for method names
+- **THEN** no method SHALL begin with `Get`
+- **AND** the declaration surface SHALL NOT carry a `//nolint`
+  directive suppressing the rule
