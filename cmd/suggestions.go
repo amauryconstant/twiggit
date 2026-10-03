@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
-	"sort"
+	"slices"
 	"time"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
@@ -116,7 +116,7 @@ func listProjects(_ context.Context, f *CommandConfig) ([]string, error) {
 	for _, gd := range gitDirs {
 		projects = append(projects, filepath.Base(gd.Path))
 	}
-	sort.Strings(projects)
+	slices.Sort(projects)
 	return projects, nil
 }
 
@@ -145,7 +145,7 @@ func listBranchesFromContext(ctx context.Context, f *CommandConfig) ([]string, e
 	for _, b := range branches {
 		out = append(out, b.Name)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out, nil
 }
 
@@ -169,7 +169,7 @@ func listBranchesForProject(ctx context.Context, f *CommandConfig, projectName s
 	for _, b := range branches {
 		out = append(out, b.Name)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out, nil
 }
 

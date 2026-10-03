@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // hasSuggestion reports whether the supplied ValidationError carries the
@@ -312,4 +313,26 @@ func TestValidateBranchName_ValidLeadingChars(t *testing.T) {
 			assert.True(t, result.Value)
 		})
 	}
+}
+
+func TestValidateFieldErr_ConstructsValidationError(t *testing.T) {
+	// validateFieldErr must construct and return *ValidationError unwrapped
+	err := validateFieldErr("BranchName", "feat", "test message", "test suggestion")
+	var ve *ValidationError
+	require.ErrorAs(t, err, &ve)
+	assert.Equal(t, "BranchName", ve.Field)
+	assert.Equal(t, "feat", ve.Value)
+	assert.Equal(t, "test message", ve.Message)
+	assert.Equal(t, []string{"test suggestion"}, ve.Suggestions)
+	assert.Equal(t, "Validation", ve.Op)
+}
+
+func TestValidateFieldErr_PerFieldShapes(t *testing.T) {
+	branch := validateFieldErr("BranchName", "x", "msg", "sug")
+	project := validateFieldErr("ProjectName", "y", "msg", "sug")
+	shell := validateFieldErr("ShellType", "z", "msg", "sug")
+
+	assert.Equal(t, "BranchName", branch.Field)
+	assert.Equal(t, "ProjectName", project.Field)
+	assert.Equal(t, "ShellType", shell.Field)
 }

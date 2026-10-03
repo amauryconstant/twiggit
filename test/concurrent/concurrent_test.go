@@ -128,9 +128,7 @@ func (s *ConcurrentTestSuite) TestConcurrentListOperations() {
 	errChan := make(chan error, 10)
 
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			cmd := exec.Command("git", "worktree", "list", "--porcelain")
 			cmd.Dir = projectPath
@@ -143,7 +141,7 @@ func (s *ConcurrentTestSuite) TestConcurrentListOperations() {
 			if len(output) == 0 {
 				errChan <- fmt.Errorf("empty output from worktree list")
 			}
-		}()
+		})
 	}
 
 	wg.Wait()
@@ -163,11 +161,9 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateOperations() {
 	errChan := make(chan error, 5)
 
 	for i := range 5 {
-		wg.Add(1)
-		go func(idx int) {
-			defer wg.Done()
+		wg.Go(func() {
 
-			branchName := fmt.Sprintf("concurrent-feature-%d", idx)
+			branchName := fmt.Sprintf("concurrent-feature-%d", i)
 			worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", branchName)
 
 			// Create branch
@@ -185,7 +181,7 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateOperations() {
 				errChan <- fmt.Errorf("worktree create failed: %w: %s", err, string(output))
 				return
 			}
-		}(i)
+		})
 	}
 
 	wg.Wait()
@@ -230,18 +226,16 @@ func (s *ConcurrentTestSuite) TestConcurrentDeleteOperations() {
 	errChan := make(chan error, 3)
 
 	for _, branch := range branches {
-		wg.Add(1)
-		go func(b string) {
-			defer wg.Done()
+		wg.Go(func() {
 
-			worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", b)
+			worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", branch)
 
 			cmd := exec.Command("git", "worktree", "remove", "--force", worktreePath)
 			cmd.Dir = projectPath
 			if output, err := cmd.CombinedOutput(); err != nil {
 				errChan <- fmt.Errorf("delete failed: %w: %s", err, string(output))
 			}
-		}(branch)
+		})
 	}
 
 	wg.Wait()
@@ -279,9 +273,7 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateDeleteOperations() {
 	errChan := make(chan error, 2)
 
 	// Create goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 
 		branchName := "concurrent-create"
 		worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", branchName)
@@ -300,19 +292,17 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateDeleteOperations() {
 		if output, err := cmd.CombinedOutput(); err != nil {
 			errChan <- fmt.Errorf("worktree create failed: %w: %s", err, string(output))
 		}
-	}()
+	})
 
 	// Delete goroutine
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 
 		cmd := exec.Command("git", "worktree", "remove", "--force", deletePath)
 		cmd.Dir = projectPath
 		if output, err := cmd.CombinedOutput(); err != nil {
 			errChan <- fmt.Errorf("delete failed: %w: %s", err, string(output))
 		}
-	}()
+	})
 
 	wg.Wait()
 	close(errChan)
@@ -363,9 +353,7 @@ func (s *ConcurrentTestSuite) TestConcurrentPruneWhileList() {
 
 	// List operations
 	for range 3 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			cmd := exec.Command("git", "worktree", "list", "--porcelain")
 			cmd.Dir = projectPath
@@ -378,21 +366,19 @@ func (s *ConcurrentTestSuite) TestConcurrentPruneWhileList() {
 			if len(output) == 0 {
 				errChan <- fmt.Errorf("empty output from worktree list")
 			}
-		}()
+		})
 	}
 
 	// Prune operations
 	for range 3 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 
 			cmd := exec.Command("git", "worktree", "prune")
 			cmd.Dir = projectPath
 			if output, err := cmd.CombinedOutput(); err != nil {
 				errChan <- fmt.Errorf("prune failed: %w: %s", err, string(output))
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

@@ -22,10 +22,11 @@ type TestIDGenerator struct {
 func NewTestIDGenerator() *TestIDGenerator {
 	name := GinkgoT().Name()
 
-	shortName := strings.ToLower(name)
-	shortName = strings.ReplaceAll(shortName, " ", "-")
-	shortName = strings.ReplaceAll(shortName, "_", "-")
-	shortName = strings.ReplaceAll(shortName, "/", "-")
+	shortName := strings.NewReplacer(
+		" ", "-",
+		"_", "-",
+		"/", "-",
+	).Replace(strings.ToLower(name))
 	if len(shortName) > 20 {
 		shortName = shortName[:20]
 	}

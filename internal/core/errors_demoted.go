@@ -1,6 +1,9 @@
 package core
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 // Demoted git / config / context error constructors. Each previously
 // concrete error type collapses to OperationError; Op names the source.
@@ -39,7 +42,7 @@ func NewGitCommandError(command string, args []string, exitCode int, _, _, messa
 	if len(args) > 0 {
 		msg += " " + strings.Join(args, " ")
 	}
-	msg += " (exit " + intToStr(exitCode) + "): " + message
+	msg += " (exit " + strconv.Itoa(exitCode) + "): " + message
 	return &OperationError{
 		Op:      "git.command",
 		Message: msg,
@@ -67,21 +70,6 @@ func NewContextDetectionError(path, message string, err error) *OperationError {
 	}
 }
 
-// intToStr formats a non-negative int without importing strconv. Exit
-// codes in this CLI are 0..255.
-func intToStr(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	if i < 0 {
-		return "-" + intToStr(-i)
-	}
-	var buf [20]byte
-	pos := len(buf)
-	for i > 0 {
-		pos--
-		buf[pos] = byte('0' + i%10)
-		i /= 10
-	}
-	return string(buf[pos:])
-}
+// intToStr removed: strconv.Itoa handles the same byte output for the
+// 0..255 exit-code range used by this CLI. See task 2.4 in
+// naming-refactor-modernize.

@@ -17,8 +17,10 @@ func ShellWrapper(shellType ShellType) (string, error) {
 	}
 
 	now := time.Now().Format("2006-01-02 15:04:05")
-	content := strings.ReplaceAll(template, "{{SHELL_TYPE}}", string(shellType))
-	content = strings.ReplaceAll(content, "{{TIMESTAMP}}", now)
+	content := strings.NewReplacer(
+		"{{SHELL_TYPE}}", string(shellType),
+		"{{TIMESTAMP}}", now,
+	).Replace(template)
 
 	return content, nil
 }
