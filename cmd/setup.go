@@ -37,7 +37,10 @@ func detectContext(
 	if err != nil {
 		return nil, nil, fmt.Errorf("git client init failed: %w", err)
 	}
-	gitClient, _ := client.(*git.Client)
+	gitClient, ok := client.(*git.Client)
+	if !ok {
+		return nil, nil, fmt.Errorf("cmdutil: GitClient returned %T, expected *git.Client", client)
+	}
 
 	detector, err := git.NewContextDetector(cfg)
 	if err != nil {

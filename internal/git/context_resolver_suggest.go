@@ -252,7 +252,7 @@ func (cr *contextResolver) getWorktreeContextSuggestions(ctxStd context.Context,
 	return suggestions
 }
 
-func (cr *contextResolver) getOutsideGitContextSuggestions(partial string) []*core.ResolutionSuggestion {
+func (cr *contextResolver) getOutsideGitContextSuggestions(_ context.Context, partial string) []*core.ResolutionSuggestion {
 	// Check if projects directory is configured and accessible
 	if cr.config.ProjectsDirectory == "" {
 		return []*core.ResolutionSuggestion{}

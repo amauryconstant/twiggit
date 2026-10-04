@@ -129,7 +129,6 @@ func (s *ConcurrentTestSuite) TestConcurrentListOperations() {
 
 	for range 10 {
 		wg.Go(func() {
-
 			cmd := exec.Command("git", "worktree", "list", "--porcelain")
 			cmd.Dir = projectPath
 			output, err := cmd.CombinedOutput()
@@ -162,7 +161,6 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateOperations() {
 
 	for i := range 5 {
 		wg.Go(func() {
-
 			branchName := fmt.Sprintf("concurrent-feature-%d", i)
 			worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", branchName)
 
@@ -227,7 +225,6 @@ func (s *ConcurrentTestSuite) TestConcurrentDeleteOperations() {
 
 	for _, branch := range branches {
 		wg.Go(func() {
-
 			worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", branch)
 
 			cmd := exec.Command("git", "worktree", "remove", "--force", worktreePath)
@@ -274,7 +271,6 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateDeleteOperations() {
 
 	// Create goroutine
 	wg.Go(func() {
-
 		branchName := "concurrent-create"
 		worktreePath := filepath.Join(s.config.WorktreesDirectory, "test-project", branchName)
 
@@ -296,7 +292,6 @@ func (s *ConcurrentTestSuite) TestConcurrentCreateDeleteOperations() {
 
 	// Delete goroutine
 	wg.Go(func() {
-
 		cmd := exec.Command("git", "worktree", "remove", "--force", deletePath)
 		cmd.Dir = projectPath
 		if output, err := cmd.CombinedOutput(); err != nil {
@@ -354,7 +349,6 @@ func (s *ConcurrentTestSuite) TestConcurrentPruneWhileList() {
 	// List operations
 	for range 3 {
 		wg.Go(func() {
-
 			cmd := exec.Command("git", "worktree", "list", "--porcelain")
 			cmd.Dir = projectPath
 			output, err := cmd.CombinedOutput()
@@ -372,7 +366,6 @@ func (s *ConcurrentTestSuite) TestConcurrentPruneWhileList() {
 	// Prune operations
 	for range 3 {
 		wg.Go(func() {
-
 			cmd := exec.Command("git", "worktree", "prune")
 			cmd.Dir = projectPath
 			if output, err := cmd.CombinedOutput(); err != nil {

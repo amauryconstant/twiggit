@@ -234,7 +234,7 @@ func (cr *contextResolver) ResolutionSuggestions(ctxStd context.Context, ctx *co
 	case core.ContextWorktree:
 		suggestions = append(suggestions, cr.getWorktreeContextSuggestions(ctxStd, ctx, partial, config)...)
 	case core.ContextOutsideGit:
-		suggestions = append(suggestions, cr.getOutsideGitContextSuggestions(partial)...)
+		suggestions = append(suggestions, cr.getOutsideGitContextSuggestions(ctxStd, partial)...)
 	}
 
 	return suggestions, nil
