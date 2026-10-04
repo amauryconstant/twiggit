@@ -28,7 +28,7 @@ func WithExistingOnly() core.SuggestionOption {
 	}
 }
 
-func (cr *contextResolver) getProjectContextSuggestions(ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
+func (cr *contextResolver) getProjectContextSuggestions(ctxStd context.Context, ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
 	var suggestions []*core.ResolutionSuggestion
 
 	// Add main suggestion
@@ -36,10 +36,10 @@ func (cr *contextResolver) getProjectContextSuggestions(ctx *core.Context, parti
 
 	// Add worktree and branch suggestions if git service is available
 	if cr.cli != nil && ctx.Path != "" {
-		worktrees, err := cr.cli.ListWorktrees(context.Background(), ctx.Path)
+		worktrees, err := cr.cli.ListWorktrees(ctxStd, ctx.Path)
 		if err == nil {
-			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees, config)
-			suggestions = cr.addBranchSuggestions(suggestions, ctx, partial, worktrees)
+			suggestions = cr.addWorktreeSuggestions(ctxStd, suggestions, ctx, partial, worktrees, config)
+			suggestions = cr.addBranchSuggestions(ctxStd, suggestions, ctx, partial, worktrees)
 		}
 	}
 
@@ -69,7 +69,7 @@ func (cr *contextResolver) addMainSuggestion(ctx *core.Context, partial string, 
 }
 
 // addWorktreeSuggestions adds suggestions for existing worktrees
-func (cr *contextResolver) addWorktreeSuggestions(suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, worktrees []core.Worktree, config *suggestionConfig) []*core.ResolutionSuggestion {
+func (cr *contextResolver) addWorktreeSuggestions(ctxStd context.Context, suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, worktrees []core.Worktree, config *suggestionConfig) []*core.ResolutionSuggestion {
 	for _, worktree := range worktrees {
 		// Apply fuzzy matching if enabled
 		if cr.config.Navigation.FuzzyMatching {
@@ -97,7 +97,7 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*core.Resolution
 		// Check dirty status for current worktree only (performance optimization)
 		var isDirty bool
 		if isCurrent && cr.goGit != nil {
-			if status, err := cr.goGit.RepositoryStatus(context.Background(), worktree.Path); err == nil {
+			if status, err := cr.goGit.RepositoryStatus(ctxStd, worktree.Path); err == nil {
 				isDirty = !status.IsClean
 			}
 		}
@@ -126,7 +126,7 @@ func (cr *contextResolver) addWorktreeSuggestions(suggestions []*core.Resolution
 // naming-refactor-modernize (the only existing filter — existingOnly
 // — is applied in addWorktreeSuggestions against the same worktree
 // list).
-func (cr *contextResolver) addBranchSuggestions(suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, existingWorktrees []core.Worktree) []*core.ResolutionSuggestion {
+func (cr *contextResolver) addBranchSuggestions(ctxStd context.Context, suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, existingWorktrees []core.Worktree) []*core.ResolutionSuggestion {
 	// When in worktree context, ListBranches should be called on project path, not worktree path
 	var listPath string
 	if ctx.Type == core.ContextWorktree {
@@ -135,7 +135,7 @@ func (cr *contextResolver) addBranchSuggestions(suggestions []*core.ResolutionSu
 		listPath = ctx.Path
 	}
 
-	branches, err := cr.goGit.ListBranches(context.Background(), listPath)
+	branches, err := cr.goGit.ListBranches(ctxStd, listPath)
 	if err != nil {
 		// Silent degradation is acceptable for suggestions - errors shouldn't prevent
 		// operation from proceeding, just reduce in helpfulness of completions
@@ -227,7 +227,7 @@ func (cr *contextResolver) addProjectSuggestions(suggestions []*core.ResolutionS
 	return suggestions
 }
 
-func (cr *contextResolver) getWorktreeContextSuggestions(ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
+func (cr *contextResolver) getWorktreeContextSuggestions(ctxStd context.Context, ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
 	suggestions := cr.addMainSuggestion(ctx, partial, config)
 
 	if cr.cli != nil && ctx.Path != "" {
@@ -240,9 +240,9 @@ func (cr *contextResolver) getWorktreeContextSuggestions(ctx *core.Context, part
 			listPath = ctx.Path
 		}
 
-		if worktrees, err := cr.cli.ListWorktrees(context.Background(), listPath); err == nil {
-			suggestions = cr.addWorktreeSuggestions(suggestions, ctx, partial, worktrees, config)
-			suggestions = cr.addBranchSuggestions(suggestions, ctx, partial, worktrees)
+		if worktrees, err := cr.cli.ListWorktrees(ctxStd, listPath); err == nil {
+			suggestions = cr.addWorktreeSuggestions(ctxStd, suggestions, ctx, partial, worktrees, config)
+			suggestions = cr.addBranchSuggestions(ctxStd, suggestions, ctx, partial, worktrees)
 		}
 	}
 

@@ -263,7 +263,7 @@ func TestContextService_Integration(t *testing.T) {
 	assert.Equal(t, repoDir, result.ResolvedPath)
 
 	// Test getting completion suggestions via the resolver.
-	suggestions, err := resolver.ResolutionSuggestions(ctx, "m")
+	suggestions, err := resolver.ResolutionSuggestions(t.Context(), ctx, "m")
 	require.NoError(t, err)
 	assert.NotEmpty(t, suggestions)
 	// Check that "main" is among the suggestions

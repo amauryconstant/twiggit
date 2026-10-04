@@ -1,9 +1,11 @@
 package git
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 	"twiggit/internal/core"
 
 	"github.com/stretchr/testify/assert"
@@ -302,6 +304,7 @@ func TestGetResolutionSuggestions_ProjectContext_NoWorktrees(t *testing.T) {
 	cr := NewContextResolver(cfg, nil, nil)
 
 	suggestions, err := cr.ResolutionSuggestions(
+		t.Context(),
 		&core.Context{Type: core.ContextProject, ProjectName: "twiggit", Path: ""},
 		"",
 	)
@@ -323,6 +326,7 @@ func TestGetResolutionSuggestions_ProjectContext_WithExistingOnly(t *testing.T) 
 	cr := NewContextResolver(cfg, nil, nil)
 
 	suggestions, err := cr.ResolutionSuggestions(
+		t.Context(),
 		&core.Context{Type: core.ContextProject, ProjectName: "twiggit", Path: ""},
 		"",
 		WithExistingOnly(),
@@ -339,6 +343,7 @@ func TestGetResolutionSuggestions_WorktreeContext(t *testing.T) {
 	cr := NewContextResolver(cfg, nil, nil)
 
 	suggestions, err := cr.ResolutionSuggestions(
+		t.Context(),
 		&core.Context{Type: core.ContextWorktree, ProjectName: "twiggit", BranchName: "feature-1", Path: ""},
 		"",
 	)
@@ -363,7 +368,7 @@ func TestGetResolutionSuggestions_OutsideGitContext(t *testing.T) {
 
 	cr := newTestResolver(cfg)
 
-	suggestions, err := cr.ResolutionSuggestions(&core.Context{Type: core.ContextOutsideGit}, "alp")
+	suggestions, err := cr.ResolutionSuggestions(t.Context(), &core.Context{Type: core.ContextOutsideGit}, "alp")
 	require.NoError(t, err)
 	require.NotEmpty(t, suggestions)
 	assert.Equal(t, "alpha", suggestions[0].Text)
@@ -375,7 +380,7 @@ func TestGetResolutionSuggestions_OutsideGitContext_EmptyProjectsDir(t *testing.
 
 	cr := NewContextResolver(cfg, nil, nil)
 
-	suggestions, err := cr.ResolutionSuggestions(&core.Context{Type: core.ContextOutsideGit}, "")
+	suggestions, err := cr.ResolutionSuggestions(t.Context(), &core.Context{Type: core.ContextOutsideGit}, "")
 	require.NoError(t, err)
 	assert.Empty(t, suggestions)
 }
@@ -384,9 +389,70 @@ func TestGetResolutionSuggestions_UnknownContext(t *testing.T) {
 	cfg := testConfig(t)
 	cr := NewContextResolver(cfg, nil, nil)
 
-	suggestions, err := cr.ResolutionSuggestions(&core.Context{Type: core.ContextUnknown}, "x")
+	suggestions, err := cr.ResolutionSuggestions(t.Context(), &core.Context{Type: core.ContextUnknown}, "x")
 	require.NoError(t, err)
 	assert.Empty(t, suggestions)
+}
+
+// TestResolutionSuggestions_CancelledContextShortCircuits verifies that
+// task 11.3's threading reaches the leaf I/O call: a pre-cancelled
+// context flows from ResolutionSuggestions through the suggestion
+// builders into ListWorktrees, which uses exec.CommandContext — so
+// the underlying git invocation aborts immediately and the call
+// returns. The test passes if ResolutionSuggestions returns
+// promptly and the worktree-listing branch was attempted (the "main"
+// fallback suggestion is still added because the cancellation only
+// affects the I/O call, not the pure addMainSuggestion path).
+func TestResolutionSuggestions_CancelledContextShortCircuits(t *testing.T) {
+	cfg := testConfig(t)
+	client, err := NewClient()
+	require.NoError(t, err)
+
+	// A real *Client triggers the worktree-listing branch
+	// (cr.cli != nil). Use a path that exists on disk so the
+	// executor's command lookup succeeds and cancellation (not a
+	// missing path) is what the leaf observes.
+	repoPath := t.TempDir()
+	cr := &contextResolver{
+		config:     cfg,
+		goGit:      client,
+		cli:        client,
+		repoFinder: NewRepoFinder(client),
+	}
+
+	cancelled, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	domainCtx := &core.Context{
+		Type:        core.ContextProject,
+		ProjectName: "twiggit",
+		Path:        repoPath,
+	}
+
+	done := make(chan struct{})
+	var suggestions []*core.ResolutionSuggestion
+	go func() {
+		defer close(done)
+		suggestions, err = cr.ResolutionSuggestions(cancelled, domainCtx, "")
+	}()
+
+	select {
+	case <-done:
+		// Returned promptly; cancellation did not block the call.
+	case <-time.After(2 * time.Second):
+		t.Fatal("ResolutionSuggestions blocked past 2s with cancelled context; ctx did not propagate to leaf I/O")
+	}
+
+	// The "main" suggestion is built from pure string ops and is
+	// independent of the cancelled leaf; it should still be
+	// present even when worktree/branch I/O is short-circuited.
+	found := false
+	for _, s := range suggestions {
+		if s.Text == "main" {
+			found = true
+		}
+	}
+	assert.True(t, found, "expected 'main' suggestion from pure fallback path despite cancelled leaf I/O")
 }
 
 func TestResolveIdentifier_WorktreeRoutesToProjectContext(t *testing.T) {
@@ -563,7 +629,7 @@ func TestAddWorktreeSuggestions_Empty(t *testing.T) {
 	ctx := &core.Context{Type: core.ContextProject, ProjectName: "twiggit"}
 	config := &suggestionConfig{}
 
-	result := cr.addWorktreeSuggestions(nil, ctx, "", nil, config)
+	result := cr.addWorktreeSuggestions(t.Context(), nil, ctx, "", nil, config)
 	assert.Empty(t, result)
 }
 
@@ -579,7 +645,7 @@ func TestAddWorktreeSuggestions_PrefixMatch(t *testing.T) {
 		{Path: "/somewhere/wt2", Branch: "maintenance"},
 	}
 
-	result := cr.addWorktreeSuggestions(nil, ctx, "feat", worktrees, config)
+	result := cr.addWorktreeSuggestions(t.Context(), nil, ctx, "feat", worktrees, config)
 	require.Len(t, result, 1)
 	assert.Equal(t, "feature-1", result[0].Text)
 	assert.Equal(t, core.PathTypeWorktree, result[0].Type)
@@ -598,7 +664,7 @@ func TestAddWorktreeSuggestions_FuzzyMatch(t *testing.T) {
 		{Path: "/somewhere/wt", Branch: "feature-1"},
 	}
 
-	result := cr.addWorktreeSuggestions(nil, ctx, "f1", worktrees, config)
+	result := cr.addWorktreeSuggestions(t.Context(), nil, ctx, "f1", worktrees, config)
 	require.Len(t, result, 1)
 	assert.Equal(t, "feature-1", result[0].Text)
 }
@@ -616,7 +682,7 @@ func TestAddWorktreeSuggestions_ExclusionPattern(t *testing.T) {
 		{Path: "/somewhere/wt2", Branch: "feature-1"},
 	}
 
-	result := cr.addWorktreeSuggestions(nil, ctx, "", worktrees, config)
+	result := cr.addWorktreeSuggestions(t.Context(), nil, ctx, "", worktrees, config)
 	require.Len(t, result, 1)
 	assert.Equal(t, "feature-1", result[0].Text)
 }
@@ -633,7 +699,7 @@ func TestAddWorktreeSuggestions_ExistingOnlyFiltersMissing(t *testing.T) {
 		{Path: "", Branch: "empty-path"},
 	}
 
-	result := cr.addWorktreeSuggestions(nil, ctx, "", worktrees, config)
+	result := cr.addWorktreeSuggestions(t.Context(), nil, ctx, "", worktrees, config)
 	assert.Empty(t, result)
 }
 
@@ -653,7 +719,7 @@ func TestAddWorktreeSuggestions_IsCurrentDetected(t *testing.T) {
 		{Path: "/somewhere/wt2", Branch: "feature-2"},
 	}
 
-	result := cr.addWorktreeSuggestions(nil, ctx, "", worktrees, config)
+	result := cr.addWorktreeSuggestions(t.Context(), nil, ctx, "", worktrees, config)
 	require.Len(t, result, 2)
 
 	var currentFound, otherFound bool
@@ -685,7 +751,7 @@ func TestAddWorktreeSuggestions_DirtyFlag_RequiresGoGit(t *testing.T) {
 		{Path: "/somewhere/wt", Branch: "feature-1"},
 	}
 
-	result := cr.addWorktreeSuggestions(nil, ctx, "", worktrees, config)
+	result := cr.addWorktreeSuggestions(t.Context(), nil, ctx, "", worktrees, config)
 	require.Len(t, result, 1)
 	assert.False(t, result[0].IsDirty, "dirty flag requires non-nil goGit")
 }

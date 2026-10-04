@@ -1,6 +1,7 @@
 package git
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/url"
@@ -215,8 +216,11 @@ func (cr *contextResolver) ResolveIdentifier(ctx *core.Context, identifier strin
 // partial identifier for the supplied Context type. Options
 // (e.g. WithExistingOnly) filter the result set; callers can pass
 // multiple options. The returned slice is non-nil on success and may
-// be empty.
-func (cr *contextResolver) ResolutionSuggestions(ctx *core.Context, partial string, opts ...core.SuggestionOption) ([]*core.ResolutionSuggestion, error) {
+// be empty. The ctxStd parameter is the cancellation context that
+// propagates through to the leaf git I/O calls; SIGINT/SIGTERM
+// surfaces via ctxStd.Err() rather than the previous
+// context.Background() sites.
+func (cr *contextResolver) ResolutionSuggestions(ctxStd context.Context, ctx *core.Context, partial string, opts ...core.SuggestionOption) ([]*core.ResolutionSuggestion, error) {
 	config := &suggestionConfig{}
 	for _, opt := range opts {
 		opt(config)
@@ -226,9 +230,9 @@ func (cr *contextResolver) ResolutionSuggestions(ctx *core.Context, partial stri
 
 	switch ctx.Type {
 	case core.ContextProject:
-		suggestions = append(suggestions, cr.getProjectContextSuggestions(ctx, partial, config)...)
+		suggestions = append(suggestions, cr.getProjectContextSuggestions(ctxStd, ctx, partial, config)...)
 	case core.ContextWorktree:
-		suggestions = append(suggestions, cr.getWorktreeContextSuggestions(ctx, partial, config)...)
+		suggestions = append(suggestions, cr.getWorktreeContextSuggestions(ctxStd, ctx, partial, config)...)
 	case core.ContextOutsideGit:
 		suggestions = append(suggestions, cr.getOutsideGitContextSuggestions(partial)...)
 	}
