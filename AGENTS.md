@@ -125,6 +125,8 @@ distribution surface ownership, and cosign verification commands.
 | Logger singleton | `iostreams.NewLogger(io.Writer)` returns the one `*slog.Logger`; `IOStreams.Logger`, `Factory.Logger`, `slog.Default()` share that pointer | `TestLoggerPointer` in `internal/iostreams/iostreams_test.go` |
 | Single-handling | Adapter code in `internal/git/` returns wrapped errors only; logging happens at the cmd boundary via `opts.IO.Logger.With("command", cmd.Name()).Debug(..., "err", err)` | `golang-error-handling` rule 7 |
 | Shell sentinels | Five `core` sentinels (`ErrShellAlreadyInstalled`, `ErrShellNotInstalled`, `ErrInvalidShellType`, `ErrInferenceFailed`, `ErrDetectionFailed`); match exclusively via `errors.Is`, never by string-comparing `OperationError.Op` | `domain-typed-errors` req 8 |
+| Bool field prefix | All bool fields use `is/has/can` prefix (`isColorEnabled`, `isExistingOnly`, `isValid`, `isCacheEnabled`, `isQuiet`) — aligns with `IOStreams.isStdoutTTY` family | `golang-naming`; grep `internal/ cmd/ --include '*.go'` for unprefixed bools |
+| Factory per-role cast | No per-role lazy fields on `cmdutil.Factory`; callers obtain `*git.Client` via `f.GitClient()` then assign to a role-typed local (`var <role> core.<Role> = client`). `*git.Client` satisfies every role through embedded promotion. | `internal/cmdutil/factory.go:51-99` field list; `internal/git/client.go:127-134` role-satisfaction guards |
 
 ## Pre-Commit Hooks
 
@@ -210,4 +212,4 @@ NotFound distinction is preserved in the formatter's hint layer.
 | [test/e2e/README.md](test/e2e/README.md) | E2E debugging, cleanup patterns |
 | [test/e2e/fixtures/AGENTS.md](test/e2e/fixtures/AGENTS.md) | E2E fixture usage |
 | [test/concurrent/AGENTS.md](test/concurrent/AGENTS.md) | Concurrent test patterns |
-| [test/worktree/AGENTS.md](test/worktree/AGENTS.md) | Test utilities — worktree fixtures (added post-split; see git log) |
+| [test/worktree/AGENTS.md](test/worktree/AGENTS.md) | Test utilities — worktree fixtures |
