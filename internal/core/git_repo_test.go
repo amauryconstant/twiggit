@@ -117,7 +117,7 @@ func TestFindGitDirByTraversal(t *testing.T) {
 	})
 }
 
-func TestGitDir_Structure(t *testing.T) {
+func TestRepoDir_Structure(t *testing.T) {
 	is := assert.New(t)
 	g := RepoDir{Name: "myrepo", Path: "/path/to/myrepo"}
 	is.Equal("myrepo", g.Name)

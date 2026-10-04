@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorktreeInfo_Structure(t *testing.T) {
+func TestWorktree_Structure(t *testing.T) {
 	t.Run("zero value has no modification flag set", func(t *testing.T) {
 		is := assert.New(t)
 		wt := Worktree{}
@@ -35,7 +35,7 @@ func TestWorktreeInfo_Structure(t *testing.T) {
 	})
 }
 
-func TestWorktreeInfo_IsModifiedBooleanSemantics(t *testing.T) {
+func TestWorktree_IsModifiedBooleanSemantics(t *testing.T) {
 	tests := []struct {
 		name     string
 		modified bool
@@ -53,18 +53,20 @@ func TestWorktreeInfo_IsModifiedBooleanSemantics(t *testing.T) {
 	}
 }
 
-func TestWorktreeInfo_UsedInGitRepositoryList(t *testing.T) {
-	is := assert.New(t)
-	must := require.New(t)
+func TestWorktree_UsedInRepositoryList(t *testing.T) {
+	t.Run("repository lists its worktrees", func(t *testing.T) {
+		is := assert.New(t)
+		must := require.New(t)
 
-	repo := Repository{
-		Path: "/repos/example",
-		Worktrees: []Worktree{
-			{Path: "/repos/example/main", Branch: "main", Commit: "abc1234", IsModified: false},
-			{Path: "/repos/example/feat", Branch: "feature/x", Commit: "def5678", IsModified: true},
-		},
-	}
-	must.Len(repo.Worktrees, 2)
-	is.False(repo.Worktrees[0].IsModified)
-	is.True(repo.Worktrees[1].IsModified)
+		repo := Repository{
+			Path: "/repos/example",
+			Worktrees: []Worktree{
+				{Path: "/repos/example/main", Branch: "main", Commit: "abc1234", IsModified: false},
+				{Path: "/repos/example/feat", Branch: "feature/x", Commit: "def5678", IsModified: true},
+			},
+		}
+		must.Len(repo.Worktrees, 2)
+		is.False(repo.Worktrees[0].IsModified)
+		is.True(repo.Worktrees[1].IsModified)
+	})
 }
