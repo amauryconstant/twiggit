@@ -210,4 +210,4 @@ NotFound distinction is preserved in the formatter's hint layer.
 | [test/e2e/README.md](test/e2e/README.md) | E2E debugging, cleanup patterns |
 | [test/e2e/fixtures/AGENTS.md](test/e2e/fixtures/AGENTS.md) | E2E fixture usage |
 | [test/concurrent/AGENTS.md](test/concurrent/AGENTS.md) | Concurrent test patterns |
-| [test/helpers/AGENTS.md](test/helpers/AGENTS.md) | Test utilities |
+| [test/worktree/AGENTS.md](test/worktree/AGENTS.md) | Test utilities — worktree fixtures (added post-split; see git log) |

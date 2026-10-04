@@ -53,12 +53,14 @@ t.Cleanup(func() { mock.AssertExpectations(t) })
 
 ## Test Helpers
 
-See test/helpers/AGENTS.md for:
-- Repository helper (test repo creation)
-- Git helper (git operations)
-- Shell helper (shell utilities)
-- Worktree helper (worktree utilities)
-- Golden helper (snapshot testing)
+Helpers live in content-named packages; see each for details:
+- `test/worktree/` — worktree creation, validation, cleanup
+- `test/shell/` — shell command execution, temp shell configs
+- `test/git/` — low-level git fixture helpers
+- `test/repo/` — git repository fixtures
+- `test/golden/` — golden-file compare and update helpers
+- `test/perf/` — performance measurement helpers
+- `test/helpers_test/` — coverage test carried over from the former `test/helpers/helpers_test.go` (move-whole; per-package dissolve deferred)
 
 ## E2E Testing
 

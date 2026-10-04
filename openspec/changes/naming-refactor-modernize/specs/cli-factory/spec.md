@@ -41,25 +41,39 @@ role-narrowed access via type assertion on the value returned by
 ### Requirement: Role interfaces obtained via type assertion on GitClient
 
 When a command needs a role-narrowed view of the git client, the
-caller SHALL obtain it by calling `f.GitClient()` and assigning the
-result to a local role-typed variable. `*git.Client` satisfies every
-role declared in `core-git` through embedded promotion, so no
-separate Factory field is required. The type assertion introduces one
-new identifier per call site and zero new lazy-cache surface.
+caller SHALL obtain it by calling `f.GitClient()` and narrowing the
+returned value to `*git.Client` (the composite role carrier). `*git.Client`
+satisfies every role declared in `core-git` through embedded promotion,
+so no separate Factory field is required.
 
-#### Scenario: Caller narrows to BranchReader via assignment
+The Factory's `GitClient` field type is `func() (cmdutil.Client, error)`
+where `cmdutil.Client` is a package-level alias for `any`. This is a
+deliberate depguard-driven indirection: it lets `internal/cmdutil`
+declare the Factory surface without importing `internal/git`, while
+preserving the embedded-promotion contract that makes role methods
+reachable through `*git.Client`. The narrow is performed at the cmd
+boundary (in `cmd/setup.go`) where the depguard rule no longer
+applies. Any future change that lets `internal/cmdutil` import
+`internal/git` may collapse `cmdutil.Client` to `*git.Client` directly.
 
-- **WHEN** a command requires `core.BranchReader`
-- **THEN** the call site SHALL read `client, err := f.GitClient(); if
-  err != nil { ... }; br := core.BranchReader(client)` or equivalent
-- **AND** the command SHALL NOT call `f.BranchReader()`
+#### Scenario: Caller narrows to *git.Client via type assertion
+
+- **WHEN** a command requires any role interface on the git client
+- **THEN** the call site SHALL reach the role by first calling
+  `f.GitClient()` to obtain the cached client and then asserting
+  the result to `*git.Client` (the composite carrier)
+- **AND** the command SHALL NOT call any per-role Factory accessor
+  (no `f.BranchReader()`, no `f.RepoOpener()`, etc.)
+- **AND** the assertion SHALL fail loudly (return an error, never a
+  silent zero-value) on any type mismatch
 
 #### Scenario: Underlying composite is unchanged
 
 - **WHEN** `f.GitClient()` is called twice from the same command
 - **THEN** both calls SHALL return the same `*git.Client` pointer
-- **AND** any role-typed local variables derived from those pointers
-  SHALL target the same composite instance
+  (after the cmd-side assertion)
+- **AND** any role methods invoked on that pointer SHALL target the
+  same composite instance
 
 ### Requirement: Factory Init touches every lazy field exactly once
 

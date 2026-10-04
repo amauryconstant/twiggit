@@ -10,7 +10,7 @@ golden files in place.
 
 ### Requirement: `CompareGolden` helper
 
-The `test/helpers` package SHALL provide a `CompareGolden(actual,
+The `test/golden` package SHALL provide a `CompareGolden(actual,
 goldenFile)` function that compares `actual` against the golden file
 content.
 

@@ -2,10 +2,11 @@
 
 ## Purpose
 
-The `test/helpers` package provides utility functions for creating,
-validating, and cleaning up test worktrees, plus shell-related test
-utilities. Helpers enforce consistent setup/teardown across the test
-suite and improve error-line reporting via `t.Helper()`.
+The `test/worktree`, `test/shell`, `test/git`, `test/repo`, `test/golden`,
+and `test/perf` packages provide content-named test utilities for
+creating, validating, and cleaning up test fixtures across the suite.
+Helpers enforce consistent setup/teardown via `t.Cleanup` / `t.TempDir`
+and improve error-line reporting via `t.Helper()`.
 
 ## Requirements
 

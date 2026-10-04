@@ -310,43 +310,49 @@ without complaint.
   the `golang-refactoring` rule against mixing structural and
   behavioral changes, and the bisection cost is high.
 
-### Decision 12: Gopatch rewrite rules drive mechanical transforms
+### Decision 12: Gopatch rewrite rules drive mechanical transforms [SUPERSEDED]
 
-**Choice**: Emit one `gopatch` rewrite rule per mechanical
-transform in this change: Get-prefix drop (group 5), each
-per-type rename (groups 4.1-4.3a-f), bool-field prefix (group
-3), and each modern idiom (groups 2.1-2.3: `sort.Strings` →
-`slices.Sort`, `wg.Add(1) + defer wg.Done()` → `wg.Go`,
-`strings.ReplaceAll` chain → `strings.NewReplacer`). Each rule
-ships with a golden test that asserts the rewrite against a
-representative input (sample fixture in
-`internal/cmdutil/factory_test.go` or `test/golden/`, named
-via the rule's `// +gopatch` marker).
+> **Superseded post-implementation.** The mechanical transforms landed
+> via direct `gopls rename` per cluster (Decision 9 ordering), one commit
+> per category. The `// +gopatch` rule-emission and golden-test work
+> described below was not performed. The audit trail is the per-cluster
+> commit log on `main` plus the cross-type-rename grep at task 4.5. No
+> follow-up is required: the renames are complete and verified by
+> `git grep` returning zero matches.
 
-**Rationale**: The change touches ~50 production files with
-cross-cutting mechanical patterns. `gopls rename` per file
-leaves no cross-file audit trail and forces hand-checking each
-site; `gopatch` rules are reviewable as a single diff,
-re-runnable against the full tree, and testable against golden
-inputs — exactly what the `golang-refactoring` skill prescribes
-for "a change that recurs across many sites". The setup cost
-(generating one rule per transform, wiring the `// +gopatch`
-golden-test marker) pays back across the ~50-file blast radius.
-Sequencing: rules ship in task 0.6 (Migration Plan step 7),
-before any rename or modernize commit lands, so each commit
+**Original choice (not executed)**: Emit one `gopatch` rewrite rule per
+mechanical transform in this change: Get-prefix drop (group 5), each
+per-type rename (groups 4.1-4.3a-f), bool-field prefix (group 3), and
+each modern idiom (groups 2.1-2.3: `sort.Strings` → `slices.Sort`,
+`wg.Add(1) + defer wg.Done()` → `wg.Go`, `strings.ReplaceAll` chain →
+`strings.NewReplacer`). Each rule ships with a golden test that
+asserts the rewrite against a representative input (sample fixture in
+`internal/cmdutil/factory_test.go` or `test/golden/`, named via the
+rule's `// +gopatch` marker).
+
+**Original rationale**: The change touches ~50 production files with
+cross-cutting mechanical patterns. `gopls rename` per file leaves no
+cross-file audit trail and forces hand-checking each site; `gopatch`
+rules are reviewable as a single diff, re-runnable against the full
+tree, and testable against golden inputs — exactly what the
+`golang-refactoring` skill prescribes for "a change that recurs across
+many sites". The setup cost (generating one rule per transform, wiring
+the `// +gopatch` golden-test marker) pays back across the ~50-file
+blast radius. Sequencing: rules ship in task 0.6 (Migration Plan
+step 7), before any rename or modernize commit lands, so each commit
 can `gopatch apply` against its rule and `git grep` cross-check.
 
-**Alternatives considered**:
-- Stick with `gopls rename` per file. Rejected: no audit
-  trail for cross-cutting transforms; per-site risk on
-  golden fixtures and string-literal error messages; no
-  automated cross-check on tag/reflection references.
-- `gofmt -r` rewrites. Rejected: rule expressiveness is
-  too limited for the type-alias gradual repair and role-method
-  signature updates that this change requires.
-- One-off `sed`/`awk` scripts. Rejected: no AST awareness,
-  no golden-test mechanism, no Go-language-server-style
-  interface-satisfaction guard.
+**Alternatives considered (re-evaluated post-implementation)**:
+- Stick with `gopls rename` per file. **Selected in practice**: the
+  per-cluster commit log + the post-cluster `git grep` cross-checks
+  (tasks 4.5 / 7.1 / 15.3) provided a sufficient audit trail for this
+  change's blast radius without the setup cost of `gopatch` rules.
+- `gofmt -r` rewrites. Rejected: rule expressiveness is too limited
+  for the type-alias gradual repair and role-method signature updates
+  that this change requires.
+- One-off `sed`/`awk` scripts. Rejected: no AST awareness, no
+  golden-test mechanism, no Go-language-server-style interface-
+  satisfaction guard.
 
 ## Risks / Trade-offs
 
@@ -399,12 +405,12 @@ can `gopatch apply` against its rule and `git grep` cross-check.
    for the 4-method `WorktreeWriter` is present). If 0, manually
    add a one-line follow-up to the existing `core-git` spec
    before this change's delta applies.
-7. Install `gopatch` (Go rewrite-rule tool) per Decision 12 and
-   generate the rewrite rules named in task 0.6 (one per
-   mechanical transform: Get-drop, type rename per type, bool
-   prefix, modern idioms). Confirm each rule's golden test in
-   `internal/cmdutil/factory_test.go` and `test/golden/` passes
-   against a sample input before any rule ships in a commit.
+7. Decision 12 originally specified installing `gopatch` and emitting
+   one rewrite rule per mechanical transform before any rename
+   commit. **Superseded** post-implementation: transforms landed via
+   direct `gopls rename` per Decision 9 ordering, and the per-cluster
+   cross-check greps (tasks 4.5 / 7.1 / 15.3) provided the audit
+   trail. No `gopatch` setup work was performed.
 8. Land commits in the order in Decision 9, gated by Sign-off
    Gates 1, 2, and 3 (per the user-chosen sequencing). Each
    commit:
