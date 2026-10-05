@@ -18,7 +18,7 @@ Defines the result value objects returned by service-layer worktree and project 
 
 ### Requirement: PruneWorktreeResult (per worktree)
 
-`core.PruneWorktreeResult` SHALL carry `ProjectName string`, `BranchName string`, `Path string`, `Deleted bool`, `BranchDeleted bool`, `Skipped bool`, and `SkipReason string` (empty when not skipped; one of `"protected branch"`, `"unmerged"`, `"current worktree"`, `"dirty"` when skipped).
+`core.PruneWorktreeResult` SHALL carry `ProjectName string`, `BranchName string`, `Path string`, `WasDeleted bool`, `WasBranchDeleted bool`, `Skipped bool`, and `SkipReason string` (empty when not skipped; one of `"protected branch"`, `"unmerged"`, `"current worktree"`, `"dirty"` when skipped).
 
 #### Scenario: Protected branch skipped
 

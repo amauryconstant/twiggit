@@ -49,22 +49,32 @@ The `HookRunner` implementation SHALL live in `internal/git/hook_runner.go`. The
 
 ### Requirement: Read context file from .twiggit.toml
 
-The system SHALL read `.twiggit.toml` at the repository root and extract `[hooks.post-create].commands`. Missing config file or empty command list SHALL result in a no-op (`HookResult.HasExecuted = false`). Per-command timeout uses `Config.Shell.HookTimeout` seconds.
+The system SHALL read `.twiggit.toml` at the repository root and extract either `[hooks.post-create].command` (a single command) or `[[hooks.post-create]]` blocks (a list of `core.HookDefinition` entries, each with its own `command`, optional `working_directory`, and optional `timeout_seconds`). Missing config file or empty command list SHALL result in a no-op (`HookResult.HasExecuted = false`). Per-command timeout falls back to `Config.Shell.HookTimeout` when the definition's `timeout_seconds` is zero.
 
 #### Scenario: Missing config is a no-op
 
 - **WHEN** `.twiggit.toml` does not exist
 - **THEN** the runner returns `&core.HookResult{HasExecuted: false}` with no error
 
-#### Scenario: Per-command timeout
+#### Scenario: Per-definition timeout
 
-- **WHEN** a command exceeds `Config.Shell.HookTimeout` seconds
-- **THEN** the runner kills the process, records a failure with the timeout flag, and continues with the next command
+- **WHEN** a `HookDefinition` carries `timeout_seconds = 5` and the command exceeds 5 seconds
+- **THEN** the runner kills the process, records a `HookFailure{TimedOut: true}` for that definition, and continues with the next definition
 
 #### Scenario: Failures do not roll back the worktree
 
-- **WHEN** one command in `[hooks.post-create].commands` exits non-zero
-- **THEN** the runner captures the failure in `HookResult.Failures` and continues running remaining commands
+- **WHEN** one definition in `[[hooks.post-create]]` exits non-zero
+- **THEN** the runner captures the failure in `HookResult.Failures` and continues running remaining definitions
+
+### Requirement: Hook runner uses typed Command enum
+
+The runner SHALL dispatch shell invocations through `git.CommandExecutor` with the typed constant `git.CmdSh` (not a free-form string), passing the user-authored script as the `args...` tail. The boundary is type-safe: a non-allow-listed program name is unrepresentable.
+
+#### Scenario: Hook command is invoked via CmdSh
+
+- **WHEN** the runner executes a hook definition
+- **THEN** it SHALL call `executor.ExecuteWithTimeout(ctx, workDir, git.CmdSh, timeout, "-c", script)`
+- **AND** the reader confirms `git.CmdSh` is the typed enum constant, not the literal `"sh"`
 
 ### Requirement: Env vars injected per command
 

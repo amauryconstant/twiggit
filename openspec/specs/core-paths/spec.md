@@ -56,3 +56,19 @@ Documents the path-utility helpers in `internal/core/pathutils.go`, used by the 
 
 - **WHEN** `NormalizePath` fails on a non-existent path
 - **THEN** the returned error's type is `*os.PathError` (or similar stdlib error), NOT a `*core.OperationError`
+
+### Requirement: core package performs no I/O
+
+The `internal/core/` package SHALL NOT perform filesystem `Stat`/`Open`/`Read`/`Write`/`os.Stat` calls. Path helpers in `core-paths` accept paths as strings and return strings/errors; the on-disk inspection lives in `internal/git/repo_inspector.go` (`IsMainRepo`, `FindMainRepoByTraversal`), which the git adapter consumes via a `RepoInspector` role interface when it needs to classify a path.
+
+#### Scenario: Path helper does not touch the filesystem
+
+- **WHEN** a caller invokes `core.NormalizePath("/tmp/missing")`
+- **THEN** the call SHALL NOT call `os.Stat`, `os.Lstat`, `filepath.EvalSymlinks`, or any other filesystem-touching function
+- **AND** SHALL return the absolute form plus an error when symlink resolution cannot run
+
+#### Scenario: Repo introspection lives in the git adapter
+
+- **WHEN** the cmd layer needs to know whether a path is a main repo
+- **THEN** it SHALL route through `internal/git/repo_inspector.go`, not through `internal/core/`
+- **AND** `internal/core/` SHALL NOT export any `Is*Repo`, `Find*`, or filesystem-probing helper
