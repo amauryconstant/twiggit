@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-10-05
+
+
+### Breaking
+
+- **BREAKING**: Consolidate CLI output and error handling onto `internal/output`; `--output` vocabulary narrows from `json|jsonl|table|plain` to `json|table|plain` (`text` and `jsonl` now exit 2), `--output json` shape changes from envelope to bare array, and `--output plain` emits headerless TSV (cli-cobra-output-format-unification)
+- **BREAKING**: Drop `Get` prefix from 8 exported methods, rename `core` data types to drop `Git*` stutter and `*Info` suffix (`GitRepository`→`Repository`, `GitCommit`→`Commit`, `GitBranch`→`Branch`, `BranchInfo`→`Branch`, `WorktreeInfo`→`Worktree`, `RemoteInfo`→`Remote`, `GitDir`→`RepoDir`), remove 6 per-role lazy fields on `cmdutil.Factory`, and split `test/helpers` into 6 content-named packages (`test/worktree`, `test/shell`, `test/git`, `test/repo`, `test/golden`, `test/perf`) (naming-refactor-modernize)
+
+### Added
+
+- Group subcommands in `--help` output via `cmd.AddGroup` with four groups: `core` (list/create/delete/prune), `navigation` (cd), `setup` (init), `meta` (version/completion) (cli-cobra-output-format-unification)
+- `Tabular` projection interface in `internal/output` (`Header() []string`, `Rows() [][]string`); `cmd/setup.go` shared helper extracted from 5 `run*` functions (cli-cobra-output-format-unification, naming-refactor-modernize)
+- Restore five shell-error sentinels in `internal/core/shell_errors.go` (`ErrShellAlreadyInstalled`, `ErrShellNotInstalled`, `ErrInvalidShellType`, `ErrInferenceFailed`, `ErrDetectionFailed`) for `errors.Is` matching from `cmd/init.go` (test-observability-error-discipline)
+
+### Changed
+
+- Dispatch order in `internal/output/errors.go` reordered to `ValidationError` → `NotFoundError` → `OperationError` → `UsageError`; switch to `errors.AsType[T]`; `hintFor` and quiet-mode hint suppression absorbed from dead `cmd/error_formatter.go` (cli-cobra-output-format-unification)
+- Unify debug logger into a single channel: `iostreams.NewLogger(io.Writer)` is the one constructor; `Factory.Logger`, `slog.Default()`, and `IOStreams.Logger` are the same `*slog.Logger` instance writing to `ios.ErrOut` (test-observability-error-discipline)
+- Restore single-handling rule in `internal/git` adapters (`detectOpError`, `discoverProjects` stop calling `slog.Error`); debug logging moves to cmd boundary via `opts.IO.Logger.With("command", ...)` (test-observability-error-discipline)
+- Preserve `*exec.ExitError` cause through every adapter failure: `git.NewCommandError` and 6 `NewWorktreeError`/`NewBranchError` call sites pass underlying `err` as `Cause` field (test-observability-error-discipline)
+- Split `internal/git/context_resolver.go` (641 LOC) into `context_resolver.go` + `context_resolver_suggest.go`; collapse three `validate*Err` constructors into `validateFieldErr`; promote `reservedNames` to package-level `var` (naming-refactor-modernize)
+- Adopt Go 1.26+ stdlib patterns: `slices.Sort` (×3), `wg.Go(...)` (×7), `strings.NewReplacer` (×2), `t.Setenv` (×2 files), strict `goleak.VerifyTestMain` in `test/concurrent`; rename unexported bool fields to `is/has/can` prefix; replace `fmt.Fprintf(os.Stderr,...)` parse-failure warning with `slog.Warn` (naming-refactor-modernize, test-observability-error-discipline)
+
+### Removed
+
+- `cmd/error_formatter.go` (~180 lines) and `cmd/output.go` (~88 lines) deleted after migrating to `internal/output`; `JSONLinesFormatter`, `FormatJSONL` const, and the `jsonl` switch arm removed (cli-cobra-output-format-unification)
+- Drop dead code: `ProgressReporter.ReportProgress`, `CreateOptions.HookRunner`, `cmd/completion.go` redundant `ValidArgsFunction`, `cmd/util.go:ProgressReporter` field; replace `cmd.Find`+`RemoveCommand` dance with `CompletionOptions.DisableDefaultCmd = true` (cli-cobra-output-format-unification, naming-refactor-modernize)
+- Drop dead error-classification code in `internal/git/errors.go`: `ErrorKindPermission`, `ErrorKindNotFound`, and the unreachable `Is(target error) bool` method (NotFound dispatch already walks cause chain via `*core.NotFoundError.Is()`) (test-observability-error-discipline)
+- Remove duplicate `// Package git/core` comments from 4 files that already have `doc.go`; 6 per-role lazy fields on `cmdutil.Factory` removed; 3 `os.Setenv` call sites replaced with `t.Setenv` (test-observability-error-discipline, naming-refactor-modernize)
+
+### Fixed
+
+- GitLab CI image build: serialize tag+branch pipelines via `resource_group: ci-image-build` and `interruptible: false`; add `$CI_COMMIT_TAG` rule so tag pipelines rebuild the image when `Dockerfile.ci` or `.mise/config.toml` change; drop `.goreleaser.yml` from `changes:` (read at release time, not embedded in the image) (a977195)
+- Fourteen mock-based tests in `internal/git` add `t.Cleanup(func() { mock.AssertExpectations(t) })` (12 in `writer_test.go`, 2 in `hook_runner_test.go`); suite methods switch from `require(s.T(), ...)` to `s.Require()`; `test/concurrent` adds strict `goleak.VerifyTestMain(m)` (test-observability-error-discipline)
+- New `TestCLIClient_NonZeroExit_PreservesExecError` asserts `errors.As(err, &*exec.ExitError)` walks the chain (test-observability-error-discipline)
+- Delete identical-twins `resolveFromWorktreeContext`; route both `core.ContextProject` and `core.ContextWorktree` through `resolveFromProjectContext`; remove dead `existingOnly` parameter on `addBranchSuggestions` (naming-refactor-modernize)
+- Add `context.Context` first-parameter to `getProjectContextSuggestions`/`getWorktreeContextSuggestions`/`getOutsideGitContextSuggestions` so inner `context.Background()` calls honour caller cancellation (naming-refactor-modernize)
+
 ## [0.13.7] - 2026-09-29
 
 
