@@ -186,7 +186,7 @@ var _ = Describe("create command", func() {
 
 		hookConfigContent := `
 [hooks.post-create]
-commands = ["echo hook-ran-successfully"]
+command = "echo hook-ran-successfully"
 `
 		hookConfigPath := filepath.Join(projectPath, ".twiggit.toml")
 		err := os.WriteFile(hookConfigPath, []byte(hookConfigContent), 0o644)
@@ -212,7 +212,7 @@ commands = ["echo hook-ran-successfully"]
 
 		hookConfigContent := `
 [hooks.post-create]
-commands = ["exit 1"]
+command = "exit 1"
 `
 		hookConfigPath := filepath.Join(projectPath, ".twiggit.toml")
 		err := os.WriteFile(hookConfigPath, []byte(hookConfigContent), 0o644)

@@ -65,8 +65,8 @@ func initTestOpts(t *testing.T, shell core.ShellType, install, force bool, confi
 		Ctx:           t.Context(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 		ShellType:     shell,
-		Install:       install,
-		Force:         force,
+		IsInstall:     install,
+		IsForce:       force,
 		ConfigFile:    configFile,
 	}
 

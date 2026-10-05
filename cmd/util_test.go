@@ -22,13 +22,13 @@ func TestVerbosef_NilIOSafe(t *testing.T) {
 }
 
 // TestVerbosef_QuietIOSilent asserts the helper is a no-op when
-// ios.Verbose is false (mirrors the predicate inside
+// ios.IsVerbose is false (mirrors the predicate inside
 // iostreams.IOStreams.Verbosef).
 func TestVerbosef_QuietIOSilent(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _, errOut := iostreams.Test()
-	ios.Verbose = false
+	ios.IsVerbose = false
 
 	verbosef(ios, "must not appear")
 
@@ -43,7 +43,7 @@ func TestVerbosef_EmitsDimStderrOneLine(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _, errOut := iostreams.Test()
-	ios.Verbose = true
+	ios.IsVerbose = true
 
 	verbosef(ios, "Creating worktree for %s/%s", "demo", "feature-x")
 
@@ -59,7 +59,7 @@ func TestVerbosef_OmitsDebugPrefixAndIndents(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _, errOut := iostreams.Test()
-	ios.Verbose = true
+	ios.IsVerbose = true
 
 	verbosef(ios, "branch: %s", "feature-y")
 

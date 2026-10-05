@@ -26,10 +26,10 @@ type DeleteOptions struct {
 	Logger        *slog.Logger
 
 	// Per-command fields.
-	Target     string
-	Force      bool
-	MergedOnly bool
-	ChangeDir  bool
+	Target       string
+	IsForce      bool
+	IsMergedOnly bool
+	IsChangeDir  bool
 }
 
 // NewCmdDelete creates a new delete command.
@@ -71,9 +71,9 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Force deletion even with uncommitted changes")
-	cmd.Flags().BoolVarP(&opts.MergedOnly, "merged-only", "m", false, "Only delete if branch is merged")
-	cmd.Flags().BoolVarP(&opts.ChangeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
+	cmd.Flags().BoolVarP(&opts.IsForce, "force", "f", false, "Force deletion even with uncommitted changes")
+	cmd.Flags().BoolVarP(&opts.IsMergedOnly, "merged-only", "m", false, "Only delete if branch is merged")
+	cmd.Flags().BoolVarP(&opts.IsChangeDir, "cd", "C", false, "Change directory after deletion (outputs path to stdout)")
 
 	carapace.Gen(cmd).PositionalCompletion(
 		actionWorktreeTarget(f, git.WithExistingOnly()),
@@ -89,29 +89,58 @@ Examples:
 
 func runDelete(opts *DeleteOptions) error {
 	ctx := opts.Ctx
-
 	currentCtx, gitClient, err := detectContext(opts.Config, opts.GitClient)
 	if err != nil {
 		return err
 	}
-
 	cfg, err := opts.Config()
 	if err != nil {
 		return fmt.Errorf("config load failed: %w", err)
 	}
-	resolver := git.NewContextResolver(cfg, gitClient, gitClient)
+
+	target, err := resolveDeleteTarget(ctx, currentCtx, cfg, opts)
+	if err != nil {
+		return err
+	}
+
+	if err := validateDeleteSafety(ctx, gitClient, target, opts); err != nil {
+		if errors.Is(err, core.ErrWorktreeNotFound) {
+			return emitDeleteResult(opts, currentCtx, cfg.ProjectsDirectory, target.WorktreePath)
+		}
+		return err
+	}
+
+	return performDelete(ctx, gitClient, cfg, currentCtx, target, opts)
+}
+
+// DeleteTarget is the resolved coordinates of a delete invocation.
+// Produced by resolveDeleteTarget and consumed by validateDeleteSafety
+// and performDelete so the runDelete entry point stays a flat
+// composition rather than a 100+ line procedure.
+type DeleteTarget struct {
+	ProjectPath  string
+	WorktreePath string
+	BranchName   string
+}
+
+// resolveDeleteTarget parses opts.Target through the resolver chain
+// and derives the (projectPath, worktreePath) pair the delete
+// command will operate on. The two-level path resolution (resolver
+// for worktreePath, projectPath derivation for outside-git callers)
+// used to be inlined in the runDelete body; pulling it out makes
+// the cmd/ run function a three-call composition.
+func resolveDeleteTarget(_ context.Context, currentCtx *core.Context, cfg *core.Config, opts *DeleteOptions) (DeleteTarget, error) {
+	resolver := git.NewContextResolver(cfg, opts.gitClient(), opts.gitClient())
 
 	resolution, err := resolver.ResolveIdentifier(currentCtx, opts.Target)
 	if err != nil {
-		return fmt.Errorf("failed to resolve target %s: %w", opts.Target, err)
+		return DeleteTarget{}, fmt.Errorf("failed to resolve target %s: %w", opts.Target, err)
 	}
-
 	if resolution.Type == core.PathTypeInvalid {
-		return fmt.Errorf("invalid target format: %s", resolution.Explanation)
+		return DeleteTarget{}, fmt.Errorf("invalid target format: %s", resolution.Explanation)
 	}
-
 	if resolution.Type == core.PathTypeWorktree && resolution.ResolvedPath == "" {
-		return core.NewOpValidationError("runDelete", "ResolvedPath", "", "resolved path cannot be empty")
+		return DeleteTarget{}, core.NewOpValidationError("resolveDeleteTarget", "ResolvedPath", "", "resolved path cannot be empty")
 	}
 
 	worktreePath := resolution.ResolvedPath
@@ -130,43 +159,54 @@ func runDelete(opts *DeleteOptions) error {
 		}
 	}
 
-	// navTarget returns the project path for -C navigation when the
-	// deletion leaves the user stranded inside the deleted worktree.
-	navTarget := func() string {
-		return getDeleteNavigationTarget(currentCtx, cfg.ProjectsDirectory, worktreePath)
-	}
+	return DeleteTarget{
+		ProjectPath:  projectPath,
+		WorktreePath: worktreePath,
+		BranchName:   resolution.BranchName,
+	}, nil
+}
 
-	// Status safety check
-	if !opts.Force {
-		status, err := getWorktreeStatus(ctx, gitClient, worktreePath)
+// gitClient is a typed accessor that lifts opts.GitClient (which
+// returns cmdutil.Client = any) to the concrete *git.Client used
+// downstream. Centralised so every helper reads through one seam
+// rather than each one calling opts.GitClient() with a type-assert.
+func (opts *DeleteOptions) gitClient() *git.Client {
+	if opts.GitClient == nil {
+		return nil
+	}
+	c, err := opts.GitClient()
+	if err != nil || c == nil {
+		return nil
+	}
+	gc, _ := c.(*git.Client)
+	return gc
+}
+
+// validateDeleteSafety runs the pre-delete guards: uncommitted-changes
+// safety (skipped under --force) and merged-only branch check.
+// Returns core.ErrWorktreeNotFound when the worktree was already gone
+// at status-check time so runDelete can short-circuit to the
+// idempotent navigation/ack emission.
+func validateDeleteSafety(ctx context.Context, gitClient *git.Client, target DeleteTarget, opts *DeleteOptions) error {
+	if !opts.IsForce {
+		status, err := getWorktreeStatus(ctx, gitClient, target.WorktreePath)
 		if err != nil {
 			if errors.Is(err, core.ErrWorktreeNotFound) {
-				// Idempotent: the desired post-state (worktree gone)
-				// is already true. Emit the navigation target only
-				// when the caller is inside the deleted worktree;
-				// outside-git callers asked for deletion by explicit
-				// reference and stay in place, so nothing is printed.
-				if opts.ChangeDir {
-					if nav := navTarget(); nav != "" {
-						_, _ = fmt.Fprintln(writeOrIgnore(opts.IO.Out), nav)
-					}
-				}
-				return nil
+				return err
 			}
 			return fmt.Errorf("failed to check worktree status: %w", err)
 		}
 		if !status.IsClean {
-			return errors.New("worktree has uncommitted changes (use --force to override)")
+			return core.NewUncommittedChangesError(target.WorktreePath)
 		}
 	}
 
-	// merged-only check
-	if opts.MergedOnly {
-		wtInfo, err := clientGetWorktreeByPath(ctx, gitClient, projectPath, worktreePath)
+	if opts.IsMergedOnly {
+		wtInfo, err := clientGetWorktreeByPath(ctx, gitClient, target.ProjectPath, target.WorktreePath)
 		if err != nil {
 			return fmt.Errorf("failed to get worktree info: %w", err)
 		}
-		merged, err := gitClient.IsBranchMerged(ctx, worktreePath, wtInfo.Branch)
+		merged, err := gitClient.IsBranchMerged(ctx, target.WorktreePath, wtInfo.Branch)
 		if err != nil {
 			return fmt.Errorf("failed to check if branch '%s' is merged: %w", wtInfo.Branch, err)
 		}
@@ -175,24 +215,47 @@ func runDelete(opts *DeleteOptions) error {
 		}
 	}
 
-	verbosef(opts.IO, "Deleting worktree at %s", worktreePath)
-	verbosef(opts.IO, "project: %s", currentCtx.ProjectName)
-	verbosef(opts.IO, "branch: %s", resolution.BranchName)
-	verbosef(opts.IO, "force: %t", opts.Force)
+	return nil
+}
 
-	if err := gitClient.DeleteWorktree(ctx, projectPath, worktreePath, opts.Force); err != nil {
+// performDelete issues the actual git worktree delete and renders the
+// post-delete output (navigation target, deleted-ack, or quiet ack).
+// The git.ErrNotFound race branch falls through to the same
+// emission shape as the success branch via emitDeleteResult.
+func performDelete(ctx context.Context, gitClient *git.Client, cfg *core.Config, currentCtx *core.Context, target DeleteTarget, opts *DeleteOptions) error {
+	verbosef(opts.IO, "Deleting worktree at %s", target.WorktreePath)
+	verbosef(opts.IO, "project: %s", currentCtx.ProjectName)
+	verbosef(opts.IO, "branch: %s", target.BranchName)
+	verbosef(opts.IO, "force: %t", opts.IsForce)
+
+	if err := gitClient.DeleteWorktree(ctx, target.ProjectPath, target.WorktreePath, opts.IsForce); err != nil {
+		if errors.Is(err, git.ErrNotFound) {
+			// Race: worktree vanished between the status check and
+			// the delete invocation. The desired post-state holds,
+			// so fall through to the navigation/quiet branch below
+			// instead of surfacing a failure.
+			return emitDeleteResult(opts, currentCtx, cfg.ProjectsDirectory, target.WorktreePath)
+		}
 		return fmt.Errorf("failed to delete worktree: %w", err)
 	}
 
-	if opts.ChangeDir {
-		nav := navTarget()
+	return emitDeleteResult(opts, currentCtx, cfg.ProjectsDirectory, target.WorktreePath)
+}
+
+// emitDeleteResult renders the post-delete navigation (or quiet ack)
+// path. Extracted so the race-condition ErrNotFound branch can fall
+// through to the same emission shape as the success branch.
+func emitDeleteResult(opts *DeleteOptions, currentCtx *core.Context, projectsDir, worktreePath string) error {
+	if opts.IsChangeDir {
+		nav := getDeleteNavigationTarget(currentCtx, projectsDir, worktreePath)
 		if nav != "" {
 			_, _ = fmt.Fprintln(writeOrIgnore(opts.IO.Out), nav)
 		}
-	} else if !opts.IO.Quiet {
+		return nil
+	}
+	if !opts.IO.IsQuiet {
 		_, _ = fmt.Fprintf(writeOrIgnore(opts.IO.Out), "Deleted worktree: %s\n", worktreePath)
 	}
-
 	return nil
 }
 

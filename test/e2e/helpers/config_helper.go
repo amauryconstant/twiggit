@@ -139,19 +139,19 @@ max_concurrent = 1
 		WorktreesDirectory:  c.worktreesDir,
 		DefaultSourceBranch: c.defaultBranch,
 		ContextDetection: core.ContextDetectionConfig{
-			CacheTTL:            "1m",
-			GitOperationTimeout: "10s",
-			EnableGitValidation: true,
+			CacheTTL:               "1m",
+			GitOperationTimeout:    "10s",
+			IsGitValidationEnabled: true,
 		},
 		Git: core.GitConfig{
-			CLITimeout:   10,
-			CacheEnabled: false,
+			CLITimeout:     10,
+			IsCacheEnabled: false,
 		},
 		Services: core.ServiceConfig{
-			CacheEnabled:  false,
-			CacheTTL:      time.Minute,
-			ConcurrentOps: false,
-			MaxConcurrent: 1,
+			IsCacheEnabled:         false,
+			CacheTTL:               time.Minute,
+			IsConcurrentOpsEnabled: false,
+			MaxConcurrent:          1,
 		},
 	}
 

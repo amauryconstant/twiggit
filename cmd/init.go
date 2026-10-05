@@ -26,8 +26,8 @@ type InitOptions struct {
 
 	// Per-command fields.
 	ShellType  core.ShellType
-	Install    bool
-	Force      bool
+	IsInstall  bool
+	IsForce    bool
 	ConfigFile string
 }
 
@@ -66,10 +66,10 @@ Examples:
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.MaximumNArgs(1)),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if opts.ConfigFile != "" && !opts.Install {
+			if opts.ConfigFile != "" && !opts.IsInstall {
 				return core.NewUsageError("--config requires --install", nil)
 			}
-			if opts.Force && !opts.Install {
+			if opts.IsForce && !opts.IsInstall {
 				return core.NewUsageError("--force requires --install", nil)
 			}
 
@@ -84,9 +84,9 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Install, "install", "i", false, "install wrapper to shell config file")
+	cmd.Flags().BoolVarP(&opts.IsInstall, "install", "i", false, "install wrapper to shell config file")
 	cmd.Flags().StringVarP(&opts.ConfigFile, "config", "c", "", "custom config file path (requires --install)")
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "force reinstall even if already installed (requires --install)")
+	cmd.Flags().BoolVarP(&opts.IsForce, "force", "f", false, "force reinstall even if already installed (requires --install)")
 
 	carapace.Gen(cmd).PositionalCompletion(
 		carapace.ActionValues("bash", "zsh", "fish"),
@@ -98,7 +98,7 @@ Examples:
 // runInit dispatches to either stdout-print or file-install mode
 // based on the --install flag.
 func runInit(opts *InitOptions) error {
-	if opts.Install {
+	if opts.IsInstall {
 		return runInitInstall(opts)
 	}
 	return runInitStdout(opts)
@@ -153,7 +153,7 @@ func runInitInstall(opts *InitOptions) error {
 	}
 
 	// Skip when already installed and not forcing reinstall.
-	if !opts.Force {
+	if !opts.IsForce {
 		if err := output.ValidateInstallation(shellType, configFile); err == nil {
 			result := &core.SetupShellResult{
 				ShellType:   shellType,
@@ -174,7 +174,7 @@ func runInitInstall(opts *InitOptions) error {
 		return fmt.Errorf("failed to generate wrapper: %w", err)
 	}
 
-	if err := output.InstallWrapper(shellType, wrapper, configFile, opts.Force); err != nil {
+	if err := output.InstallWrapper(shellType, wrapper, configFile, opts.IsForce); err != nil {
 		if isAlreadyInstalled(err) {
 			result := &core.SetupShellResult{
 				ShellType:   shellType,

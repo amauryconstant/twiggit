@@ -29,11 +29,11 @@ type PruneOptions struct {
 	Logger        *slog.Logger
 
 	// Per-command fields.
-	Force            bool
-	Yes              bool
-	DeleteBranches   bool
-	AllProjects      bool
-	DryRun           bool
+	IsForce          bool
+	IsYes            bool
+	IsDeleteBranches bool
+	IsAllProjects    bool
+	IsDryRun         bool
 	SpecificWorktree string
 }
 
@@ -86,11 +86,11 @@ Examples:
 		},
 	}
 
-	cmd.Flags().BoolVarP(&opts.Force, "force", "f", false, "Force deletion even with uncommitted changes")
-	cmd.Flags().BoolVarP(&opts.Yes, "yes", "y", false, "Auto-confirm prompts (keeps safety checks)")
-	cmd.Flags().BoolVarP(&opts.DeleteBranches, "delete-branches", "d", false, "Delete branches after worktree removal")
-	cmd.Flags().BoolVarP(&opts.AllProjects, "all", "a", false, "Prune across all projects")
-	cmd.Flags().BoolVarP(&opts.DryRun, "dry-run", "n", false, "Preview only, no actual deletion")
+	cmd.Flags().BoolVarP(&opts.IsForce, "force", "f", false, "Force deletion even with uncommitted changes")
+	cmd.Flags().BoolVarP(&opts.IsYes, "yes", "y", false, "Auto-confirm prompts (keeps safety checks)")
+	cmd.Flags().BoolVarP(&opts.IsDeleteBranches, "delete-branches", "d", false, "Delete branches after worktree removal")
+	cmd.Flags().BoolVarP(&opts.IsAllProjects, "all", "a", false, "Prune across all projects")
+	cmd.Flags().BoolVarP(&opts.IsDryRun, "dry-run", "n", false, "Preview only, no actual deletion")
 
 	carapace.Gen(cmd).PositionalCompletion(
 		actionWorktreeTarget(f, git.WithExistingOnly()),
@@ -99,9 +99,10 @@ Examples:
 	return cmd
 }
 
-// runPrune performs the prune walk. After slice 9 the worktree
-// iteration, skip logic, branch deletion, and result aggregation all
-// live in cmd/.
+// runPrune composes the prune walk: optional bulk-preview +
+// confirmation, the actual walk, and the post-walk output. After
+// slice 9 the worktree iteration, skip logic, branch deletion, and
+// result aggregation all live in cmd/.
 func runPrune(opts *PruneOptions) error {
 	ctx := opts.Ctx
 
@@ -115,62 +116,101 @@ func runPrune(opts *PruneOptions) error {
 		return fmt.Errorf("config load failed: %w", err)
 	}
 
-	reporter := NewProgressReporter(opts.IO)
-
-	if opts.AllProjects && !opts.Force && !opts.Yes && !opts.DryRun {
-		previewReq := &core.PruneWorktreesRequest{
-			Context:          currentCtx,
-			Force:            opts.Force,
-			DeleteBranches:   opts.DeleteBranches,
-			AllProjects:      opts.AllProjects,
-			DryRun:           true,
-			SpecificWorktree: opts.SpecificWorktree,
-		}
-		reporter.Report("Previewing prune operation...")
-		previewResult, err := runPruneWalk(ctx, gitClient, opts.IO.Logger, cfg, previewReq, currentCtx)
-		if err != nil {
-			return fmt.Errorf("prune preview failed: %w", err)
-		}
-		outputPruneResults(opts.IO, previewResult, true)
-
-		confirmed, err := confirmBulkPrune(opts.IO)
+	var preview *core.PruneWorktreesResult
+	if opts.IsAllProjects && !opts.IsForce && !opts.IsYes && !opts.IsDryRun {
+		preview, err = buildPrunePreview(ctx, opts, gitClient, cfg, currentCtx)
 		if err != nil {
 			return err
 		}
+	}
+
+	result, err := runPruneWithConfirm(ctx, opts, gitClient, cfg, currentCtx, preview)
+	if err != nil {
+		return err
+	}
+
+	emitPruneOutput(opts, result, currentCtx)
+	return nil
+}
+
+// pruneRequest assembles a *core.PruneWorktreesRequest from opts +
+// the current context, with dryRun overriding opts.IsDryRun so the
+// preview walk can run a forced IsDryRun=true pass without
+// mutating opts.
+func pruneRequest(opts *PruneOptions, currentCtx *core.Context, dryRun bool) *core.PruneWorktreesRequest {
+	return &core.PruneWorktreesRequest{
+		Context:          currentCtx,
+		IsForce:          opts.IsForce,
+		IsDeleteBranches: opts.IsDeleteBranches,
+		IsAllProjects:    opts.IsAllProjects,
+		IsDryRun:         dryRun,
+		SpecificWorktree: opts.SpecificWorktree,
+	}
+}
+
+// buildPrunePreview runs the prune walk in dry-run mode and prints
+// the preview so the user can decide whether to proceed. Returns
+// the preview result so runPrune can feed it into the interactive
+// confirm step.
+func buildPrunePreview(ctx context.Context, opts *PruneOptions, gitClient *git.Client, cfg *core.Config, currentCtx *core.Context) (*core.PruneWorktreesResult, error) {
+	reporter := NewProgressReporter(opts.IO)
+	reporter.Report("Previewing prune operation...")
+
+	return runPruneWalk(ctx, gitClient, opts.IO.Logger, cfg, pruneRequest(opts, currentCtx, true), currentCtx)
+}
+
+// runPruneWithConfirm gates the real prune behind the interactive
+// confirm prompt when a preview was built. With preview == nil the
+// confirm is skipped (caller already short-circuited on
+// --yes/--force/--dry-run/--specific). Returns nil + nil when the
+// user declines; callers must surface "Prune cancelled." on their
+// own if they care to print it.
+func runPruneWithConfirm(ctx context.Context, opts *PruneOptions, gitClient *git.Client, cfg *core.Config, currentCtx *core.Context, preview *core.PruneWorktreesResult) (*core.PruneWorktreesResult, error) {
+	if preview != nil {
+		outputPruneResults(opts.IO, preview, true)
+
+		confirmed, err := confirmBulkPrune(opts.IO)
+		if err != nil {
+			return nil, err
+		}
 		if !confirmed {
 			_, _ = fmt.Fprintln(writeOrIgnore(opts.IO.ErrOut), "Prune cancelled.")
-			return nil
+			return nil, nil
 		}
 	}
 
-	if opts.AllProjects || opts.SpecificWorktree == "" {
+	if opts.IsAllProjects || opts.SpecificWorktree == "" {
+		reporter := NewProgressReporter(opts.IO)
 		reporter.Report("Pruning merged worktrees...")
 	}
 
-	req := &core.PruneWorktreesRequest{
-		Context:          currentCtx,
-		Force:            opts.Force,
-		DeleteBranches:   opts.DeleteBranches,
-		AllProjects:      opts.AllProjects,
-		DryRun:           opts.DryRun,
-		SpecificWorktree: opts.SpecificWorktree,
-	}
-	result, err := runPruneWalk(ctx, gitClient, opts.IO.Logger, cfg, req, currentCtx)
+	result, err := runPruneWalk(ctx, gitClient, opts.IO.Logger, cfg, pruneRequest(opts, currentCtx, opts.IsDryRun), currentCtx)
 	if err != nil {
-		return fmt.Errorf("prune failed: %w", err)
+		return nil, fmt.Errorf("prune failed: %w", err)
+	}
+	return result, nil
+}
+
+// emitPruneOutput prints the aggregated prune result, the
+// progress-reporting tail (when applicable), and the navigation
+// path for single-target prunes. Tolerates a nil result: a
+// cancelled walk returns (nil, nil) from runPruneWithConfirm, and
+// the function must not panic on that path.
+func emitPruneOutput(opts *PruneOptions, result *core.PruneWorktreesResult, _ *core.Context) {
+	if result == nil {
+		return
 	}
 
-	outputPruneResults(opts.IO, result, opts.DryRun)
+	outputPruneResults(opts.IO, result, opts.IsDryRun)
 
-	if opts.AllProjects || opts.SpecificWorktree == "" {
+	if opts.IsAllProjects || opts.SpecificWorktree == "" {
+		reporter := NewProgressReporter(opts.IO)
 		reporter.Report("Prune complete")
 	}
 
 	if result.NavigationPath != "" {
 		_, _ = fmt.Fprintln(writeOrIgnore(opts.IO.Out), result.NavigationPath)
 	}
-
-	return nil
 }
 
 // runPruneWalk performs the prune walk and returns the aggregated
@@ -219,7 +259,7 @@ func runPruneWalk(ctx context.Context, client *git.Client, logger *slog.Logger, 
 // the request flags. Mirrors the project-resolution branch of
 // worktreeService.PruneMergedWorktrees.
 func resolvePruneProjects(ctx context.Context, client *git.Client, cfg *core.Config, req *core.PruneWorktreesRequest, currentCtx *core.Context) ([]*core.ProjectInfo, error) {
-	if req.AllProjects {
+	if req.IsAllProjects {
 		finder := git.NewRepoFinder(client)
 		gitDirs, err := finder.FindGitRepositories(cfg.ProjectsDirectory)
 		if err != nil {
@@ -233,7 +273,7 @@ func resolvePruneProjects(ctx context.Context, client *git.Client, cfg *core.Con
 		projects := make([]*core.ProjectInfo, len(gitDirs))
 		for i, gitDir := range gitDirs {
 			mainRepo := gitDir.Path
-			if resolved := core.FindMainRepoByTraversal(gitDir.Path); resolved != "" {
+			if resolved := git.FindMainRepoByTraversal(gitDir.Path); resolved != "" {
 				mainRepo = resolved
 			}
 			projects[i] = &core.ProjectInfo{
@@ -296,7 +336,7 @@ func pruneProject(ctx context.Context, client *git.Client, logger *slog.Logger, 
 			ProjectName:  project.Name,
 			WorktreePath: wt.Path,
 			BranchName:   wt.Branch,
-			Deleted:      false,
+			WasDeleted:   false,
 		}
 
 		if skip := checkWorktreeSkip(ctx, client, cfg, wt, project, cwd, req); skip != nil {
@@ -304,7 +344,24 @@ func pruneProject(ctx context.Context, client *git.Client, logger *slog.Logger, 
 			continue
 		}
 
-		deleteWorktreeAndBranch(ctx, client, logger, project, wt, req, entry, result)
+		target := pruneTarget{Project: project, Worktree: wt, Request: req}
+		if err := deleteWorktree(ctx, client, target); err != nil {
+			entry.Error = err
+			result.SkippedWorktrees = append(result.SkippedWorktrees, entry)
+			result.TotalSkipped++
+			continue
+		}
+
+		entry.WasDeleted = true
+		result.DeletedWorktrees = append(result.DeletedWorktrees, entry)
+		result.TotalDeleted++
+
+		if err := deleteBranchIfRequested(ctx, client, logger, target); err != nil {
+			entry.Error = err
+		} else if req.IsDeleteBranches {
+			entry.WasBranchDeleted = true
+			result.TotalBranchesDeleted++
+		}
 	}
 }
 
@@ -331,14 +388,18 @@ func checkWorktreeSkip(ctx context.Context, client *git.Client, cfg *core.Config
 		return &pruneSkipResult{reason: "branch not merged", category: "unmerged"}
 	}
 
-	if !req.Force && !req.DryRun {
+	if !req.IsForce && !req.IsDryRun {
 		status, err := client.RepositoryStatus(ctx, wt.Path)
 		if err == nil && !status.IsClean {
-			return &pruneSkipResult{reason: "uncommitted changes (use --force to override)", category: "skipped"}
+			return &pruneSkipResult{
+				reason:   "uncommitted changes (use --force to override)",
+				err:      fmt.Errorf("worktree %s: %w", wt.Path, core.ErrUncommittedChanges),
+				category: "skipped",
+			}
 		}
 	}
 
-	if req.DryRun {
+	if req.IsDryRun {
 		return &pruneSkipResult{reason: "dry run", category: "skipped"}
 	}
 
@@ -363,30 +424,45 @@ func addSkippedPrune(result *core.PruneWorktreesResult, entry *core.PruneWorktre
 	result.TotalSkipped++
 }
 
-// deleteWorktreeAndBranch performs the actual delete + optional branch removal.
-func deleteWorktreeAndBranch(ctx context.Context, client *git.Client, logger *slog.Logger, project *core.ProjectInfo, wt core.Worktree, req *core.PruneWorktreesRequest, entry *core.PruneWorktreeResult, result *core.PruneWorktreesResult) {
-	if err := client.DeleteWorktree(ctx, project.GitRepoPath, wt.Path, req.Force); err != nil {
-		entry.Error = err
-		result.SkippedWorktrees = append(result.SkippedWorktrees, entry)
-		result.TotalSkipped++
-		return
-	}
+// pruneTarget bundles the inputs the delete-branch step needs so
+// deleteWorktree + deleteBranchIfRequested can share a single value
+// without restating (project, worktree, request) at every call.
+type pruneTarget struct {
+	Project  *core.ProjectInfo
+	Worktree core.Worktree
+	Request  *core.PruneWorktreesRequest
+}
 
-	entry.Deleted = true
-	result.DeletedWorktrees = append(result.DeletedWorktrees, entry)
-	result.TotalDeleted++
-
-	if req.DeleteBranches {
-		if err := client.PruneWorktrees(ctx, project.GitRepoPath); err != nil {
-			logger.Error("prune worktrees failed", "error", err, "repo_path", project.GitRepoPath)
-		}
-		if err := client.DeleteBranch(ctx, project.GitRepoPath, wt.Branch); err != nil {
-			entry.Error = fmt.Errorf("worktree deleted but branch deletion failed: %w", err)
-		} else {
-			entry.BranchDeleted = true
-			result.TotalBranchesDeleted++
-		}
+// deleteWorktree removes the worktree at target.Worktree.Path from
+// the repo at target.Project.GitRepoPath, honoring the request's
+// IsForce flag. Returns the underlying git error so the caller can
+// record it on the entry and bucket the worktree into
+// SkippedWorktrees.
+func deleteWorktree(ctx context.Context, client *git.Client, target pruneTarget) error {
+	if err := client.DeleteWorktree(ctx, target.Project.GitRepoPath, target.Worktree.Path, target.Request.IsForce); err != nil {
+		return fmt.Errorf("delete worktree %s: %w", target.Worktree.Path, err)
 	}
+	return nil
+}
+
+// deleteBranchIfRequested removes the worktree's git branch when
+// the request opts in (--delete-branches). Prunes stale admin
+// refs first to avoid "branch in use" failures. Returns the wrapped
+// branch-deletion error when the worktree is gone but the branch
+// could not be removed; the caller stores it on entry.Error so the
+// summary still surfaces the worktree success + branch failure
+// separately.
+func deleteBranchIfRequested(ctx context.Context, client *git.Client, logger *slog.Logger, target pruneTarget) error {
+	if !target.Request.IsDeleteBranches {
+		return nil
+	}
+	if err := client.PruneWorktrees(ctx, target.Project.GitRepoPath); err != nil {
+		logger.Error("prune worktrees failed", "error", err, "repo_path", target.Project.GitRepoPath)
+	}
+	if err := client.DeleteBranch(ctx, target.Project.GitRepoPath, target.Worktree.Branch); err != nil {
+		return fmt.Errorf("worktree deleted but branch deletion failed: %w", err)
+	}
+	return nil
 }
 
 // confirmBulkPrune prompts on stderr for a y/n confirmation. Reads
@@ -424,7 +500,7 @@ func outputPruneResults(ios *iostreams.IOStreams, result *core.PruneWorktreesRes
 		}
 		for _, wt := range result.DeletedWorktrees {
 			_, _ = fmt.Fprintf(errOut, "  %s (%s/%s)\n", wt.WorktreePath, wt.ProjectName, wt.BranchName)
-			if wt.BranchDeleted {
+			if wt.WasBranchDeleted {
 				_, _ = fmt.Fprintf(errOut, "    branch deleted: %s\n", wt.BranchName)
 			}
 			if wt.Error != nil {

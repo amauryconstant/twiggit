@@ -37,6 +37,8 @@ func NewCmdVersion(f *cmdutil.Factory, runF func(*VersionOptions) error) *cobra.
 	cmd := &cobra.Command{
 		Use:           "version",
 		Short:         "Show version of twiggit",
+		Long:          "Show version of twiggit.",
+		Example:       "  twiggit version",
 		SilenceUsage:  true,
 		SilenceErrors: true,
 		Args:          wrapArgsValidator(cobra.NoArgs),

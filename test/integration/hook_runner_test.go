@@ -36,13 +36,13 @@ func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_ExecutesEchoCommand(
 	configPath := filepath.Join(s.configDir, ".twiggit.toml")
 	configContent := `
 [hooks.post-create]
-commands = ["echo hello"]
+command = "echo hello"
 `
 	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -55,21 +55,23 @@ commands = ["echo hello"]
 	s.Empty(result.Failures)
 }
 
-func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_MultipleCommandsSucceed() {
+func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_MultipleDefinitionsSucceed() {
 	configPath := filepath.Join(s.configDir, ".twiggit.toml")
 	configContent := `
-[hooks.post-create]
-commands = [
-    "echo first",
-    "echo second",
-    "echo third",
-]
+[[hooks.post-create]]
+command = "echo first"
+
+[[hooks.post-create]]
+command = "echo second"
+
+[[hooks.post-create]]
+command = "echo third"
 `
 	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -85,18 +87,20 @@ commands = [
 func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_CommandFailure_ContinuesExecution() {
 	configPath := filepath.Join(s.configDir, ".twiggit.toml")
 	configContent := `
-[hooks.post-create]
-commands = [
-    "echo first",
-    "sh -c 'exit 1'",
-    "echo third",
-]
+[[hooks.post-create]]
+command = "echo first"
+
+[[hooks.post-create]]
+command = "sh -c 'exit 1'"
+
+[[hooks.post-create]]
+command = "echo third"
 `
 	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -115,13 +119,13 @@ func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_EnvironmentVariables
 	configPath := filepath.Join(s.configDir, ".twiggit.toml")
 	configContent := `
 [hooks.post-create]
-commands = ["printenv TWIGGIT_PROJECT_NAME"]
+command = "printenv TWIGGIT_PROJECT_NAME"
 `
 	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   s.tempDir,
 		ProjectName:    "test-project",
 		BranchName:     "feature-branch",
@@ -142,13 +146,13 @@ func (s *HookRunnerIntegrationSuite) TestRun_RealConfigFile_CommandExecutesInWor
 	testFile := filepath.Join(s.tempDir, "marker.txt")
 	configContent := `
 [hooks.post-create]
-commands = ["touch marker.txt"]
+command = "touch marker.txt"
 `
 	err := os.WriteFile(configPath, []byte(configContent), 0o644)
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}
@@ -165,7 +169,7 @@ commands = ["touch marker.txt"]
 
 func (s *HookRunnerIntegrationSuite) TestRun_NoConfigFile_ReturnsNotExecuted() {
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: filepath.Join(s.configDir, "nonexistent.toml"),
 	}
@@ -187,7 +191,7 @@ key = "value"
 	s.Require().NoError(err)
 
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   s.tempDir,
 		ConfigFilePath: configPath,
 	}

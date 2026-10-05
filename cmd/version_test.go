@@ -25,18 +25,16 @@ func TestVersion_NoOutputFlagRendersPlainText(t *testing.T) {
 	require.NoError(t, runVersion(opts))
 
 	out := stdout.String()
-	must := require.New(t)
-	is := assert.New(t)
 
-	must.NotEmpty(out, "version must emit something to stdout")
+	assert.NotEmpty(t, out, "version must emit something to stdout")
 
-	is.NotContains(out, "[", "non-list default must not emit JSON array markers")
-	is.NotContains(out, "]", "non-list default must not emit JSON array markers")
-	is.NotRegexp(`^BRANCH\t`, out,
+	assert.NotContains(t, out, "[", "non-list default must not emit JSON array markers")
+	assert.NotContains(t, out, "]", "non-list default must not emit JSON array markers")
+	assert.NotRegexp(t, `^BRANCH\t`, out,
 		"non-list default must not emit Tabular TSV header")
-	is.NotRegexp(`\{".+":.+,"path":.+,"status":`, out,
+	assert.NotRegexp(t, `\{".+":.+,"path":.+,"status":`, out,
 		"non-list default must not emit bare-JSON worktree row")
 
-	is.Regexp(`twiggit\s+1\.27\.1`, out,
+	assert.Regexp(t, `twiggit\s+1\.27\.1`, out,
 		"non-list default renders plain human text mentioning the binary name and version")
 }

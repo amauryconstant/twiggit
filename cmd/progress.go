@@ -7,7 +7,7 @@ import (
 )
 
 // ProgressReporter provides progress feedback for bulk operations.
-// It honours the iostreams.Quiet gate rather than reading the flag
+// It honours the iostreams.IsQuiet gate rather than reading the flag
 // directly so the constructor composes cleanly with the test-only
 // iostreams.Test() helper.
 type ProgressReporter struct {
@@ -21,7 +21,7 @@ func NewProgressReporter(ios *iostreams.IOStreams) *ProgressReporter {
 	if ios == nil {
 		return &ProgressReporter{isQuiet: false, out: io.Discard}
 	}
-	return &ProgressReporter{isQuiet: ios.Quiet, out: ios.ErrOut}
+	return &ProgressReporter{isQuiet: ios.IsQuiet, out: ios.ErrOut}
 }
 
 // Report outputs a progress message if not in quiet mode

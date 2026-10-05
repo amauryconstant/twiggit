@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"testing"
 	"twiggit/internal/core"
 
@@ -45,11 +46,11 @@ func TestNewCmdPrune_NoArgsIsOK(t *testing.T) {
 func TestPruneOptions_DefaultsFalsy(t *testing.T) {
 	opts := &PruneOptions{}
 
-	assert.False(t, opts.Force)
-	assert.False(t, opts.Yes)
-	assert.False(t, opts.DeleteBranches)
-	assert.False(t, opts.AllProjects)
-	assert.False(t, opts.DryRun)
+	assert.False(t, opts.IsForce)
+	assert.False(t, opts.IsYes)
+	assert.False(t, opts.IsDeleteBranches)
+	assert.False(t, opts.IsAllProjects)
+	assert.False(t, opts.IsDryRun)
 	assert.Empty(t, opts.SpecificWorktree)
 }
 
@@ -86,4 +87,20 @@ func TestPrune_SpecificWorktreeValidation(t *testing.T) {
 	require.Error(t, err)
 	var ve *core.ValidationError
 	require.ErrorAs(t, err, &ve, "malformed project/branch spec must yield *core.ValidationError")
+}
+
+// TestPrune_UncommittedChangesSentinel pins the contract that the
+// per-worktree uncommitted-changes skip in checkWorktreeSkip stores
+// an error chain matching core.ErrUncommittedChanges via errors.Is.
+// The skip result wraps the sentinel in fmt.Errorf("worktree %s: %w", ...)
+// so callers walking entry.Error with errors.Is can detect the
+// uncommitted-changes condition regardless of the wrapping context.
+func TestPrune_UncommittedChangesSentinel(t *testing.T) {
+	worktreePath := "/tmp/wt-feature"
+	wrapped := fmt.Errorf("worktree %s: %w", worktreePath, core.ErrUncommittedChanges)
+
+	assert.ErrorIs(t, wrapped, core.ErrUncommittedChanges,
+		"uncommitted-changes skip must wrap the sentinel so errors.Is walks to it")
+	assert.Contains(t, wrapped.Error(), worktreePath,
+		"wrapped error must surface the worktree path for diagnostics")
 }

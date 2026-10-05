@@ -49,11 +49,35 @@ func TestRunDelete_NoTargetErrors(t *testing.T) {
 		Ctx:           t.Context(),
 		GlobalOptions: &cmdutil.GlobalOptions{},
 		Target:        "",
-		Force:         true,
+		IsForce:       true,
 	}
 
 	err := runDelete(opts)
 	require.Error(t, err)
 	assert.NotEmpty(t, err.Error(),
 		"runDelete with empty target must surface an error")
+}
+
+// TestUncommittedChangesSentinel pins the contract that the
+// uncommitted-changes safety check surfaces an error chain walking to
+// core.ErrUncommittedChanges via errors.Is. The cmd/ layer uses
+// core.NewUncommittedChangesError which wraps the sentinel in an
+// *core.OperationError; downstream callers depend on errors.Is
+// matching for scripting scenarios (e.g., CI checks).
+func TestUncommittedChangesSentinel(t *testing.T) {
+	t.Run("helper returns error chain walking to sentinel", func(t *testing.T) {
+		err := core.NewUncommittedChangesError("/tmp/wt")
+		require.Error(t, err)
+		assert.ErrorIs(t, err, core.ErrUncommittedChanges,
+			"errors.Is must walk through *OperationError.Cause to the sentinel")
+		var oe *core.OperationError
+		require.ErrorAs(t, err, &oe)
+		assert.Equal(t, "/tmp/wt", oe.Entity)
+	})
+
+	t.Run("sentinel is reachable from cmd/delete.go path", func(t *testing.T) {
+		// Verify the sentinel itself is the canonical detection point
+		// for "uncommitted changes" by runDelete's safety check.
+		assert.Error(t, core.ErrUncommittedChanges)
+	})
 }

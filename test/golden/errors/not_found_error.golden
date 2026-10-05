@@ -1,4 +1,4 @@
 Error: invalid git repository
-  op=status.worktree entity=/tmp/fixtures/worktrees/test-project/non-existent-worktree
+  entity=/tmp/fixtures/worktrees/test-project/non-existent-worktree
   cause: git validate: not a valid git repository
   hint: Verify the repository path

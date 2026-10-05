@@ -31,9 +31,9 @@ type CreateOptions struct {
 	Logger        *slog.Logger
 
 	// Per-command fields.
-	Spec   string
-	Source string
-	CdFlag bool
+	Spec     string
+	Source   string
+	IsCdFlag bool
 }
 
 // NewCmdCreate creates a new create command.
@@ -82,7 +82,7 @@ Examples:
 	}
 
 	cmd.Flags().StringVar(&opts.Source, "source", "", "Source branch to create from")
-	cmd.Flags().BoolVarP(&opts.CdFlag, "cd", "C", false, "Output worktree path to stdout (for shell wrapper)")
+	cmd.Flags().BoolVarP(&opts.IsCdFlag, "cd", "C", false, "Output worktree path to stdout (for shell wrapper)")
 
 	carapace.Gen(cmd).PositionalCompletion(actionWorktreeTarget(f))
 	carapace.Gen(cmd).FlagCompletion(map[string]carapace.Action{
@@ -99,92 +99,174 @@ Examples:
 func runCreate(opts *CreateOptions) error {
 	ctx := opts.Ctx
 
+	if err := validateBranchNameForCreate(opts); err != nil {
+		return err
+	}
+
+	req, gitClient, err := prepareCreateRequest(ctx, opts)
+	if err != nil {
+		return err
+	}
+
+	worktree, err := materialiseWorktree(ctx, gitClient, opts, req)
+	if err != nil {
+		return err
+	}
+
+	result := &core.CreateWorktreeResult{Worktree: worktree}
+	result.HookResult = dispatchCreateHooks(ctx, opts, req)
+
+	renderCreateResult(opts, result)
+	return nil
+}
+
+// createRequest is the cmd-level resolved request after
+// prepareCreateRequest finishes. Project carries the full
+// *core.ProjectInfo (so dispatchCreateHooks can resolve the
+// .twiggit.toml config), WorktreePath is computed from cfg +
+// project.Name + branchName, and SourceBranch mirrors opts.Source so
+// the helper signatures don't need the full options struct.
+type createRequest struct {
+	BranchName   string
+	SourceBranch string
+	Project      *core.ProjectInfo
+	WorktreePath string
+}
+
+// validateBranchNameForCreate extracts the branch-name fragment from
+// the spec and runs the canonical core validator. Returns the error
+// directly so runCreate can short-circuit before any I/O.
+func validateBranchNameForCreate(opts *CreateOptions) error {
 	branchName := extractBranchNameForValidation(opts.Spec)
 	branchValidation := core.ValidateBranchName(branchName)
 	if branchValidation.IsError() {
 		return branchValidation.Error
 	}
+	return nil
+}
 
-	currentCtx, gitClient, err := detectContext(opts.Config, opts.GitClient)
+// prepareCreateRequest resolves the spec into a *createRequest with
+// the project metadata, worktree path, and source branch all checked.
+// It performs every read-side step: context detection, project
+// discovery, source-branch existence check, worktree-path conflict
+// check. Returns the resolved request AND the typed *git.Client so
+// materialiseWorktree can perform the write-side step without a
+// second type-assertion round-trip through cmdutil.Client = any.
+func prepareCreateRequest(ctx context.Context, opts *CreateOptions) (*createRequest, *git.Client, error) {
+	currentCtx, cfg, gitClient, err := loadCreateContext(opts)
 	if err != nil {
-		return err
-	}
-
-	cfg, err := opts.Config()
-	if err != nil {
-		return fmt.Errorf("config load failed: %w", err)
+		return nil, nil, err
 	}
 
 	projectName, branchName, err := parseProjectBranch(opts.Spec, currentCtx)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 
 	project, err := discoverProject(ctx, gitClient, cfg, projectName, currentCtx)
 	if err != nil {
-		return fmt.Errorf("failed to discover project %s: %w", projectName, err)
+		return nil, nil, fmt.Errorf("failed to discover project %s: %w", projectName, err)
 	}
 
-	// Validate source branch exists before creating worktree
 	sourceBranchExists, err := gitClient.BranchExists(ctx, project.GitRepoPath, opts.Source)
 	if err != nil {
-		return core.NewOpValidationError("CreateWorktreeRequest", "source", opts.Source, "failed to check if source branch exists: "+err.Error())
+		return nil, nil, core.NewOpValidationError("CreateWorktreeRequest", "source", opts.Source, "failed to check if source branch exists: "+err.Error())
 	}
 	if !sourceBranchExists {
-		return core.NewOpValidationError("CreateWorktreeRequest", "source", opts.Source, fmt.Sprintf("source branch '%s' does not exist", opts.Source))
+		return nil, nil, core.NewOpValidationError("CreateWorktreeRequest", "source", opts.Source, fmt.Sprintf("source branch '%s' does not exist", opts.Source))
 	}
 
 	worktreePath := calculateWorktreePath(cfg, project.Name, branchName)
 	if _, err := os.Stat(worktreePath); err == nil {
-		return core.NewConflictError("worktree", branchName, "CreateWorktree", "worktree already exists at "+worktreePath, nil)
+		return nil, nil, core.NewConflictError("worktree", branchName, "CreateWorktree", "worktree already exists at "+worktreePath, nil)
 	}
 
-	parentDir := filepath.Dir(worktreePath)
+	return &createRequest{
+		BranchName:   branchName,
+		SourceBranch: opts.Source,
+		Project:      project,
+		WorktreePath: worktreePath,
+	}, gitClient, nil
+}
+
+// loadCreateContext runs the three cmd-side pre-flight steps: detect
+// the current git context, load config, and resolve the composite
+// git client. Centralising them keeps prepareCreateRequest focused
+// on the spec-to-request resolution.
+func loadCreateContext(opts *CreateOptions) (*core.Context, *core.Config, *git.Client, error) {
+	currentCtx, gitClient, err := detectContext(opts.Config, opts.GitClient)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	cfg, err := opts.Config()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("config load failed: %w", err)
+	}
+	return currentCtx, cfg, gitClient, nil
+}
+
+// materialiseWorktree creates the worktree directory's parent and
+// dispatches the git worktree add command. Returns the new
+// *core.Worktree on success so the caller can attach it to the
+// CreateWorktreeResult. The split from prepareCreateRequest keeps the
+// I/O-causing step clearly separated from the read-side validation.
+func materialiseWorktree(ctx context.Context, gitClient *git.Client, opts *CreateOptions, req *createRequest) (*core.Worktree, error) {
+	parentDir := filepath.Dir(req.WorktreePath)
 	if err := os.MkdirAll(parentDir, 0o755); err != nil { // #nosec G301 -- standard directory perms (rwxr-xr-x)
-		return fmt.Errorf("failed to create worktree parent directory: %w", err)
+		return nil, fmt.Errorf("failed to create worktree parent directory: %w", err)
 	}
 
-	if err := gitClient.CreateWorktree(ctx, project.GitRepoPath, branchName, opts.Source, worktreePath); err != nil {
-		return &core.OperationError{
+	if err := gitClient.CreateWorktree(ctx, req.Project.GitRepoPath, req.BranchName, req.SourceBranch, req.WorktreePath); err != nil {
+		return nil, &core.OperationError{
 			Op:      "create.worktree",
-			Entity:  worktreePath,
+			Entity:  req.WorktreePath,
 			Message: "failed to create worktree",
 			Cause:   err,
 		}
 	}
 
-	result := &core.CreateWorktreeResult{
-		Worktree: &core.Worktree{Path: worktreePath, Branch: branchName},
+	verbosef(opts.IO, "Creating worktree for %s/%s", req.Project.Name, req.BranchName)
+	verbosef(opts.IO, "from branch: %s", req.SourceBranch)
+	verbosef(opts.IO, "to path: %s", req.Project.Name+"/"+req.BranchName)
+
+	return &core.Worktree{Path: req.WorktreePath, Branch: req.BranchName}, nil
+}
+
+// dispatchCreateHooks runs the post-create hook runner against the
+// freshly created worktree. Errors are logged but do not abort the
+// create — the worktree already exists. Returns the *HookResult so
+// the formatter can show per-command failures if any.
+func dispatchCreateHooks(ctx context.Context, opts *CreateOptions, req *createRequest) *core.HookResult {
+	cfg, err := opts.Config()
+	if err != nil {
+		opts.IO.Logger.Error("hook config load failed", "error", err)
+		return nil
 	}
-
-	verbosef(opts.IO, "Creating worktree for %s/%s", project.Name, branchName)
-	verbosef(opts.IO, "from branch: %s", opts.Source)
-	verbosef(opts.IO, "to path: %s", project.Name+"/"+branchName)
-
-	// Run post-create hooks if the project has a .twiggit.toml config.
-	hookResult, err := runPostCreateHooks(ctx, gitClient, cfg, project, branchName, opts.Source, worktreePath)
+	hookResult, err := runPostCreateHooks(ctx, nil, cfg, req.Project, req.BranchName, req.SourceBranch, req.WorktreePath)
 	if err != nil {
 		opts.IO.Logger.Error("hook execution failed",
 			"error", err,
-			"worktree_path", worktreePath,
-			"hook_type", string(core.HookPostCreate),
+			"worktree_path", req.WorktreePath,
+			"hook_type", core.HookTypePostCreate.String(),
 		)
 	}
-	result.HookResult = hookResult
+	return hookResult
+}
 
-	if opts.CdFlag {
+// renderCreateResult emits the post-create output: the worktree path
+// for `-C` callers, the success message, and the hook-failure summary
+// when any command failed. Quiet mode suppresses the success line.
+func renderCreateResult(opts *CreateOptions, result *core.CreateWorktreeResult) {
+	if opts.IsCdFlag {
 		_, _ = fmt.Fprintln(writeOrIgnore(opts.IO.Out), result.Worktree.Path)
-	} else if !opts.IO.Quiet {
-		if err := displayCreateSuccess(opts.IO.Out, result.Worktree); err != nil {
-			return err
-		}
+		return
 	}
-
+	if !opts.IO.IsQuiet {
+		_ = displayCreateSuccess(opts.IO.Out, result.Worktree)
+	}
 	if result.HookResult != nil && !result.HookResult.IsSuccessful {
 		displayHookFailures(opts.IO.ErrOut, result.HookResult)
 	}
-
-	return nil
 }
 
 // runPostCreateHooks constructs a HookRunner and dispatches the
@@ -198,7 +280,7 @@ func runPostCreateHooks(ctx context.Context, _ *git.Client, cfg *core.Config, pr
 	runner := git.NewHookRunner(executor, cfg.Shell.HookTimeout)
 
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   worktreePath,
 		ProjectName:    project.Name,
 		BranchName:     branchName,
@@ -231,7 +313,7 @@ func discoverProject(ctx context.Context, client *git.Client, cfg *core.Config, 
 		case core.ContextProject, core.ContextWorktree:
 			projectPath := currentCtx.Path
 			if currentCtx.Type == core.ContextWorktree {
-				mainRepo := core.FindMainRepoByTraversal(projectPath)
+				mainRepo := git.FindMainRepoByTraversal(projectPath)
 				if mainRepo != "" {
 					projectPath = mainRepo
 				}
@@ -244,57 +326,13 @@ func discoverProject(ctx context.Context, client *git.Client, cfg *core.Config, 
 	return nil, core.NewOpValidationError("DiscoverProject", "projectName", "", "project name required when outside git context")
 }
 
-// buildProjectInfo returns the full *core.ProjectInfo for the path.
+// buildProjectInfo delegates to the shared git adapter helper.
 func buildProjectInfo(ctx context.Context, client *git.Client, _ *core.Config, projectPath string) (*core.ProjectInfo, error) {
-	if err := client.ValidateRepository(projectPath); err != nil {
-		return nil, &core.OperationError{
-			Op:      "discover.project",
-			Entity:  projectPath,
-			Message: "invalid git repository",
-			Cause:   err,
-		}
-	}
-
-	mainRepoPath := projectPath
-	if resolved := core.FindMainRepoByTraversal(projectPath); resolved != "" {
-		mainRepoPath = resolved
-	}
-
-	repoInfo, err := client.Repository(ctx, mainRepoPath)
+	info, err := git.ProjectInfoFromGitDir(ctx, client, projectPath)
 	if err != nil {
-		repoInfo = &core.Repository{Path: mainRepoPath}
+		return nil, fmt.Errorf("discover project %s: %w", projectPath, err)
 	}
-
-	worktrees, err := client.ListWorktrees(ctx, mainRepoPath)
-	if err != nil {
-		worktrees = nil
-	}
-
-	worktreePtrs := make([]*core.Worktree, len(worktrees))
-	for i := range worktrees {
-		worktreePtrs[i] = &worktrees[i]
-	}
-
-	branchPtrs := make([]*core.Branch, len(repoInfo.Branches))
-	for i := range repoInfo.Branches {
-		branchPtrs[i] = &repoInfo.Branches[i]
-	}
-
-	remotePtrs := make([]*core.Remote, len(repoInfo.Remotes))
-	for i := range repoInfo.Remotes {
-		remotePtrs[i] = &repoInfo.Remotes[i]
-	}
-
-	return &core.ProjectInfo{
-		Name:          filepath.Base(mainRepoPath),
-		Path:          projectPath,
-		GitRepoPath:   mainRepoPath,
-		Worktrees:     worktreePtrs,
-		Branches:      branchPtrs,
-		Remotes:       remotePtrs,
-		DefaultBranch: repoInfo.DefaultBranch,
-		IsBare:        repoInfo.IsBare,
-	}, nil
+	return info, nil
 }
 
 // findProjectByName does a case-insensitive directory scan of

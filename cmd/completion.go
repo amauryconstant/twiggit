@@ -34,6 +34,7 @@ func newCompletionShellCommand(rootCmd *cobra.Command, shell string) *cobra.Comm
 To load completions:
 
 ` + getShellInstructions(shell),
+		Example:               "  source <(twiggit completion " + shell + ")",
 		SilenceUsage:          true,
 		SilenceErrors:         true,
 		Args:                  wrapArgsValidator(cobra.ExactArgs(1)),

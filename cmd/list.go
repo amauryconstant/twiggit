@@ -291,14 +291,24 @@ func listAllProjectsWorktrees(ctx context.Context, client *git.Client, cfg *core
 	return out, nil
 }
 
-// filterNonMain returns the worktrees that are not the repo's main
-// checkout. Mirrors the legacy "IncludeMain: false" default.
+// filterNonMain is the partition helper for the `list` command.
+// Mirrors the legacy "IncludeMain: false" default: the worktree
+// sitting at repoPath is the repo's main checkout and is excluded
+// from the returned projection. Pointers taken into the returned
+// slice are safe to retain because filterNonMain returns a fresh
+// backing array (slices.Clone) — see internal/git's
+// parseWorktreeList for the underlying clone-or-not contract.
 func filterNonMain(worktrees []core.Worktree, repoPath string) []core.Worktree {
-	out := make([]core.Worktree, 0, len(worktrees))
-	for _, wt := range worktrees {
-		if wt.Path != repoPath {
-			out = append(out, wt)
-		}
-	}
-	return slices.Clone(out)
+	out := slices.Clone(worktrees)
+	return slices.DeleteFunc(out, func(wt core.Worktree) bool {
+		return isMainWorktree(wt, repoPath)
+	})
+}
+
+// isMainWorktree reports whether wt is the repo's main checkout
+// identified by repoPath. The comparison runs on the absolute path
+// emitted by `git worktree list --porcelain` so symlinked or
+// non-normalized CWD values do not slip through.
+func isMainWorktree(wt core.Worktree, repoPath string) bool {
+	return wt.Path == repoPath
 }
