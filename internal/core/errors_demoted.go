@@ -53,7 +53,7 @@ func NewGitCommandError(command string, args []string, exitCode int, _, _, messa
 // NewConfigError demoted: returns *OperationError.
 func NewConfigError(path, message string, err error) *OperationError {
 	return &OperationError{
-		Op:      "config",
+		Op:      "config.load",
 		Entity:  path,
 		Message: message,
 		Cause:   err,
@@ -63,7 +63,7 @@ func NewConfigError(path, message string, err error) *OperationError {
 // NewContextDetectionError demoted: returns *OperationError.
 func NewContextDetectionError(path, message string, err error) *OperationError {
 	return &OperationError{
-		Op:      "context.detection",
+		Op:      "context.detect",
 		Entity:  path,
 		Message: message,
 		Cause:   err,

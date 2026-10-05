@@ -50,7 +50,7 @@ func TestConfigManager_LoadDefaults(t *testing.T) {
 
 	assert.Equal(t, defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
 	assert.Equal(t, defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
-	assert.Equal(t, defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
+	assert.Equal(t, defaultConfig.Git.IsCacheEnabled, config.Git.IsCacheEnabled)
 
 	assert.Equal(t, defaultConfig.ContextDetection.CacheTTL, config.ContextDetection.CacheTTL)
 }
@@ -201,7 +201,7 @@ func TestConfigManager_LoadDefaultsErrorHandling(t *testing.T) {
 	defaultConfig := core.DefaultConfig()
 	assert.Equal(t, defaultConfig.DefaultSourceBranch, config.DefaultSourceBranch)
 	assert.Equal(t, defaultConfig.Git.CLITimeout, config.Git.CLITimeout)
-	assert.Equal(t, defaultConfig.Git.CacheEnabled, config.Git.CacheEnabled)
+	assert.Equal(t, defaultConfig.Git.IsCacheEnabled, config.Git.IsCacheEnabled)
 }
 
 func TestConfigManager_ExpandConfigPath(t *testing.T) {
@@ -387,19 +387,19 @@ func TestConfigManager_NoColorRespected(t *testing.T) {
 	config, err := manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, config)
-	assert.True(t, config.ColorEnabled, "ColorEnabled should default to true when NO_COLOR is unset")
+	assert.True(t, config.IsColorEnabled, "ColorEnabled should default to true when NO_COLOR is unset")
 
 	t.Setenv("NO_COLOR", "1")
 	config, err = manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, config)
-	assert.False(t, config.ColorEnabled, "ColorEnabled should be false when NO_COLOR is set")
+	assert.False(t, config.IsColorEnabled, "ColorEnabled should be false when NO_COLOR is set")
 
 	unsetEnv(t, "NO_COLOR")
 	config, err = manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, config)
-	assert.True(t, config.ColorEnabled, "ColorEnabled should return to true when NO_COLOR is unset")
+	assert.True(t, config.IsColorEnabled, "ColorEnabled should return to true when NO_COLOR is unset")
 }
 
 func TestConfigManager_ColorEnabledPropagatesToCopy(t *testing.T) {
@@ -408,17 +408,17 @@ func TestConfigManager_ColorEnabledPropagatesToCopy(t *testing.T) {
 	loaded, err := manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, loaded)
-	require.False(t, loaded.ColorEnabled)
+	require.False(t, loaded.IsColorEnabled)
 
 	cached := manager.Config()
 	require.NotNil(t, cached)
-	assert.False(t, cached.ColorEnabled, "Config copy should preserve ColorEnabled=false")
+	assert.False(t, cached.IsColorEnabled, "Config copy should preserve ColorEnabled=false")
 
 	unsetEnv(t, "NO_COLOR")
 	reloaded, err := manager.Load()
 	require.NoError(t, err)
 	require.NotNil(t, reloaded)
-	assert.True(t, reloaded.ColorEnabled, "ColorEnabled should reset when NO_COLOR is unset")
+	assert.True(t, reloaded.IsColorEnabled, "ColorEnabled should reset when NO_COLOR is unset")
 }
 
 func TestConfigManager_LoadWrapsKoanfErrors(t *testing.T) {

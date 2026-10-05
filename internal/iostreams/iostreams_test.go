@@ -23,7 +23,7 @@ func TestTest_ReturnsNonTTYStreams(t *testing.T) {
 	assert.False(t, ios.IsStdinTTY())
 	assert.False(t, ios.ColorEnabled())
 	assert.False(t, ios.IsInteractive())
-	assert.False(t, ios.Quiet)
+	assert.False(t, ios.IsQuiet)
 	assert.NotNil(t, ios.Logger)
 	assert.Same(t, ios.Out, out)
 	assert.NotNil(t, in)
@@ -53,7 +53,7 @@ func TestVerbosef_NoOpWhenVerboseFalse(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _, errOut := iostreams.Test()
-	ios.Verbose = false
+	ios.IsVerbose = false
 
 	ios.Verbosef("should not appear %d", 42)
 
@@ -64,7 +64,7 @@ func TestVerbosef_WritesDimLineWhenVerboseTrue(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _, errOut := iostreams.Test()
-	ios.Verbose = true
+	ios.IsVerbose = true
 
 	ios.Verbosef("step %d of %d", 2, 5)
 
@@ -76,7 +76,7 @@ func TestVerbosef_AppendsTrailingNewline(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _, errOut := iostreams.Test()
-	ios.Verbose = true
+	ios.IsVerbose = true
 
 	ios.Verbosef("no-newline")
 
@@ -91,7 +91,7 @@ func TestVerbosef_OmitsDebugPrefix(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _, errOut := iostreams.Test()
-	ios.Verbose = true
+	ios.IsVerbose = true
 
 	ios.Verbosef("cloning %s into %s", "origin", "feature-branch")
 

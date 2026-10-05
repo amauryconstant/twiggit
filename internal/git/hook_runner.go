@@ -65,19 +65,19 @@ func (r *HookRunner) Run(ctx context.Context, req *core.HookRunRequest) (*core.H
 		return noOpResult(req), nil
 	}
 
-	var definition *core.HookDefinition
+	var definitions []core.HookDefinition
 	switch req.HookType {
-	case core.HookPostCreate:
-		definition = config.PostCreate
+	case core.HookTypePostCreate:
+		definitions = config.PostCreate
 	default:
 		return noOpResult(req), nil
 	}
 
-	if definition == nil || len(definition.Commands) == 0 {
+	if len(definitions) == 0 {
 		return noOpResult(req), nil
 	}
 
-	return r.executeCommands(ctx, req, definition.Commands), nil
+	return r.executeDefinitions(ctx, req, definitions), nil
 }
 
 func noOpResult(req *core.HookRunRequest) *core.HookResult {
@@ -107,7 +107,12 @@ func (r *HookRunner) readHookConfig(path string) (*core.HookConfig, error) {
 	return hookConfig.Hooks, nil
 }
 
-func (r *HookRunner) executeCommands(ctx context.Context, req *core.HookRunRequest, commands []string) *core.HookResult {
+// executeDefinitions runs each definition in order and aggregates the
+// per-definition results into a single HookResult. Per-definition
+// failure keeps going — one bad command does not abort the chain so
+// every hook has a chance to run, matching the previous behaviour for
+// multi-command single-definition configs.
+func (r *HookRunner) executeDefinitions(ctx context.Context, req *core.HookRunRequest, definitions []core.HookDefinition) *core.HookResult {
 	result := &core.HookResult{
 		HookType:     req.HookType,
 		HasExecuted:  true,
@@ -117,13 +122,23 @@ func (r *HookRunner) executeCommands(ctx context.Context, req *core.HookRunReque
 
 	envExports := r.buildEnvExports(req)
 
-	for _, cmd := range commands {
-		if strings.TrimSpace(cmd) == "" {
+	for _, def := range definitions {
+		command := strings.TrimSpace(def.Command)
+		if command == "" {
 			continue
 		}
 
-		fullCmd := envExports + cmd
-		cmdResult, err := r.executor.ExecuteWithTimeout(ctx, req.WorktreePath, "sh", r.defaultTimeout, "-c", fullCmd)
+		timeout := r.defaultTimeout
+		if def.TimeoutSeconds > 0 {
+			timeout = time.Duration(def.TimeoutSeconds) * time.Second
+		}
+		workDir := req.WorktreePath
+		if def.WorkingDirectory != "" {
+			workDir = def.WorkingDirectory
+		}
+
+		fullCmd := envExports + command
+		cmdResult, err := r.executor.ExecuteWithTimeout(ctx, workDir, CmdSh, timeout, "-c", fullCmd)
 
 		if err != nil || cmdResult == nil || cmdResult.ExitCode != 0 {
 			result.IsSuccessful = false
@@ -139,10 +154,13 @@ func (r *HookRunner) executeCommands(ctx context.Context, req *core.HookRunReque
 					output += strings.TrimSpace(cmdResult.Stderr)
 				}
 			}
+			timedOut := errors.Is(err, context.DeadlineExceeded)
 			result.Failures = append(result.Failures, core.HookFailure{
-				Command:  cmd,
+				Command:  command,
 				ExitCode: exitCode,
 				Output:   output,
+				Error:    err,
+				TimedOut: timedOut,
 			})
 		}
 	}

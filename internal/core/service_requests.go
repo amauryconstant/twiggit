@@ -6,22 +6,22 @@ type CreateWorktreeRequest struct {
 	BranchName   string   // Name of the branch to create
 	SourceBranch string   // Source branch to create from
 	Context      *Context // Current context for resolution
-	Force        bool     // Force creation even if branch exists
+	IsForce      bool     // Force creation even if branch exists
 }
 
 // DeleteWorktreeRequest represents a request to delete a worktree
 type DeleteWorktreeRequest struct {
 	WorktreePath string   // Path to the worktree to delete
-	Force        bool     // Force deletion even if there are uncommitted changes
+	IsForce      bool     // Force deletion even if there are uncommitted changes
 	Context      *Context // Current context for validation
 }
 
 // ListWorktreesRequest represents a request to list worktrees
 type ListWorktreesRequest struct {
-	ProjectName     string   // Name of the project (optional, uses context if empty)
-	Context         *Context // Current context for project resolution
-	IncludeMain     bool     // Include main worktree in results
-	ListAllProjects bool     // List worktrees from all discovered projects (overrides ProjectName)
+	ProjectName           string   // Name of the project (optional, uses context if empty)
+	Context               *Context // Current context for project resolution
+	IsIncludeMainWorktree bool     // Include main worktree in results
+	IsListAllProjects     bool     // List worktrees from all discovered projects (overrides ProjectName)
 }
 
 // ResolvePathRequest represents a request to resolve a path identifier
@@ -34,10 +34,10 @@ type ResolvePathRequest struct {
 type PruneWorktreesRequest struct {
 	ProjectName      string   // Name of the project (optional, uses context if empty)
 	Context          *Context // Current context for project resolution
-	Force            bool     // Force pruning even with uncommitted changes
-	DeleteBranches   bool     // Delete branches after worktree removal
-	DryRun           bool     // Preview only, no actual deletion
-	AllProjects      bool     // Prune across all projects
+	IsForce          bool     // Force pruning even with uncommitted changes
+	IsDeleteBranches bool     // Delete branches after worktree removal
+	IsDryRun         bool     // Preview only, no actual deletion
+	IsAllProjects    bool     // Prune across all projects
 	SpecificWorktree string   // Specific worktree to prune (project/branch format)
 }
 
@@ -56,11 +56,11 @@ type PruneWorktreesResult struct {
 
 // PruneWorktreeResult represents the result of pruning a single worktree
 type PruneWorktreeResult struct {
-	ProjectName   string // Name of the project
-	WorktreePath  string // Path to the worktree
-	BranchName    string // Branch name
-	Deleted       bool   // Whether the worktree was deleted
-	BranchDeleted bool   // Whether the branch was deleted
-	SkipReason    string // Reason for skipping (if applicable)
-	Error         error  // Error that occurred during pruning (if any)
+	ProjectName      string // Name of the project
+	WorktreePath     string // Path to the worktree
+	BranchName       string // Branch name
+	WasDeleted       bool   // Whether the worktree was deleted
+	WasBranchDeleted bool   // Whether the branch was deleted
+	SkipReason       string // Reason for skipping (if applicable)
+	Error            error  // Error that occurred during pruning (if any)
 }

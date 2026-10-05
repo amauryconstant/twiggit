@@ -5,23 +5,35 @@ import (
 	"time"
 )
 
-// Result represents a generic result type following the Result/Either pattern
+// Result represents a generic result type following the Result/Either pattern.
+// Success tracks the (value, error) tuple shape so IsSuccess / IsError dispatch
+// on the flag without re-comparing Error == nil; the Value / Error fields stay
+// the canonical access points for downstream code.
 type Result[T any] struct {
-	Value T
-	Error error
+	Value   T
+	Success bool
+	Error   error
 }
 
 // NewResult creates a new successful result.
 // When T is a slice type, the underlying backing array is cloned to
 // prevent callers from mutating internal state through the returned struct.
 func NewResult[T any](value T) Result[T] {
-	return Result[T]{Value: cloneSlice(value), Error: nil}
+	return Result[T]{Value: cloneSlice(value), Success: true, Error: nil}
+}
+
+// NewResultOr constructs a Result from a (value, error) pair. Success tracks
+// err == nil so callers do not have to repeat the comparison. Named with the
+// Rust Result::Ok_or shape; the single-arg NewResult / NewErrResult constructors
+// remain the canonical success / failure constructors per core-types spec.
+func NewResultOr[T any](value T, err error) Result[T] {
+	return Result[T]{Value: cloneSlice(value), Success: err == nil, Error: err}
 }
 
 // NewErrResult creates a new error result
 func NewErrResult[T any](err error) Result[T] {
 	var zero T
-	return Result[T]{Value: zero, Error: err}
+	return Result[T]{Value: zero, Success: false, Error: err}
 }
 
 // cloneSlice returns a copy of the slice when value is a slice type;
@@ -43,12 +55,12 @@ func cloneSlice[T any](value T) T {
 
 // IsSuccess returns true if the result is successful
 func (r Result[T]) IsSuccess() bool {
-	return r.Error == nil
+	return r.Success
 }
 
 // IsError returns true if the result contains an error
 func (r Result[T]) IsError() bool {
-	return r.Error != nil
+	return !r.Success
 }
 
 // WorktreeStatus represents the status of a worktree

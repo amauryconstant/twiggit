@@ -23,7 +23,7 @@ import (
 // values after flag parse.
 type GlobalOptions struct {
 	Output  string
-	Quiet   bool
+	IsQuiet bool
 	Verbose int
 }
 
@@ -43,7 +43,7 @@ func (g *GlobalOptions) IsVerbose() bool { return g.Verbose > 0 }
 // cmd/ files.
 func AddPersistentFlags(cmd *cobra.Command, opts *GlobalOptions) {
 	cmd.PersistentFlags().StringVar(&opts.Output, "output", "", "Output format: json, table, plain. Empty falls through to the per-command default.")
-	cmd.PersistentFlags().BoolVar(&opts.Quiet, "quiet", false, "Suppress non-essential output for scripting scenarios.")
+	cmd.PersistentFlags().BoolVar(&opts.IsQuiet, "quiet", false, "Suppress non-essential output for scripting scenarios.")
 	cmd.PersistentFlags().CountVarP(&opts.Verbose, "verbose", "v", "Increase verbosity (can be used multiple times: -v, -vv)")
 }
 
@@ -59,6 +59,6 @@ func (g *GlobalOptions) ApplyToIOS(ios *iostreams.IOStreams) {
 	if ios == nil {
 		return
 	}
-	ios.Quiet = g.Quiet
-	ios.Verbose = g.IsVerbose()
+	ios.IsQuiet = g.IsQuiet
+	ios.IsVerbose = g.IsVerbose()
 }

@@ -78,7 +78,7 @@ func TestFormatError_NotFoundErrorEmptyName(t *testing.T) {
 }
 
 func TestFormatError_OperationError(t *testing.T) {
-	t.Parallel()
+	t.Setenv("TWIGGIT_DEBUG", "1")
 
 	cause := errors.New("boom")
 	err := &core.OperationError{
@@ -275,7 +275,7 @@ func TestFormatError_QuietStripsHints(t *testing.T) {
 	t.Parallel()
 
 	ios, _, _, _ := iostreams.Test()
-	ios.Quiet = true
+	ios.IsQuiet = true
 	var buf bytes.Buffer
 
 	err := &core.OperationError{

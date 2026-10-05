@@ -36,14 +36,14 @@ func TestAddPersistentFlags_DefaultsAreZeroValues(t *testing.T) {
 	cmdutil.AddPersistentFlags(cmd, opts)
 
 	assert.Empty(t, opts.Output)
-	assert.False(t, opts.Quiet)
+	assert.False(t, opts.IsQuiet)
 	assert.Equal(t, 0, opts.Verbose)
 	assert.False(t, opts.IsVerbose())
 }
 
 // TestAddPersistentFlags_BindsValuesToOpts confirms the cobra binding
 // writes parsed flag values back into the GlobalOptions struct so
-// cmd/ can read opts.Quiet instead of re-parsing Flag.Lookup.
+// cmd/ can read opts.IsQuiet instead of re-parsing Flag.Lookup.
 func TestAddPersistentFlags_BindsValuesToOpts(t *testing.T) {
 	t.Parallel()
 
@@ -56,7 +56,7 @@ func TestAddPersistentFlags_BindsValuesToOpts(t *testing.T) {
 	require.NoError(t, cmd.PersistentFlags().Set("verbose", "1"))
 
 	assert.Equal(t, "json", opts.Output)
-	assert.True(t, opts.Quiet)
+	assert.True(t, opts.IsQuiet)
 	assert.Equal(t, 1, opts.Verbose)
 	assert.True(t, opts.IsVerbose())
 }

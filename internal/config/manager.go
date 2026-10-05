@@ -101,7 +101,7 @@ func copyConfig(config *core.Config) *core.Config {
 		Navigation:          config.Navigation,
 		Shell:               config.Shell,
 		Completion:          config.Completion,
-		ColorEnabled:        config.ColorEnabled,
+		IsColorEnabled:      config.IsColorEnabled,
 	}
 }
 
@@ -213,9 +213,9 @@ func (m *koanfConfigManager) Load() (*core.Config, error) {
 	// 5. NO_COLOR handling: presence of NO_COLOR in env disables color output.
 	// Default is true (color on); set false when NO_COLOR is set in env (any value).
 	if _, noColor := os.LookupEnv("NO_COLOR"); noColor {
-		config.ColorEnabled = false
+		config.IsColorEnabled = false
 	} else {
-		config.ColorEnabled = true
+		config.IsColorEnabled = true
 	}
 
 	// 6. Validate configuration using pure function
@@ -266,14 +266,14 @@ func (m *koanfConfigManager) loadDefaults() error {
 	if err := m.ko.Set("context_detection.git_operation_timeout", defaults.ContextDetection.GitOperationTimeout); err != nil {
 		return fmt.Errorf("failed to set context_detection.git_operation_timeout default: %w", err)
 	}
-	if err := m.ko.Set("context_detection.enable_git_validation", defaults.ContextDetection.EnableGitValidation); err != nil {
+	if err := m.ko.Set("context_detection.enable_git_validation", defaults.ContextDetection.IsGitValidationEnabled); err != nil {
 		return fmt.Errorf("failed to set context_detection.enable_git_validation default: %w", err)
 	}
 
 	if err := m.ko.Set("git.cli_timeout", defaults.Git.CLITimeout); err != nil {
 		return fmt.Errorf("failed to set git.cli_timeout default: %w", err)
 	}
-	if err := m.ko.Set("git.cache_enabled", defaults.Git.CacheEnabled); err != nil {
+	if err := m.ko.Set("git.cache_enabled", defaults.Git.IsCacheEnabled); err != nil {
 		return fmt.Errorf("failed to set git.cache_enabled default: %w", err)
 	}
 	if err := m.ko.Set("completion.timeout", defaults.Completion.Timeout); err != nil {

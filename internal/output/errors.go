@@ -57,21 +57,21 @@ func style(ios *iostreams.IOStreams) *iostreams.Styles {
 }
 
 // shouldEmitHints is the single source for the quiet gate. Hint
-// lines render only when ios is non-nil AND ios.Quiet is false.
+// lines render only when ios is non-nil AND ios.IsQuiet is false.
 func shouldEmitHints(ios *iostreams.IOStreams) bool {
-	return ios != nil && !ios.Quiet
+	return ios != nil && !ios.IsQuiet
 }
 
 // writeFieldContext renders the op=/entity=/field=/value= context
-// line shared by ValidationError and OperationError. Empty fields
-// are omitted from the rendered output; the whole line is skipped
-// when every field is empty.
-func writeFieldContext(w io.Writer, op, entity, field, value string, st *iostreams.Styles) {
-	if op == "" && entity == "" && field == "" && value == "" {
-		return
-	}
+// line shared by ValidationError and OperationError. The Op and Value
+// fields are gated on ios.DebugEnabled() so internal context stays
+// out of user-facing errors by default; Entity / Field are always
+// rendered because they help diagnose the input without leaking
+// internals. Empty fields are omitted from the rendered output; the
+// whole line is skipped when every field is empty.
+func writeFieldContext(w io.Writer, op, entity, field, value string, st *iostreams.Styles, debugEnabled bool) {
 	var parts []string
-	if op != "" {
+	if debugEnabled && op != "" {
 		parts = append(parts, "op="+op)
 	}
 	if entity != "" {
@@ -80,8 +80,11 @@ func writeFieldContext(w io.Writer, op, entity, field, value string, st *iostrea
 	if field != "" {
 		parts = append(parts, "field="+field)
 	}
-	if value != "" {
+	if debugEnabled && value != "" {
 		parts = append(parts, "value="+value)
+	}
+	if len(parts) == 0 {
+		return
 	}
 	_, _ = fmt.Fprintf(w, "  %s\n", st.Hint(strings.Join(parts, " ")))
 }
@@ -125,7 +128,7 @@ func formatValidationError(w io.Writer, e *core.ValidationError, ios *iostreams.
 		msg = "validation failed"
 	}
 	_, _ = fmt.Fprintf(w, "%s %s\n", header, msg)
-	writeFieldContext(w, e.Op, e.Entity, e.Field, e.Value, st)
+	writeFieldContext(w, e.Op, e.Entity, e.Field, e.Value, st, debugEnabled(ios))
 	if shouldEmitHints(ios) {
 		writeSuggestions(w, e.Suggestions, st)
 		if hint := hintFor(chain); hint != "" {
@@ -153,7 +156,7 @@ func formatOperationError(w io.Writer, e *core.OperationError, ios *iostreams.IO
 		msg = "operation failed"
 	}
 	_, _ = fmt.Fprintf(w, "%s %s\n", header, msg)
-	writeFieldContext(w, e.Op, e.Entity, e.Field, "", st)
+	writeFieldContext(w, e.Op, e.Entity, e.Field, "", st, debugEnabled(ios))
 	if e.Cause != nil {
 		_, _ = fmt.Fprintf(w, "  %s %s\n", st.Hint("cause:"), e.Cause.Error())
 	}
@@ -163,6 +166,14 @@ func formatOperationError(w io.Writer, e *core.OperationError, ios *iostreams.IO
 			_, _ = fmt.Fprintf(w, "  %s %s\n", st.Hint("hint:"), hint)
 		}
 	}
+}
+
+// debugEnabled is the single source for the debug-mode gate used by
+// the formatters. Nil-safe: returns false when ios is not wired so
+// unit tests that bypass the IOStreams wiring still render the
+// non-debug default.
+func debugEnabled(ios *iostreams.IOStreams) bool {
+	return ios != nil && ios.DebugEnabled()
 }
 
 func formatUsageError(w io.Writer, e *core.UsageError, ios *iostreams.IOStreams) {

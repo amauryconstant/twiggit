@@ -12,14 +12,20 @@ import (
 )
 
 var (
-	loggerMu    sync.Mutex
+	loggerMu sync.Mutex
+	// loggerCache memoizes *slog.Logger instances per writer so
+	// NewLogger returns the same pointer for the same writer. The
+	// cache is CLI-lifetime only (never cleared) to honor the
+	// TestLoggerPointer singleton guarantee. See the package doc
+	// "Logger cache lifecycle" section for the bounded-writer
+	// rationale.
 	loggerCache = map[io.Writer]*slog.Logger{}
 )
 
 // IOStreams abstracts terminal I/O so commands never touch
 // os.Stdout / os.Stderr directly. The struct carries In / Out /
 // ErrOut streams, TTY detection state, the NO_COLOR-aware
-// isColorEnabled flag, a Quiet gate for --quiet, a Verbose gate
+// isColorEnabled flag, an IsQuiet gate for --quiet, an IsVerbose gate
 // for --verbose, and a Logger channel for TWIGGIT_DEBUG.
 //
 // System() and Test() constructors cover production and unit-test
@@ -32,8 +38,8 @@ type IOStreams struct {
 	isStdoutTTY    bool
 	isStderrTTY    bool
 	isStdinTTY     bool
-	Quiet          bool
-	Verbose        bool
+	IsQuiet        bool
+	IsVerbose      bool
 	Logger         *slog.Logger
 	styles         *Styles
 }
@@ -102,11 +108,11 @@ func (s *IOStreams) IsInteractive() bool {
 	return s.isColorEnabled && s.isStdinTTY && s.isStdoutTTY
 }
 
-// Verbosef writes a dim-styled line to ErrOut when Verbose is
+// Verbosef writes a dim-styled line to ErrOut when IsVerbose is
 // set. Explicit trailing newline is always appended, matching
 // spec 3.3.
 func (s *IOStreams) Verbosef(format string, args ...any) {
-	if !s.Verbose {
+	if !s.IsVerbose {
 		return
 	}
 	line := s.styles.Dim(fmt.Sprintf(format, args...))
@@ -125,6 +131,13 @@ func (s *IOStreams) SetColorEnabled(enabled bool) {
 // friends are identity when color is off and lipgloss-rendered
 // when color is on.
 func (s *IOStreams) Styles() *Styles { return s.styles }
+
+// DebugEnabled reports whether the TWIGGIT_DEBUG env is set at the
+// moment of the call. Re-read each invocation so toggles between
+// calls take effect without rebuilding IOStreams. Output formatters
+// gate internal context (op=/entity=/field=/value= hints) on this so
+// user-facing errors stay terse by default.
+func (s *IOStreams) DebugEnabled() bool { return os.Getenv("TWIGGIT_DEBUG") != "" }
 
 // NewLogger returns the slog logger channel for TWIGGIT_DEBUG:
 // LevelDebug when TWIGGIT_DEBUG is non-empty at construction time,

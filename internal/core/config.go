@@ -14,8 +14,8 @@ type ContextDetectionConfig struct {
 	// Timeout for git operations during context detection
 	GitOperationTimeout string `toml:"git_operation_timeout" koanf:"git_operation_timeout"`
 
-	// Enable git repository validation during context detection
-	EnableGitValidation bool `toml:"enable_git_validation" koanf:"enable_git_validation"`
+	// IsGitValidationEnabled reports whether context detection validates git repositories.
+	IsGitValidationEnabled bool `toml:"enable_git_validation" koanf:"enable_git_validation"`
 }
 
 // GitConfig represents git operations specific configuration
@@ -23,46 +23,46 @@ type GitConfig struct {
 	// Timeout for CLI git operations in seconds
 	CLITimeout int `toml:"cli_timeout" koanf:"cli_timeout"`
 
-	// Enable caching for git operations
-	CacheEnabled bool `toml:"cache_enabled" koanf:"cache_enabled"`
+	// IsCacheEnabled reports whether caching is enabled for git operations.
+	IsCacheEnabled bool `toml:"cache_enabled" koanf:"cache_enabled"`
 }
 
 // ServiceConfig holds service-specific configuration
 type ServiceConfig struct {
-	CacheEnabled  bool          `toml:"cache_enabled" koanf:"cache_enabled"`
-	CacheTTL      time.Duration `toml:"cache_ttl" koanf:"cache_ttl"`
-	ConcurrentOps bool          `toml:"concurrent_operations" koanf:"concurrent_operations"`
-	MaxConcurrent int           `toml:"max_concurrent" koanf:"max_concurrent"`
+	IsCacheEnabled         bool          `toml:"cache_enabled" koanf:"cache_enabled"`
+	CacheTTL               time.Duration `toml:"cache_ttl" koanf:"cache_ttl"`
+	IsConcurrentOpsEnabled bool          `toml:"concurrent_operations" koanf:"concurrent_operations"`
+	MaxConcurrent          int           `toml:"max_concurrent" koanf:"max_concurrent"`
 }
 
 // ValidationConfig holds validation-specific configuration
 type ValidationConfig struct {
-	StrictBranchNames    bool     `toml:"strict_branch_names" koanf:"strict_branch_names"`
-	RequireCleanWorktree bool     `toml:"require_clean_worktree" koanf:"require_clean_worktree"`
-	AllowForceDelete     bool     `toml:"allow_force_delete" koanf:"allow_force_delete"`
-	ProtectedBranches    []string `toml:"protected_branches" koanf:"protected_branches"`
+	IsStrictBranchNames    bool     `toml:"strict_branch_names" koanf:"strict_branch_names"`
+	IsRequireCleanWorktree bool     `toml:"require_clean_worktree" koanf:"require_clean_worktree"`
+	IsAllowForceDelete     bool     `toml:"allow_force_delete" koanf:"allow_force_delete"`
+	ProtectedBranches      []string `toml:"protected_branches" koanf:"protected_branches"`
 }
 
 // NavigationConfig holds navigation-specific configuration
 type NavigationConfig struct {
-	EnableSuggestions bool `toml:"enable_suggestions" koanf:"enable_suggestions"`
-	MaxSuggestions    int  `toml:"max_suggestions" koanf:"max_suggestions"`
-	FuzzyMatching     bool `toml:"fuzzy_matching" koanf:"fuzzy_matching"`
+	IsSuggestionsEnabled bool `toml:"enable_suggestions" koanf:"enable_suggestions"`
+	MaxSuggestions       int  `toml:"max_suggestions" koanf:"max_suggestions"`
+	IsFuzzyMatching      bool `toml:"fuzzy_matching" koanf:"fuzzy_matching"`
 }
 
 // ShellWrapperConfig represents shell wrapper specific configuration
 type ShellWrapperConfig struct {
-	// Enable shell wrapper functionality
-	Enabled bool `toml:"enabled" koanf:"enabled"`
+	// IsEnabled reports whether shell wrapper functionality is on.
+	IsEnabled bool `toml:"enabled" koanf:"enabled"`
 
-	// Auto-detect shell type
-	AutoDetect bool `toml:"auto_detect" koanf:"auto_detect"`
+	// IsAutoDetect reports whether shell type should be auto-detected.
+	IsAutoDetect bool `toml:"auto_detect" koanf:"auto_detect"`
 
 	// Default shell type if auto-detection fails
 	DefaultShell string `toml:"default_shell" koanf:"default_shell"`
 
-	// Enable backup of existing configuration files
-	BackupEnabled bool `toml:"backup_enabled" koanf:"backup_enabled"`
+	// IsBackupEnabled reports whether backups of existing configuration files are kept.
+	IsBackupEnabled bool `toml:"backup_enabled" koanf:"backup_enabled"`
 
 	// Backup directory for configuration file backups
 	BackupDir string `toml:"backup_dir" koanf:"backup_dir"`
@@ -85,8 +85,8 @@ type ShellConfig struct {
 	// Shell wrapper configuration
 	Wrapper ShellWrapperConfig `toml:"wrapper" koanf:"wrapper"`
 
-	// Enable shell integration features
-	Enabled bool `toml:"enabled" koanf:"enabled"`
+	// IsEnabled reports whether shell integration features are on.
+	IsEnabled bool `toml:"enabled" koanf:"enabled"`
 
 	// Timeout for shell operations in seconds
 	Timeout int `toml:"timeout" koanf:"timeout"`
@@ -125,9 +125,9 @@ type Config struct {
 	// Completion settings
 	Completion CompletionConfig `toml:"completion" koanf:"completion"`
 
-	// ColorEnabled reports whether ANSI color output is enabled.
+	// IsColorEnabled reports whether ANSI color output is enabled.
 	// It is set by config.Manager from NO_COLOR at load time (default true).
-	ColorEnabled bool `toml:"-" koanf:"-"`
+	IsColorEnabled bool `toml:"-" koanf:"-"`
 }
 
 // DefaultConfig returns the default configuration values
@@ -147,41 +147,41 @@ func DefaultConfig() *Config {
 		WorktreesDirectory:  filepath.Join(home, "Worktrees"),
 		DefaultSourceBranch: "main",
 		ContextDetection: ContextDetectionConfig{
-			CacheTTL:            "5m",
-			GitOperationTimeout: "30s",
-			EnableGitValidation: true,
+			CacheTTL:               "5m",
+			GitOperationTimeout:    "30s",
+			IsGitValidationEnabled: true,
 		},
 		Git: GitConfig{
-			CLITimeout:   30,
-			CacheEnabled: true,
+			CLITimeout:     30,
+			IsCacheEnabled: true,
 		},
 		Services: ServiceConfig{
-			CacheEnabled:  true,
-			CacheTTL:      5 * time.Minute,
-			ConcurrentOps: true,
-			MaxConcurrent: 4,
+			IsCacheEnabled:         true,
+			CacheTTL:               5 * time.Minute,
+			IsConcurrentOpsEnabled: true,
+			MaxConcurrent:          4,
 		},
 		Validation: ValidationConfig{
-			StrictBranchNames:    true,
-			RequireCleanWorktree: true,
-			AllowForceDelete:     false,
-			ProtectedBranches:    []string{"main", "master", "develop", "staging", "production"},
+			IsStrictBranchNames:    true,
+			IsRequireCleanWorktree: true,
+			IsAllowForceDelete:     false,
+			ProtectedBranches:      []string{"main", "master", "develop", "staging", "production"},
 		},
 		Navigation: NavigationConfig{
-			EnableSuggestions: true,
-			MaxSuggestions:    10,
-			FuzzyMatching:     false,
+			IsSuggestionsEnabled: true,
+			MaxSuggestions:       10,
+			IsFuzzyMatching:      false,
 		},
 		Shell: ShellConfig{
-			Enabled:     true,
+			IsEnabled:   true,
 			Timeout:     30,
 			HookTimeout: 30,
 			Wrapper: ShellWrapperConfig{
-				Enabled:       true,
-				AutoDetect:    true,
-				DefaultShell:  "bash",
-				BackupEnabled: true,
-				BackupDir:     "~/.config/twiggit/backups",
+				IsEnabled:       true,
+				IsAutoDetect:    true,
+				DefaultShell:    "bash",
+				IsBackupEnabled: true,
+				BackupDir:       "~/.config/twiggit/backups",
 			},
 		},
 		Completion: CompletionConfig{
@@ -189,7 +189,7 @@ func DefaultConfig() *Config {
 			ExcludeBranches: []string{},
 			ExcludeProjects: []string{},
 		},
-		ColorEnabled: true,
+		IsColorEnabled: true,
 	}
 }
 

@@ -29,24 +29,7 @@ func WithExistingOnly() core.SuggestionOption {
 }
 
 func (cr *contextResolver) getProjectContextSuggestions(ctxStd context.Context, ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
-	var suggestions []*core.ResolutionSuggestion
-
-	// Add main suggestion
-	suggestions = append(suggestions, cr.addMainSuggestion(ctx, partial, config)...)
-
-	// Add worktree and branch suggestions if git service is available
-	if cr.cli != nil && ctx.Path != "" {
-		worktrees, err := cr.cli.ListWorktrees(ctxStd, ctx.Path)
-		if err == nil {
-			suggestions = cr.addWorktreeSuggestions(ctxStd, suggestions, ctx, partial, worktrees, config)
-			suggestions = cr.addBranchSuggestions(ctxStd, suggestions, ctx, partial, worktrees)
-		}
-	}
-
-	// Add project suggestions (exclude current project for cross-project navigation)
-	suggestions = cr.addProjectSuggestions(suggestions, ctx, partial, true)
-
-	return suggestions
+	return cr.collectContextSuggestions(ctxStd, ctx, partial, config, ctx.Path)
 }
 
 // addMainSuggestion adds the "main" project root suggestion
@@ -72,7 +55,7 @@ func (cr *contextResolver) addMainSuggestion(ctx *core.Context, partial string, 
 func (cr *contextResolver) addWorktreeSuggestions(ctxStd context.Context, suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, worktrees []core.Worktree, config *suggestionConfig) []*core.ResolutionSuggestion {
 	for _, worktree := range worktrees {
 		// Apply fuzzy matching if enabled
-		if cr.config.Navigation.FuzzyMatching {
+		if cr.config.Navigation.IsFuzzyMatching {
 			if !fuzzyMatch(partial, worktree.Branch) {
 				continue
 			}
@@ -122,10 +105,9 @@ func (cr *contextResolver) addWorktreeSuggestions(ctxStd context.Context, sugges
 }
 
 // addBranchSuggestions adds suggestions for branches without worktrees.
-// The unused suggestionConfig parameter was removed in §11.2 of
-// naming-refactor-modernize (the only existing filter — existingOnly
-// — is applied in addWorktreeSuggestions against the same worktree
-// list).
+// The suggestionConfig parameter was dropped; existingOnly is the only
+// filter and is applied in addWorktreeSuggestions against the same
+// worktree list.
 func (cr *contextResolver) addBranchSuggestions(ctxStd context.Context, suggestions []*core.ResolutionSuggestion, ctx *core.Context, partial string, existingWorktrees []core.Worktree) []*core.ResolutionSuggestion {
 	// When in worktree context, ListBranches should be called on project path, not worktree path
 	var listPath string
@@ -155,7 +137,7 @@ func (cr *contextResolver) addBranchSuggestions(ctxStd context.Context, suggesti
 		}
 
 		// Apply fuzzy matching if enabled
-		if cr.config.Navigation.FuzzyMatching {
+		if cr.config.Navigation.IsFuzzyMatching {
 			if !fuzzyMatch(partial, branch.Name) {
 				continue
 			}
@@ -202,7 +184,7 @@ func (cr *contextResolver) addProjectSuggestions(suggestions []*core.ResolutionS
 		}
 
 		// Apply fuzzy matching if enabled
-		if cr.config.Navigation.FuzzyMatching {
+		if cr.config.Navigation.IsFuzzyMatching {
 			if !fuzzyMatch(partial, project.Name) {
 				continue
 			}
@@ -228,25 +210,31 @@ func (cr *contextResolver) addProjectSuggestions(suggestions []*core.ResolutionS
 }
 
 func (cr *contextResolver) getWorktreeContextSuggestions(ctxStd context.Context, ctx *core.Context, partial string, config *suggestionConfig) []*core.ResolutionSuggestion {
+	listPath := ctx.Path
+	if ctx.Type == core.ContextWorktree {
+		listPath = filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
+	}
+	return cr.collectContextSuggestions(ctxStd, ctx, partial, config, listPath)
+}
+
+// collectContextSuggestions is the merged helper that backs both
+// getProjectContextSuggestions and getWorktreeContextSuggestions.
+// The only per-context difference was the path passed to
+// ListWorktrees (the project context uses ctx.Path; the worktree
+// context re-anchors to the project root via cr.config.ProjectsDirectory +
+// ctx.ProjectName). Centralising the path choice eliminates the
+// duplicated walk over worktrees / branches / projects and keeps the
+// two public entry points as thin dispatchers.
+func (cr *contextResolver) collectContextSuggestions(ctxStd context.Context, ctx *core.Context, partial string, config *suggestionConfig, listPath string) []*core.ResolutionSuggestion {
 	suggestions := cr.addMainSuggestion(ctx, partial, config)
 
-	if cr.cli != nil && ctx.Path != "" {
-		// When in worktree context, ListWorktrees should be called on project path, not worktree path
-		// Construct project path from project name and projects directory
-		var listPath string
-		if ctx.Type == core.ContextWorktree {
-			listPath = filepath.Join(cr.config.ProjectsDirectory, ctx.ProjectName)
-		} else {
-			listPath = ctx.Path
-		}
-
+	if cr.cli != nil && listPath != "" {
 		if worktrees, err := cr.cli.ListWorktrees(ctxStd, listPath); err == nil {
 			suggestions = cr.addWorktreeSuggestions(ctxStd, suggestions, ctx, partial, worktrees, config)
 			suggestions = cr.addBranchSuggestions(ctxStd, suggestions, ctx, partial, worktrees)
 		}
 	}
 
-	// Add project suggestions (exclude current project for cross-project navigation)
 	suggestions = cr.addProjectSuggestions(suggestions, ctx, partial, true)
 
 	return suggestions
@@ -269,7 +257,7 @@ func (cr *contextResolver) getOutsideGitContextSuggestions(_ context.Context, pa
 	var suggestions []*core.ResolutionSuggestion
 	for _, project := range projects {
 		// Apply fuzzy matching if enabled
-		if cr.config.Navigation.FuzzyMatching {
+		if cr.config.Navigation.IsFuzzyMatching {
 			if !fuzzyMatch(partial, project.Name) {
 				continue
 			}

@@ -131,7 +131,15 @@ func (r *reader) BranchExists(_ context.Context, repoPath, branchName string) (b
 	return true, nil
 }
 
-// RepositoryStatus returns repository status (idempotent)
+// RepositoryStatus returns the current working-tree status. The
+// returned RepositoryStatus carries file-name slices (Modified, Added,
+// Deleted, Untracked) populated from immutable strings; the slices
+// themselves are owned by the returned value and may be retained by
+// the caller for the lifetime of that value. Callers MUST NOT keep a
+// RepositoryStatus across any subsequent RepositoryStatus call (or
+// any other write to the underlying repository): the new snapshot
+// supersedes the old one and stale slices must be discarded to avoid
+// reporting status that no longer reflects the on-disk state.
 func (r *reader) RepositoryStatus(_ context.Context, repoPath string) (core.RepositoryStatus, error) {
 	repo, err := r.OpenRepository(repoPath)
 	if err != nil {

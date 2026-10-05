@@ -26,14 +26,14 @@ func TestHookRunnerFunc_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 
 	want := &core.HookResult{
-		HookType:     core.HookPostCreate,
+		HookType:     core.HookTypePostCreate,
 		HasExecuted:  true,
 		IsSuccessful: true,
 	}
 
 	var runner HookRunner = HookRunnerFunc(func(_ context.Context, req *core.HookRunRequest) (*core.HookResult, error) {
 		// Echo the request fields through to confirm the impl saw them.
-		assert.Equal(t, core.HookPostCreate, req.HookType)
+		assert.Equal(t, core.HookTypePostCreate, req.HookType)
 		assert.Equal(t, "/tmp/worktrees/feature", req.WorktreePath)
 		assert.Equal(t, "twiggit", req.ProjectName)
 		assert.Equal(t, "feature", req.BranchName)
@@ -44,7 +44,7 @@ func TestHookRunnerFunc_ImplementsInterface(t *testing.T) {
 	})
 
 	req := &core.HookRunRequest{
-		HookType:       core.HookPostCreate,
+		HookType:       core.HookTypePostCreate,
 		WorktreePath:   "/tmp/worktrees/feature",
 		ProjectName:    "twiggit",
 		BranchName:     "feature",
@@ -56,7 +56,7 @@ func TestHookRunnerFunc_ImplementsInterface(t *testing.T) {
 	result, err := runner.Run(t.Context(), req)
 	require.NoError(t, err)
 	require.Same(t, want, result)
-	assert.Equal(t, core.HookPostCreate, result.HookType)
+	assert.Equal(t, core.HookTypePostCreate, result.HookType)
 	assert.True(t, result.HasExecuted)
 	assert.True(t, result.IsSuccessful)
 }
@@ -68,7 +68,7 @@ func TestHookRunnerFunc_NoOpReturnsNilResult(t *testing.T) {
 		return nil, nil
 	})
 
-	result, err := runner.Run(t.Context(), &core.HookRunRequest{HookType: core.HookPostCreate})
+	result, err := runner.Run(t.Context(), &core.HookRunRequest{HookType: core.HookTypePostCreate})
 	require.NoError(t, err)
 	assert.Nil(t, result)
 }

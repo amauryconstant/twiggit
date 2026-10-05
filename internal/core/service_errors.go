@@ -17,11 +17,15 @@ func NewServiceError(service, operation, message string, _ error) *ValidationErr
 }
 
 // NewWorktreeServiceError demoted: returns *ValidationError.
+// The err parameter is preserved on the hidden cause chain so
+// errors.Is / errors.As walk through to the originating error; the
+// rendered Value keeps the err text for backward-compatible output.
 func NewWorktreeServiceError(worktreePath, branchName, _, message string, err error) *ValidationError {
 	ve := &ValidationError{
 		Op:      "worktree.service",
 		Entity:  worktreePath,
 		Message: message,
+		cause:   err,
 	}
 	if branchName != "" {
 		ve.Field = "branch:" + branchName

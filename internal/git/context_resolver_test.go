@@ -654,7 +654,7 @@ func TestAddWorktreeSuggestions_PrefixMatch(t *testing.T) {
 
 func TestAddWorktreeSuggestions_FuzzyMatch(t *testing.T) {
 	cfg := testConfig(t)
-	cfg.Navigation.FuzzyMatching = true
+	cfg.Navigation.IsFuzzyMatching = true
 	cr := newTestResolver(cfg)
 
 	ctx := &core.Context{Type: core.ContextProject, ProjectName: "twiggit"}
@@ -834,7 +834,7 @@ func TestAddProjectSuggestions_FuzzyMatch(t *testing.T) {
 	tmp := t.TempDir()
 	cfg := core.DefaultConfig()
 	cfg.ProjectsDirectory = tmp
-	cfg.Navigation.FuzzyMatching = true
+	cfg.Navigation.IsFuzzyMatching = true
 
 	require.NoError(t, os.Mkdir(filepath.Join(tmp, "alpha"), 0o755))
 
@@ -847,5 +847,5 @@ func TestAddProjectSuggestions_FuzzyMatch(t *testing.T) {
 }
 
 func TestAddBranchSuggestions_NilGoGit_PanicsDocumented(t *testing.T) {
-	t.Skip("addBranchSuggestions unconditionally calls cr.goGit.ListBranches; characterizing nil-goGit behavior is deferred to the §10/§11 split where goGit is injected via an interface")
+	t.Skip("addBranchSuggestions unconditionally calls cr.goGit.ListBranches; characterizing nil-goGit behavior is deferred to a future change where goGit is injected via an interface")
 }

@@ -1,23 +1,23 @@
 package core
 
-// Sentinels: only the four NotFound sentinels remain. Walk-to-sentinel
-// behavior is implemented by OperationError.Is / ValidationError.Is for
-// the resource they previously identified.
-
 import (
 	"errors"
 	"fmt"
 	"strings"
 )
 
+// Sentinels: only the four NotFound sentinels remain. Walk-to-sentinel
+// behavior is implemented by OperationError.Is / ValidationError.Is for
+// the resource they previously identified.
+
 // ValidationError marks an input or argument validation failure.
 //
 // Op / Entity / Field distinguish the original source constructor
 // (ServiceError, WorktreeServiceError, ProjectServiceError,
 // NavigationServiceError, ResolutionError, ConflictError, or direct
-// NewValidationError use). The ValidationError is terminal: its Unwrap
-// returns nil so the cmd-side formatter can match it via errors.As
-// without a chain hop.
+// NewValidationError use). The hidden cause field carries the wrapped
+// error from constructors that accept one (e.g. NewWorktreeServiceError)
+// so errors.Is / errors.As walk through the chain.
 type ValidationError struct {
 	Op          string
 	Entity      string
@@ -25,6 +25,7 @@ type ValidationError struct {
 	Value       string
 	Message     string
 	Suggestions []string
+	cause       error
 }
 
 // Error formats the validation failure as a single line: optional Op
@@ -56,9 +57,9 @@ func (e *ValidationError) Error() string {
 	return strings.TrimRight(sb.String(), " \t")
 }
 
-// Unwrap returns nil: ValidationError is terminal and has no chain to
-// walk. This makes it typed-nil-safe (golang-safety).
-func (e *ValidationError) Unwrap() error { return nil }
+// Unwrap returns the hidden cause so errors.Is / errors.As walk the
+// chain. Returns nil when no cause was supplied at construction time.
+func (e *ValidationError) Unwrap() error { return e.cause }
 
 // Is maps the Operation identifier to one of the four NotFound sentinels.
 // ConflictError / ServiceError / direct NewValidationError do not map.
@@ -120,10 +121,22 @@ func (e *NotFoundError) Error() string {
 func (e *NotFoundError) Unwrap() error { return nil }
 
 // Is reports membership in the four canonical NotFound sentinels.
+// Dispatch is on Entity (not on Name) so the same resource kind maps
+// to the same sentinel regardless of the specific instance: project
+// resources walk to ErrProjectNotFound, worktree resources to
+// ErrWorktreeNotFound, etc. The previous catch-all "true for all four
+// sentinels" behaviour was unsound because callers expected errors.Is
+// to identify the missing resource.
 func (e *NotFoundError) Is(target error) bool {
 	switch target {
-	case ErrGitRepoNotFound, ErrWorktreeNotFound, ErrProjectNotFound, ErrResolutionNotFound:
-		return true
+	case ErrGitRepoNotFound:
+		return e.Entity == "git.repository" || e.Entity == "git.repo" || e.Entity == "repo" || e.Entity == "repository" || e.Entity == "git repository"
+	case ErrWorktreeNotFound:
+		return e.Entity == "worktree"
+	case ErrProjectNotFound:
+		return e.Entity == "project"
+	case ErrResolutionNotFound:
+		return e.Entity == "resolution" || e.Entity == "navigation" || e.Entity == "resolution target" || e.Entity == "navigation target"
 	}
 	return false
 }
@@ -176,17 +189,35 @@ func (e *OperationError) Unwrap() error { return e.Cause }
 
 // Is maps the operation identifier to a NotFound sentinel when
 // appropriate. The Cause chain is walked first, then the Op table.
-// Uses HasPrefix so dot-concatenated Op values (e.g. "git.repository.open"
-// or "git.worktree.create") still match the namespace sentinel.
+// HasPrefix matches both "project" and "project.<subop>" namespaces
+// (e.g. "project.discover", "navigation.navigate", "resolution.find")
+// so the four NotFound families each own a clean namespace.
 func (e *OperationError) Is(target error) bool {
 	if errors.Is(e.Cause, target) {
 		return true
 	}
-	switch {
-	case strings.HasPrefix(e.Op, "git.repository") || e.Op == "Repository":
-		return target == ErrGitRepoNotFound
-	case strings.HasPrefix(e.Op, "git.worktree") || e.Op == "GitWorktree":
-		return target == ErrWorktreeNotFound
+	switch target {
+	case ErrProjectNotFound:
+		return e.Op != "" && (e.Op == "project" || strings.HasPrefix(e.Op, "project."))
+	case ErrWorktreeNotFound:
+		return e.Op != "" && (e.Op == "worktree" || strings.HasPrefix(e.Op, "worktree.") || strings.HasPrefix(e.Op, "git.worktree"))
+	case ErrGitRepoNotFound:
+		return e.Op != "" && (e.Op == "repo" || strings.HasPrefix(e.Op, "git.repository") || strings.HasPrefix(e.Op, "git.repo") || strings.HasPrefix(e.Op, "repository"))
+	case ErrResolutionNotFound:
+		return e.Op != "" && (e.Op == "resolution" || strings.HasPrefix(e.Op, "resolution.") || e.Op == "navigation" || strings.HasPrefix(e.Op, "navigation."))
 	}
 	return false
+}
+
+// NewUncommittedChangesError constructs an *OperationError that wraps
+// ErrUncommittedChanges so callers can detect uncommitted-change
+// safety checks via errors.Is. The worktreePath is surfaced via the
+// Entity field for hint rendering.
+func NewUncommittedChangesError(worktreePath string) *OperationError {
+	return &OperationError{
+		Op:      "worktree.uncommitted_changes",
+		Entity:  worktreePath,
+		Message: "worktree has uncommitted changes (use --force to override)",
+		Cause:   ErrUncommittedChanges,
+	}
 }

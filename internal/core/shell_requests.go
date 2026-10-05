@@ -29,12 +29,12 @@ type SetupShellRequest struct {
 	// ConfigFile specifies an explicit config file to use (optional)
 	ConfigFile string
 
-	// ForceOverwrite specifies whether to overwrite existing wrapper
-	ForceOverwrite bool
+	// IsForceOverwrite specifies whether to overwrite existing wrapper
+	IsForceOverwrite bool
 }
 
 // NewSetupShellRequest constructs a SetupShellRequest with the
-// supplied shell type. ConfigFile and ForceOverwrite stay zero; set
+// supplied shell type. ConfigFile and IsForceOverwrite stay zero; set
 // them on the returned struct if needed.
 func NewSetupShellRequest(shellType ShellType) *SetupShellRequest {
 	return &SetupShellRequest{shellType: shellType}
@@ -45,8 +45,8 @@ func (r *SetupShellRequest) ShellType() ShellType {
 	return r.shellType
 }
 
-// ValidateShellSetupRequest validates setup shell request
-func (r *SetupShellRequest) ValidateShellSetupRequest() error {
+// Validate validates setup shell request
+func (r *SetupShellRequest) Validate() error {
 	return ValidateShellTypeRequest(r)
 }
 
@@ -68,8 +68,8 @@ func (r *ValidateInstallationRequest) ShellType() ShellType {
 	return r.shellType
 }
 
-// ValidateValidateInstallationRequest validates the validate installation request
-func (r *ValidateInstallationRequest) ValidateValidateInstallationRequest() error {
+// Validate validates the validate installation request
+func (r *ValidateInstallationRequest) Validate() error {
 	return ValidateShellTypeRequest(r)
 }
 
@@ -91,8 +91,8 @@ func (r *GenerateWrapperRequest) ShellType() ShellType {
 	return r.shellType
 }
 
-// ValidateGenerateWrapperRequest validates the generate wrapper request
-func (r *GenerateWrapperRequest) ValidateGenerateWrapperRequest() error {
+// Validate validates the generate wrapper request
+func (r *GenerateWrapperRequest) Validate() error {
 	if !IsValidShellType(r.shellType) {
 		return &ValidationError{
 			Op:          "GenerateWrapper",

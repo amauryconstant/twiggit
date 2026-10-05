@@ -2,25 +2,12 @@ package core
 
 import "errors"
 
-// Sentinel errors matched by callers via errors.Is per
-// domain-typed-errors req 8. Restored after the prior archive; the
-// seven shell-error subtype structs (ShellAlreadyInstalledError,
-// etc.) stay removed per design Decision 4.
-var (
-	ErrShellAlreadyInstalled = errors.New("core: shell wrapper already installed")
-	ErrShellNotInstalled     = errors.New("core: shell wrapper not installed")
-	ErrInvalidShellType      = errors.New("core: invalid shell type")
-	ErrInferenceFailed       = errors.New("core: could not infer shell type")
-	ErrDetectionFailed       = errors.New("core: shell detection failed")
-)
-
-// Demoted shell error constructors. Each previously concrete shell error
-// type (ShellAlreadyInstalledError, ShellNotInstalledError,
-// ShellInvalidTypeError, ShellInferenceError, ShellDetectionError,
-// ShellWrapperError, ShellConfigError) collapses to OperationError;
-// Op names the source. Cause carries the matching sentinel joined
-// with the caller's err so errors.Is reaches both the sentinel
-// (for dispatch) and the originating error (for diagnostic chains).
+// Shell-error constructors. The five package-level sentinels
+// (ErrShellAlreadyInstalled, ErrShellNotInstalled, ErrInvalidShellType,
+// ErrInferenceFailed, ErrDetectionFailed) live in sentinels.go — single
+// source of truth for the errors.Is membership catalog. Each
+// constructor joins the sentinel into Cause so dispatch reaches the
+// sentinel AND the originating error in one walk.
 
 // NewShellAlreadyInstalledError demoted.
 func NewShellAlreadyInstalledError(shellType, context string, err error) *OperationError {

@@ -19,7 +19,7 @@ func NewMockCommandExecutor() *MockCommandExecutor {
 }
 
 // Execute executes the mock command
-func (m *MockCommandExecutor) Execute(ctx context.Context, dir, cmd string, args ...string) (*CommandResult, error) {
+func (m *MockCommandExecutor) Execute(ctx context.Context, dir string, cmd Command, args ...string) (*CommandResult, error) {
 	resultArgs := m.Called(ctx, dir, cmd, args)
 	if mockErr := resultArgs.Error(1); mockErr != nil {
 		return nil, fmt.Errorf("mock execute: %w", mockErr)
@@ -36,7 +36,7 @@ func (m *MockCommandExecutor) Execute(ctx context.Context, dir, cmd string, args
 }
 
 // ExecuteWithTimeout executes the mock command with timeout
-func (m *MockCommandExecutor) ExecuteWithTimeout(ctx context.Context, dir, cmd string, timeout time.Duration, args ...string) (*CommandResult, error) {
+func (m *MockCommandExecutor) ExecuteWithTimeout(ctx context.Context, dir string, cmd Command, timeout time.Duration, args ...string) (*CommandResult, error) {
 	resultArgs := m.Called(ctx, dir, cmd, timeout, args)
 	if mockErr := resultArgs.Error(1); mockErr != nil {
 		return nil, fmt.Errorf("mock execute with timeout: %w", mockErr)

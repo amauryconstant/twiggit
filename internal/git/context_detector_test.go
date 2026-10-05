@@ -281,13 +281,13 @@ func testUnixPaths(t *testing.T) {
 func TestContextDetectionError(t *testing.T) {
 	err := core.NewContextDetectionError("/test/path", "test message", nil)
 
-	assert.Equal(t, "context.detection: test message (entity: /test/path)", err.Error())
+	assert.Equal(t, "context.detect: test message (entity: /test/path)", err.Error())
 	require.NoError(t, err.Unwrap())
 
 	originalErr := assert.AnError
 	err = core.NewContextDetectionError("/test/path", "test message", originalErr)
 
-	assert.Equal(t, "context.detection: test message (entity: /test/path): assert.AnError general error for testing", err.Error())
+	assert.Equal(t, "context.detect: test message (entity: /test/path): assert.AnError general error for testing", err.Error())
 	assert.Equal(t, originalErr, err.Unwrap())
 }
 

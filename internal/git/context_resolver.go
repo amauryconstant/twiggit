@@ -226,7 +226,7 @@ func (cr *contextResolver) ResolutionSuggestions(ctxStd context.Context, ctx *co
 		opt(config)
 	}
 
-	var suggestions []*core.ResolutionSuggestion
+	suggestions := []*core.ResolutionSuggestion{}
 
 	switch ctx.Type {
 	case core.ContextProject:

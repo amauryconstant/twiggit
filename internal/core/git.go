@@ -58,7 +58,7 @@ type RemoteReader interface {
 // follow-up because it would split methods that are always used together.
 type WorktreeWriter interface {
 	CreateWorktree(ctx context.Context, repoPath, branchName, sourceBranch, worktreePath string) error
-	DeleteWorktree(ctx context.Context, repoPath, worktreePath string, force bool) error
+	DeleteWorktree(ctx context.Context, repoPath, worktreePath string, isForce bool) error
 	ListWorktrees(ctx context.Context, repoPath string) ([]Worktree, error)
 	PruneWorktrees(ctx context.Context, repoPath string) error
 }

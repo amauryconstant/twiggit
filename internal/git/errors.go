@@ -7,6 +7,18 @@ import (
 	"twiggit/internal/core"
 )
 
+// ErrNotFound is the package-local sentinel marking a CLI-reported
+// "not found" failure from a write-side git invocation (e.g. `git
+// worktree remove` against a missing worktree, `git branch -D` against
+// a missing branch). Writers wrap result.Err via %w so callers can
+// detect the idempotent "already gone" condition via errors.Is
+// without re-string-matching stderr. The OperationError.Op prefix
+// still walks to the matching core.Err*NotFound sentinel via the
+// existing OperationError.Is dispatch table, so cmd callers that
+// already match on core.ErrWorktreeNotFound continue to work
+// unchanged.
+var ErrNotFound = errors.New("git: not found")
+
 // ErrorKind classifies ExternalError instances for callers that need to
 // branch on failure shape without walking the cause chain. Only the kinds
 // actually produced by classifyKind are exported; ErrorKindNotFound and
