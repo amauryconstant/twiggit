@@ -37,6 +37,8 @@ Depguard owns the import rules (see `.golangci.yml`).
 | `delete` | `rm` | Remove worktree (+ optional branch) |
 | `prune` | - | Delete merged worktrees |
 | `cd` | - | Print worktree path |
+| `rebase` | - | Rebase current/named/all worktrees onto tracked base |
+| `sync` | - | Fetch remote tracking refs (optionally + rebase) |
 | `init` | - | Shell wrapper |
 | `version` | - | Build version |
 
@@ -44,8 +46,9 @@ Depguard owns the import rules (see `.golangci.yml`).
 
 - **Bool prefix.** `is/has/can` on every bool field. `Was*` on past-tense bools (`WasDeleted`).
 - **Single-handling.** Adapter returns wrapped errors only; logging at cmd boundary via `opts.IO.Logger`.
-- **Sentinels.** Nine `core.Err*` live in `internal/core/sentinels.go`. Match via `errors.Is`, never by `Op` string.
+- **Sentinels.** Twelve `core.Err*` live in `internal/core/sentinels.go`. Match via `errors.Is`, never by `Op` string.
 - **Factory roles.** No per-role lazy fields. Callers do `f.GitClient()` then assign to a role-typed local.
+- **Tracked base.** Worktree's rebase target persists at `twiggit.tracked-base` per-wt git config (`git config --worktree`). Written by `wtg create`; mutated by `wtg rebase --set-base`.
 - **Exit codes.** 0=ok, 1=error, 2=usage. `cmdutil.ExitCodeFor` is the single mapping.
 
 ## Subdirectory Guides
