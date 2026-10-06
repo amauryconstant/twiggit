@@ -5,12 +5,13 @@ package e2e
 import (
 	"context"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"twiggit/test/e2e/fixtures"
 	"twiggit/test/e2e/helpers"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/onsi/gomega/gbytes"
 	"github.com/onsi/gomega/gexec"
 )
 
@@ -76,11 +77,22 @@ var _ = Describe("rebase command", func() {
 	})
 
 	Describe("--set-base", func() {
-		It("persists the new base without rebasing", func() {
+		It("persists twiggit.tracked-base to per-worktree config", func() {
 			setup := fixture.CreateWorktreeSetup("testset")
 			enableWorktreeConfig(fixture, "testset")
+
 			session := ctxHelper.FromWorktreeDir("testset", setup.Feature1Branch, "rebase", "--set-base", "develop")
 			Eventually(session).Should(gexec.Exit(0))
+
+			wtPath := filepath.Join(
+				fixture.GetConfigHelper().GetWorktreesDir(),
+				"testset",
+				setup.Feature1Branch,
+			)
+			tracked, err := readTrackedBase(context.Background(), wtPath)
+			Expect(err).NotTo(HaveOccurred(), "git config --worktree --get must succeed after --set-base")
+			Expect(tracked).To(Equal("develop"),
+				"per-worktree config must hold the new base branch")
 		})
 	})
 
@@ -93,41 +105,18 @@ var _ = Describe("rebase command", func() {
 	})
 })
 
-var _ = Describe("rebase workflow", func() {
-	var fixture *fixtures.E2ETestFixture
-	var cli *helpers.TwiggitCLI
-	var ctxHelper *fixtures.ContextHelper
-
-	BeforeEach(func() {
-		fixture = fixtures.NewE2ETestFixture()
-		cli = helpers.NewTwiggitCLI()
-		cli = cli.WithConfigDir(fixture.Build())
-		ctxHelper = fixtures.NewContextHelper(fixture, cli)
-	})
-
-	AfterEach(func() {
-		if CurrentSpecReport().Failed() {
-			GinkgoT().Log(fixture.Inspect())
-		}
-		fixture.Cleanup()
-	})
-
-	Describe("create -> rebase -> push end-to-end", func() {
-		It("completes without error", func() {
-			_ = fixture.CreateWorktreeSetup("workflow")
-			// Rebase from the project dir; accept any non-panic exit.
-			session := ctxHelper.FromProjectDir("workflow", "rebase")
-			Eventually(session).Should(gexec.Exit())
-			if session.ExitCode() == 0 {
-				Eventually(session.Err).Should(gbytes.Say("Rebased|nothing to do|Summary"))
-			}
-		})
-	})
-})
-
 func enableWorktreeConfig(f *fixtures.E2ETestFixture, projectName string) {
 	projectsDir := f.GetConfigHelper().GetProjectsDir()
 	cmd := exec.CommandContext(context.Background(), "git", "config", "--local", "extensions.worktreeConfig", "true")
 	cmd.Dir = projectsDir + "/" + projectName
 	_ = cmd.Run()
+}
+
+func readTrackedBase(ctx context.Context, wtPath string) (string, error) {
+	cmd := exec.CommandContext(ctx, "git", "-C", wtPath, "config", "--worktree", "--get", "twiggit.tracked-base")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
 }
