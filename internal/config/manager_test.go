@@ -421,6 +421,73 @@ func TestConfigManager_ColorEnabledPropagatesToCopy(t *testing.T) {
 	assert.True(t, reloaded.IsColorEnabled, "ColorEnabled should reset when NO_COLOR is unset")
 }
 
+func TestConfig_RebaseSync_Defaults(t *testing.T) {
+	manager, _, _ := setupConfigManagerTest(t)
+	config, err := manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	defaults := core.DefaultConfig()
+	assert.Equal(t, defaults.Rebase.FetchOnAll, config.Rebase.FetchOnAll)
+	assert.Equal(t, defaults.Rebase.ConflictPolicy, config.Rebase.ConflictPolicy)
+	assert.Equal(t, defaults.Sync.DefaultRemote, config.Sync.DefaultRemote)
+	assert.Equal(t, defaults.Sync.PruneRemoteRefs, config.Sync.PruneRemoteRefs)
+	assert.Equal(t, defaults.Sync.RebaseAfterSync, config.Sync.RebaseAfterSync)
+}
+
+func TestConfig_RebaseSync_FileOverridesDefaults(t *testing.T) {
+	manager, tempDir, _ := setupConfigManagerTest(t)
+	configDir := filepath.Join(tempDir, "twiggit")
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+	configContent := `
+[rebase]
+fetch_on_all = true
+conflict_policy = "continue"
+
+[sync]
+default_remote = "upstream"
+prune_remote_refs = false
+rebase_after_sync = true
+`
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(configContent), 0o644))
+
+	config, err := manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	assert.True(t, config.Rebase.FetchOnAll)
+	assert.Equal(t, "continue", config.Rebase.ConflictPolicy)
+	assert.Equal(t, "upstream", config.Sync.DefaultRemote)
+	assert.False(t, config.Sync.PruneRemoteRefs)
+	assert.True(t, config.Sync.RebaseAfterSync)
+}
+
+func TestConfig_RebaseSync_EnvOverridesFile(t *testing.T) {
+	manager, tempDir, _ := setupConfigManagerTest(t)
+	configDir := filepath.Join(tempDir, "twiggit")
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
+
+	configContent := `
+[rebase]
+fetch_on_all = false
+
+[sync]
+rebase_after_sync = false
+`
+	require.NoError(t, os.WriteFile(filepath.Join(configDir, "config.toml"), []byte(configContent), 0o644))
+
+	t.Setenv("TWIGGIT_REBASE__FETCH_ON_ALL", "true")
+	t.Setenv("TWIGGIT_SYNC__REBASE_AFTER_SYNC", "true")
+
+	config, err := manager.Load()
+	require.NoError(t, err)
+	require.NotNil(t, config)
+
+	assert.True(t, config.Rebase.FetchOnAll, "env must override file fetch_on_all=false")
+	assert.True(t, config.Sync.RebaseAfterSync, "env must override file rebase_after_sync=false")
+}
+
 func TestConfigManager_LoadWrapsKoanfErrors(t *testing.T) {
 	manager, tempDir, _ := setupConfigManagerTest(t)
 

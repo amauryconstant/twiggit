@@ -123,7 +123,7 @@ var _ = lru.New[string, *git.Repository]
 
 // compile-time role satisfaction. The composite *Client embeds *reader and
 // *cliClient, so its method set is the union of both halves; these checks
-// guard all 14 role methods at once against drift on the unexported concretes.
+// guard all role methods at once against drift on the unexported concretes.
 var (
 	_ core.RepositoryOpener = (*Client)(nil)
 	_ core.BranchReader     = (*Client)(nil)
@@ -131,4 +131,6 @@ var (
 	_ core.RemoteReader     = (*Client)(nil)
 	_ core.WorktreeWriter   = (*Client)(nil)
 	_ core.BranchWriter     = (*Client)(nil)
+	_ core.Rebaser          = (*Client)(nil)
+	_ core.BaseTracker      = (*Client)(nil)
 )

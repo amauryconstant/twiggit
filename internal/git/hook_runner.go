@@ -39,7 +39,10 @@ func NewHookRunner(executor CommandExecutor, hookTimeoutSeconds ...int) *HookRun
 	}
 }
 
-// Run executes hooks of the specified type with the given request context
+// Run executes hooks of the specified type with the given request context.
+// PreRebase failures are surfaced as a HardFailure result so the cmd
+// layer can short-circuit the rebase; all other failure modes are
+// recorded in the result without blocking the calling operation.
 func (r *HookRunner) Run(ctx context.Context, req *core.HookRunRequest) (*core.HookResult, error) {
 	if req.ConfigFilePath == "" {
 		return noOpResult(req), nil
@@ -65,19 +68,31 @@ func (r *HookRunner) Run(ctx context.Context, req *core.HookRunRequest) (*core.H
 		return noOpResult(req), nil
 	}
 
-	var definitions []core.HookDefinition
-	switch req.HookType {
-	case core.HookTypePostCreate:
-		definitions = config.PostCreate
-	default:
-		return noOpResult(req), nil
-	}
-
+	definitions, hardFailure := r.selectDefinitions(config, req.HookType)
 	if len(definitions) == 0 {
 		return noOpResult(req), nil
 	}
 
-	return r.executeDefinitions(ctx, req, definitions), nil
+	return r.executeDefinitions(ctx, req, definitions, hardFailure), nil
+}
+
+// selectDefinitions returns the hook definitions for the given hook
+// type and whether the lifecycle stage treats a non-zero exit as a
+// hard failure (PreRebase) versus a warning (PostCreate, PostRebase,
+// PostSync).
+func (r *HookRunner) selectDefinitions(config *core.HookConfig, hookType core.HookType) ([]core.HookDefinition, bool) {
+	switch hookType {
+	case core.HookTypePostCreate:
+		return config.PostCreate, false
+	case core.HookTypePreRebase:
+		return config.PreRebase, true
+	case core.HookTypePostRebase:
+		return config.PostRebase, false
+	case core.HookTypePostSync:
+		return config.PostSync, false
+	default:
+		return nil, false
+	}
 }
 
 func noOpResult(req *core.HookRunRequest) *core.HookResult {
@@ -112,7 +127,11 @@ func (r *HookRunner) readHookConfig(path string) (*core.HookConfig, error) {
 // failure keeps going — one bad command does not abort the chain so
 // every hook has a chance to run, matching the previous behaviour for
 // multi-command single-definition configs.
-func (r *HookRunner) executeDefinitions(ctx context.Context, req *core.HookRunRequest, definitions []core.HookDefinition) *core.HookResult {
+//
+// When hardFailure is true (PreRebase lifecycle stage) the first
+// non-zero exit stops iteration so the cmd layer can short-circuit
+// the gated operation.
+func (r *HookRunner) executeDefinitions(ctx context.Context, req *core.HookRunRequest, definitions []core.HookDefinition, hardFailure bool) *core.HookResult {
 	result := &core.HookResult{
 		HookType:     req.HookType,
 		HasExecuted:  true,
@@ -162,6 +181,9 @@ func (r *HookRunner) executeDefinitions(ctx context.Context, req *core.HookRunRe
 				Error:    err,
 				TimedOut: timedOut,
 			})
+			if hardFailure {
+				break
+			}
 		}
 	}
 
@@ -184,6 +206,28 @@ func (r *HookRunner) buildEnvExports(req *core.HookRunRequest) string {
 	}
 	if req.MainRepoPath != "" {
 		exports.WriteString(fmt.Sprintf("export TWIGGIT_MAIN_REPO_PATH=%q; ", req.MainRepoPath))
+	}
+	if req.HookType == core.HookTypePreRebase || req.HookType == core.HookTypePostRebase {
+		if req.RebaseBase != "" {
+			exports.WriteString(fmt.Sprintf("export TWIGGIT_REBASE_BASE=%q; ", req.RebaseBase))
+		}
+		if req.RebaseOldTip != "" {
+			exports.WriteString(fmt.Sprintf("export TWIGGIT_REBASE_OLD_TIP=%q; ", req.RebaseOldTip))
+		}
+		if req.RebaseNewTip != "" {
+			exports.WriteString(fmt.Sprintf("export TWIGGIT_REBASE_NEW_TIP=%q; ", req.RebaseNewTip))
+		}
+		if req.RebaseResult != "" {
+			exports.WriteString(fmt.Sprintf("export TWIGGIT_REBASE_RESULT=%q; ", req.RebaseResult))
+		}
+	}
+	if req.HookType == core.HookTypePostSync {
+		if req.SyncRemote != "" {
+			exports.WriteString(fmt.Sprintf("export TWIGGIT_SYNC_REMOTE=%q; ", req.SyncRemote))
+		}
+		if req.SyncBranch != "" {
+			exports.WriteString(fmt.Sprintf("export TWIGGIT_SYNC_BRANCH=%q; ", req.SyncBranch))
+		}
 	}
 	return exports.String()
 }

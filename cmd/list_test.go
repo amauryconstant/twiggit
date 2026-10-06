@@ -17,8 +17,12 @@ import (
 // newRootForTest builds a root cobra.Command wired with the same
 // persistent flags + subcommands as NewRootCommand, but without
 // touching cmd/root.go directly so tests can supply overrides via
-// the optional mutate hook.
+// the optional mutate hook. The package mutex serialises the
+// underlying carapace.Gen call (see race_lock_test.go) so parallel
+// tests don't race on cobra's global OnInitialize hook list.
 func newRootForTest(f *cmdutil.Factory, mutate ...func(*cobra.Command)) *cobra.Command {
+	rootBuildMu.Lock()
+	defer rootBuildMu.Unlock()
 	root := NewRootCommand(f)
 	if len(mutate) > 0 {
 		mutate[0](root)

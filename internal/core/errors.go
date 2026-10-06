@@ -137,6 +137,8 @@ func (e *NotFoundError) Is(target error) bool {
 		return e.Entity == "project"
 	case ErrResolutionNotFound:
 		return e.Entity == "resolution" || e.Entity == "navigation" || e.Entity == "resolution target" || e.Entity == "navigation target"
+	case ErrBaseNotSet:
+		return e.Entity == "tracked-base" || e.Entity == "base"
 	}
 	return false
 }
@@ -205,6 +207,10 @@ func (e *OperationError) Is(target error) bool {
 		return e.Op != "" && (e.Op == "repo" || strings.HasPrefix(e.Op, "git.repository") || strings.HasPrefix(e.Op, "git.repo") || strings.HasPrefix(e.Op, "repository"))
 	case ErrResolutionNotFound:
 		return e.Op != "" && (e.Op == "resolution" || strings.HasPrefix(e.Op, "resolution.") || e.Op == "navigation" || strings.HasPrefix(e.Op, "navigation."))
+	case ErrRebaseConflict:
+		return e.Op != "" && (e.Op == "rebase" || strings.HasPrefix(e.Op, "rebase."))
+	case ErrBaseNotSet:
+		return e.Op != "" && (e.Op == "base" || strings.HasPrefix(e.Op, "base."))
 	}
 	return false
 }

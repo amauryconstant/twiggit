@@ -10,6 +10,15 @@ const (
 	HookTypeUnknown HookType = iota
 	// HookTypePostCreate is the hook executed after worktree creation.
 	HookTypePostCreate
+	// HookTypePreRebase is the hook executed before a rebase starts.
+	// Non-zero exit aborts the rebase.
+	HookTypePreRebase
+	// HookTypePostRebase is the hook executed after a clean rebase.
+	// Non-zero exit is a warning; the rebase outcome is preserved.
+	HookTypePostRebase
+	// HookTypePostSync is the hook executed after a sync walk. Non-zero
+	// exit is a warning; the sync outcome is preserved.
+	HookTypePostSync
 )
 
 // HookPostCreate is a transitional alias for HookTypePostCreate kept so
@@ -25,16 +34,24 @@ func (h HookType) String() string {
 	switch h {
 	case HookTypePostCreate:
 		return "post-create"
+	case HookTypePreRebase:
+		return "pre-rebase"
+	case HookTypePostRebase:
+		return "post-rebase"
+	case HookTypePostSync:
+		return "post-sync"
 	default:
 		return "unknown"
 	}
 }
 
-// HookConfig represents the hooks section of .twiggit.toml. PostCreate
-// is a slice so multiple hook definitions can chain on a single event
-// (per spec line "HookConfig.PostCreate → []HookDefinition").
+// HookConfig represents the hooks section of .twiggit.toml. Each event
+// is a slice so multiple hook definitions can chain on a single event.
 type HookConfig struct {
 	PostCreate []HookDefinition `toml:"post-create" koanf:"post-create"`
+	PreRebase  []HookDefinition `toml:"pre-rebase" koanf:"pre-rebase"`
+	PostRebase []HookDefinition `toml:"post-rebase" koanf:"post-rebase"`
+	PostSync   []HookDefinition `toml:"post-sync" koanf:"post-sync"`
 }
 
 // HookDefinition represents a single hook's configuration. Command is a
@@ -71,7 +88,10 @@ type HookFailure struct {
 
 // HookRunRequest carries the context needed to execute hooks. Pure data —
 // the consumer-side interface (cmdutil.HookRunner) takes this type; the
-// implementation lives in internal/git/hook_runner.go.
+// implementation lives in internal/git/hook_runner.go. The six optional
+// rebase/sync fields default to empty and are surfaced to the hook
+// process only when the field's lifecycle stage matches the HookType
+// and the field is non-empty.
 type HookRunRequest struct {
 	HookType       HookType
 	WorktreePath   string
@@ -80,4 +100,10 @@ type HookRunRequest struct {
 	SourceBranch   string
 	MainRepoPath   string
 	ConfigFilePath string
+	RebaseBase     string
+	RebaseOldTip   string
+	RebaseNewTip   string
+	RebaseResult   string
+	SyncRemote     string
+	SyncBranch     string
 }

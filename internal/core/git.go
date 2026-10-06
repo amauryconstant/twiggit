@@ -68,3 +68,24 @@ type BranchWriter interface {
 	DeleteBranch(ctx context.Context, repoPath, branchName string) error
 	IsBranchMerged(ctx context.Context, repoPath, branchName string) (bool, error)
 }
+
+// Rebaser exposes the rebase lifecycle and the fetch primitive. Sits at
+// 4 methods, the same shape as WorktreeWriter: the four verbs (Rebase,
+// Abort, Continue, Fetch) form a tightly coupled rebase-lifecycle set
+// and the core-git spec accepts this as a deliberate exception to the
+// 1-3 method rule.
+type Rebaser interface {
+	Rebase(ctx context.Context, wtPath, onto string) (RebaseOutcome, error)
+	Abort(ctx context.Context, wtPath string) error
+	Continue(ctx context.Context, wtPath string) (RebaseOutcome, error)
+	Fetch(ctx context.Context, repoPath, remote, ref string) error
+}
+
+// BaseTracker exposes the per-worktree tracked-base read/write pair.
+// GetTrackedBase returns ("", nil) (not an error) when the worktree has
+// no twiggit.tracked-base entry; callers decide whether to treat empty
+// as missing or as a fallback signal.
+type BaseTracker interface {
+	SetTrackedBase(ctx context.Context, wtPath, base string) error
+	GetTrackedBase(ctx context.Context, wtPath string) (string, error)
+}

@@ -19,4 +19,7 @@ var (
 	ErrInferenceFailed       = errors.New("core: could not infer shell type")
 	ErrDetectionFailed       = errors.New("core: shell detection failed")
 	ErrUncommittedChanges    = errors.New("core: worktree has uncommitted changes")
+	ErrRebaseConflict        = errors.New("core: rebase conflict")
+	ErrRebaseInProgress      = errors.New("core: no rebase in progress")
+	ErrBaseNotSet            = errors.New("core: tracked base not set")
 )

@@ -165,6 +165,7 @@ linters:
             - github.com/samber/lo
             - github.com/knadh/koanf/v2
             - github.com/knadh/koanf/parsers/toml
+            - github.com/knadh/koanf/providers/env/v2
             - twiggit/internal/core
           deny:
             - pkg: "github.com/charmbracelet/lipgloss"

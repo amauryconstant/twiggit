@@ -229,6 +229,18 @@ func materialiseWorktree(ctx context.Context, gitClient *git.Client, opts *Creat
 	verbosef(opts.IO, "from branch: %s", req.SourceBranch)
 	verbosef(opts.IO, "to path: %s", req.Project.Name+"/"+req.BranchName)
 
+	// Persist the tracked base so the subsequent `twiggit rebase`
+	// knows which branch to rebase onto. Failure is non-fatal: the
+	// worktree already exists, the user can rebase manually or run
+	// `twiggit rebase --set-base` later.
+	if err := gitClient.SetTrackedBase(ctx, req.WorktreePath, req.SourceBranch); err != nil {
+		opts.IO.Logger.Warn("set tracked base failed",
+			"worktree_path", req.WorktreePath,
+			"tracked_base", req.SourceBranch,
+			"err", err,
+		)
+	}
+
 	return &core.Worktree{Path: req.WorktreePath, Branch: req.BranchName}, nil
 }
 

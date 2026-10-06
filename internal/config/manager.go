@@ -10,6 +10,7 @@ import (
 	"twiggit/internal/core"
 
 	"github.com/knadh/koanf/parsers/toml"
+	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/v2"
 )
 
@@ -101,6 +102,8 @@ func copyConfig(config *core.Config) *core.Config {
 		Navigation:          config.Navigation,
 		Shell:               config.Shell,
 		Completion:          config.Completion,
+		Rebase:              config.Rebase,
+		Sync:                config.Sync,
 		IsColorEnabled:      config.IsColorEnabled,
 	}
 }
@@ -196,6 +199,26 @@ func (m *koanfConfigManager) Load() (*core.Config, error) {
 		}
 	}
 
+	// 2b. Load env overrides (TWIGGIT_<SECTION>__<KEY>) so test/CI
+	// harnesses can flip a knob without touching the config file.
+	// Koanf's env provider is configured with the TWIGGIT_ prefix; the
+	// transform converts REBASE__FETCH_ON_ALL -> rebase.fetch_on_all so
+	// the override lands on the same key the TOML file uses.
+	if err := m.ko.Load(env.Provider(".", env.Opt{
+		Prefix: "TWIGGIT_",
+		TransformFunc: func(k, v string) (string, any) {
+			key := strings.ToLower(strings.TrimPrefix(k, "TWIGGIT_"))
+			key = strings.ReplaceAll(key, "__", ".")
+			return key, v
+		},
+	}), nil); err != nil {
+		return nil, &core.OperationError{
+			Op:      "config.load",
+			Message: "failed to load env overrides",
+			Cause:   err,
+		}
+	}
+
 	// 3. Unmarshal to config object
 	config := &core.Config{}
 	if err := m.ko.Unmarshal("", config); err != nil {
@@ -278,6 +301,21 @@ func (m *koanfConfigManager) loadDefaults() error {
 	}
 	if err := m.ko.Set("completion.timeout", defaults.Completion.Timeout); err != nil {
 		return fmt.Errorf("failed to set completion.timeout default: %w", err)
+	}
+	if err := m.ko.Set("rebase.fetch_on_all", defaults.Rebase.FetchOnAll); err != nil {
+		return fmt.Errorf("failed to set rebase.fetch_on_all default: %w", err)
+	}
+	if err := m.ko.Set("rebase.conflict_policy", defaults.Rebase.ConflictPolicy); err != nil {
+		return fmt.Errorf("failed to set rebase.conflict_policy default: %w", err)
+	}
+	if err := m.ko.Set("sync.default_remote", defaults.Sync.DefaultRemote); err != nil {
+		return fmt.Errorf("failed to set sync.default_remote default: %w", err)
+	}
+	if err := m.ko.Set("sync.prune_remote_refs", defaults.Sync.PruneRemoteRefs); err != nil {
+		return fmt.Errorf("failed to set sync.prune_remote_refs default: %w", err)
+	}
+	if err := m.ko.Set("sync.rebase_after_sync", defaults.Sync.RebaseAfterSync); err != nil {
+		return fmt.Errorf("failed to set sync.rebase_after_sync default: %w", err)
 	}
 	return nil
 }

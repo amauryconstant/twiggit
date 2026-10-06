@@ -68,6 +68,25 @@ type ShellWrapperConfig struct {
 	BackupDir string `toml:"backup_dir" koanf:"backup_dir"`
 }
 
+// RebaseConfig holds knobs that govern the rebase walk. FetchOnAll is
+// reserved for a follow-up: a per-project fetch opt-in during --all
+// fan-out. ConflictPolicy is reserved for a follow-up: a switch that
+// moves past stop-on-first conflict to a more permissive policy.
+type RebaseConfig struct {
+	FetchOnAll     bool   `toml:"fetch_on_all" koanf:"fetch_on_all"`
+	ConflictPolicy string `toml:"conflict_policy" koanf:"conflict_policy"`
+}
+
+// SyncConfig holds knobs that govern the sync walk. DefaultRemote
+// resolves the remote when --remote is absent. PruneRemoteRefs asks
+// git fetch to drop refs that no longer exist upstream. RebaseAfterSync
+// triggers the rebase walk after a successful fetch.
+type SyncConfig struct {
+	DefaultRemote   string `toml:"default_remote" koanf:"default_remote"`
+	PruneRemoteRefs bool   `toml:"prune_remote_refs" koanf:"prune_remote_refs"`
+	RebaseAfterSync bool   `toml:"rebase_after_sync" koanf:"rebase_after_sync"`
+}
+
 // CompletionConfig represents shell completion specific configuration
 type CompletionConfig struct {
 	// Timeout for completion operations
@@ -124,6 +143,12 @@ type Config struct {
 
 	// Completion settings
 	Completion CompletionConfig `toml:"completion" koanf:"completion"`
+
+	// Rebase settings
+	Rebase RebaseConfig `toml:"rebase" koanf:"rebase"`
+
+	// Sync settings
+	Sync SyncConfig `toml:"sync" koanf:"sync"`
 
 	// IsColorEnabled reports whether ANSI color output is enabled.
 	// It is set by config.Manager from NO_COLOR at load time (default true).
@@ -188,6 +213,15 @@ func DefaultConfig() *Config {
 			Timeout:         "500ms",
 			ExcludeBranches: []string{},
 			ExcludeProjects: []string{},
+		},
+		Rebase: RebaseConfig{
+			FetchOnAll:     false,
+			ConflictPolicy: "stop",
+		},
+		Sync: SyncConfig{
+			DefaultRemote:   "origin",
+			PruneRemoteRefs: true,
+			RebaseAfterSync: false,
 		},
 		IsColorEnabled: true,
 	}

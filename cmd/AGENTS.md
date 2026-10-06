@@ -172,6 +172,27 @@ Purpose: Delete merged worktrees for post-merge cleanup
 Args: `[project/branch]` (optional)
 Flags: `-n, --dry-run`, `-f, --force`, `-y, --yes`, `-d, --delete-branches`, `-a, --all`
 
+### rebase
+Purpose: Rebase the current (or named) worktree onto its tracked base
+Args: `[project/branch]` (optional; mutually exclusive with `--all`)
+Flags: `-a, --all`, `-f, --fetch`, `-c, --continue`, `-A, --abort`,
+`--set-base <branch>`, `-F, --force` (reserved no-op in v1)
+Files: `cmd/rebase.go` (`RebaseOptions`, `NewCmdRebase`, `runRebase`,
+`resolveRebaseTarget`, short-circuit verbs), `cmd/rebase_helpers.go`
+(`resolveRebaseTargets`, `resolveTrackedBase`, `dispatchRebaseHooks`,
+`runRebaseWalk`, `emitRebaseOutput`). The shared `runRebaseWalk` is
+reused by `twiggit sync --rebase`.
+
+### sync
+Purpose: Fetch the project's tracking refs and (optionally) rebase
+Args: `[project]` (optional)
+Flags: `-a, --all`, `--remote <name>`, `--branch <name>`,
+`-r, --rebase`, `-F, --fetch-only`
+Files: `cmd/sync.go` (`SyncOptions`, `NewCmdSync`, `runSync`,
+`runSyncWalk`, `resolveSyncTargets`, `emitSyncOutput`),
+`cmd/sync_helpers.go` (test-only helpers). The `--rebase` flag
+delegates to the shared `runRebaseWalk` in `cmd/rebase_helpers.go`.
+
 ## Testing
 
 - **Unit tests**: `cmd/<command>_test.go` exercise `runX(opts)` directly via

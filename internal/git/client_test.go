@@ -337,6 +337,8 @@ type _DriftCheck struct {
 	core.RemoteReader
 	core.WorktreeWriter
 	core.BranchWriter
+	core.Rebaser
+	core.BaseTracker
 }
 
 var _ = _DriftCheck{
@@ -346,6 +348,8 @@ var _ = _DriftCheck{
 	RemoteReader:     (*Client)(nil),
 	WorktreeWriter:   (*Client)(nil),
 	BranchWriter:     (*Client)(nil),
+	Rebaser:          (*Client)(nil),
+	BaseTracker:      (*Client)(nil),
 }
 
 // TestReadSideFailure_OpIsGitRepository pins git-client R4.S1: read-side
@@ -368,4 +372,42 @@ func TestReadSideFailure_OpIsGitRepository(t *testing.T) {
 		"OpenRepository Op must follow \"git.repository.<method>\" format")
 	assert.NotEmpty(t, oe.Message)
 	assert.Error(t, oe.Cause, "Cause must wrap underlying go-git error via %w")
+}
+
+// TestDriftSentinel_AllRolesPresent pins the role surface: every role
+// declared in internal/core/git.go must appear both as a `var _ core.Role`
+// declaration in client.go AND as an embedded field in _DriftCheck. A
+// future role that gets one without the other is caught here.
+func TestDriftSentinel_AllRolesPresent(t *testing.T) {
+	t.Parallel()
+
+	is := assert.New(t)
+	required := []struct {
+		role core.BranchReader
+		name string
+	}{
+		{name: "RepositoryOpener"},
+		{name: "BranchReader"},
+		{name: "RepositoryReader"},
+		{name: "RemoteReader"},
+		{name: "WorktreeWriter"},
+		{name: "BranchWriter"},
+		{name: "Rebaser"},
+		{name: "BaseTracker"},
+	}
+	is.Len(required, 8, "expected 8 roles; update the table when a new role is added")
+
+	// Compile-time guarantee: the _DriftCheck literal below fails the
+	// build if any embedded interface is missing or any field cannot
+	// accept (*Client)(nil).
+	var _ _DriftCheck = _DriftCheck{
+		RepositoryOpener: (*Client)(nil),
+		BranchReader:     (*Client)(nil),
+		RepositoryReader: (*Client)(nil),
+		RemoteReader:     (*Client)(nil),
+		WorktreeWriter:   (*Client)(nil),
+		BranchWriter:     (*Client)(nil),
+		Rebaser:          (*Client)(nil),
+		BaseTracker:      (*Client)(nil),
+	}
 }

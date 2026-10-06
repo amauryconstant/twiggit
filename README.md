@@ -110,6 +110,22 @@ twiggit delete feature/old-feature
 twiggit prune --dry-run              # Preview what would be deleted
 twiggit prune                        # Delete merged worktrees in current project
 twiggit prune --all                  # Prune across all projects
+
+# Rebase a worktree onto its tracked base
+twiggit rebase                       # Rebase current worktree
+twiggit rebase myproject/feature     # Rebase a specific worktree
+twiggit rebase --all                 # Rebase every worktree in the project
+twiggit rebase --fetch               # Fetch the base, then rebase
+twiggit rebase --continue feature    # Resume a paused rebase
+twiggit rebase --abort feature       # Abort a paused rebase
+twiggit rebase --set-base develop    # Persist a new tracked base
+
+# Sync a project's tracking refs from its remote
+twiggit sync                         # Fetch origin for current project
+twiggit sync --all                   # Sync every project
+twiggit sync --remote upstream       # Fetch from a non-default remote
+twiggit sync --rebase                # Fetch and rebase every worktree
+twiggit sync --fetch-only            # Skip the rebase walk
 ```
 
 ## Post-Create Hooks
@@ -137,6 +153,35 @@ When you run `twiggit create`, these commands will execute in the new worktree d
 | `TWIGGIT_BRANCH_NAME` | Name of the new branch |
 | `TWIGGIT_SOURCE_BRANCH` | Branch the worktree was created from |
 | `TWIGGIT_MAIN_REPO_PATH` | Path to the main repository |
+
+### Pre-rebase, post-rebase, and post-sync hooks
+
+Twiggit also runs hooks before rebase, after a clean rebase, and
+after a sync. Pre-rebase hooks that exit non-zero abort the rebase
+(useful for stashing or sanity checks); post-rebase and post-sync
+hook failures are recorded as warnings.
+
+```toml
+[hooks.pre-rebase]
+commands = ["git stash"]
+
+[hooks.post-rebase]
+commands = ["go build ./..."]
+
+[hooks.post-sync]
+commands = ["echo synced"]
+```
+
+The rebase and sync hooks also receive the variables above plus:
+
+| Variable | Description |
+|----------|-------------|
+| `TWIGGIT_REBASE_BASE` | Branch being rebased onto (pre/post-rebase) |
+| `TWIGGIT_REBASE_OLD_TIP` | Pre-rebase tip (post-rebase) |
+| `TWIGGIT_REBASE_NEW_TIP` | Post-rebase tip (post-rebase) |
+| `TWIGGIT_REBASE_RESULT` | "clean" / "conflicted" / "nothing-to-do" (post-rebase) |
+| `TWIGGIT_SYNC_REMOTE` | Remote that was fetched (post-sync) |
+| `TWIGGIT_SYNC_BRANCH` | Branch that was fetched (post-sync) |
 
 ### Behavior
 

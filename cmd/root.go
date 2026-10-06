@@ -97,6 +97,10 @@ across multiple projects.`,
 	deleteCmd.GroupID = "core"
 	pruneCmd := NewCmdPrune(f, nil)
 	pruneCmd.GroupID = "core"
+	rebaseCmd := NewCmdRebase(f, nil)
+	rebaseCmd.GroupID = "core"
+	syncCmd := NewCmdSync(f, nil)
+	syncCmd.GroupID = "core"
 	cdCmd := NewCmdCd(f, nil)
 	cdCmd.GroupID = "navigation"
 	initCmd := NewCmdInit(f, nil)
@@ -110,6 +114,8 @@ across multiple projects.`,
 		createCmd,
 		deleteCmd,
 		pruneCmd,
+		rebaseCmd,
+		syncCmd,
 		cdCmd,
 		initCmd,
 		versionCmd,

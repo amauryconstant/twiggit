@@ -3,6 +3,7 @@ package repo
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -17,6 +18,86 @@ type RepoTestHelper struct {
 	commitCount int
 	projectName string
 	mu          sync.RWMutex
+}
+
+func runGitCmd(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %v in %s: %v\n%s", args, dir, err, out)
+	}
+}
+
+// CreateDivergentBranch adds a new commit on top of an existing
+// branch, diverging it from the base. Returns the new commit hash.
+func (h *RepoTestHelper) CreateDivergentBranch(projectName, branchName, file, content string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	repoPath, ok := h.repos[projectName]
+	if !ok {
+		h.t.Fatalf("CreateDivergentBranch: project %q not found", projectName)
+	}
+	wtPath := filepath.Join(h.baseDir, "wt-"+branchName)
+	runGitCmd(h.t, repoPath, "worktree", "add", "-b", branchName, wtPath, "main")
+	if err := os.WriteFile(filepath.Join(wtPath, file), []byte(content), 0o644); err != nil {
+		h.t.Fatalf("write %s: %v", file, err)
+	}
+	runGitCmd(h.t, wtPath, "add", file)
+	runGitCmd(h.t, wtPath, "commit", "-m", "add "+file)
+	out, err := exec.Command("git", "-C", wtPath, "rev-parse", "HEAD").Output()
+	if err != nil {
+		h.t.Fatalf("rev-parse: %v", err)
+	}
+	return string(out[:len(out)-1])
+}
+
+// CreateDirtyWorktree writes an uncommitted file inside the named
+// worktree. Used to test the dirty-wt refusal path.
+func (h *RepoTestHelper) CreateDirtyWorktree(projectName, branchName, file, content string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	wtPath := filepath.Join(h.baseDir, "wt-"+branchName)
+	if err := os.WriteFile(filepath.Join(wtPath, file), []byte(content), 0o644); err != nil {
+		h.t.Fatalf("write %s: %v", file, err)
+	}
+}
+
+// CreateMidRebase sets the worktree into a mid-rebase state by
+// creating a divergent branch, checking it out as the named
+// branch, then running `git rebase main` from inside it. The
+// conflict-free path leaves the worktree mid-rebase.
+func (h *RepoTestHelper) CreateMidRebase(projectName, branchName string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	wtPath := filepath.Join(h.baseDir, "wt-"+branchName)
+	// The caller is expected to have already created the worktree
+	// via CreateDivergentBranch. Just kick off a rebase that will
+	// conflict; the rebase pauses mid-flight.
+	runGitCmd(h.t, wtPath, "rebase", "main")
+}
+
+// AdvanceBase adds a new commit to the base branch (main) so the
+// named worktree is now behind the base. Used to set up
+// "needs-rebase" states.
+func (h *RepoTestHelper) AdvanceBase(projectName, file, content string) string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	repoPath, ok := h.repos[projectName]
+	if !ok {
+		h.t.Fatalf("AdvanceBase: project %q not found", projectName)
+	}
+	if err := os.WriteFile(filepath.Join(repoPath, file), []byte(content), 0o644); err != nil {
+		h.t.Fatalf("write %s: %v", file, err)
+	}
+	runGitCmd(h.t, repoPath, "add", file)
+	runGitCmd(h.t, repoPath, "commit", "-m", "advance "+file)
+	out, err := exec.Command("git", "-C", repoPath, "rev-parse", "HEAD").Output()
+	if err != nil {
+		h.t.Fatalf("rev-parse: %v", err)
+	}
+	return string(out[:len(out)-1])
 }
 
 // NewRepoTestHelper creates a new RepoTestHelper instance

@@ -117,6 +117,22 @@ func NewBranchError(op, msg string, cause error) *ExternalError {
 	return newExternalError("git.branch", op, msg, cause)
 }
 
+// NewRebaseError constructs an ExternalError tagged with Op="git.rebase".
+// Used by the rebase-lifecycle methods (Rebase, Abort, Continue) on
+// *cliClient. The Op namespace lets OperationError.Is walk the cause
+// chain to core.ErrRebaseConflict / core.ErrRebaseInProgress.
+func NewRebaseError(op, msg string, cause error) *ExternalError {
+	return newExternalError("git.rebase", op, msg, cause)
+}
+
+// NewBaseTrackerError constructs an ExternalError tagged with Op="git.base".
+// Used by the per-worktree tracked-base read/write methods
+// (SetTrackedBase, GetTrackedBase). The Op namespace lets
+// OperationError.Is walk the cause chain to core.ErrBaseNotSet.
+func NewBaseTrackerError(op, msg string, cause error) *ExternalError {
+	return newExternalError("git.base", op, msg, cause)
+}
+
 // newExternalError is the shared constructor. tag is the high-level
 // namespace (e.g. "git.worktree"); op is the per-method suffix (e.g.
 // "create"). The embedded *core.OperationError.Op carries the
