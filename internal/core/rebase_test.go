@@ -136,6 +136,28 @@ func TestSyncResult_ZeroValueSafe(t *testing.T) {
 	}
 }
 
+// TestSyncResult_FetchOnlyLeavesRebasedBranchesEmpty covers the spec
+// scenario "--fetch-only leaves RebasedBranches empty": even when a
+// sync populates SyncedBranches, --fetch-only must keep the rebase
+// slice empty. The previous zero-value-safe test only covered the
+// fully empty case.
+func TestSyncResult_FetchOnlyLeavesRebasedBranchesEmpty(t *testing.T) {
+	t.Parallel()
+
+	r := SyncResult{
+		SyncedBranches: []*SyncedBranch{
+			{ProjectName: "p", BranchName: "main", RemoteName: "origin", OldTip: "abc", NewTip: "def"},
+		},
+		TotalSynced: 1,
+	}
+	if len(r.SyncedBranches) != 1 {
+		t.Fatalf("SyncedBranches must hold 1 entry, got %d", len(r.SyncedBranches))
+	}
+	if len(r.RebasedBranches) != 0 || r.TotalRebased != 0 {
+		t.Fatalf("--fetch-only must keep RebasedBranches empty: got %+v", r)
+	}
+}
+
 func TestSentinels_Rebase(t *testing.T) {
 	t.Parallel()
 

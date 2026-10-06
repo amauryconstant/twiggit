@@ -139,6 +139,35 @@ func fanOutProject(ctx context.Context, gitClient *git.Client, project *core.Pro
 	return targets, nil
 }
 
+// dispatchDirtyCheck returns a non-nil error when the worktree at
+// wtPath is dirty and opts.IsForce is false. The error wraps
+// core.ErrUncommittedChanges via *core.OperationError so callers can
+// branch via errors.Is and the formatter renders the spec-mandated
+// "stash, commit, or pop" hint. Returns nil for a clean worktree, for
+// an unreadable status (callers let git surface the real failure
+// downstream), or when --force bypasses the check.
+//
+// The RepositoryStatus call lives here, not in runRebaseWalk, so the
+// check can be unit-tested independently of the walk loop and so
+// single-target and --all paths share the same definition.
+func dispatchDirtyCheck(ctx context.Context, gitClient *git.Client, wtPath string, isForce bool) error {
+	if isForce {
+		return nil
+	}
+	// An unreadable status is reported by the subsequent git
+	// invocation; don't double-report it here.
+	status, _ := gitClient.RepositoryStatus(ctx, wtPath)
+	if status.IsClean {
+		return nil
+	}
+	return &core.OperationError{
+		Op:      "rebase.dirty",
+		Entity:  wtPath,
+		Message: "worktree has uncommitted changes; stash, commit, or pop before rebasing (or pass --force to override)",
+		Cause:   core.ErrUncommittedChanges,
+	}
+}
+
 // resolveTrackedBase picks the base branch a worktree should rebase
 // onto. The priority chain: explicit --set-base value (already
 // written by runRebaseSetBase; here we just read) > per-worktree
@@ -271,6 +300,22 @@ func runRebaseWalk(opts *RebaseOptions, gitClient *git.Client, cfg *core.Config,
 			continue
 		}
 		entry.TrackedBase = base
+
+		// Dirty-worktree refusal. Single-target: surface an
+		// OperationError that wraps core.ErrUncommittedChanges so
+		// callers can detect via errors.Is. --all: skip the
+		// worktree and continue the walk, analogous to the
+		// "prior conflict" skip path.
+		if dirtyErr := dispatchDirtyCheck(opts.Ctx, gitClient, target.WorktreePath, opts.IsForce); dirtyErr != nil {
+			if !opts.IsAll {
+				return nil, dirtyErr
+			}
+			entry.Error = dirtyErr
+			entry.SkipReason = "dirty worktree"
+			result.SkippedWorktrees = append(result.SkippedWorktrees, entry)
+			result.TotalSkipped++
+			continue
+		}
 
 		// Optional fetch.
 		if opts.IsFetch {

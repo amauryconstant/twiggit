@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 	"twiggit/internal/core"
@@ -229,6 +230,60 @@ func TestRebaseIntegration_SetBasePersists(t *testing.T) {
 	base, err := client.GetTrackedBase(context.Background(), wt)
 	require.NoError(t, err)
 	assert.Equal(t, "develop", base)
+}
+
+// TestRebaseIntegration_SetBaseThenRebase covers the spec scenario
+// "Subsequent rebase uses the new base": after
+// `twiggit rebase --set-base develop`, a follow-up rebase must
+// rebase onto develop, not the prior default. Set up two distinct
+// branch tips (main and develop) and assert the second rebase lands
+// on the develop tip, not main.
+func TestRebaseIntegration_SetBaseThenRebase(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+
+	mainRepo, wt := setupRebaseIntegrationRepo(t)
+
+	client, err := git.NewClient()
+	require.NoError(t, err)
+
+	// Create a divergent "develop" branch tip in main so develop
+	// and main point at different commits.
+	if err := os.WriteFile(filepath.Join(mainRepo, "develop.txt"), []byte("dev"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, mainRepo, "add", ".")
+	runGit(t, mainRepo, "commit", "-m", "develop tip")
+	runGit(t, mainRepo, "branch", "develop")
+
+	// Capture the develop tip commit.
+	developTipBytes, err := exec.Command("git", "-C", mainRepo, "rev-parse", "develop").CombinedOutput()
+	require.NoError(t, err, "git rev-parse develop must succeed")
+	developTip := strings.TrimSpace(string(developTipBytes))
+
+	// Re-point the wt at develop and rebase.
+	require.NoError(t, client.SetTrackedBase(context.Background(), wt, "develop"))
+
+	got, err := client.GetTrackedBase(context.Background(), wt)
+	require.NoError(t, err)
+	require.Equal(t, "develop", got,
+		"set-base must persist develop so the follow-up rebase picks it up")
+
+	outcome, err := client.Rebase(context.Background(), wt, "develop")
+	require.NoError(t, err)
+	assert.NotEqual(t, core.RebaseOutcomeAborted, outcome)
+
+	wtTipBytes, err := exec.Command("git", "-C", wt, "rev-parse", "HEAD").CombinedOutput()
+	require.NoError(t, err, "git rev-parse HEAD on wt must succeed")
+	wtTip := strings.TrimSpace(string(wtTipBytes))
+
+	// After rebase onto develop, the wt branch must have develop
+	// tip as one of its ancestors. Reject the test if wtTip has not
+	// moved past develop (or onto develop tip).
+	ancestorCmd := exec.Command("git", "-C", wt, "merge-base", "--is-ancestor", developTip, wtTip)
+	require.NoError(t, ancestorCmd.Run(),
+		"develop tip %s must be an ancestor of wt HEAD %s after rebase", developTip, wtTip)
 }
 
 // TestRebaseIntegration_PreRebaseHookAborts covers the PreRebase

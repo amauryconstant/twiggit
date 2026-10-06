@@ -176,7 +176,10 @@ Flags: `-n, --dry-run`, `-f, --force`, `-y, --yes`, `-d, --delete-branches`, `-a
 Purpose: Rebase the current (or named) worktree onto its tracked base
 Args: `[project/branch]` (optional; mutually exclusive with `--all`)
 Flags: `-a, --all`, `-f, --fetch`, `-c, --continue`, `-A, --abort`,
-`--set-base <branch>`, `-F, --force` (reserved no-op in v1)
+`--set-base <branch>`, `-F, --force` (bypasses the dirty-worktree
+refusal; worktree status is checked before the rebase step and the
+walk aborts with a `core.OperationError{Op: "rebase.dirty"}` wrapping
+`core.ErrUncommittedChanges` when the check fails)
 Files: `cmd/rebase.go` (`RebaseOptions`, `NewCmdRebase`, `runRebase`,
 `resolveRebaseTarget`, short-circuit verbs), `cmd/rebase_helpers.go`
 (`resolveRebaseTargets`, `resolveTrackedBase`, `dispatchRebaseHooks`,

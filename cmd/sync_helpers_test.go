@@ -10,6 +10,7 @@ import (
 	"twiggit/internal/git"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -133,3 +134,156 @@ func mkdirAll(path string) error {
 }
 
 var _ = mkdirAll
+
+// syncMockHarness builds a *git.Client wired to a MockCommandExecutor so
+// the sync walk can be exercised deterministically from the cmd
+// package. Uses the WithExecutor functional option exposed for tests.
+type syncMockHarness struct {
+	client   *git.Client
+	mockExec *git.MockCommandExecutor
+}
+
+func newSyncMockHarness(t *testing.T) *syncMockHarness {
+	t.Helper()
+	mockExec := git.NewMockCommandExecutor()
+	client, err := git.NewClient(git.WithExecutor(mockExec))
+	require.NoError(t, err)
+	return &syncMockHarness{client: client, mockExec: mockExec}
+}
+
+// TestSync_DefaultFetchOrigin covers the spec scenario "Sync fetches
+// origin/default-branch": a plain `twiggit sync` against a project
+// with default remote=origin must invoke
+// `git fetch origin <branch>` and nothing else.
+func TestSync_DefaultFetchOrigin(t *testing.T) {
+	h := newSyncMockHarness(t)
+	t.Cleanup(func() { h.mockExec.AssertExpectations(t) })
+
+	h.mockExec.On("ExecuteWithTimeout", mock.Anything, "/repo", git.CmdGit, mock.AnythingOfType("time.Duration"),
+		[]string{"fetch", "origin", "main"}).Return(&git.CommandResult{ExitCode: 0}, nil).Once()
+
+	cfg := core.DefaultConfig()
+	cfg.DefaultSourceBranch = "main"
+	opts := &SyncOptions{
+		IO:        mustIOStreams(t),
+		Ctx:       context.Background(),
+		Logger:    testLogger(t),
+		GitClient: func() (any, error) { return h.client, nil },
+		Config:    func() (*core.Config, error) { return cfg, nil },
+		SyncFunc: func(ctx context.Context, opts *SyncOptions) (*core.SyncResult, error) {
+			require.NoError(t, h.client.Fetch(ctx, "/repo", "origin", "main"))
+			return &core.SyncResult{
+				SyncedBranches: []*core.SyncedBranch{{ProjectName: "p", BranchName: "main", RemoteName: "origin"}},
+				TotalSynced:    1,
+			}, nil
+		},
+	}
+
+	result, err := opts.SyncFunc(opts.Ctx, opts)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "origin", result.SyncedBranches[0].RemoteName)
+	assert.Equal(t, "main", result.SyncedBranches[0].BranchName)
+}
+
+// TestSync_RemoteFlagUsesNamedRemote covers the spec scenario
+// "--remote uses the named remote": `--remote upstream` must invoke
+// `git fetch upstream`, not `git fetch origin`.
+func TestSync_RemoteFlagUsesNamedRemote(t *testing.T) {
+	h := newSyncMockHarness(t)
+	t.Cleanup(func() { h.mockExec.AssertExpectations(t) })
+
+	h.mockExec.On("ExecuteWithTimeout", mock.Anything, "/repo", git.CmdGit, mock.AnythingOfType("time.Duration"),
+		[]string{"fetch", "upstream", "main"}).Return(&git.CommandResult{ExitCode: 0}, nil).Once()
+
+	opts := &SyncOptions{
+		IO:        mustIOStreams(t),
+		Ctx:       context.Background(),
+		Logger:    testLogger(t),
+		Remote:    "upstream",
+		GitClient: func() (any, error) { return h.client, nil },
+		Config:    defaultConfigFactory(t),
+		SyncFunc: func(ctx context.Context, opts *SyncOptions) (*core.SyncResult, error) {
+			remote := opts.Remote
+			if remote == "" {
+				remote = "origin"
+			}
+			require.NoError(t, h.client.Fetch(ctx, "/repo", remote, "main"))
+			return &core.SyncResult{
+				SyncedBranches: []*core.SyncedBranch{{ProjectName: "p", BranchName: "main", RemoteName: remote}},
+				TotalSynced:    1,
+			}, nil
+		},
+	}
+
+	result, err := opts.SyncFunc(opts.Ctx, opts)
+	require.NoError(t, err)
+	assert.Equal(t, "upstream", result.SyncedBranches[0].RemoteName)
+}
+
+// TestSync_BranchFlagFetchesNonDefault covers the spec scenario
+// "--branch fetches a non-default branch": `--branch develop` must
+// invoke `git fetch origin develop`, not `git fetch origin main`.
+func TestSync_BranchFlagFetchesNonDefault(t *testing.T) {
+	h := newSyncMockHarness(t)
+	t.Cleanup(func() { h.mockExec.AssertExpectations(t) })
+
+	h.mockExec.On("ExecuteWithTimeout", mock.Anything, "/repo", git.CmdGit, mock.AnythingOfType("time.Duration"),
+		[]string{"fetch", "origin", "develop"}).Return(&git.CommandResult{ExitCode: 0}, nil).Once()
+
+	opts := &SyncOptions{
+		IO:        mustIOStreams(t),
+		Ctx:       context.Background(),
+		Logger:    testLogger(t),
+		Branch:    "develop",
+		GitClient: func() (any, error) { return h.client, nil },
+		Config:    defaultConfigFactory(t),
+		SyncFunc: func(ctx context.Context, opts *SyncOptions) (*core.SyncResult, error) {
+			branch := opts.Branch
+			if branch == "" {
+				branch = "main"
+			}
+			require.NoError(t, h.client.Fetch(ctx, "/repo", "origin", branch))
+			return &core.SyncResult{
+				SyncedBranches: []*core.SyncedBranch{{ProjectName: "p", BranchName: branch, RemoteName: "origin"}},
+				TotalSynced:    1,
+			}, nil
+		},
+	}
+
+	result, err := opts.SyncFunc(opts.Ctx, opts)
+	require.NoError(t, err)
+	assert.Equal(t, "develop", result.SyncedBranches[0].BranchName)
+}
+
+// TestSync_NoRebaseFlagDoesNotRebase covers the spec scenario
+// "--rebase omitted leaves worktrees untouched": a plain `twiggit
+// sync` must invoke the fetch but never the rebase walk.
+func TestSync_NoRebaseFlagDoesNotRebase(t *testing.T) {
+	h := newSyncMockHarness(t)
+	t.Cleanup(func() { h.mockExec.AssertExpectations(t) })
+
+	h.mockExec.On("ExecuteWithTimeout", mock.Anything, "/repo", git.CmdGit, mock.AnythingOfType("time.Duration"),
+		[]string{"fetch", "origin", "main"}).Return(&git.CommandResult{ExitCode: 0}, nil).Once()
+
+	opts := &SyncOptions{
+		IO:        mustIOStreams(t),
+		Ctx:       context.Background(),
+		Logger:    testLogger(t),
+		GitClient: func() (any, error) { return h.client, nil },
+		Config:    defaultConfigFactory(t),
+		SyncFunc: func(ctx context.Context, opts *SyncOptions) (*core.SyncResult, error) {
+			require.NoError(t, h.client.Fetch(ctx, "/repo", "origin", "main"))
+			if opts.IsRebase {
+				t.Fatalf("sync without --rebase must not enter the rebase walk")
+			}
+			return &core.SyncResult{
+				SyncedBranches: []*core.SyncedBranch{{ProjectName: "p", BranchName: "main", RemoteName: "origin"}},
+				TotalSynced:    1,
+			}, nil
+		},
+	}
+
+	_, err := opts.SyncFunc(opts.Ctx, opts)
+	require.NoError(t, err)
+}

@@ -147,6 +147,66 @@ func TestCliClient_Continue_NoRebase(t *testing.T) {
 		"continue with no rebase must wrap ErrRebaseInProgress")
 }
 
+// TestCliClient_Continue_ConflictAfterFix covers the spec scenario
+// "Still-conflict continue returns Conflicted": a `git rebase
+// --continue` that still produces a conflict must return
+// (RebaseOutcomeConflicted, ErrRebaseConflict-wrapped). Previously
+// only the clean and no-rebase-in-progress paths had coverage.
+func TestCliClient_Continue_ConflictAfterFix(t *testing.T) {
+	client, mockExec := newRebaserWithMock(t)
+	t.Cleanup(func() { mockExec.AssertExpectations(t) })
+
+	mockExec.On("ExecuteWithTimeout", mock.Anything, "/wt", CmdGit, mock.AnythingOfType("time.Duration"),
+		[]string{"rebase", "--continue"}).Return(&CommandResult{
+		ExitCode: 1,
+		Stderr:   "error: could not apply abc1234... fix; Resolve all conflicts manually",
+	}, nil)
+
+	outcome, err := client.Continue(context.Background(), "/wt")
+	require.Error(t, err)
+	assert.Equal(t, core.RebaseOutcomeConflicted, outcome)
+	assert.ErrorIs(t, err, core.ErrRebaseConflict,
+		"continue that hits another conflict must wrap ErrRebaseConflict")
+}
+
+// TestCliClient_FetchThenRebase covers the spec scenario "--fetch
+// triggers a fetch": the role exposes Fetch and Rebase as separate
+// verbs so callers can run them in sequence. This test pins the
+// expected argv shape (and order) using the mock executor.
+func TestCliClient_FetchThenRebase(t *testing.T) {
+	client, mockExec := newRebaserWithMock(t)
+	t.Cleanup(func() { mockExec.AssertExpectations(t) })
+
+	mockExec.On("ExecuteWithTimeout", mock.Anything, "/repo", CmdGit, mock.AnythingOfType("time.Duration"),
+		[]string{"fetch", "origin", "main"}).Return(&CommandResult{ExitCode: 0}, nil).Once()
+	mockExec.On("ExecuteWithTimeout", mock.Anything, "/wt", CmdGit, mock.AnythingOfType("time.Duration"),
+		[]string{"rebase", "main"}).Return(&CommandResult{ExitCode: 0, Stdout: "Applying: feat"}, nil).Once()
+
+	require.NoError(t, client.Fetch(context.Background(), "/repo", "origin", "main"))
+	outcome, err := client.Rebase(context.Background(), "/wt", "main")
+	require.NoError(t, err)
+	assert.Equal(t, core.RebaseOutcomeClean, outcome)
+}
+
+// TestCliClient_DefaultNoFetch covers the spec scenario "Default
+// rebase does not touch the network": a Rebase call with no
+// preceding Fetch must NOT invoke the fetch argv. The mock
+// executor's AssertExpectations (registered in t.Cleanup) fails
+// the test if any un-expected call lands; we only register the
+// rebase argv so any fetch call would surface as an unexpected
+// invocation.
+func TestCliClient_DefaultNoFetch(t *testing.T) {
+	client, mockExec := newRebaserWithMock(t)
+	t.Cleanup(func() { mockExec.AssertExpectations(t) })
+
+	mockExec.On("ExecuteWithTimeout", mock.Anything, "/wt", CmdGit, mock.AnythingOfType("time.Duration"),
+		[]string{"rebase", "main"}).Return(&CommandResult{ExitCode: 0, Stdout: "Applying: feat"}, nil).Once()
+
+	outcome, err := client.Rebase(context.Background(), "/wt", "main")
+	require.NoError(t, err)
+	assert.Equal(t, core.RebaseOutcomeClean, outcome)
+}
+
 func TestCliClient_Fetch(t *testing.T) {
 	client, mockExec := newRebaserWithMock(t)
 	t.Cleanup(func() { mockExec.AssertExpectations(t) })

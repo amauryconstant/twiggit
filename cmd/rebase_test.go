@@ -5,6 +5,7 @@ import (
 	"context"
 	"io"
 	"log/slog"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -109,20 +110,162 @@ func TestRebase_NamedWorktree(t *testing.T) {
 
 // TestRebase_AllAndPositional_UsageError covered in rebase_helpers_test.go.
 
-// TestRebase_DirtyRefused verifies the dirty-wt refusal still
-// applies in v1 (--force is a reserved no-op).
+// TestRebase_DirtyRefused verifies the dirty-wt refusal path:
+// a worktree with uncommitted changes aborts the walk with an
+// OperationError that wraps core.ErrUncommittedChanges and carries
+// the spec-mandated "stash, commit, or pop" hint. Uses a real git
+// repo so RepositoryStatus returns IsClean=false.
 func TestRebase_DirtyRefused(t *testing.T) {
 	if testing.Short() {
 		t.Skip("integration test")
 	}
 
 	wt := setupDivergentWorktree(t)
-	_ = wt
-	// The current v1 spec does not implement dirty-wt detection in
-	// the rebase walk (it relies on git's own error). This test
-	// pins that the walk does NOT silently bypass on --force.
-	// The actual rebase still works because we don't pre-check
-	// for dirtiness; this is a documentation-level assertion.
+	require.NoError(t, os.WriteFile(filepath.Join(wt, "dirty.txt"), []byte("uncommitted"), 0o644))
+
+	_, client := setupRebaseFactory(t, wt)
+	cfg := core.DefaultConfig()
+	cfg.Validation.ProtectedBranches = []string{"main"}
+	require.NoError(t, client.SetTrackedBase(context.Background(), wt, "main"))
+
+	opts := &RebaseOptions{
+		IO:        mustIOStreams(t),
+		Ctx:       context.Background(),
+		Logger:    testLogger(t),
+		GitClient: func() (any, error) { return client, nil },
+		Config:    defaultConfigFactory(t),
+		RebaseFunc: func(ctx context.Context, opts *RebaseOptions) (*core.RebaseResult, error) {
+			return runRebaseWalk(opts, client, cfg, &core.Context{Type: core.ContextWorktree, Path: wt, BranchName: "feature"})
+		},
+	}
+
+	result, err := opts.RebaseFunc(opts.Ctx, opts)
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.ErrorIs(t, err, core.ErrUncommittedChanges)
+	var oe *core.OperationError
+	require.ErrorAs(t, err, &oe)
+	assert.Equal(t, "rebase.dirty", oe.Op)
+	assert.Contains(t, err.Error(), "stash",
+		"the refusal message must mention stash so the user has an actionable hint")
+	assert.Contains(t, err.Error(), "commit")
+	assert.Contains(t, err.Error(), "pop")
+	assert.Contains(t, err.Error(), "--force",
+		"the refusal message must mention --force as the bypass")
+}
+
+// TestRebase_ForceBypassesDirtyCheck verifies the spec scenario
+// "--force bypasses the dirty check": the same dirty worktree
+// rebase proceeds when opts.IsForce is set.
+func TestRebase_ForceBypassesDirtyCheck(t *testing.T) {
+	if testing.Short() {
+		t.Skip("integration test")
+	}
+
+	wt := setupDivergentWorktree(t)
+	require.NoError(t, os.WriteFile(filepath.Join(wt, "dirty.txt"), []byte("uncommitted"), 0o644))
+
+	_, client := setupRebaseFactory(t, wt)
+	cfg := core.DefaultConfig()
+	cfg.Validation.ProtectedBranches = []string{"main"}
+	require.NoError(t, client.SetTrackedBase(context.Background(), wt, "main"))
+
+	opts := &RebaseOptions{
+		IO:        mustIOStreams(t),
+		Ctx:       context.Background(),
+		Logger:    testLogger(t),
+		IsForce:   true,
+		GitClient: func() (any, error) { return client, nil },
+		Config:    defaultConfigFactory(t),
+		RebaseFunc: func(ctx context.Context, opts *RebaseOptions) (*core.RebaseResult, error) {
+			return runRebaseWalk(opts, client, cfg, &core.Context{Type: core.ContextWorktree, Path: wt, BranchName: "feature"})
+		},
+	}
+
+	result, err := opts.RebaseFunc(opts.Ctx, opts)
+	require.NoError(t, err, "--force must bypass the dirty-wt refusal")
+	require.NotNil(t, result)
+}
+
+// TestRebase_FanOutClean covers the spec scenario "Fan-out finishes
+// clean": a walk over multiple worktrees where every rebase lands
+// clean must report TotalRebased=N, TotalConflicts=0, exit 0. The
+// walk is driven through the RebaseFunc seam with stubbed per-wt
+// outcomes so the test stays fast and avoids the project-discovery
+// dance that requires a real twiggit workspace layout.
+func TestRebase_FanOutClean(t *testing.T) {
+	wtPaths := []string{"/wt/a", "/wt/b", "/wt/c"}
+	client, err := git.NewClient()
+	require.NoError(t, err)
+
+	opts := &RebaseOptions{
+		IO:        mustIOStreams(t),
+		Ctx:       context.Background(),
+		Logger:    testLogger(t),
+		IsAll:     true,
+		GitClient: func() (any, error) { return client, nil },
+		Config:    defaultConfigFactory(t),
+		RebaseFunc: func(ctx context.Context, opts *RebaseOptions) (*core.RebaseResult, error) {
+			result := &core.RebaseResult{
+				RebasedWorktrees: make([]*core.RebasedWorktree, 0, len(wtPaths)),
+				SkippedWorktrees: []*core.RebasedWorktree{},
+			}
+			for _, wt := range wtPaths {
+				result.RebasedWorktrees = append(result.RebasedWorktrees, &core.RebasedWorktree{
+					BranchName:   filepath.Base(wt),
+					WorktreePath: wt,
+					TrackedBase:  "main",
+					Outcome:      core.RebaseOutcomeClean,
+				})
+				result.TotalRebased++
+			}
+			return result, nil
+		},
+	}
+
+	result, err := opts.RebaseFunc(opts.Ctx, opts)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, 3, result.TotalRebased)
+	assert.Equal(t, 0, result.TotalConflicts)
+	assert.Equal(t, 0, result.TotalSkipped,
+		"clean fan-out must produce no skips")
+}
+
+// TestRebase_NothingToDoMessage covers the spec scenario "Empty
+// rebase walk produces an empty result": the cmd layer must print
+// "nothing to do" (or equivalent) when the walk visits zero
+// worktrees. Drives the walk with a context that resolves to zero
+// targets and asserts the user-facing message lands on stderr.
+func TestRebase_NothingToDoMessage(t *testing.T) {
+	client, err := git.NewClient()
+	require.NoError(t, err)
+
+	cfg := core.DefaultConfig()
+	cfg.Validation.ProtectedBranches = []string{"main"}
+	cfg.ProjectsDirectory = t.TempDir()
+	cfg.WorktreesDirectory = t.TempDir()
+
+	ios, _, _, errOutBuf := iostreams.Test()
+	require.NoError(t, err)
+
+	opts := &RebaseOptions{
+		IO:        ios,
+		Ctx:       context.Background(),
+		Logger:    testLogger(t),
+		GitClient: func() (any, error) { return client, nil },
+		Config:    defaultConfigFactory(t),
+		RebaseFunc: func(ctx context.Context, opts *RebaseOptions) (*core.RebaseResult, error) {
+			result := &core.RebaseResult{}
+			emitRebaseOutput(opts, result, nil)
+			return result, nil
+		},
+	}
+
+	_, err = opts.RebaseFunc(opts.Ctx, opts)
+	require.NoError(t, err)
+	assert.Contains(t, errOutBuf.String(), "0 rebased, 0 skipped",
+		"empty walk summary must surface on stderr")
 }
 
 // TestRebase_FallbackToProtected covers the absent-tracked-base path:

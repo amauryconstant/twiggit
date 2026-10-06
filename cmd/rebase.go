@@ -63,8 +63,9 @@ Use flags to control scope and behaviour:
   --continue, -c      Resume a paused rebase (after conflict resolution)
   --abort, -A         Abort a paused rebase
   --set-base <branch> Persist the tracked base without rebasing
-  --force, -F         Reserved no-op in v1 (flag accepted for forward
-                      compatibility; dirty-wt refusal still applies)
+  --force, -F         Bypass the dirty-worktree refusal check (use
+                      with care — git will still fail if the rebase
+                      itself conflicts)
 
 Examples:
   twiggit rebase                      Rebase the current worktree
@@ -94,7 +95,7 @@ Examples:
 	cmd.Flags().BoolVarP(&opts.IsContinue, "continue", "c", false, "Resume a paused rebase")
 	cmd.Flags().BoolVarP(&opts.IsAbort, "abort", "A", false, "Abort a paused rebase")
 	cmd.Flags().StringVar(&opts.SetBase, "set-base", "", "Persist a new tracked base without rebasing")
-	cmd.Flags().BoolVarP(&opts.IsForce, "force", "F", false, "Reserved no-op: dirty-wt refusal still applies in v1")
+	cmd.Flags().BoolVarP(&opts.IsForce, "force", "F", false, "Bypass the dirty-worktree refusal check")
 
 	carapace.Gen(cmd).PositionalCompletion(
 		actionWorktreeTarget(f, git.WithExistingOnly()),

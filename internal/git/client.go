@@ -20,6 +20,7 @@ type ClientOption func(*clientConfig)
 type clientConfig struct {
 	cacheSize      int
 	isCacheEnabled bool
+	executor       CommandExecutor
 }
 
 // WithCacheSize sets the LRU cache capacity to n. Panics-equivalent
@@ -41,6 +42,17 @@ func WithCacheSize(n int) ClientOption {
 func WithCacheDisabled() ClientOption {
 	return func(c *clientConfig) {
 		c.isCacheEnabled = false
+	}
+}
+
+// WithExecutor replaces the CLI adapter's executor. Tests inject a
+// MockCommandExecutor so cmd-layer tests can drive git invocations
+// deterministically without spawning a real git binary. Production
+// callers leave this unset; the default is NewCommandExecutor with
+// defaultCLITimeout.
+func WithExecutor(exec CommandExecutor) ClientOption {
+	return func(c *clientConfig) {
+		c.executor = exec
 	}
 }
 
@@ -81,7 +93,10 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 		return nil, fmt.Errorf("create git LRU cache: %w", err)
 	}
 
-	executor := NewCommandExecutor(defaultCLITimeout)
+	executor := cfg.executor
+	if executor == nil {
+		executor = NewCommandExecutor(defaultCLITimeout)
+	}
 
 	return &Client{
 		reader: &reader{
