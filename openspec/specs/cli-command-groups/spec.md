@@ -12,7 +12,7 @@ The root `twiggit` command SHALL assign subcommands to groups via `cobra.Command
 
 | Group ID | Members |
 |---|---|
-| core | list, create, delete, prune |
+| core | list, create, delete, prune, rebase, sync |
 | navigation | cd |
 | setup | init |
 | meta | version, completion |
@@ -21,6 +21,7 @@ The root `twiggit` command SHALL assign subcommands to groups via `cobra.Command
 
 - **WHEN** the user runs `twiggit --help`
 - **THEN** the output contains the four group headers `Core:`, `Navigation:`, `Setup:`, `Meta:` with the respective subcommands under each
+- **AND** the `Core:` group SHALL include `rebase` and `sync` as members
 
 #### Scenario: Group registered before subcommand
 

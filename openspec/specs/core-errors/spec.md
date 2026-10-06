@@ -148,3 +148,28 @@ Sentinel variables SHALL use the `Err` prefix (`ErrGitRepoNotFound`, `ErrShellAl
 - **WHEN** the runner detects uncommitted changes in a worktree and returns `core.NewUncommittedChangesError(path)`
 - **THEN** `errors.Is(err, core.ErrUncommittedChanges)` SHALL return `true`
 - **AND** `errors.AsType[*core.OperationError](err)` SHALL return a non-nil result with `Entity` identifying the worktree path
+
+### Requirement: Rebase sentinels live in the core sentinel home
+
+The system SHALL expose three package-level sentinels for rebase and base-tracking error conditions: one for a rebase conflict, one for "no rebase in progress" (continue/abort called without a paused rebase), and one for "tracked base not set and no fallback". Each sentinel SHALL be declared in `internal/core/sentinels.go` (the single canonical home for `core.Err*` sentinels). Each sentinel's message SHALL be lowercase without trailing punctuation.
+
+#### Scenario: Sentinels live in sentinels.go
+
+- **WHEN** the source tree for `internal/core/` is searched for sentinel declarations
+- **THEN** the three rebase sentinels SHALL be declared in `sentinels.go`
+- **AND** SHALL NOT be redeclared in any other file
+
+#### Scenario: Adapter wraps via %w so errors.Is walks the chain
+
+- **WHEN** the rebase adapter constructs an error for a conflict, an absent rebase, or a missing tracked base
+- **THEN** the returned error SHALL wrap the appropriate sentinel via `fmt.Errorf("{context}: %w", core.Err...)`
+- **AND** `errors.Is(err, <matching sentinel>)` SHALL return true
+
+### Requirement: Per-entity dispatch extended for rebase and base-tracking
+
+The `core.OperationError.Is` and `core.NotFoundError.Is` dispatch SHALL walk the rebase-conflict and missing-base sentinels when `Op` carries the corresponding prefix (`rebase.*` and `base.*`) so callers can use `errors.Is(err, Sentinel)` regardless of which constructor produced the error.
+
+#### Scenario: OperationError walking matches the rebase-conflict sentinel
+
+- **WHEN** an adapter returns a `*core.OperationError{Op: "rebase.worktree"}` whose `Cause` walks to the rebase-conflict sentinel
+- **THEN** `errors.Is(err, <rebase-conflict sentinel>)` SHALL return true
