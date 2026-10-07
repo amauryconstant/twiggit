@@ -51,6 +51,90 @@ var _ = Describe("completion command", func() {
 		}
 	})
 
+	It("emits powershell completion script", func() {
+		session := cli.Run("completion", "powershell")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "using namespace System.Management.Automation")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("emits elvish completion script", func() {
+		session := cli.Run("completion", "elvish")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "set edit:completion:arg-completer")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("emits nushell completion script", func() {
+		session := cli.Run("completion", "nushell")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "let twiggit_completer")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("emits oil completion script", func() {
+		session := cli.Run("completion", "oil")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "#!/bin/osh")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("emits tcsh completion script", func() {
+		session := cli.Run("completion", "tcsh")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, `complete "twiggit"`)
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("emits xonsh completion script", func() {
+		session := cli.Run("completion", "xonsh")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "from xonsh.completers.completer import add_one_completer")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("emits cmd-clink completion script", func() {
+		session := cli.Run("completion", "cmd-clink")
+		cli.ShouldSucceed(session)
+		cli.ShouldOutput(session, "match_builder:setnosort()")
+
+		if session.ExitCode() != 0 {
+			GinkgoT().Log("Output:", string(session.Out.Contents()))
+			GinkgoT().Log("Error:", string(session.Err.Contents()))
+		}
+	})
+
+	It("rejects unsupported shell with ValidationError", Pending, func() {
+		session := cli.Run("completion", "ksh")
+		cli.ShouldFailWithExit(session, 1)
+		cli.ShouldErrorOutput(session, "ksh")
+		cli.ShouldErrorOutput(session, "unsupported")
+	})
+
 	It("rejects a stray positional after the shell name", func() {
 		session := cli.Run("completion", "zsh", "extra")
 		cli.ShouldFailWithExit(session, 2)
