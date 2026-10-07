@@ -37,7 +37,7 @@ To load completions:
 		Example:               "  source <(twiggit completion " + shell + ")",
 		SilenceUsage:          true,
 		SilenceErrors:         true,
-		Args:                  wrapArgsValidator(cobra.ExactArgs(1)),
+		Args:                  wrapArgsValidator(cobra.NoArgs),
 		DisableFlagsInUseLine: true,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			snippet, err := carapace.Gen(rootCmd).Snippet(shell)
