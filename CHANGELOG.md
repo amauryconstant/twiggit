@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-10-08
+
+
+
+### Added
+
+- Cover all 10 completion shells in `test/e2e/completion_test.go` (powershell, elvish, nushell, oil, tcsh, xonsh, cmd-clink on top of existing bash/zsh/fish); each block asserts exit 0 + shell-specific marker; pending `It` block for unsupported-shell scenario (cli-completion)
+
+### Changed
+
+- `mise run verify` runs golangci-lint exactly once: `lint:gated` invokes `lint:fix` (auto-fix on gate), redundant `lint:fix` entry removed from verify (it was shadowed by `lint:gated`) (ci-tooling)
+
+### Fixed
+
+- `twiggit completion zsh` rejected with `accepts 1 arg(s), received 0` because per-shell subcommands required one positional even though the shell name is encoded in `Use`; switch validator to `cobra.NoArgs`; pin with unit + e2e tests for bash/zsh/fish and the regression (cli-completion)
+- `twiggit completion ksh` previously printed parent help and exited 0; replace parent `Args` with a whitelist validator returning `*core.ValidationError` on mismatch (parent gains a minimal `RunE` returning `cmd.Help()` so `cobra` still consults `Args` for unmatched subcommand args and preserves "show help when no shell given"); unlocks the unsupported-shell scenario in `openspec/specs/cli-completion/spec.md` (cli-completion)
+
 ## [0.15.0] - 2026-10-06
 
 
