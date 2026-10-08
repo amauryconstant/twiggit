@@ -74,10 +74,10 @@ description = "Summarise gopls analysis state"
 run = "gopls stats"
 
 [tasks."lint:gated"]
-description = "Run gopls + golangci-lint together"
+description = "Run gopls + golangci-lint --fix together (mutates)"
 run = [
     { task = "gopls:check" },
-    { task = "lint:check" },
+    { task = "lint:fix" },
 ]
 
 [tasks."vuln:check"]
@@ -85,10 +85,9 @@ description = "Scan for known vulnerabilities via govulncheck"
 run = "govulncheck ./..."
 
 [tasks.verify]
-description = "Run all maintenance tasks: format, auto-fix lint, gate lint (gopls + golangci-lint), vuln scan, full test suite, build"
+description = "Run all maintenance tasks: format, gate lint (gopls + golangci-lint --fix), vuln scan, full test suite, build"
 run = [
     { task = "format" },
-    { task = "lint:fix" },
     { task = "lint:gated" },
     { task = "vuln:check" },
     { task = "test" },
