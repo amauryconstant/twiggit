@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"testing"
+	"twiggit/internal/core"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -48,4 +49,53 @@ func TestNewCompletionCommand_HasAllShellsRegistered(t *testing.T) {
 		require.NotNil(t, matched, "completion subcommand %q must be registered", name)
 		assert.Equal(t, name, matched.Name(), "completion subcommand %q must resolve exactly", name)
 	}
+}
+
+func TestNewCompletionCommand_AcceptsZeroPositionals(t *testing.T) {
+	t.Parallel()
+
+	root := &cobra.Command{Use: "twiggit"}
+	completion := newCompletionCommand(root)
+
+	require.NotNil(t, completion.Args, "completion parent must declare Args validator")
+
+	err := completion.Args(completion, []string{})
+	assert.NoError(t, err, "twiggit completion must accept zero positionals to show help")
+}
+
+func TestNewCompletionCommand_AcceptsEachSupportedShell(t *testing.T) {
+	t.Parallel()
+
+	root := &cobra.Command{Use: "twiggit"}
+	completion := newCompletionCommand(root)
+
+	shells := []string{
+		"bash", "zsh", "fish", "powershell",
+		"elvish", "nushell", "oil", "tcsh", "xonsh", "cmd-clink",
+	}
+	for _, s := range shells {
+		t.Run(s, func(t *testing.T) {
+			t.Parallel()
+			err := completion.Args(completion, []string{s})
+			assert.NoError(t, err, "shell %q must be accepted by completion parent", s)
+		})
+	}
+}
+
+func TestNewCompletionCommand_RejectsUnsupportedShell(t *testing.T) {
+	t.Parallel()
+
+	root := &cobra.Command{Use: "twiggit"}
+	completion := newCompletionCommand(root)
+
+	err := completion.Args(completion, []string{"ksh"})
+	require.Error(t, err, "twiggit completion ksh must fail validation")
+
+	var ve *core.ValidationError
+	require.ErrorAs(t, err, &ve, "rejection must surface as *core.ValidationError")
+
+	assert.Equal(t, "shell", ve.Field)
+	assert.Equal(t, "ksh", ve.Value)
+	assert.Contains(t, ve.Message, "unsupported")
+	assert.Contains(t, ve.Message, "ksh")
 }

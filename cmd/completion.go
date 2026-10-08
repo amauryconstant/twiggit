@@ -2,10 +2,32 @@ package cmd
 
 import (
 	"fmt"
+	"slices"
+	"strings"
+	"twiggit/internal/core"
 
 	"github.com/carapace-sh/carapace"
 	"github.com/spf13/cobra"
 )
+
+var supportedCompletionShells = []string{
+	"bash", "zsh", "fish", "powershell",
+	"elvish", "nushell", "oil", "tcsh", "xonsh", "cmd-clink",
+}
+
+func validateSupportedShell(_ *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return nil
+	}
+	if slices.Contains(supportedCompletionShells, args[0]) {
+		return nil
+	}
+	return core.NewValidationError(
+		"shell", args[0],
+		fmt.Sprintf("unsupported shell %q (supported: %s)",
+			args[0], strings.Join(supportedCompletionShells, ", ")),
+	)
+}
 
 func newCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
@@ -14,11 +36,13 @@ func newCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 		Long:          `Generate the autocompletion script for twiggit for the specified shell. See each sub-command's help for details on how to use the generated script.`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
-		Args:          wrapArgsValidator(cobra.NoArgs),
+		Args:          validateSupportedShell,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return cmd.Help()
+		},
 	}
 
-	shells := []string{"bash", "zsh", "fish", "powershell", "elvish", "nushell", "oil", "tcsh", "xonsh", "cmd-clink"}
-	for _, shell := range shells {
+	for _, shell := range supportedCompletionShells {
 		cmd.AddCommand(newCompletionShellCommand(rootCmd, shell))
 	}
 

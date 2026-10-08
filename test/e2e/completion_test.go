@@ -128,11 +128,10 @@ var _ = Describe("completion command", func() {
 		}
 	})
 
-	It("rejects unsupported shell with ValidationError", Pending, func() {
+	It("rejects unsupported shell with ValidationError", func() {
 		session := cli.Run("completion", "ksh")
 		cli.ShouldFailWithExit(session, 1)
-		cli.ShouldErrorOutput(session, "ksh")
-		cli.ShouldErrorOutput(session, "unsupported")
+		cli.ShouldErrorOutput(session, `unsupported shell "ksh"`)
 	})
 
 	It("rejects a stray positional after the shell name", func() {
