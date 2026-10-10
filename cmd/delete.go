@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"time"
 	"twiggit/internal/cmdutil"
 	"twiggit/internal/core"
 	"twiggit/internal/git"
@@ -104,9 +103,6 @@ func runDelete(opts *DeleteOptions) error {
 	}
 
 	if err := validateDeleteSafety(ctx, gitClient, target, opts); err != nil {
-		if errors.Is(err, core.ErrWorktreeNotFound) {
-			return emitDeleteResult(opts, currentCtx, cfg.ProjectsDirectory, target.WorktreePath)
-		}
 		return err
 	}
 
@@ -189,12 +185,20 @@ func (opts *DeleteOptions) gitClient() *git.Client {
 // idempotent navigation/ack emission.
 func validateDeleteSafety(ctx context.Context, gitClient *git.Client, target DeleteTarget, opts *DeleteOptions) error {
 	if !opts.IsForce {
-		status, err := getWorktreeStatus(ctx, gitClient, target.WorktreePath)
+		repoPath := target.ProjectPath
+		if repoPath == "" {
+			repoPath = target.WorktreePath
+		}
+		cfg, err := opts.Config()
 		if err != nil {
-			if errors.Is(err, core.ErrWorktreeNotFound) {
-				return err
+			return fmt.Errorf("config load failed: %w", err)
+		}
+		status, err := gitClient.ReadWorktreeStatus(ctx, cfg, repoPath, target.WorktreePath)
+		if err != nil {
+			if !errors.Is(err, core.ErrWorktreeNotFound) {
+				return fmt.Errorf("failed to check worktree status: %w", err)
 			}
-			return fmt.Errorf("failed to check worktree status: %w", err)
+			return fmt.Errorf("read worktree status: %w", err)
 		}
 		if !status.IsClean {
 			return core.NewUncommittedChangesError(target.WorktreePath)
@@ -257,55 +261,6 @@ func emitDeleteResult(opts *DeleteOptions, currentCtx *core.Context, projectsDir
 		_, _ = fmt.Fprintf(writeOrIgnore(opts.IO.Out), "Deleted worktree: %s\n", worktreePath)
 	}
 	return nil
-}
-
-// getWorktreeStatus mirrors worktreeService.GetWorktreeStatus.
-func getWorktreeStatus(ctx context.Context, client *git.Client, worktreePath string) (*core.WorktreeStatus, error) {
-	if worktreePath == "" {
-		return nil, core.NewOpValidationError("GetWorktreeStatus", "worktreePath", "", "worktree path cannot be empty")
-	}
-	if err := client.ValidateRepository(worktreePath); err != nil {
-		return nil, &core.OperationError{
-			Op:      "status.worktree",
-			Entity:  worktreePath,
-			Message: "invalid git repository",
-			Cause:   err,
-		}
-	}
-
-	repoStatus, err := client.RepositoryStatus(ctx, worktreePath)
-	if err != nil {
-		return nil, &core.OperationError{
-			Op:      "status.worktree",
-			Entity:  worktreePath,
-			Message: "failed to get repository status",
-			Cause:   err,
-		}
-	}
-
-	branchStatus := "up-to-date"
-	switch {
-	case repoStatus.Ahead > 0 && repoStatus.Behind > 0:
-		branchStatus = "diverged"
-	case repoStatus.Ahead > 0:
-		branchStatus = "ahead"
-	case repoStatus.Behind > 0:
-		branchStatus = "behind"
-	}
-
-	return &core.WorktreeStatus{
-		RepositoryStatus:      &repoStatus,
-		LastChecked:           now(),
-		IsClean:               repoStatus.IsClean,
-		HasUncommittedChanges: !repoStatus.IsClean,
-		BranchStatus:          branchStatus,
-	}, nil
-}
-
-// now returns the current time. Pulled into a helper so future slices
-// can stub it without rewriting the call sites.
-func now() time.Time {
-	return time.Now()
 }
 
 // clientGetWorktreeByPath returns the worktree info for worktreePath

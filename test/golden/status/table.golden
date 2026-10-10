@@ -1,0 +1,8 @@
+# `twiggit status --output table` output
+
+# Capture by running:
+#   UPDATE_GOLDEN=true mise run test:e2e
+#
+# Format: lipgloss table with header BRANCH, PATH, AHEAD, BEHIND,
+# BASE, MERGED, DIRTY, STALE; one row per worktree. Border
+# decoration drops under --no-color.

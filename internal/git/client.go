@@ -136,16 +136,21 @@ func newClientWithCacheFactory(size int, enabled bool, factory goGitCacheFactory
 // through the public Client surface.
 var _ = lru.New[string, *git.Repository]
 
-// compile-time role satisfaction. The composite *Client embeds *reader and
-// *cliClient, so its method set is the union of both halves; these checks
-// guard all role methods at once against drift on the unexported concretes.
+// compile-time role satisfaction. The composite *Client embeds *reader
+// and *cliClient, so its method set is the union of both halves plus
+// any direct methods declared on *Client itself (e.g.,
+// ReadWorktreeStatus, which spans the two halves and is implemented as
+// a direct method on the composite rather than promoted from either
+// embedded half). These checks guard all role methods at once against
+// drift on the unexported concretes.
 var (
-	_ core.RepositoryOpener = (*Client)(nil)
-	_ core.BranchReader     = (*Client)(nil)
-	_ core.RepositoryReader = (*Client)(nil)
-	_ core.RemoteReader     = (*Client)(nil)
-	_ core.WorktreeWriter   = (*Client)(nil)
-	_ core.BranchWriter     = (*Client)(nil)
-	_ core.Rebaser          = (*Client)(nil)
-	_ core.BaseTracker      = (*Client)(nil)
+	_ core.RepositoryOpener     = (*Client)(nil)
+	_ core.BranchReader         = (*Client)(nil)
+	_ core.RepositoryReader     = (*Client)(nil)
+	_ core.RemoteReader         = (*Client)(nil)
+	_ core.WorktreeWriter       = (*Client)(nil)
+	_ core.BranchWriter         = (*Client)(nil)
+	_ core.Rebaser              = (*Client)(nil)
+	_ core.BaseTracker          = (*Client)(nil)
+	_ core.WorktreeStatusReader = (*Client)(nil)
 )

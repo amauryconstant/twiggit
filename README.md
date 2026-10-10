@@ -126,7 +126,32 @@ twiggit sync --all                   # Sync every project
 twiggit sync --remote upstream       # Fetch from a non-default remote
 twiggit sync --rebase                # Fetch and rebase every worktree
 twiggit sync --fetch-only            # Skip the rebase walk
+
+# Show the diagnostic view of every worktree: ahead/behind counts
+# against the tracked base, merge readiness, dirty state, last-commit
+# date, and a stale flag. Pipeable via --output json|table|plain.
+twiggit status                       # Status for the current project
 ```
+
+## status
+
+Show the diagnostic view of every worktree: ahead/behind counts against
+the tracked base, merge readiness, dirty state, last-commit date, and a
+stale flag. Output is human-readable by default and pipeable via
+`--output json|table|plain`.
+
+```sh
+twiggit status                       # Status for the current project
+twiggit status --all                 # Status across every project
+twiggit status --output json         # JSON for scripts
+twiggit status --stale-behind 5      # Override the stale threshold
+```
+
+The columns are `BRANCH`, `PATH`, `AHEAD`, `BEHIND`, `BASE`, `MERGED`,
+`DIRTY`, `STALE`. A worktree is `stale` when its `Behind` count meets
+`status.stale_behind` (default 20) or its last commit is older than
+`status.stale_days` (default 30). Set both to `0` to disable the
+heuristic.
 
 ## Post-Create Hooks
 

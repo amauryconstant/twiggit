@@ -87,6 +87,16 @@ type SyncConfig struct {
 	RebaseAfterSync bool   `toml:"rebase_after_sync" koanf:"rebase_after_sync"`
 }
 
+// StatusConfig holds knobs that govern the `twiggit status` command
+// and the stale heuristic. StaleBehind and StaleDays are independent:
+// either trips the IsStale column. A value of 0 disables the
+// corresponding half of the heuristic. The TOML key prefix is
+// `[status]`.
+type StatusConfig struct {
+	StaleBehind int `toml:"stale_behind" koanf:"stale_behind"`
+	StaleDays   int `toml:"stale_days" koanf:"stale_days"`
+}
+
 // CompletionConfig represents shell completion specific configuration
 type CompletionConfig struct {
 	// Timeout for completion operations
@@ -149,6 +159,9 @@ type Config struct {
 
 	// Sync settings
 	Sync SyncConfig `toml:"sync" koanf:"sync"`
+
+	// Status settings (stale heuristic thresholds for `twiggit status`).
+	Status StatusConfig `toml:"status" koanf:"status"`
 
 	// IsColorEnabled reports whether ANSI color output is enabled.
 	// It is set by config.Manager from NO_COLOR at load time (default true).
@@ -223,6 +236,10 @@ func DefaultConfig() *Config {
 			PruneRemoteRefs: true,
 			RebaseAfterSync: false,
 		},
+		Status: StatusConfig{
+			StaleBehind: 20,
+			StaleDays:   30,
+		},
 		IsColorEnabled: true,
 	}
 }
@@ -244,6 +261,17 @@ func (c *Config) Validate() error {
 	// Validate default source branch
 	if c.DefaultSourceBranch == "" {
 		validationErrors = append(validationErrors, "default_source_branch cannot be empty")
+	}
+
+	// Validate status stale thresholds. Zero is a valid value (it
+	// disables that half of the stale heuristic); negative values are
+	// not — the heuristic is a count / day count, not a sign. No upper
+	// bound: a user may set a high threshold to silence the column.
+	if c.Status.StaleBehind < 0 {
+		validationErrors = append(validationErrors, "status.stale_behind cannot be negative")
+	}
+	if c.Status.StaleDays < 0 {
+		validationErrors = append(validationErrors, "status.stale_days cannot be negative")
 	}
 
 	if len(validationErrors) > 0 {

@@ -63,14 +63,51 @@ func (r Result[T]) IsError() bool {
 	return !r.Success
 }
 
-// WorktreeStatus represents the status of a worktree
+// WorktreeStatus represents the diagnostic view of a single worktree:
+// its repository status, ahead/behind counts against the resolved
+// base, merge readiness, dirty state, last-commit date, and a
+// best-effort skip flag. Populated by the *git.Client.ReadWorktreeStatus
+// adapter (cross-half method on the composite) and consumed by
+// cmd/status and cmd/delete.
 type WorktreeStatus struct {
-	Worktree              *Worktree
-	RepositoryStatus      *RepositoryStatus
-	LastChecked           time.Time
-	IsClean               bool
-	HasUncommittedChanges bool
-	BranchStatus          string // "ahead", "behind", "diverged", "up-to-date"
+	Worktree              *Worktree         `json:"worktree,omitempty"`
+	ProjectName           string            `json:"project,omitempty"`
+	RepositoryStatus      *RepositoryStatus `json:"repository_status,omitempty"`
+	LastChecked           time.Time         `json:"last_checked"`
+	IsClean               bool              `json:"is_clean"`
+	HasUncommittedChanges bool              `json:"has_uncommitted_changes"`
+	Base                  string            `json:"base"`
+	IsMerged              bool              `json:"is_merged"`
+	IsStale               bool              `json:"is_stale"`
+	LastCommitDate        time.Time         `json:"last_commit_date"`
+	IsSkipped             bool              `json:"is_skipped"`
+	SkipReason            string            `json:"skip_reason,omitempty"`
+}
+
+// Dirty reports whether the worktree has uncommitted changes.
+// Aliased to HasUncommittedChanges for cmd-layer readability.
+func (s *WorktreeStatus) Dirty() bool { return s.HasUncommittedChanges }
+
+// ComputeIsStale returns true when either the behind-count exceeds
+// cfg.Status.StaleBehind (when > 0) or the time since LastCommitDate
+// exceeds cfg.Status.StaleDays * 24h (when > 0 and LastCommitDate is
+// not the zero time). When both thresholds are zero the heuristic is
+// disabled. The cmd layer calls this per row after the adapter
+// returns so the IsStale field carries the per-invocation value.
+func (s *WorktreeStatus) ComputeIsStale(cfg *Config) bool {
+	if cfg == nil {
+		return false
+	}
+	if cfg.Status.StaleBehind > 0 && s.RepositoryStatus != nil && s.RepositoryStatus.Behind >= cfg.Status.StaleBehind {
+		return true
+	}
+	if cfg.Status.StaleDays > 0 && !s.LastCommitDate.IsZero() {
+		age := time.Since(s.LastCommitDate)
+		if age >= time.Duration(cfg.Status.StaleDays)*24*time.Hour {
+			return true
+		}
+	}
+	return false
 }
 
 // ProjectInfo represents comprehensive project information

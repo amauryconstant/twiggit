@@ -353,10 +353,11 @@ func findProjectByName(ctx context.Context, client *git.Client, cfg *core.Config
 	entries, err := os.ReadDir(cfg.ProjectsDirectory)
 	if err != nil {
 		return nil, &core.OperationError{
-			Op:      "discover.project",
-			Entity:  projectName,
-			Message: "failed to search projects",
-			Cause:   err,
+			Op:          "discover.project",
+			Entity:      projectName,
+			Message:     "failed to search projects",
+			Cause:       err,
+			Suggestions: []string{"check that the projects directory exists and is readable"},
 		}
 	}
 	for _, entry := range entries {
@@ -368,11 +369,7 @@ func findProjectByName(ctx context.Context, client *git.Client, cfg *core.Config
 			return buildProjectInfo(ctx, client, cfg, projectPath)
 		}
 	}
-	return nil, &core.OperationError{
-		Op:      "discover.project",
-		Entity:  projectName,
-		Message: "project not found",
-	}
+	return nil, &core.NotFoundError{Entity: "project", Name: projectName}
 }
 
 // calculateWorktreePath builds the worktree path under

@@ -177,3 +177,24 @@ func TestCreate_SetTrackedBaseFailure(t *testing.T) {
 	assert.Contains(t, buf.String(), req.SourceBranch,
 		"warning must include the tracked base for diagnosis")
 }
+
+// TestFindProjectByName_UnknownReturnsNotFoundError pins the typed
+// error contract for the project-name lookup helper. All five
+// discoverProject consumers (create, prune, rebase, sync, status)
+// route through this branch, so the contract must hold at the
+// helper level rather than at each call site.
+func TestFindProjectByName_UnknownReturnsNotFoundError(t *testing.T) {
+	projectsDir := t.TempDir()
+	cfg := core.DefaultConfig()
+	cfg.ProjectsDirectory = projectsDir
+
+	_, err := findProjectByName(context.Background(), nil, cfg, "no-such-project")
+
+	require.Error(t, err)
+	var nfe *core.NotFoundError
+	require.ErrorAs(t, err, &nfe, "missing project must surface as *core.NotFoundError")
+	assert.Equal(t, "project", nfe.Entity)
+	assert.Equal(t, "no-such-project", nfe.Name)
+	assert.ErrorIs(t, err, core.ErrProjectNotFound,
+		"missing project must satisfy errors.Is(err, core.ErrProjectNotFound)")
+}

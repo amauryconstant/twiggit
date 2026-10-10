@@ -504,3 +504,66 @@ func TestConfigManager_LoadWrapsKoanfErrors(t *testing.T) {
 	assert.Equal(t, "config.load", oe.Op)
 	assert.Equal(t, configPath, oe.Entity)
 }
+
+// TestStatusConfig_KoanfLoadsFromEnv confirms that the
+// TWIGGIT_STATUS__STALE_BEHIND / TWIGGIT_STATUS__STALE_DAYS env
+// providers flow into Config.Status through the same load path the
+// production binary uses. Pairs with TestStatusConfig_FieldsHaveKoanfTags
+// in internal/core: the latter guards tag presence, this one guards
+// the load behavior.
+func TestStatusConfig_KoanfLoadsFromEnv(t *testing.T) {
+	t.Setenv("TWIGGIT_STATUS__STALE_BEHIND", "50")
+	t.Setenv("TWIGGIT_STATUS__STALE_DAYS", "7")
+
+	cfg, err := NewManager().Load()
+	require.NoError(t, err)
+	require.NoError(t, cfg.Validate())
+
+	is := assert.New(t)
+	is.Equal(50, cfg.Status.StaleBehind, "env override must land on StaleBehind")
+	is.Equal(7, cfg.Status.StaleDays, "env override must land on StaleDays")
+}
+
+// TestStatusConfig_KoanfDefaultsPreserved confirms that an
+// env override on one threshold does not erase the default for the
+// other. Catches a future regression where the env provider mistakenly
+// zero-fills siblings.
+func TestStatusConfig_KoanfDefaultsPreserved(t *testing.T) {
+	t.Setenv("TWIGGIT_STATUS__STALE_BEHIND", "50")
+	unsetEnv(t, "TWIGGIT_STATUS__STALE_DAYS")
+
+	cfg, err := NewManager().Load()
+	require.NoError(t, err)
+
+	is := assert.New(t)
+	is.Equal(50, cfg.Status.StaleBehind, "env override must land on StaleBehind")
+	is.Equal(30, cfg.Status.StaleDays, "unset StaleDays must fall back to the default")
+}
+
+// TestStatusConfig_KoanfLoadsFromTOML confirms the
+// [status] stale_behind / stale_days TOML keys round-trip into
+// Config.Status through the file-load branch. Hermetic via the
+// XDG_CONFIG_HOME env var; the manager reads
+// $XDG_CONFIG_HOME/twiggit/config.toml (per resolveConfigPath).
+func TestStatusConfig_KoanfLoadsFromTOML(t *testing.T) {
+	manager, tempDir, _ := setupConfigManagerTest(t)
+
+	// Ensure no env override leaks into this TOML-only test.
+	unsetEnv(t, "TWIGGIT_STATUS__STALE_BEHIND")
+	unsetEnv(t, "TWIGGIT_STATUS__STALE_DAYS")
+
+	configDir := filepath.Join(tempDir, "twiggit")
+	require.NoError(t, os.MkdirAll(configDir, 0o755))
+	configPath := filepath.Join(configDir, "config.toml")
+	require.NoError(t, os.WriteFile(configPath, []byte(
+		"[status]\nstale_behind = 50\nstale_days = 7\n",
+	), 0o600))
+
+	cfg, err := manager.Load()
+	require.NoError(t, err)
+	require.NoError(t, cfg.Validate())
+
+	is := assert.New(t)
+	is.Equal(50, cfg.Status.StaleBehind, "TOML [status].stale_behind must round-trip")
+	is.Equal(7, cfg.Status.StaleDays, "TOML [status].stale_days must round-trip")
+}

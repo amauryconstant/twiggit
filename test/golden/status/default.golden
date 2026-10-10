@@ -1,0 +1,8 @@
+# `twiggit status` default output
+
+# Capture by running:
+#   UPDATE_GOLDEN=true mise run test:e2e
+#
+# Format: tab-separated rows (BRANCH, PATH, AHEAD, BEHIND, BASE,
+# MERGED, DIRTY, STALE), no header, one row per worktree. Empty
+# collection emits no lines.

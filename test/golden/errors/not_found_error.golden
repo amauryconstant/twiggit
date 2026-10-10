@@ -1,4 +1,4 @@
-Error: invalid git repository
+Error: operation failed
   entity=/tmp/fixtures/worktrees/test-project/non-existent-worktree
-  cause: git validate: not a valid git repository
-  hint: Verify the repository path
+  cause: core: worktree not found
+  hint: Use 'twiggit list' to see available worktrees

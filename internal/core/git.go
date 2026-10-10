@@ -89,3 +89,19 @@ type BaseTracker interface {
 	SetTrackedBase(ctx context.Context, wtPath, base string) error
 	GetTrackedBase(ctx context.Context, wtPath string) (string, error)
 }
+
+// WorktreeStatusReader exposes the per-worktree diagnostic projection
+// assembled from across the read- and write-side halves of the
+// composite client. The cfg argument carries the protected-branch
+// fallback chain and the stale-heuristic thresholds; repoPath is the
+// project's main checkout and wtPath is the worktree being reported on.
+//
+// The adapter fills the Base / IsMerged / IsStale (zero) / LastCommitDate
+// / IsSkipped / SkipReason fields on top of the existing dirty-state
+// read; IsStale is intentionally left at the zero value here so the
+// cmd layer can derive it per row via WorktreeStatus.ComputeIsStale(cfg)
+// using the per-invocation thresholds (which may come from --stale-behind
+// or --stale-days flags).
+type WorktreeStatusReader interface {
+	ReadWorktreeStatus(ctx context.Context, cfg *Config, repoPath, wtPath string) (WorktreeStatus, error)
+}

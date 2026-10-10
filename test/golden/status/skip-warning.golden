@@ -1,0 +1,9 @@
+# Per-skip-warning case
+
+# Capture by running:
+#   UPDATE_GOLDEN=true mise run test:e2e
+#
+# Format: a single stderr line per skipped row,
+#   "warning: <branch> (<path>): <reason>".
+# Suppressed under --quiet. The data projection on stdout is
+# unaffected.

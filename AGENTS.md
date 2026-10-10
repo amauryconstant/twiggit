@@ -7,12 +7,20 @@ Pragmatic git worktree CLI. Functional-core + I/O-adapter layout.
 | Package | Role |
 |---|---|
 | `internal/core/` | Pure value objects, errors, validation. No I/O. |
-| `internal/git/` | I/O adapter: client, writer, hook runner, context resolver. |
+| `internal/git/` | I/O adapter: client, writer, hook runner, context resolver, `status.go` per-worktree diagnostic reader. |
 | `internal/config/` | koanf config loader. |
 | `internal/output/` | Formatters + error renderer. |
 | `internal/iostreams/` | TTY, IOStreams, slog singleton. |
 | `internal/cmdutil/` | Factory, ExitCodeFor, persistent flags. |
 | `cmd/` + `main.go` | Cobra tree + composition root. |
+
+## Config knobs
+
+| Knob | Default | Source |
+|---|---|---|
+| `validation.protected_branches` | `["main","master","develop","staging","production"]` | `git-config` |
+| `status.stale_behind` | `20` | `[status] stale_behind` |
+| `status.stale_days` | `30` | `[status] stale_days` |
 
 Depguard owns the import rules (see `.golangci.yml`).
 
@@ -38,6 +46,7 @@ Depguard owns the import rules (see `.golangci.yml`).
 | `prune` | - | Delete merged worktrees |
 | `cd` | - | Print worktree path |
 | `rebase` | - | Rebase current/named/all worktrees onto tracked base |
+| `status` | - | Per-worktree diagnostic view (ahead/behind, base, merged, dirty, stale) |
 | `sync` | - | Fetch remote tracking refs (optionally + rebase) |
 | `init` | - | Shell wrapper |
 | `version` | - | Build version |

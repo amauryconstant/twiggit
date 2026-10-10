@@ -104,6 +104,7 @@ func copyConfig(config *core.Config) *core.Config {
 		Completion:          config.Completion,
 		Rebase:              config.Rebase,
 		Sync:                config.Sync,
+		Status:              config.Status,
 		IsColorEnabled:      config.IsColorEnabled,
 	}
 }
@@ -316,6 +317,12 @@ func (m *koanfConfigManager) loadDefaults() error {
 	}
 	if err := m.ko.Set("sync.rebase_after_sync", defaults.Sync.RebaseAfterSync); err != nil {
 		return fmt.Errorf("failed to set sync.rebase_after_sync default: %w", err)
+	}
+	if err := m.ko.Set("status.stale_behind", defaults.Status.StaleBehind); err != nil {
+		return fmt.Errorf("failed to set status.stale_behind default: %w", err)
+	}
+	if err := m.ko.Set("status.stale_days", defaults.Status.StaleDays); err != nil {
+		return fmt.Errorf("failed to set status.stale_days default: %w", err)
 	}
 	return nil
 }

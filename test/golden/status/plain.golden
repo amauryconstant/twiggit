@@ -1,0 +1,8 @@
+# `twiggit status --output plain` output
+
+# Capture by running:
+#   UPDATE_GOLDEN=true mise run test:e2e
+#
+# Format: headerless TSV (BRANCH, PATH, AHEAD, BEHIND, BASE, MERGED,
+# DIRTY, STALE), one row per worktree. Empty collection emits no
+# lines.

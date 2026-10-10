@@ -1,0 +1,8 @@
+# `twiggit status --output json` output
+
+# Capture by running:
+#   UPDATE_GOLDEN=true mise run test:e2e
+#
+# Format: a bare JSON array of {branch,path,base,ahead,behind,merged,
+# dirty,last_commit_date,stale,skipped,skip_reason} objects. Empty
+# collection emits `[]`. skip_reason is omitted when empty.
