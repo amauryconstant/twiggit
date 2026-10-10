@@ -106,6 +106,29 @@ to source-tree layers as:
 **Layout**: one folder per spec, single `spec.md` inside. Use `# Capability:`
 + `## Purpose` + `## Requirements` headers.
 
+### Active spec cross-references
+
+Beyond the canonical ownership table above, these specs are
+co-owned with adjacent layers; reference them by their bare
+directory name when describing a cross-cutting concern:
+
+- `core-worktree-status` (new in `add-status-command`) — owns
+  `core.WorktreeStatus` extensions, the `WorktreeStatusReader`
+  role, the per-worktree best-effort skip contract, and the
+  `IsStale` derivation. Cross-referenced from `core-git` (the
+  role-interface segregation requirement).
+- `cli-status` (new in `add-status-command`) — owns the
+  `twiggit status` command surface (flags, positional, four
+  output shapes) and its exit-code contract.
+
+### Recent cross-layer moves
+
+- The `getWorktreeStatus` helper that used to live in
+  `cmd/delete.go` was retired; the canonical per-worktree read
+  path is now `core.WorktreeStatusReader.ReadWorktreeStatus`
+  (`internal/git/status.go`). Both `cmd/status` and `cmd/delete`
+  call the role; no copy remains in the `cmd/` layer.
+
 **Purity rules** (enforced by `openspec validate --specs`):
 
 | Rule | Meaning |
@@ -165,7 +188,7 @@ norm; the project norm for this repo is the comment-light variant).
 
 ### Interfaces / composition
 - **[interface-consumer-side]** Interfaces SHALL be defined where they are consumed, not where they are produced; concrete types return structs. (golang-structs-interfaces, golang-design-patterns)
-- **[canonical-method-signatures]** Role interfaces (`RepositoryOpener`, `BranchReader`, etc.) MUST have method sets enforced by a compile-time drift sentinel; signature changes ripple to all consumers. (golang-structs-interfaces, project-specific via `core-git`)
+- **[canonical-method-signatures]** Role interfaces (`RepositoryOpener`, `BranchReader`, `WorktreeStatusReader`, etc.) MUST have method sets enforced by a compile-time drift sentinel; signature changes ripple to all consumers. (golang-structs-interfaces, project-specific via `core-git`, `core-worktree-status`)
 
 ### Naming
 - **[mixed-caps-only]** Identifiers MUST use `MixedCaps` or `mixedCaps`; underscores in identifiers are prohibited. (golang-naming)
