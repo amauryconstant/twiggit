@@ -1,53 +1,90 @@
 version = "1.12.0"
 
-[meta]
-side = "orchestrator"
-
 [core]
-version = "1.13.1"
+version = "1.14.1"
 installed = true
 baseline = ".openspec-extended-baseline.json"
 
-[resources.agents]
+[meta]
+side = "orchestrator"
+
+[resources.skills.osx-workflow]
+version = "0.6.0"
 
 [resources.skills.osc-apply-change]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-archive-change]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-bulk-archive-change]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-continue-change]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-explore]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-ff-change]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-new-change]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-onboard]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-propose]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-sync-specs]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-verify-change]
-version = "1.13.1"
+version = "1.14.1"
 
 [resources.skills.osc-update-change]
-version = "1.13.1"
+version = "1.14.1"
+
+[resources.agents.osx-analyzer]
+version = "0.2.5"
+
+[resources.agents.osx-builder]
+version = "0.2.5"
+
+[resources.agents.osx-editor]
+version = "0.1.0"
+
+[resources.agents.osx-maintainer]
+version = "0.2.5"
+
+[resources.agents.osx-reviewer]
+version = "0.1.2"
 
 [resources.commands.osx-changelog]
 version = "0.2.1"
 
 [resources.commands.osx-maintain-docs]
 version = "0.3.1"
+
+[resources.commands.osx-phase0]
+version = "0.4.3"
+
+[resources.commands.osx-phase1]
+version = "0.3.9"
+
+[resources.commands.osx-phase2]
+version = "0.4.2"
+
+[resources.commands.osx-phase3]
+version = "0.3.9"
+
+[resources.commands.osx-phase4]
+version = "0.2.16"
+
+[resources.commands.osx-phase5]
+version = "0.3.8"
+
+[resources.commands.osx-phase6]
+version = "0.4.2"

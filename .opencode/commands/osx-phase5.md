@@ -1,162 +1,54 @@
 ---
-description: PHASE5 - Self-Reflection
-agent: osx-analyzer
+name: osx-phase5
+description: PHASE5 — autonomous reflection over the change's iteration history. Use when dispatched by the orchestrator after sync, or ad-hoc via the orchestrator to harvest improvement suggestions.
+license: MIT
+compatibility: Requires openspec CLI.
+allowed-tools: Bash(openspec:*)
+agent: osx-reviewer
+metadata:
+  audience: PHASE5 self-reflection (dispatched by orchestrator)
+  workflow: post-implementation — reflection on iteration history
 ---
-
-## Tools Available
-
-| Tool | Usage |
-|------|-------|
-| `osx` | `.opencode/scripts/lib/osx <domain> <action> [args]` - unified OpenSpec tool |
-| Domains: `ctx`, `state`, `iterations`, `log`, `complete`, `validate` |
 
 # PHASE5: Self-Reflection
 
 Change: $1
 
-## MANDATORY START
+> **Protocol spine** — see `references/phase-protocol-common.md`.
+> **Tools** — see `osx-workflow` §1.
+> **Store selection** — see `references/store-selection.md`.
 
-1. Load context:
-  !`.opencode/scripts/lib/osx ctx get "$1"`
-2. Confirm `phase` is PHASE5
-3. Review full history via `osx log get "$1"` to understand entire workflow
-4. Review `history.iterations_recorded` for iteration counts per phase
-5. Load skill: `.opencode/skills/osx-concepts/SKILL.md` (reference only)
+**Input**: The orchestrator dispatches `<change-name>` as `$1` (e.g., `/osx-phase5 add-auth`). For ad-hoc invocations: if omitted, check if it can be inferred from conversation context; auto-select if only one active change exists; otherwise run `openspec list --json` and prompt via `AskUserQuestion`. PHASE5 also reads `iterations.json` and `decision-log.json` for the change's full history, plus `verification-report.md` and `test-compliance-report.md` from earlier phases.
 
-## PURPOSE
+## Steps
 
-Critically evaluate the autonomous development process and identify improvements.
+1. **Select the change**
 
-## REFLECTION QUESTIONS
+   If a name is provided (the orchestrator dispatches `<change-name>` as `$1`), use it. Otherwise:
+   - Infer from conversation context if the user mentioned a change
+   - Auto-select if only one active change exists
+   - If ambiguous, run `openspec list --json` and ask the user to select one
 
-Answer each with 2-4 sentences minimum, including specific examples:
+   Always announce: "Using change: <change-name>" and how to override (e.g., `/osx-phase5 <other>`).
 
-**1. How well did the artifact review process work?**
-   - Were CRITICAL issues identified accurately?
-   - Did the iteration limit (5) constrain fixing important issues?
-   - Should any issues have been raised earlier or later?
+2. Load context per protocol spine.
+3. **Pull history** via `openspec-extended osx ctx get "$1"` — extract `history.iterations_recorded`, `decision_log`, and the latest `verification_report` and `test_compliance_report`.
+4. **Optional pre-step — deep think.** If the iteration history is dense (3+ reroutes, multiple `implementation_incorrect` transitions, or recurring Critical findings across phases), invoke `/openspec-explore <name>` first to surface structural improvements through guided reasoning. Skip this step when history is short and the suggestions are obvious — the autonomous pass below covers the typical case.
+5. **Reflect autonomously** — review workflow execution, identify recurring patterns (blockers, reroutes, milestone-commit cadence), and surface improvements as concrete suggestions.
+6. Write `reflections.md` with: phase-by-phase iteration counts, dominant blocker categories, recurring routing decisions, and 1–5 actionable improvement suggestions for the orchestrator's future runs.
+7. Commit `reflections.md` via `osx-commit`. Capture the commit hash in the decision-log entry.
+8. **Mandatory end** — append `osx log` and `osx iterations` per protocol spine, then `osx state complete "$1"`. Script advances to PHASE6.
 
-**2. How effective was the implementation phase?**
-   - Were tasks clear and achievable?
-   - Did milestone commits make sense?
-   - Was test compliance review useful?
+## Output
 
-**3. How did verification perform?**
-   - Did it catch important issues?
-   - Were issues actionable?
-   - Should any CRITICAL/WARNING issues have been caught earlier?
+`reflections.md` with phase summary, dominant blocker categories, recurring routing decisions, and 1–5 actionable suggestions. Commit hash recorded in `decision-log.json` and `iterations.json`.
 
-**4. What assumptions had to be made?**
-   - List all significant assumptions from decision-log.json
-   - Which caused issues later?
-   - Which worked well?
+## Guardrails
 
-**5. How did completion phases work?**
-   - Were phase transitions smooth?
-   - Did MAINTAIN DOCS provide value?
-   - Did SYNC complete successfully?
-
-**6. How was commit behavior?**
-   - Were milestone commits made appropriately?
-   - Did commit timing make sense?
-
-**7. What would improve the workflow?**
-   - Missing skills or tools?
-   - Process bottlenecks?
-   - Documentation improvements?
-
-**8. What would improve for future changes?**
-   - Review suggestions.md for any quick wins
-   - Were any suggestions actually blockers in disguise?
-   - Should any suggestions become new OpenSpec changes?
-   - Artifact quality improvements?
-   - Missing checkpoints?
-   - Better progress tracking?
-
-## DECISION LOG
-
-Write reflections to file, then log:
-
-```bash
-# Write reflections (full markdown allowed)
-cat > "openspec/changes/$1/reflections.md" << 'EOF'
-# Self-Reflection: $1
-
-## 1. How well did the artifact review process work?
-[Answer with specific examples - 2-4 sentences]
-
-## 2. How effective was the implementation phase?
-[Answer with specific examples - 2-4 sentences]
-
-## 3. How did verification perform?
-[Answer with specific examples - 2-4 sentences]
-
-## 4. What assumptions had to be made?
-[Answer with specific examples - 2-4 sentences]
-
-## 5. How did completion phases work?
-[Answer with specific examples - 2-4 sentences]
-
-## 6. How was commit behavior?
-[Answer with specific examples - 2-4 sentences]
-
-## 7. What would improve the workflow?
-[Answer with specific examples - 2-4 sentences]
-
-## 8. What would improve for future changes?
-[Answer with specific examples - 2-4 sentences]
-EOF
-
-# Log with path reference (not inline content)
-.opencode/scripts/lib/osx log append "$1" \
-  --phase SELF_REFLECTION \
-  --iteration N \
-  --summary "Self-reflection completed. Workflow evaluation finished." \
-  --commit-hash "<hash or null>" \
-  --next-steps "Self-reflection complete. Proceeding to PHASE6 (ARCHIVE)." \
-  --extra '{"reflections_path":"openspec/changes/$1/reflections.md","total_phases":7,"total_iterations":N}'
-```
-
-## ITERATIONS.JSON
-
-Append entry:
-```bash
-.opencode/scripts/lib/osx iterations append "$1" \
-  --phase SELF_REFLECTION \
-  --iteration N \
-  --commit-hash "<hash or null>" \
-  --notes "Self-reflection completed" \
-  --extra '{"total_phases":7,"total_iterations":N,"reflection_completed":true}'
-```
-
-## MANDATORY END
-
-1. Invoke osx-commit skill
-2. Commit changes:
-
-   ```bash
-   git add openspec/changes/$1/reflections.md
-   git commit -m "Complete self-reflection for $1"
-   ```
-
-3. Record commit hash in decision log and iterations.json
-
-## BLOCKER HANDLING
-
-If you encounter an unrecoverable issue that prevents progress:
-
-```bash
-.opencode/scripts/lib/osx complete set "$1" BLOCKED --blocker-reason "[Describe the specific blocking issue]"
-```
-
-The orchestrator will detect this and halt the workflow.
-
-**When to use:**
-- Reflection reveals a critical issue that requires human intervention
-- Workflow cannot proceed to archive due to unresolved problems
-
-## TRANSITION
-
-1. Log: "Self-reflection complete, proceeding to ARCHIVE"
-2. Mark phase complete via `osx state`
-3. Script will advance to PHASE6 (ARCHIVE)
+- **Agent**: `osx-reviewer` (`edit: allow`).
+- **Read-only on artifacts** — `reflections.md` is the only write target. Never modify planning or implementation artifacts here.
+- **No tool-specific fallback** — there is no `osc-*` core skill for self-reflection; this phase runs autonomous reasoning over the change's iteration history.
+- **Max 10 iterations** per phase. If exceeded, signal `BLOCKED` with `iteration_budget_exceeded`.
+- **Failure modes**:
+  - `iterations.json` corrupt or missing → log warning, write `reflections.md` with partial data, mark phase complete.
+  - `decision-log.json` not parseable → fall back to `state.json.history` for the summary.

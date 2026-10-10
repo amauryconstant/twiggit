@@ -1,141 +1,67 @@
 ---
-description: PHASE3 - Maintain Documentation
+name: osx-phase3
+description: PHASE3 — sync project docs (`AGENTS.md` / `CLAUDE.md`) with what implementation changed. Use when dispatched by the orchestrator after verification, or ad-hoc via `/osx-maintain-docs`.
+license: MIT
+compatibility: Requires openspec CLI.
+allowed-tools: Bash(openspec:*)
 agent: osx-maintainer
+metadata:
+  audience: PHASE3 documentation maintenance (dispatched by orchestrator)
+  workflow: post-implementation — docs sync
 ---
-
-## Tools Available
-
-| Tool | Usage |
-|------|-------|
-| `osx` | `.opencode/scripts/lib/osx <domain> <action> [args]` - unified OpenSpec tool |
-| Domains: `ctx`, `state`, `iterations`, `log`, `complete`, `validate` |
 
 # PHASE3: Maintain Documentation
 
 Change: $1
 
-## MANDATORY START
+> **Protocol spine** — see `references/phase-protocol-common.md`. **Blocker semantics** — `references/blocker-semantics.md`. **Decision-log schema** — `references/osx-decision-logging.md`. **Shell-arg safety** — `references/shell-argument-safety.md`. **Tools** — `osx-workflow` §1. **Store selection** — `references/store-selection.md`.
 
-1. Load context:
-  !`.opencode/scripts/lib/osx ctx get "$1"`
-2. Confirm `phase` is PHASE3
-3. Review `history.iterations_recorded` for previous attempts
-4. Load skill: `.opencode/skills/osx-concepts/SKILL.md` (reference only)
+**Input**: The orchestrator dispatches `<change-name>` as `$1` (e.g., `/osx-phase3 add-auth`). For ad-hoc invocations: if omitted, check if it can be inferred from conversation context; auto-select if only one active change exists; otherwise run `openspec list --json` and prompt via `AskUserQuestion`. PHASE3 also reads `tasks.md` for any `AGENTS.md` task items the implementer deferred from PHASE1.
 
-## PURPOSE
-
-Update AGENTS.md and CLAUDE.md files to reflect ALL changes made during implementation. If there is an available skill for that process, load it first.
-
-**Scope - What to update:**
-- Root AGENTS.md with new commands, patterns, or conventions
-- Package-level AGENTS.md files (e.g., `internal/library/AGENTS.md`)
-- CLAUDE.md if project supports both platforms
-- Any other AI context documentation
-
-**What to include:**
-- New packages and their purpose
-- New CLI commands and usage
-- New architectural patterns
-- Updated command references
-- New capabilities added to the codebase
-
-**NOT in scope:**
-- Inline code comments (done in PHASE1)
-- README files (done in PHASE1)
-- Test files (done in PHASE1)
-
-## PROCESS
-
-1. Load and use `osx-maintain-ai-docs` skill
-2. Read change artifacts: `openspec/changes/$1/proposal.md`, `openspec/changes/$1/specs/`, `openspec/changes/$1/design.md`, `openspec/changes/$1/tasks.md`
-3. Read recent git changes: `git log --oneline -10`
-4. Update project documentation:
-   - AGENTS.md - Update with new commands, patterns, or conventions
-   - CLAUDE.md - Update if Claude-specific patterns changed (if applicable)
-   - Other docs as needed based on the change
-
-5. Apply best practices:
-   - Use tables over verbose lists
-   - Be specific (concrete commands, not vague descriptions)
-   - Progressive disclosure (summary first, details later)
-   - Target <300 lines per file
-
-## AGENTS.md TASKS FROM TASKS.MD
-
-If tasks.md contains AGENTS.md documentation tasks (e.g., "12.1 Update cmd/AGENTS.md"):
-
-1. These tasks were intentionally deferred from PHASE1
-2. Complete them now as part of this phase
-3. Mark them complete in tasks.md after updating
-4. Include in the single PHASE3 commit
-
-This consolidation ensures:
-- Single documentation commit for review
-- Accurate representation of final codebase state
-- No duplicate documentation work
-
-## MANDATORY END
-
-IF documentation was updated during this phase:
-
-1. Invoke osx-commit skill
-2. Commit changes:
-
-   ```bash
-   git add AGENTS.md CLAUDE.md
-   git commit -m "Update documentation for $1"
-   ```
-
-3. Record commit hash in decision log and iterations.json
-
-## BLOCKER HANDLING
-
-If you encounter an unrecoverable issue that prevents progress:
+## Mandatory start / end
 
 ```bash
-.opencode/scripts/lib/osx complete set "$1" BLOCKED --blocker-reason "[Describe the specific blocking issue]"
+# Start
+openspec-extended osx ctx get "$1"
+# End
+openspec-extended osx log append "$1" --phase MAINTAIN_DOCS --iteration N \
+  --summary "..." --commit-hash "<hash or null>" --next-steps "..." \
+  --extra '{"docs_file":"...","lines_added":N,"commit_style":"..."}'
+openspec-extended osx iterations append "$1" --phase MAINTAIN_DOCS --iteration N \
+  --commit-hash "<hash or null>" --notes "..."
+# Phase end
+openspec-extended osx state complete "$1"
 ```
 
-The orchestrator will detect this and halt the workflow.
+## Steps
 
-**When to use:**
-- Documentation conflicts that cannot be resolved
-- AGENTS.md/CLAUDE.md structure fundamentally incompatible with changes
+1. **Select the change**
 
-## STATE FILE UPDATES
+   If a name is provided (the orchestrator dispatches `<change-name>` as `$1`), use it. Otherwise:
+   - Infer from conversation context if the user mentioned a change
+   - Auto-select if only one active change exists
+   - If ambiguous, run `openspec list --json` and ask the user to select one
 
-Phase complete:
-```bash
-.opencode/scripts/lib/osx state complete "$1"
-```
+   Always announce: "Using change: <change-name>" and how to override (e.g., `/osx-phase3 <other>`).
 
-## DECISION LOG
+2. Load context per protocol spine.
+3. Load and use `osx-maintain-docs` skill. Follow the doc-update rules in `references/update-rules.md` and worked diffs in `references/update-examples.md`. Edit `AGENTS.md` (project-specific docs file) only — never inline comments. Cross-reference `references/doc-structures.md` for AGENTS.md/CLAUDE.md parse/write rules and the `osx-maintain-docs` command body for the canonical protocol; `references/osx-mode-conventions.md` clarifies how `OSX_AUTONOMOUS=1` resolves interactive confirmation steps.
+4. **Structure guide** — see `references/doc-structures.md` for AGENTS.md / CLAUDE.md parsing/writing strategies and validation rules.
+5. **Mode** — `OSX_AUTONOMOUS=1` is set by the orchestrator. Interactive confirmation steps use their documented autonomous defaults (see `references/osx-mode-conventions.md`).
+6. Commit via `osx-commit`. Capture the commit hash in the decision-log entry.
+7. **Mandatory end** — append `osx log` and `osx iterations` per protocol spine, then `osx state complete "$1"`.
 
-Append entry:
-```bash
-.opencode/scripts/lib/osx log append "$1" \
-  --phase MAINTAIN_DOCS \
-  --iteration N \
-  --summary "Documentation updated successfully" \
-  --commit-hash "<hash or null>" \
-  --next-steps "Proceeding to PHASE4 (SYNC)" \
-  --extra '{"docs_updated":["AGENTS.md","CLAUDE.md"],"changes_made":["Specific change 1","Specific change 2"]}'
-```
+## Output
 
-## ITERATIONS.JSON
+`AGENTS.md` updated to reflect what the implementation actually changed (not what was planned). No section reordering; no inline-comment substitution; no doc cruft. Commit hash recorded in `decision-log.json` and `iterations.json`.
 
-Append entry:
-```bash
-.opencode/scripts/lib/osx iterations append "$1" \
-  --phase MAINTAIN_DOCS \
-  --iteration N \
-  --commit-hash "<hash or null>" \
-  --notes "Documentation updated successfully" \
-  --extra '{"docs_updated":["AGENTS.md","CLAUDE.md"]}'
-```
+## Guardrails
 
-## TRANSITION
-
-1. Log: "Documentation updated, proceeding to SYNC"
-2. Mark phase complete via `osx state`
-3. Script will advance to PHASE4
+- **Agent**: `osx-maintainer` (`edit: allow`).
+- **Document only what AI cannot infer from code** — code is the source of truth for behaviour; docs describe intent, trade-offs, and operational guidance.
+- **Never bypass** `osx-commit`'s detection heuristic; commit style must match the project standard.
+- **Warn if** `AGENTS.md` > 300 lines. **Error if** > 500 lines (split required before adding content).
+- **Max 10 iterations** per phase. If exceeded, signal `BLOCKED` with `iteration_budget_exceeded`.
+- **Failure modes**:
+  - Doc structure invalid → fix and re-iterate.
+  - Commit style ambiguous → `osx-commit` falls back to Conventional Commits; record the chosen style in the log.

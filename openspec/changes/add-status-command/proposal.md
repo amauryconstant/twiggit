@@ -39,7 +39,7 @@ None. `core-types` already documents `core.WorktreeStatus` only as a service res
 - `internal/core/service_results.go` (modify): extend `WorktreeStatus` with `Base string`, `IsMerged bool`, `IsStale bool`, `LastCommitDate time.Time`, `IsSkipped bool`, `SkipReason string`; add JSON tags to every exported field.
 - `internal/core/config.go` (modify): add `StatusConfig` sub-struct (`StaleBehind int`, `StaleDays int`) under `Config.Status`; wire defaults in `DefaultConfig`.
 - `internal/git/client.go` (modify): add `var _ core.WorktreeStatusReader = (*Client)(nil)`; amend the existing drift-sentinel comment to acknowledge the direct method on the composite.
-- `internal/git/status.go` (new): `func (c *Client) ReadWorktreeStatus(ctx, repoPath, wtPath, base) (core.WorktreeStatus, error)`; populate all fields; return best-effort per-wt error contract.
+- `internal/git/status.go` (new): `func (c *Client) ReadWorktreeStatus(ctx, cfg, repoPath, wtPath) (core.WorktreeStatus, error)`; populate all fields; return best-effort per-wt error contract.
 
 ### Tests (unit + integration + e2e + golden)
 

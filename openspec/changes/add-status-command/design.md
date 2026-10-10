@@ -69,13 +69,12 @@ The drift-sentinel comment in `internal/git/client.go` is amended to acknowledge
 
 ### 5. `cmd/status` follows the existing `cmd/list` shape exactly, including the per-format projection pattern
 
-**Choice:** `StatusOptions` mirrors `ListOptions` (Factory-injected IOStreams / Config / GitClient / Ctx / GlobalOptions / Logger; flags `All bool`, `Output string`, `StaleBehind int`, `StaleDays int`; `runF` test seam; `cobra.MaximumNArgs(1)`; Args validator). The `statusRows` Tabular projection lives in `cmd/status.go` and implements both `output.Tabular` (for `table`) and `json.Marshaler` (for the bare-array JSON), exactly as `worktreeRows` does for `list`.
+**Choice:** `StatusOptions` mirrors `ListOptions` (Factory-injected IOStreams / Config / GitClient / Ctx / GlobalOptions / Logger; flags `All bool`, `StaleBehind int`, `StaleDays int`; `runF` test seam; `cobra.MaximumNArgs(1)`; Args validator). The `statusRows` Tabular projection lives in `cmd/status.go` and implements both `output.Tabular` (for `table`) and `json.Marshaler` (for the bare-array JSON), exactly as `worktreeRows` does for `list`.
 
 **Rationale:** the project's `cli-output-formats` and `cli-flags-ergonomics` specs are clear that per-list-command output projections live in the cmd layer (presentation stays out of the core). Matching the `list` shape also keeps the diff minimal: a reviewer can compare `cmd/list.go` and `cmd/status.go` side by side and find the deltas (`worktreeRows` becomes `statusRows`, three columns become eight, additional flags). The `--all` and `--output` semantics are already battle-tested in `list`; status inherits them.
 
 **Alternatives considered:**
 - A shared `rows` helper between `list` and `status`. Rejected: the projections diverge (status has ahead/behind/base/etc., list does not); abstracting now is premature.
-- Use `text/tabwriter` directly in the run function. Rejected: the `output.Tabular` interface is the project's existing pattern; bypassing it for one command breaks consistency with the formatter registry.
 
 ## Risks / Trade-offs
 

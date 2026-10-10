@@ -1,161 +1,75 @@
 ---
-description: PHASE1 - Implementation
+name: osx-phase1
+description: PHASE1 — implement the change's tasks with milestone commits. Use when dispatched by the orchestrator after artifact review passes, or ad-hoc to apply tasks from a change's `tasks.md`.
+license: MIT
+compatibility: Requires openspec CLI.
+allowed-tools: Bash(openspec:*)
 agent: osx-builder
+metadata:
+  audience: PHASE1 implementation (dispatched by orchestrator)
+  workflow: implementation
 ---
-
-## Tools Available
-
-| Tool | Type | Usage |
-|------|------|-------|
-| `openspec` | Upstream CLI | `openspec <command> [options]` - npm package |
-| `osx` | Local script | `.opencode/scripts/lib/osx <domain> <action> [args]` - unified OpenSpec tool |
-| Domains: `ctx`, `state`, `iterations`, `log`, `complete`, `validate` |
 
 # PHASE1: Implementation
 
 Change: $1
 
-## MANDATORY START
+> **Protocol spine** — see `references/phase-protocol-common.md`. **Blocker semantics** — `references/blocker-semantics.md`. **Decision-log schema** — `references/osx-decision-logging.md`. **Shell-arg safety** — `references/shell-argument-safety.md`. **Tools** — `osx-workflow` §1. **Store selection** — `references/store-selection.md`.
 
-1. Load context:
-  !`.opencode/scripts/lib/osx ctx get "$1"`
-2. Confirm `phase` is PHASE1
-3. Review `history.iterations_recorded` for previous attempts
-4. Load skill: `.opencode/skills/osx-concepts/SKILL.md` (reference only)
-5. Read context files: `openspec/changes/$1/proposal.md`, `openspec/changes/$1/specs/`, `openspec/changes/$1/design.md`, `openspec/changes/$1/tasks.md`
-6. Determine which tasks to implement this iteration
+**Input**: The orchestrator dispatches `<change-name>` as `$1` (e.g., `/osx-phase1 add-auth`). For ad-hoc invocations: if omitted, check if it can be inferred from conversation context; auto-select if only one active change exists; otherwise run `openspec list --json` and prompt via `AskUserQuestion`. When the change is store-backed, carry `--store <id>` on every `openspec …` command.
 
-## MANDATORY CHECKPOINT: CLI Output Logging
-
-Before beginning implementation:
-
-1. Run: `openspec status --change "$1" --json`
-2. Log via `osx log` with `cli_status` field
-3. Run: `openspec instructions apply --change "$1" --json`
-4. Log via `osx log` with `cli_instructions` field
-
-## PURPOSE
-
-Implement tasks from the change, making logical milestone commits and validating test coverage.
-
-## PROCESS
-
-### 1. Load Implementation Skill
-
-Load skill: Use `osc-apply-change` (originally `openspec-apply-change`) skill for change "$1"
-
-The skill provides the implementation workflow. Follow its task execution pattern.
-
-### 2. Implement Tasks
-
-Per the skill workflow:
-- Read tasks.md to identify unchecked tasks
-- Implement tasks sequentially
-- Mark tasks complete: `- [ ]` → `- [x]`
-- Continue until all tasks complete OR iteration limit reached
-
-### 3. MANDATORY: Milestone Commits
-
-**You MUST commit after completing logical work units.**
-
-- Minimum 1 commit per iteration
-- Maximum 5 commits per iteration
-- Subject: imperative verb + brief description (40-72 chars)
-- Review staged changes: `git diff --staged` before committing
-
-For each commit:
-
-1. Invoke osx-commit skill
-2. Stage and commit changes
-
-**Pre-commit hook guardrails (ALWAYS apply):**
-- NEVER use `--no-verify` to bypass pre-commit hooks
-- If pre-commit hooks fail, fix the issues
-- Re-run the commit after fixing - hooks must pass
-
-**Persistent failures:** If fixes aren't possible within 3 attempts:
-- Document the issue via `osx log`
-- Consider if artifacts need modification
-- May need to signal COMPLETE with blocker_reason
-
-**Documentation scope for PHASE1:**
-- ✅ Inline code comments
-- ✅ README updates for new features
-- ✅ Package-level doc.go files
-- ✅ CLI help text and usage strings
-- ❌ AGENTS.md files → Deferred to PHASE3
-
-**Why AGENTS.md is deferred:**
-AGENTS.md files document the codebase structure for future AI sessions. They should be updated AFTER all implementation is complete to ensure accurate representation of the final state. PHASE3 handles this.
-
-### 4. Validate Test Coverage
-
-After implementation complete:
-- Run `osx-review-test-compliance` skill
-- Analyze spec-to-test alignment
-- IF gaps found: Implement missing tests, commit, re-run
-- UNTIL: Clean or only suggestions remain
-
-## ERROR HANDLING
-
-- If git commit fails: Check staged files, verify working directory clean, retry once
-- If tests fail repeatedly (>3 attempts): Use subagent to debug, check spec clarity
-- If stuck in iteration loop (>3 iterations with no progress): Document blocker, signal COMPLETE
-- If openspec CLI commands fail: Proceed without CLI output, document via `osx log`
-
-## BLOCKER HANDLING
-
-If you encounter an unrecoverable issue that prevents progress:
+## Mandatory start / end
 
 ```bash
-.opencode/scripts/lib/osx complete set "$1" BLOCKED --blocker-reason "[Describe the specific blocking issue]"
+# Start
+openspec-extended osx ctx get "$1"
+# Apply prerequisites (v1.13.0+ envelope includes missingPrerequisites)
+openspec-extended osx fetch_apply_prerequisites "$1"
+# End — log missing prerequisites when present
+openspec-extended osx log append "$1" --phase IMPLEMENTATION --iteration N \
+  --summary "..." --commit-hash "<hash or null>" --next-steps "..." \
+  --extra '{"missing_prerequisites":[...],"milestone_commits":[...]}'
+openspec-extended osx iterations append "$1" --phase IMPLEMENTATION --iteration N \
+  --commit-hash "<hash or null>" --notes "..."
+# Phase end
+openspec-extended osx state complete "$1"
 ```
 
-The orchestrator will detect this and halt the workflow.
+**Advisory project guidance** (optional): if `openspec-extended` injects guidance at the top of this prompt via `RunRequest.extra_prompt` (surfaced from `operations.apply.guidance` in `openspec/config.yaml`), treat it as authoritative project context.
 
-**When to use:**
-- Pre-commit hook failures that cannot be resolved after 3 attempts
-- Implementation fundamentally blocked by unclear or contradictory specs
-- External dependencies unavailable or broken
-- Task cannot be completed due to missing information
+## Steps
 
-## STATE FILE UPDATES
+1. **Select the change**
 
-When all tasks are complete:
-```bash
-.opencode/scripts/lib/osx state complete "$1"
-```
+   If a name is provided (the orchestrator dispatches `<change-name>` as `$1`), use it. Otherwise:
+   - Infer from conversation context if the user mentioned a change
+   - Auto-select if only one active change exists
+   - If ambiguous, run `openspec list --json` and ask the user to select one
 
-## DECISION LOG
+   Always announce: "Using change: <change-name>" and how to override (e.g., `/osx-phase1 <other>`).
 
-Append entry:
-```bash
-.opencode/scripts/lib/osx log append "$1" \
-  --phase IMPLEMENTATION \
-  --iteration N \
-  --summary "What was accomplished this iteration" \
-  --next-steps "Continue implementation or transition to PHASE2" \
-  --errors '[]' \
-  --extra '{"assumptions":["Assumption with rationale"],"tasks_completed":["1.1","1.2"],"tasks_remaining":0,"commits_made":N,"cli_status":{},"cli_instructions":{}}'
-```
+2. Load context per protocol spine.
+3. **Load apply prerequisites** via `osx fetch_apply_prerequisites "$1"` — reads `instructions apply --json` and surfaces `missingArtifacts`, `missingPrerequisites`, `tasks`, `contextFiles`, `operationGuidance`. Address missing prerequisites via PHASE0 routing before continuing.
+4. Load and use `osc-apply-change` skill for change `<change-name>`. Follow its task execution pattern.
+5. Implement tasks in order. Dispatched via `osx-builder` (`edit: allow`).
+6. **Milestone commits** — 1–5 commits per iteration, invoked via `osx-commit`. Each commit advances `state.json.current_commit` and is logged in `decision-log.json` and `iterations.json`. Cap at the iteration budget.
+7. **End-of-iteration coverage check** — invoke `osx-review-test-compliance` skill. If a `Critical` or unresolved `Warning` finding appears, fix it (re-iterate) or transition (`implementation_incorrect` → PHASE1 with new details). Slash-command equivalent for ad-hoc runs: `/osx-verify-tests <change-name>` — same skill body.
+8. **Validation** — `openspec validate --change "$1" --type all --strict --json`. If invalid, fix and re-iterate.
+9. **Mandatory end** — append `osx log` and `osx iterations` per protocol spine, then `osx state complete "$1"`.
 
-## ITERATIONS.JSON
+## Output
 
-Append entry:
-```bash
-.opencode/scripts/lib/osx iterations append "$1" \
-  --phase IMPLEMENTATION \
-  --iteration N \
-  --notes "Brief summary" \
-  --errors '[]' \
-  --extra '{"tasks_completed":["1.1","1.2","1.3"],"tasks_remaining":0,"tasks_this_session":3,"commits_made":N,"cli_status":{},"cli_instructions":{}}'
-```
+Completed implementation with `openspec validate --strict` passing, end-of-iteration `test-compliance-report.md` free of Critical findings, milestone commits recorded in `iterations.json`, and `state.json.phase = PHASE1_COMPLETE`.
 
-## TRANSITION
+## Guardrails
 
-When all tasks in `tasks.md` are marked complete `[x]`:
-- Log: "All tasks complete, transitioning to PHASE2 (REVIEW)"
-- Mark phase complete via `osx state`
-- Script will advance to PHASE2
-
-Note: AGENTS.md updates will occur in PHASE3 (MAINTAIN DOCS), not here. Even if tasks.md contains AGENTS.md tasks, they should be deferred to PHASE3.
+- **Agent**: `osx-builder` (`edit: allow`).
+- **Pause-and-route on scope/design drift** — if implementation reveals the spec or design is wrong (not just the code), stop work in PHASE1, route via `/osc-update-change <name>`, then resume. If the intent changed entirely, follow the `Update vs Start Fresh` heuristic (`osc-update-change` §Guardrails) and route to `/osc-new-change <fresh-name>` instead of retrofitting the current change.
+- **Never edits OpenSpec planning artifacts** in PHASE1 (`openspec/changes/<name>/{proposal,design,specs,tasks}.md`); those belong to `/osc-update-change` (called by the user outside the dispatched phase).
+- **Never invokes `osx log` or `osx iterations` with backticks in arg values** — shell interprets backticks as command substitution. See `references/shell-argument-safety.md`.
+- **Max 10 iterations** per phase; if exceeded, signal `BLOCKED` with `iteration_budget_exceeded` and let the user investigate.
+- **Failure modes**:
+  - Apply instructions report `state: "blocked"` (missing artifacts) → route back to PHASE0 via `state transition --target PHASE0 --reason artifacts_missing`.
+  - `state: "all_done"` → skip to PHASE2.
+  - `openspec validate` fails → fix and re-iterate within PHASE1 (not a blocker).
+- **Pre-commit hook failure** → fix and re-stage. Never bypass with `--no-verify`.

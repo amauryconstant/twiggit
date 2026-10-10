@@ -4,7 +4,7 @@ Complete reference for the OpenSpec-extended autonomous orchestrator system.
 
 **Purpose**: Guide AI agents working with the 7-phase autonomous implementation workflow.
 
-**When to read this**: When executing `/osx-phase0` through `/osx-phase6` commands or debugging orchestrator issues.
+**When to read this**: When executing `osx-phase0` through `osx-phase6` commands, when the orchestrator dispatches you, or when debugging orchestrator issues.
 
 ---
 
@@ -25,17 +25,19 @@ Complete reference for the OpenSpec-extended autonomous orchestrator system.
 
 ### 1.1 What Is the Orchestrator?
 
-The orchestrator (`osx-orchestrate`) is a Python script that manages autonomous implementation of OpenSpec changes through 7 phases:
+The orchestrator is the Python engine in `source/orchestrator/engine.py`, exposed via the `openspec-extended orchestrate <change>` command (the entry point users run). The engine manages autonomous implementation of OpenSpec changes through 7 phases:
 
 ```
-PHASE0: Artifact Review   → osx-analyzer
-PHASE1: Implementation   → osx-builder
-PHASE2: Verification    → osx-analyzer
-PHASE3: Maintain Docs   → osx-maintainer
-PHASE4: Sync           → osx-maintainer
-PHASE5: Self-Reflection → osx-analyzer
-PHASE6: Archive         → osx-maintainer
+PHASE0: ARTIFACT_REVIEW  → osx-analyzer
+PHASE1: IMPLEMENTATION   → osx-builder
+PHASE2: REVIEW           → osx-reviewer
+PHASE3: MAINTAIN_DOCS    → osx-maintainer
+PHASE4: SYNC             → osx-maintainer
+PHASE5: SELF_REFLECTION  → osx-reviewer
+PHASE6: ARCHIVE          → osx-maintainer
 ```
+
+> **PHASE2 name disambiguation**: the engine's canonical phase name is `REVIEW`. The skill it loads is `osc-verify-change` ("Verification"). Both refer to the same phase; you'll see `--phase REVIEW` in `decision-log.json` and the skill name as `osc-verify-change` in the phase command. See the main skill (§2) for the full cross-reference.
 
 ### 1.2 Orchestrator Loop
 
@@ -72,21 +74,24 @@ After archive: Historical files move to `openspec/changes/archive/YYYY-MM-DD-<ch
 
 ### 2.1 How Agents Are Invoked
 
-The orchestrator uses OpenCode's `opencode run` command:
+The orchestrator spawns per-phase AI processes via OpenCode's `opencode run` command:
 
 ```bash
 opencode run \
   --command "osx-phase0" \
   --agent "osx-analyzer" \
   "$CHANGE_ID" \
-  --title="PHASE0: Artifact Review for $CHANGE_ID" \
-  --model="claude-sonnet-4"
+  --title="OpenSpec: $CHANGE_ID - ARTIFACT REVIEW" \
+  --model="$MODEL"
 ```
 
+The model defaults to the platform's configured default; override with `openspec-extended orchestrate --model <name>`.
+
 **Key points**:
-- CHANGE_ID is passed as **positional argument** (not a flag)
-- Commands reference it as `$1` in their markdown
+- `$CHANGE_ID` is passed as **positional argument** (not a flag)
+- Phase commands reference it as `$1` in their markdown
 - Agent receives full context including state files and history
+- Each iteration is a **fresh subprocess**; per-subprocess timeout is `--timeout` (default 1800s)
 
 ### 2.2 Agent's Responsibilities
 
@@ -127,56 +132,87 @@ Phase commands instruct agents to "load and use" skills:
 
 | Prefix | Meaning | Source | Example |
 |--------|----------|---------|---------|
-| `osc-*` (renamed from `openspec-*`) | OpenSpec Core | Upstream npm package, renamed by installer | `osc-new-change` (was `openspec-new-change`), `osc-apply-change` (was `openspec-apply-change`) |
-| `osx-*` | OpenSpec eXtended | Local extensions | `osx-review-artifacts`, `osx-modify-artifacts` |
-| `openspec` | Core CLI | npm installed tool | `openspec status`, `openspec new change` |
+| `osc-*` | OpenSpec Core | Upstream npm package, installed by `openspec init` | `osc-new-change`, `osc-apply-change`, `osc-update-change` |
+| `osx-*` | OpenSpec eXtended | Local extensions | `osx-review-artifacts` (audit), `osx-maintain-docs`, `osx-changelog`, `osx-commit` |
+| `openspec` | Core CLI | npm installed tool | `openspec status`, `openspec new change`, `openspec instructions` |
 
 ### 3.2 When to Use Which Tool
 
 | Situation | Tool | Skill / Command |
 |-----------|-------|----------------|
-| Start a change | `osc-new-change` skill | `openspec new change "$NAME"` |
-| Create all artifacts | `osc-ff-change` skill | `openspec ff "$NAME"` |
+| Start a change (step-by-step) | `osc-new-change` skill | `openspec new change "$NAME"` |
+| Start a change (one-shot, full proposal) | `osc-propose` skill | `/openspec-propose <description>` |
+| Start a change (fast-forward, all artifacts at once) | `osc-ff-change` skill | `openspec ff "$NAME"` |
+| Start a change (first-time user tutorial) | `osc-onboard` skill | `/openspec-onboard` |
+| Thinking partner (no artifacts yet) | `osc-explore` skill | `/openspec-explore` |
 | Implement tasks | `osc-apply-change` skill | Read skill file, follow instructions |
-| Review artifacts | `osx-review-artifacts` skill | Read skill file, follow instructions |
-| Modify artifacts | `osx-modify-artifacts` skill | Read skill file, follow instructions |
+| Audit artifacts (schema-driven, read-only) | `osx-review-artifacts` skill | Read skill file, follow instructions; slash command: `/osx-review <change>` |
+| Single- or multi-artifact reconciliation | `osc-update-change` skill | `openspec update "$NAME"` or `/osc-update-change` |
+| Continue creating missing artifacts | `osc-continue-change` skill | `openspec continue "$NAME"` or `/osc-continue-change` |
+| Spec-to-test alignment | `osx-review-test-compliance` skill | Read skill file; slash command: `/osx-verify-tests <change>` |
+| Maintain project docs | `osx-maintain-docs` command | `/osx-maintain-docs <change>` |
+| Generate release changelog | `osx-changelog` command | `/osx-changelog [--since YYYY-MM-DD | <change>...]` |
+| Detect project commit style | `osx-commit` skill | `/osx-commit` after each phase write |
 | Check status | `openspec` CLI | `openspec status --change "$1" --json` |
-| Orchestration state | `osx` lib tool | `.opencode/scripts/lib/osx <domain> <action>` |
+| Orchestration state | `osx` lib tool | `openspec-extended osx <domain> <action>` |
 
-### 3.3 The `osx` Lib Tool
+### 3.3 The `osx` Subcommand
 
-Location: `.opencode/scripts/lib/osx` (Python script)
+Location: `openspec-extended osx` (CLI subcommand of the `openspec-extended` binary)
 
 **Domains and Actions**:
 
 | Domain | Action | Purpose |
-|--------|---------|---------|
+|--------|--------|---------|
 | `ctx` | `get` | Load aggregate context (state, history, config) |
 | `state` | `complete` | Mark current phase as complete |
 | `state` | `transition` | Explicit phase transition (PHASE2 uses this) |
+| `state` | `set-phase` | Force-set phase (use `--from-phase` instead when possible) |
+| `state` | `clear-transition` | Clear a pending transition |
+| `phase` | `current` | Read current phase from state |
+| `phase` | `next` | Read next phase in sequence |
+| `phase` | `advance` | Force-advance to next phase (rare; use with care) |
 | `log` | `append` | Record decision in decision-log.json |
 | `iterations` | `append` | Record iteration in iterations.json |
 | `complete` | `set BLOCKED` | Signal unrecoverable blocker |
-| `validate` | `changes` | Validate state file integrity |
+| `baseline` | `record` / `get` | Starting commit snapshot |
+| `validate` | `json` / `skills` / `commands` / `change-dir` / `archive` / `iterations` / `completion` | Pre-flight checks |
 
 **Examples**:
 ```bash
 # Load context
-.opencode/scripts/lib/osx ctx get "$CHANGE_ID"
+openspec-extended osx ctx get "$CHANGE_ID"
 
 # Mark phase complete
-.opencode/scripts/lib/osx state complete "$CHANGE_ID"
+openspec-extended osx state complete "$CHANGE_ID"
 
 # Record decision
-.opencode/scripts/lib/osx log append "$CHANGE_ID" \
+openspec-extended osx log append "$CHANGE_ID" \
   --phase IMPLEMENTATION \
   --summary "Completed authentication feature" \
   --extra '{"tasks_completed": ["1.1", "1.2"], "commits_made": 3}'
 
 # Signal blocker
-.opencode/scripts/lib/osx complete set "$CHANGE_ID" BLOCKED \
+openspec-extended osx complete set "$CHANGE_ID" BLOCKED \
   --blocker-reason "Third-party API unavailable"
 ```
+
+**Complete vocabulary** (every valid action per domain — canonical form):
+
+| Domain | Read | Write / Mutate |
+|--------|------|----------------|
+| `ctx` | `get` | — |
+| `git` | `get` | — |
+| `baseline` | `get` | `record` |
+| `state` | `get` | `complete`, `set-phase`, `transition`, `clear-transition` |
+| `phase` | `current`, `next` | `advance` |
+| `iterations` | `get` | `append` |
+| `log` | `get` | `append` |
+| `complete` | `check`, `get` | `set` |
+| `validate` | `json`, `skills`, `commands`, `change-dir`, `archive`, `iterations`, `completion` | — |
+| `instructions` | `instructions <artifact> [--change <name>] [--json]` | — |
+
+The only canonical read verb is `get`. There is no `show` or `list` — use `get`. The only canonical write verbs are `append`, `complete`, `set-phase`, `transition`, `clear-transition`, `record`, `advance`, and `set` (for `complete`).
 
 ---
 
@@ -196,21 +232,21 @@ Location: `.opencode/scripts/lib/osx` (Python script)
 
 ### 4.2 PHASE2 Transition Logic
 
-PHASE2 (Verification) has complex decision logic:
+PHASE2 (REVIEW) has complex decision logic:
 
 ```mermaid
 graph TD
     A[Verify implementation] --> B{Critical or Warning issues?}
     B -->|No| C[Phase complete → PHASE3]
     B -->|Yes| D{What's the root cause?}
-    
-    D -->|Artifacts wrong| E[Use osx-modify-artifacts to fix]
+
+    D -->|Artifacts wrong (typical)| E[Use /osc-update-change to reconcile single- and multi-artifact defects]
     E --> F[Commit fixes]
     F --> G[Transition to PHASE1]
-    
+
     D -->|Implementation wrong| H[Do NOT modify artifacts]
     H --> I[Transition to PHASE1]
-    
+
     D -->|Same phase retry| J[Try different approach]
     J --> K[Transition to PHASE2]
 ```
@@ -219,9 +255,10 @@ graph TD
 
 | Situation | Command | Reason Parameter |
 |-----------|----------|-----------------|
-| Artifacts are wrong | `osx state transition "$1" PHASE1 artifacts_modified` | "Fixed unclear specs in design.md" |
-| Implementation is wrong | `osx state transition "$1" PHASE1 implementation_incorrect` | "Missing validation in API handler" |
-| Same phase retry | `osx state transition "$1" PHASE2 retry_requested` | "Alternative verification strategy" |
+| Artifacts are wrong (typically multi-artifact) | `osx state transition "$1" --target PHASE1 --reason artifacts_modified` | "Reconciled specs + design + tasks via /osc-update-change" |
+| Artifacts are wrong (isolated single-artifact defect) | `osx state transition "$1" --target PHASE1 --reason artifacts_modified` | "Surgical fix via /osc-update-change" |
+| Implementation is wrong | `osx state transition "$1" --target PHASE1 --reason implementation_incorrect` | "Missing validation in API handler" |
+| Same phase retry | `osx state transition "$1" --target PHASE2 --reason retry_requested` | "Alternative verification strategy" |
 
 **Critical**: Choose the correct case - wrong transition sends workflow to wrong place.
 
@@ -264,22 +301,30 @@ graph TD
 
 ### 5.1 PHASE0: Artifact Review
 
-**Agent**: `osx-analyzer`
+**Agent**: `osx-analyzer` (read-only: `edit: deny`)
 **Tool**: `osx-review-artifacts` skill
 
-**Purpose**: Ensure artifacts are excellent before implementation
+**Purpose**: Ensure artifacts are excellent before implementation.
 
 **Process**:
 1. Load context: `osx ctx get "$1"`
-2. Run review using `osx-review-artifacts` skill
-3. If CRITICAL/WARNING issues found: **FIX IMMEDIATELY** with `osx-modify-artifacts`
-4. If clean: Log and complete
+2. Run review using `osx-review-artifacts` skill (schema-driven audit).
+3. Apply the **severity threshold**: only Critical and Warning findings trigger a route. Suggestion findings are advisory and do not block. When findings exist (Critical or Warning), classify by breadth and emit a routing report:
+   - all findings on a single artifact + no coherence-level finding → `/osc-update-change <name> <id>`
+   - multi-artifact drift or any coherence-level finding → `/osc-update-change <name>`
+   - missing artifacts → `/osc-continue-change <name>`
+   - all clean (no findings, ad-hoc invocation) → `/osc-apply-change <name>` — the orchestrated loop advances via `state complete`
+   - intent-level change detected (Update vs Start Fresh) → `/osc-new-change <fresh-name>`
+4. **Do not fix inside PHASE0.** The user invokes the routed command externally.
+5. If clean **or Suggestion-only findings**: Log the Suggestions in `decision-log.json` / `iterations.json` and complete the phase (orchestrator advances to PHASE1). Suggestions surface in the routing report but do not block.
 
-**Critical**: Do not wait for next iteration to fix CRITICAL issues. Fix in same invocation.
+**Note**: PHASE0 used to fix artifacts in the same invocation. With the
+read-only `osx-analyzer`, fixes are routed to `/osc-update-change`,
+which the user (or a follow-up slash command) performs.
 
 **State update**:
 ```bash
-.osx/scripts/lib/osx state complete "$1"
+openspec-extended osx state complete "$1"
 ```
 
 ### 5.2 PHASE1: Implementation
@@ -305,38 +350,52 @@ graph TD
 
 **State update**: `osx state complete "$1"`
 
-### 5.3 PHASE2: Verification
+### 5.3 PHASE2: Review
 
-**Agent**: `osx-analyzer`
+**Agent**: `osx-reviewer` (`edit: allow`)
 **Tool**: `osc-verify-change` skill
 
-**Purpose**: Verify implementation matches artifacts
+**Purpose**: Verify implementation matches artifacts. Writes `verification-report.md` with embedded requirement-level diff (v1.11.0+ via `openspec show --diff --json`). The report has three new sections when the diff envelope is non-empty: `## Delta inventory`, `## Requirement diff`, `## Verification warnings`.
 
 **Process**:
 1. Load context
 2. Run `osc-verify-change` skill
 3. Analyze verification report
-4. **Critical decision tree** (see Section 4.2)
+4. **Critical decision tree** (see Section 4.2):
+   - **Case A — artifacts wrong**: route to `/osc-update-change <name>` for the
+     typical multi-artifact drift (specs + design + tasks move together).
+     Isolated single-artifact defects may use `/osc-update-change <name> <id>`.
+   - **Case B — implementation wrong**: do not modify artifacts.
+   - **Case C — same phase retry**: try a different approach.
+   - **Missing-artifact sub-case**: if the report surfaces an artifact the
+     implementation needs but does not yet exist, route via
+     `/osc-continue-change <name>` (creation), not `/osc-update-change` (revision).
+   - **Design-ambiguity sub-case**: if the report surfaces design-level
+     ambiguity in spec intent, invoke `/openspec-explore <name>` for thinking time
+     *before* reconciling via `/osc-update-change`.
 
 **State updates**:
 ```bash
 # Normal: all good
-.osx/scripts/lib/osx state complete "$1"
+openspec-extended osx state complete "$1"
 
-# Explicit transition: artifacts wrong
-.osx/scripts/lib/osx state transition "$1" PHASE1 artifacts_modified "Updated unclear specs"
+# Case A: artifacts wrong (default → update)
+openspec-extended osx state transition "$1" --target PHASE1 --reason artifacts_modified --details "Reconciled via /osc-update-change"
 
-# Explicit transition: implementation wrong
-.osx/scripts/lib/osx state transition "$1" PHASE1 implementation_incorrect "Missing validation"
+# Case A (isolated): single-artifact defect via modify
+openspec-extended osx state transition "$1" --target PHASE1 --reason artifacts_modified --details "Surgical fix via /osc-update-change"
 
-# Explicit transition: retry
-.osx/scripts/lib/osx state transition "$1" PHASE2 retry_requested "Alternative strategy"
+# Case B: implementation wrong
+openspec-extended osx state transition "$1" --target PHASE1 --reason implementation_incorrect --details "Missing validation"
+
+# Case C: same phase retry
+openspec-extended osx state transition "$1" --target PHASE2 --reason retry_requested --details "Alternative strategy"
 ```
 
 ### 5.4 PHASE3: Maintain Documentation
 
 **Agent**: `osx-maintainer`
-**Tool**: `osx-maintain-ai-docs` skill
+**Tool**: `osx-maintain-docs` skill
 
 **Purpose**: Update AGENTS.md and CLAUDE.md after implementation
 
@@ -344,7 +403,7 @@ graph TD
 1. Load context
 2. Read change artifacts
 3. Read recent git history
-4. Use `osx-maintain-ai-docs` skill
+4. Use `osx-maintain-docs` skill
 5. Update documentation following best practices
 6. Commit changes
 
@@ -370,20 +429,23 @@ graph TD
 3. Merge deltas from `changes/<name>/specs/` into `specs/`
 4. Commit sync
 
+**Malformed-delta fallback**: if a delta in `changes/<name>/specs/` is malformed (invalid section headers, missing `## REMOVED Requirements`, broken `### Requirement:` blocks), never hand-edit the delta — fix the *source* artifact via `/osc-update-change <name>` (proposal/specs/design/tasks reconciliation), then re-run sync. The delta renders from upstream artifacts.
+
 **State update**: `osx state complete "$1"`
 
 ### 5.6 PHASE5: Self-Reflection
 
-**Agent**: `osx-analyzer`
+**Agent**: `osx-reviewer`
 **Tool**: No specific skill (autonomous reasoning)
 
 **Purpose**: Review workflow execution, identify improvements
 
 **Process**:
 1. Load full history from `iterations.json` and `decision-log.json`
-2. Analyze what went well, what didn't
-3. Create `reflections.md` with findings
-4. Log insights for future improvements
+2. *Optional pre-step*: if history is dense (3+ reroutes, recurring Critical findings), invoke `/openspec-explore <name>` for a guided reasoning pass before writing reflections — surfaces structural improvements the autonomous pass might miss.
+3. Analyze what went well, what didn't
+4. Create `reflections.md` with findings
+5. Log insights for future improvements
 
 **State update**: `osx state complete "$1"`
 
@@ -406,6 +468,8 @@ graph TD
 7. **Mark phase complete**: `osx state complete "$1"`
 
 **Why atomic**: Partial execution triggers unnecessary re-execution. Archive is idempotent but expensive to re-run.
+
+**Post-archive hand-off**: After archive succeeds, the user can run `/osx-changelog` (with optional `--since YYYY-MM-DD` or `<change-name>` filters) to surface archived changes in `CHANGELOG.md` using Keep a Changelog format. This is the natural hook after a release cutoff or version-header update.
 
 **State update**: `osx state complete "$1"`
 
@@ -433,7 +497,7 @@ A blocker is an **unrecoverable issue** that prevents workflow progress.
 ### 6.2 Signaling a Blocker
 
 ```bash
-.opencode/scripts/lib/osx complete set "$CHANGE_ID" BLOCKED \
+openspec-extended osx complete set "$CHANGE_ID" BLOCKED \
   --blocker-reason "Describe the specific blocking issue in detail"
 ```
 
@@ -471,7 +535,7 @@ A blocker is an **unrecoverable issue** that prevents workflow progress.
 User can resume workflow from any phase:
 
 ```bash
-.opencode/scripts/osx-orchestrate "$CHANGE_ID" --from-phase PHASE2
+openspec-extended orchestrate "$CHANGE_ID" --from-phase PHASE2
 ```
 
 **Use cases**:
@@ -484,10 +548,11 @@ User can resume workflow from any phase:
 Orchestrator enforces limits to prevent infinite loops:
 
 | Setting | Default | Purpose |
-|----------|-----------|----------|
-| `--max-phase-iterations` | 5 | Maximum iterations per phase |
-| `--timeout` | 30 min | Timeout per phase (seconds) |
-| `--max-total-iterations` | 50 | Total iterations across all phases |
+|----------|-----------|---------|
+| `--max-phase-iterations` | 10 | Maximum iterations per phase; `-1` = unlimited |
+| `--timeout` | 1800 | Per agent subprocess timeout in seconds |
+
+> **There is no `--max-total-iterations` flag.** Only `--max-phase-iterations`. If you've seen that flag mentioned elsewhere, it is stale documentation.
 
 **When limit reached**:
 - Orchestrator halts workflow
@@ -508,7 +573,7 @@ Orchestrator enforces limits to prevent infinite loops:
 Always log decisions with context:
 
 ```bash
-.osx/scripts/lib/osx log append "$1" \
+openspec-extended osx log append "$1" \
   --phase IMPLEMENTATION \
   --iteration 3 \
   --summary "Completed authentication tasks 1.1-1.5" \
@@ -534,7 +599,7 @@ Always log decisions with context:
 
 **Explanation**: `osc-*` are OpenSpec core commands (from npm). `osx` is the extended lib tool for orchestration state.
 
-**Check**: Script path is `.opencode/scripts/lib/osx`, not `.opencode/scripts/lib/osc`.
+**Check**: The invocation is `openspec-extended osx …` (CLI subcommand), not `osc-…` (core OpenSpec commands).
 
 ### 8.2 Skill Invocation Confusion
 
@@ -606,7 +671,7 @@ osx ctx get "$CHANGE_ID"
 osx state complete "$CHANGE_ID"
 
 # Phase transition (PHASE2 only)
-osx state transition "$CHANGE_ID" PHASE1 artifacts_modified "Fixed specs"
+osx state transition "$CHANGE_ID" --target PHASE1 --reason artifacts_modified --details "Fixed specs"
 
 # Log decision
 osx log append "$CHANGE_ID" --phase PHASE0 --iteration 1 --summary "Review complete"
@@ -619,18 +684,29 @@ openspec status --change "$CHANGE_ID" --json
 openspec instructions apply --change "$CHANGE_ID" --json
 ```
 
+### Entry points (how to start a change)
+
+| Want | Slash command |
+|---|---|
+| Guided tutorial (first time) | `/openspec-onboard` |
+| One-shot proposal (everything in one go) | `/openspec-propose <description>` |
+| Step-by-step (one artifact at a time) | `/openspec-new-change <name>` |
+| Fast-forward (all artifacts at once) | `/openspec-ff-change <name>` |
+| Thinking partner (no artifacts yet) | `/openspec-explore` |
+| Review existing artifacts (read-only audit) | `/osx-review <change>` |
+| Verify implementation (post-apply) | `/osc-verify-change <change>` |
+| Test-compliance check (post-apply) | `/osx-verify-tests <change>` |
+| Update docs | `/osx-maintain-docs <change>` |
+| Generate CHANGELOG from archived changes | `/osx-changelog [--since YYYY-MM-DD | <change>...]` |
+
 ### Phase Summary
 
-| Phase | Agent | Key Skills | Critical Requirement |
-|--------|---------|-------------|---------------------|
-| PHASE0 | osx-analyzer | review-artifacts, modify-artifacts | Fix CRITICAL issues immediately |
-| PHASE1 | osx-builder | apply-change, review-test-compliance | Milestone commits (1-5 per iteration) |
-| PHASE2 | osx-analyzer | verify-change | Correct transition logic |
-| PHASE3 | osx-maintainer | maintain-ai-docs | Update AGENTS.md (not inline comments) |
-| PHASE4 | osx-maintainer | sync-specs | Merge deltas into main specs |
-| PHASE5 | osx-analyzer | None | Analyze workflow history |
-| PHASE6 | osx-maintainer | archive-change, bulk-archive | **ATOMIC EXECUTION** - all steps in one call |
-
----
-
-See `../SKILL.md` for fundamental OpenSpec concepts and mental models.
+| Phase | Agent | Key Skills | Optional Companions | Critical Requirement |
+|--------|---------|-------------|---------------------|---------------------|
+| PHASE0 | osx-analyzer | osx-review-artifacts | `/osc-explore`, `/osc-update-change`, `/osc-continue-change`, `/osc-new-change`, `/osc-archive-change` (routes only) | Read-only — emit routing report, never fix |
+| PHASE1 | osx-builder | osc-apply-change, osx-review-test-compliance | `/osc-explore`, `/osc-update-change` (pause-and-route), `osx-commit` (milestones) | Milestone commits (1-5 per iteration); pause-and-route on drift |
+| PHASE2 | osx-reviewer | osc-verify-change | `/osc-explore`, `/osc-update-change` (Case A), `/osc-continue-change` (missing artifact) | Correct transition logic; embeds openspec show --diff appendix (v1.11.0+) |
+| PHASE3 | osx-maintainer | osx-maintain-docs | (none — self-contained) | Update AGENTS.md (not inline comments) |
+| PHASE4 | osx-maintainer | osc-sync-specs | `/osc-update-change` (malformed-delta fix upstream), `osc-bulk-archive-change` (conflict) | Merge deltas into main specs; never hand-edit delta |
+| PHASE5 | osx-reviewer | (autonomous reasoning) | `/osc-explore` (optional pre-step), `osx-commit` | Analyze workflow history |
+| PHASE6 | osx-maintainer | osc-archive-change, osc-bulk-archive-change | `/osx-changelog` (post-archive), `osx-commit` | **ATOMIC EXECUTION** - all steps in one call |

@@ -42,7 +42,7 @@ The zero value of `core.WorktreeStatus` SHALL be safe: no nil-deref panics on fi
 
 ### Requirement: `WorktreeStatusReader` is a one-method role
 
-`core.WorktreeStatusReader` SHALL be a single-method interface: `ReadWorktreeStatus(ctx context.Context, repoPath, wtPath, base string) (core.WorktreeStatus, error)`. The interface SHALL be declared in `internal/core` per `core-git` consumer-side segregation rules.
+`core.WorktreeStatusReader` SHALL be a single-method interface: `ReadWorktreeStatus(ctx context.Context, cfg *core.Config, repoPath, wtPath string) (core.WorktreeStatus, error)`. The `cfg` argument carries the `core.Config` the adapter needs to resolve the tracked-base chain (`GetTrackedBase` then `Config.Validation.ProtectedBranches[0]`) and to surface the stale heuristic thresholds. The interface SHALL be declared in `internal/core` per `core-git` consumer-side segregation rules.
 
 #### Scenario: Interface declares the read verb only
 
@@ -113,7 +113,7 @@ The `LastCommitDate` field SHALL be set to the author date of the commit that th
 
 ### Requirement: `IsStale` derives from `Behind` and `LastCommitDate` against configured thresholds
 
-The `IsStale` field SHALL be `true` when EITHER `Behind >= Config.Status.StaleBehind` (when `StaleBehind > 0`) OR the duration `time.Since(LastCommitDate)` exceeds `Config.Status.StaleDays * 24h` (when `StaleDays > 0` and `LastCommitDate` is not the zero time). When both thresholds are zero, `IsStale` SHALL be `false`. The derivation SHALL be a pure function on the populated value and the configuration; tests SHALL table-drive every combination.
+The `IsStale` field SHALL be `true` when EITHER `Behind >= Config.Status.StaleBehind` (when `StaleBehind > 0`) OR the duration `time.Since(LastCommitDate)` exceeds `Config.Status.StaleDays * 24h` (when `StaleDays > 0` and `LastCommitDate` is not the zero time). When both thresholds are zero, `IsStale` SHALL be `false`. The derivation SHALL be a pure function on the populated value and the configuration; tests SHALL table-drive every combination. The derivation SHALL be a method on `*core.WorktreeStatus` (`ComputeIsStale(cfg *core.Config) bool`) called by the cmd layer after the adapter returns; the adapter SHALL set `IsStale = false` (zero value).
 
 #### Scenario: Behind at or above the threshold
 
@@ -134,6 +134,12 @@ The `IsStale` field SHALL be `true` when EITHER `Behind >= Config.Status.StaleBe
 
 - **WHEN** `Behind = 5`, `LastCommitDate` is 3 days ago, `StaleBehind = 20`, `StaleDays = 30`
 - **THEN** `IsStale` is `false`
+
+#### Scenario: Adapter returns `IsStale` as zero
+
+- **WHEN** the adapter returns a populated `core.WorktreeStatus` after a successful read
+- **THEN** the `IsStale` field is `false`
+- **AND** the cmd layer fills it via `row.ComputeIsStale(cfg)` after collection
 
 ### Requirement: Per-worktree read failures populate the skip fields, not an error
 

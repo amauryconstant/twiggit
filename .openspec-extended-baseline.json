@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-09-19T19:06:12.923133+00:00",
+  "captured_at": "2026-10-10T01:02:55.215787+00:00",
   "tool": "opencode",
   "global_config": {
     "profile": "custom",
@@ -20,8 +20,9 @@
     ],
     "telemetry": {
       "noticeSeen": true,
-      "anonymousId": "04f147a1-627e-463e-9bf8-b82675e745bb"
-    }
+      "anonymousId": "3c08e9d9-6301-4f0a-af83-bb2d396d24e8"
+    },
+    "completionTipSeen": true
   },
   "project_root": "/home/amaury/Projects/twiggit"
 }
