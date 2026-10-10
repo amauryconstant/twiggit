@@ -23,13 +23,18 @@ The system SHALL display the per-worktree diagnostic projection for every worktr
 
 ### Requirement: `--all` shows worktrees from every project
 
-The system SHALL accept `--all` / `-a` to list worktrees from every project under the configured `ProjectsDirectory`. The output SHALL prepend each row's project name as an additional leading column when more than one project contributes rows. The main worktree SHALL still be excluded per project.
+The system SHALL accept `--all` / `-a` to list worktrees from every project under the configured `ProjectsDirectory`. When `--all` is set, the output SHALL prepend each row's project name as the leading column. The main worktree SHALL still be excluded per project. Without `--all`, the project name is not surfaced (single-project mode omits the column to keep the output narrow).
 
 #### Scenario: Multiple projects, worktrees present
 
 - **WHEN** the user runs `twiggit status --all` and two projects each have worktrees
 - **THEN** stdout contains rows for every worktree
 - **AND** each row carries the project name as the leading column
+
+#### Scenario: Single project under --all still shows the leading column
+
+- **WHEN** the user runs `twiggit status --all` and only one project has worktrees
+- **THEN** stdout contains the project name as the leading column on every row
 
 ### Requirement: Outside git without positional or `--all` returns a usage error
 

@@ -8,7 +8,7 @@ Owns the `core.WorktreeStatus` value type that every worktree diagnostic view re
 
 ### Requirement: `core.WorktreeStatus` carries the full diagnostic projection
 
-`core.WorktreeStatus` SHALL expose the fields `Worktree *core.Worktree`, `RepositoryStatus *core.RepositoryStatus`, `LastChecked time.Time`, `IsClean bool`, `HasUncommittedChanges bool`, `BranchStatus string`, `Base string`, `IsMerged bool`, `IsStale bool`, `LastCommitDate time.Time`, `IsSkipped bool`, and `SkipReason string`.
+`core.WorktreeStatus` SHALL expose the fields `Worktree *core.Worktree`, `ProjectName string`, `RepositoryStatus *core.RepositoryStatus`, `LastChecked time.Time`, `IsClean bool`, `HasUncommittedChanges bool`, `Base string`, `IsMerged bool`, `IsStale bool`, `LastCommitDate time.Time`, `IsSkipped bool`, and `SkipReason string`.
 
 #### Scenario: Field set is complete
 
