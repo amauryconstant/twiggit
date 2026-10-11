@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.0] - 2026-10-11
+
+
+
+### Added
+
+- `twiggit status` per-worktree diagnostic view in the `core` group: one row per worktree with BRANCH, PATH, AHEAD, BEHIND, BASE, MERGED, DIRTY, STALE columns; pipeable via `--output json|table|plain`; `--all` walks every project, `[project]` selects one; `--stale-behind N` and `--stale-days N` override the per-invocation thresholds (cli-status-command)
+- `core.WorktreeStatusReader` role + `Client.ReadWorktreeStatus` adapter (`internal/git/status.go`); ahead/behind via `rev-list`, merged via the `IsBranchMerged` walk, base via the rebase tracked-base chain (cli-status-command)
+- `core.WorktreeStatus` extended with `Base`, `IsMerged`, `IsStale`, `LastCommitDate`, `IsSkipped`, `SkipReason` and JSON tags on every exported field; `ComputeIsStale` derives `IsStale` per row from the per-invocation config so `--stale-behind` takes effect (cli-status-command)
+- `Config.Status` sub-struct under `[status]` TOML prefix (`StaleBehind=20`, `StaleDays=30`; zero disables the corresponding half of the heuristic) (cli-status-command)
+- Best-effort per-worktree skip: a failed wt row carries `IsSkipped` + `SkipReason`, the walk returns `nil`, stderr warns under non-quiet mode (cli-status-command)
+
+### Changed
+
+- `cmd/delete` routes through `WorktreeStatusReader`; the standalone `getWorktreeStatus` helper in `cmd/delete.go` is retired in favour of the role, so status and delete share one canonical read path (cli-status-command)
+- `findProjectByName` returns `*core.NotFoundError` so `status`, `prune`, `rebase`, `sync` share the typed not-found contract (cli-status-command)
+
 ## [0.15.1] - 2026-10-08
 
 
