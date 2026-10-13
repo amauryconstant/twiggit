@@ -13,13 +13,25 @@ jobs:
   release:
     runs-on: ubuntu-latest
     container:
-      image: goreleaser/goreleaser:v2.18.2
+      image: golang:1.27.2-alpine3.23
       options: --entrypoint /bin/sh
     steps:
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Install release tools
+        run: |
+          set -euo pipefail
+          apk add --no-cache bash git ca-certificates curl docker-cli
+          go install github.com/goreleaser/goreleaser/v2@v2.18.2
+          go install github.com/sigstore/cosign/v3/cmd/cosign@v3.1.3
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin v1.51.1
+          goreleaser --version
+          syft --version
+          cosign --version
 
       - name: Tag format guard
         run: |

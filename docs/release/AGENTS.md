@@ -21,13 +21,26 @@ Split enforced at the goreleaser config layer:
 | GitHub release | GitHub Actions `release.yml` | `.goreleaser.github.yml` (`force_token: github`) | Tarballs, checksums, SBOMs to `github.com/amauryconstant/twiggit/releases/tag/<tag>` |
 | Tag mirror to GitHub | GitLab CI `mirror-to-github` job | `.gitlab-ci.yml` | `git push --tags --force-with-lease` (tag pipelines: `when: never`) |
 
-**Invariant:** The GitHub Actions release job MUST run inside the
-`goreleaser/goreleaser:v2.18.2` Docker image (via the `container:` directive),
-not via `goreleaser-action@v6`. `goreleaser-action@v6` installs only the
-goreleaser binary; goreleaser's `sboms:` step then shells out to `syft` and
-fails with `exec: "syft": executable file not found in $PATH`. Using the
-Docker image as the job container bundles `goreleaser`, `syft`, `cosign`,
-and `gh` — symmetric with the GitLab CI `release` job and with `airk`.
+**Invariant:** The release job image MUST run a Go version that satisfies
+`go.mod`'s `go` directive (currently `go 1.27.2`). Goreleaser pins
+`GOTOOLCHAIN=local` for its child `go build` invocations, which disables
+Go's toolchain auto-download — so the host Go has to already satisfy
+go.mod or the `before:` hook fails with
+`go: go.mod requires go >= 1.27.2 (running go 1.27.1; GOTOOLCHAIN=local)`.
+
+The `goreleaser/goreleaser:v2.18.2` Docker image ships Go 1.27.1 (and
+v2.18.3 still ships 1.27.1) because goreleaser's pre-baked `.apk` is
+compiled against the image's pinned Go. Using that image as the release
+job container while go.mod's `go` directive is newer is a hard trap. The
+release job therefore runs on `golang:1.27.2-alpine3.23` (matching the
+`Dockerfile.ci` base) with goreleaser v2.18.2, syft v1.51.1, and cosign
+v3.1.3 installed inside the job's `before_script`. This pattern applies
+symmetrically to the GitLab CI `release` and `goreleaser-dry-run` jobs and
+to the GitHub Actions `release` job.
+
+When bumping go.mod's `go` directive, bump the release job image base in
+the same change. Do not reintroduce the goreleaser-pinned image as a
+release runner.
 
 **CHANGELOG**: Auto-generated via `openspec-generate-changelog` after
 archiving changes.
