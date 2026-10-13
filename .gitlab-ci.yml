@@ -292,12 +292,25 @@ release:
     - |
       # GitLab Releases API preflight: fail if release for tag already exists.
       # Backup for goreleaser's missing --fail-if-tag-exists flag in v2.18.2.
+      # Tag is the literal string (e.g. v0.16.0); API does not take a 'v' prefix.
+      # 200 -> release exists (block); 404 -> no release (proceed);
+      # anything else -> fail loud so we never release into an unknown state
+      # (auth outage, partial API failure, etc.).
       status=$(curl -sI -o /dev/null -w "%{http_code}" \
-        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases/v$CI_COMMIT_TAG")
-      if [ "$status" = "200" ]; then
-        echo "ERROR: release for tag $CI_COMMIT_TAG already exists (HTTP 200)"
-        exit 1
-      fi
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases/$CI_COMMIT_TAG")
+      case "$status" in
+        200)
+          echo "ERROR: release for tag $CI_COMMIT_TAG already exists (HTTP 200)"
+          exit 1
+          ;;
+        404)
+          echo "preflight OK: no release for tag $CI_COMMIT_TAG"
+          ;;
+        *)
+          echo "ERROR: preflight got unexpected HTTP $status from GitLab Releases API"
+          exit 1
+          ;;
+      esac
     - |
       # Signing mode: prefer OIDC keyless; fall back to $COSIGN_KEY.
       if [ -n "${SIGSTORE_ID_TOKEN:-}" ]; then
