@@ -1,0 +1,8 @@
+openspec/changes/archive
+.opencode
+node_modules
+dist
+bin
+coverage.html
+.cache
+.gomodcache
