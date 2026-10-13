@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.1] - 2026-10-13
+
+
+### Added
+
+- Prettier 3.9.10 wired as the project's markdown formatter and lint guard across mise tasks (`lint:md`, `format:md`), `.prettierrc.json` (proseWrap preserve, printWidth 100, trailingComma all, singleQuote, endOfLine lf), `.prettierignore` (excludes `openspec/changes/archive`, `.opencode`, node_modules, build/cache artifacts), and pre-commit via `mirrors-prettier` v3.1.0 with `additional_dependencies: prettier@3.9.10` + `types_or: [markdown]`; `lint:md` folded into `mise run verify` so every surface catches the same violations (`a7aff3f`)
+
+### Changed
+
+- `mise run lint:md` (`prettier --check`) now passes `--log-level warn` so the "Checking formatting..." header and "All matched files..." summary drop on a clean tree while `[warn]` lines still surface on a dirty tree (`096905f`)
+- `mise run test:e2e` runs ginkgo with `--succinct --no-color` so the output is one line per spec with no ANSI noise (`096905f`)
+- 56 markdown files under the project root reformatted by the newly-pinned prettier 3.9.10 (top-level docs, per-directory `AGENTS.md`, test directories, openspec specs, and active change folders); `openspec/changes/archive` is left untouched to preserve generated report history; `proseWrap: preserve` keeps hand-broken lines, command fences, and bullet lists intact (`fac29f8`)
+
+### Fixed
+
+- v0.16.0 release failed inside the goreleaser `before:` hook with `go: go.mod requires go >= 1.27.2 (running go 1.27.1; GOTOOLCHAIN=local)`; goreleaser pins `GOTOOLCHAIN=local` for its child `go build` invocations, so toolchain auto-download is unavailable inside the pipeline and the host Go must already satisfy go.mod. Swap the `goreleaser-dry-run` and `release` jobs in `.gitlab-ci.yml` and the GitHub Actions `release.yml` job to `golang:1.27.2-alpine3.23` (matching the `Dockerfile.ci` base); each job's `before_script` now installs goreleaser v2.18.2, cosign v3.1.3, and syft v1.51.1 at locked versions, replacing the image-bundled copies. Bump `Dockerfile.ci` base to `golang:1.27.2-alpine3.23` to fix the same class of drift in setup/lint/test jobs; rewrite the release-job invariant in `docs/release/AGENTS.md` to document the `GOTOOLCHAIN=local` constraint and the rule that the release image base must satisfy go.mod (`2f9a0d8`)
+- GitLab Releases API preflight built the URL as `releases/v$CI_COMMIT_TAG`, but `$CI_COMMIT_TAG` is the literal tag string (e.g. `v0.16.0`), so the path became `releases/vv0.16.0` and never matched a real release; the check silently returned 404 for every run and never blocked a duplicate release — the comment's intent ("backup for goreleaser's missing `--fail-if-tag-exists` flag") was never realized. Use the literal tag in the path: `releases/$CI_COMMIT_TAG`; tighten the status check so 200 = release exists (block), 404 = no release (proceed), and anything else (401, 403, 5xx) fails loud instead of silently proceeding into a release during auth outage or partial API failure (`8eaa2ae`)
+
 ## [0.16.0] - 2026-10-11
 
 ### Added
