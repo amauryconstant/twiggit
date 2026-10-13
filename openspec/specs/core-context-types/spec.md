@@ -10,12 +10,12 @@ Defines the `core.ContextType`, `core.PathType`, `core.Context`, `core.Resolutio
 
 `core.ContextType` SHALL be an `int` type with the following variants, in order:
 
-| Position | Constant | Meaning |
-|---|---|---|
-| 0 | `ContextUnknown` | Uninitialized; never a valid detected state |
-| 1 | `ContextProject` | Inside a project's main repository |
-| 2 | `ContextWorktree` | Inside a worktree under `Config.WorktreesDirectory` |
-| 3 | `ContextOutsideGit` | Not in any git repository |
+| Position | Constant            | Meaning                                             |
+| -------- | ------------------- | --------------------------------------------------- |
+| 0        | `ContextUnknown`    | Uninitialized; never a valid detected state         |
+| 1        | `ContextProject`    | Inside a project's main repository                  |
+| 2        | `ContextWorktree`   | Inside a worktree under `Config.WorktreesDirectory` |
+| 3        | `ContextOutsideGit` | Not in any git repository                           |
 
 `ContextType.String()` SHALL return `"unknown"` for `ContextUnknown`, `"project"` for `ContextProject`, `"worktree"` for `ContextWorktree`, and `"outside-git"` for `ContextOutsideGit`.
 
@@ -29,12 +29,12 @@ Defines the `core.ContextType`, `core.PathType`, `core.Context`, `core.Resolutio
 
 `core.PathType` SHALL be an `int` type with the following variants:
 
-| Position | Constant | Meaning |
-|---|---|---|
-| 0 | `PathTypeUnknown` | Uninitialized |
-| 1 | `PathTypeProject` | Path resolves to a project |
-| 2 | `PathTypeWorktree` | Path resolves to a worktree |
-| 3 | `PathTypeInvalid` | Path is not under any configured directory |
+| Position | Constant           | Meaning                                    |
+| -------- | ------------------ | ------------------------------------------ |
+| 0        | `PathTypeUnknown`  | Uninitialized                              |
+| 1        | `PathTypeProject`  | Path resolves to a project                 |
+| 2        | `PathTypeWorktree` | Path resolves to a worktree                |
+| 3        | `PathTypeInvalid`  | Path is not under any configured directory |
 
 `PathType.String()` SHALL return `"unknown"`, `"project"`, `"worktree"`, or `"invalid"` per the variant.
 

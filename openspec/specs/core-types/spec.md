@@ -95,17 +95,17 @@ their semantic content. Types previously named `GitRepository`,
 `GitDir`, `GitCommit`, `GitBranch`, `BranchInfo`, `WorktreeInfo`,
 `RemoteInfo`, `CommitInfo` SHALL be renamed as follows:
 
-| Old name           | New name         |
-|--------------------|------------------|
-| `GitRepository`    | `Repository`     |
-| `GitDir`           | `RepoDir`        |
-| `GitCommit`        | `Commit`         |
-| `GitBranch`        | `Branch`         |
-| `BranchInfo`       | `Branch`         |
-| `WorktreeInfo`     | `Worktree`       |
-| `RemoteInfo`       | `Remote`         |
-| `CommitInfo`       | `Commit`         |
-| `RepositoryStatus` | (unchanged)      |
+| Old name           | New name     |
+| ------------------ | ------------ |
+| `GitRepository`    | `Repository` |
+| `GitDir`           | `RepoDir`    |
+| `GitCommit`        | `Commit`     |
+| `GitBranch`        | `Branch`     |
+| `BranchInfo`       | `Branch`     |
+| `WorktreeInfo`     | `Worktree`   |
+| `RemoteInfo`       | `Remote`     |
+| `CommitInfo`       | `Commit`     |
+| `RepositoryStatus` | (unchanged)  |
 
 No `Git*` prefix SHALL appear in any data type declared in
 `internal/core/` because the package name supplies the git context.

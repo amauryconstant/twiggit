@@ -1,6 +1,7 @@
 # core-worktree-status Specification
 
 ## Purpose
+
 Owns the `core.WorktreeStatus` value type that every worktree diagnostic view reads, and the read path that produces it. Defines the `WorktreeStatusReader` role interface that `cmd/status`, `cmd/delete`, and any future consumer compose against, plus the per-worktree best-effort error contract that lets one failed worktree never abort the rest of the walk. Cross-references `core-types` (the existing data type) and `core-git` (the role-interface pattern); does not restate either.
 
 ## Requirements

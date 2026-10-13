@@ -23,6 +23,7 @@ The `internal/version` package SHALL export three string variables: `Version` (d
 ### Requirement: String() formatter
 
 `version.String() string` SHALL return a formatted version line:
+
 - Full info: `<version> (<commit>) <date>`
 - No commit: `<version> () `
 - No date: `<version> (<commit>) `

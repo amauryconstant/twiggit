@@ -46,11 +46,11 @@ Defines the `core.ValidationPipeline[T]` type and `core.ValidationFunc[T]` funct
 
 The following pre-built pipelines SHALL be exported from `internal/core/validation.go`:
 
-| Pipeline | Constructor | Validation rules |
-|---|---|---|
-| Branch name | `core.ValidateBranchName(name string) core.Result[bool]` | Non-empty; ≤ 128 chars; no `..`, no `~`, `^`, `:`, `?`, `*`, `[`, no leading `-`, no trailing `/`, no whitespace |
-| Project name | `core.ValidateProjectName(name string) core.Result[bool]` | Non-empty; matches `^[A-Za-z0-9._-]+$`; ≤ 64 chars; no leading `.` |
-| Shell type | `core.ValidateShellType(s string) core.Result[bool]` | One of `bash`, `zsh`, `fish`; case-sensitive |
+| Pipeline     | Constructor                                               | Validation rules                                                                                                 |
+| ------------ | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Branch name  | `core.ValidateBranchName(name string) core.Result[bool]`  | Non-empty; ≤ 128 chars; no `..`, no `~`, `^`, `:`, `?`, `*`, `[`, no leading `-`, no trailing `/`, no whitespace |
+| Project name | `core.ValidateProjectName(name string) core.Result[bool]` | Non-empty; matches `^[A-Za-z0-9._-]+$`; ≤ 64 chars; no leading `.`                                               |
+| Shell type   | `core.ValidateShellType(s string) core.Result[bool]`      | One of `bash`, `zsh`, `fish`; case-sensitive                                                                     |
 
 Each pre-built pipeline is a single `core.ValidationFunc[string]` for simplicity (no internal composition); future expansion to multiple rules will wrap in a `core.NewValidationPipeline[string](...)` chain.
 

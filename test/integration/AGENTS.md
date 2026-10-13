@@ -1,4 +1,5 @@
 ## Integration Test Structure
+
 Purpose: Test component interactions with real dependencies
 
 ## Testify Suite Pattern (Required)
@@ -43,11 +44,11 @@ func (s *MyTestSuite) TestOperation_Success() {
 
 ## Assertion Guidelines
 
-| Use `require.*` (fail fast) | Use `assert.*` (continue) |
-|-----------------------------|---------------------------|
-| `s.Require().NoError(err)` | `s.Equal(exp, act)` |
-| `s.Require().NotNil(obj)` | `s.Contains(str, substr)` |
-| `s.Require().Equal(exp, act)` | `s.True(cond)` |
+| Use `require.*` (fail fast)   | Use `assert.*` (continue) |
+| ----------------------------- | ------------------------- |
+| `s.Require().NoError(err)`    | `s.Equal(exp, act)`       |
+| `s.Require().NotNil(obj)`     | `s.Contains(str, substr)` |
+| `s.Require().Equal(exp, act)` | `s.True(cond)`            |
 
 **Testifylint:** Error assertions MUST use `require.Error()` or `require.NoError()`
 
@@ -57,12 +58,12 @@ See `test/mocks/AGENTS.md` for mock inventory and usage patterns.
 
 ## Setup/Teardown
 
-| Method | When |
-|--------|------|
-| `SetupTest()` | Before each test method |
-| `TearDownTest()` | After each test method (optional) |
-| `SetupSuite()` | Once before all tests (rare) |
-| `TearDownSuite()` | Once after all tests (rare) |
+| Method            | When                              |
+| ----------------- | --------------------------------- |
+| `SetupTest()`     | Before each test method           |
+| `TearDownTest()`  | After each test method (optional) |
+| `SetupSuite()`    | Once before all tests (rare)      |
+| `TearDownSuite()` | Once after all tests (rare)       |
 
 ## Error Testing
 
@@ -91,11 +92,11 @@ Test user: `test@twiggit.dev` / `Test User`
 
 ## Test Types
 
-| Type | Framework | Focus | Mocking |
-|------|-----------|-------|---------|
-| Unit | Testify + table-driven | Component isolation | Mock external deps |
-| Integration | Testify + `//go:build integration` | Component interactions | Real git repos |
-| E2E | Ginkgo/Gomega + gexec | CLI workflows | Built binary |
+| Type        | Framework                          | Focus                  | Mocking            |
+| ----------- | ---------------------------------- | ---------------------- | ------------------ |
+| Unit        | Testify + table-driven             | Component isolation    | Mock external deps |
+| Integration | Testify + `//go:build integration` | Component interactions | Real git repos     |
+| E2E         | Ginkgo/Gomega + gexec              | CLI workflows          | Built binary       |
 
 **Skip in short mode:** `if testing.Short() { t.Skip() }`
 

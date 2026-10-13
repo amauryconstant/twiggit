@@ -80,13 +80,13 @@ The runner SHALL dispatch shell invocations through `git.CommandExecutor` with t
 
 The runner SHALL set the following env vars for each hook command:
 
-| Variable | Value |
-|---|---|
-| `TWIGGIT_WORKTREE_PATH` | Absolute path to the new worktree |
-| `TWIGGIT_PROJECT_NAME` | Project identifier |
-| `TWIGGIT_BRANCH_NAME` | New branch name |
-| `TWIGGIT_SOURCE_BRANCH` | Branch created from |
-| `TWIGGIT_MAIN_REPO_PATH` | Path to the main repository |
+| Variable                 | Value                             |
+| ------------------------ | --------------------------------- |
+| `TWIGGIT_WORKTREE_PATH`  | Absolute path to the new worktree |
+| `TWIGGIT_PROJECT_NAME`   | Project identifier                |
+| `TWIGGIT_BRANCH_NAME`    | New branch name                   |
+| `TWIGGIT_SOURCE_BRANCH`  | Branch created from               |
+| `TWIGGIT_MAIN_REPO_PATH` | Path to the main repository       |
 
 #### Scenario: Env vars set for each command
 

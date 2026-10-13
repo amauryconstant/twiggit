@@ -21,21 +21,25 @@ Thank you for your interest in contributing to Twiggit! This guide will help you
 ### Initial Setup
 
 1. **Fork and clone the repository:**
+
    ```bash
    git clone https://gitlab.com/YOUR_USERNAME/twiggit.git
    cd twiggit
    ```
 
 2. **Install the full development toolchain:**
+
    ```bash
    mise install
    ```
+
    `mise install` provisions Go, `golangci-lint`, `goreleaser`, `govulncheck`,
    `cosign`, `gopls`, `ginkgo`, `gocover-cobertura`, `gocovmerge`, and
    `pre-commit` per the pins in `.mise/config.toml`. No manual binary
    installation is required on a clean checkout.
 
 3. **Set up pre-commit hooks:**
+
    ```bash
    pre-commit install
    ```
@@ -119,6 +123,7 @@ Pre-commit hooks run automatically on commit:
 - `golangci-lint` - Comprehensive linting
 
 To run all hooks manually:
+
 ```bash
 pre-commit run --all-files
 ```
@@ -135,16 +140,19 @@ pre-commit run --all-files
 ### Before Submitting
 
 1. **Create a feature branch:**
+
    ```bash
    git checkout -b feature/your-feature-name
    ```
 
 2. **Make your changes and test:**
+
    ```bash
    mise run verify    # Run all validation
    ```
 
 3. **Commit your changes:**
+
    ```bash
    git add .
    git commit -m "type: brief description"

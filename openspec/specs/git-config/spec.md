@@ -23,6 +23,7 @@ The `internal/config/manager.go` loader SHALL use koanf to read the TOML config 
 ### Requirement: Merge order: defaults → file → env (TWIGGIT_*) → flags
 
 The loader SHALL merge configuration in this exact order, each layer overriding the previous:
+
 1. `core.DefaultConfig()` (built-in defaults)
 2. The TOML file at the resolved XDG path
 3. `TWIGGIT_*` environment variables

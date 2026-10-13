@@ -39,12 +39,12 @@ Defines the four `core.Error` subtypes that drive cmd-side error formatting and 
 
 `core.NotFoundError.Is(target)` SHALL return `true` only when `target` is the sentinel whose entity matches `e.Entity`:
 
-| Entity value | Matching sentinel |
-|---|---|
-| `"git.repo"` or `"repo"` | `core.ErrGitRepoNotFound` |
-| `"worktree"` | `core.ErrWorktreeNotFound` |
-| `"project"` | `core.ErrProjectNotFound` |
-| `"resolution"` | `core.ErrResolutionNotFound` |
+| Entity value             | Matching sentinel            |
+| ------------------------ | ---------------------------- |
+| `"git.repo"` or `"repo"` | `core.ErrGitRepoNotFound`    |
+| `"worktree"`             | `core.ErrWorktreeNotFound`   |
+| `"project"`              | `core.ErrProjectNotFound`    |
+| `"resolution"`           | `core.ErrResolutionNotFound` |
 
 The dispatch SHALL NOT return `true` for any other sentinel; `errors.Is(err, core.ErrWorktreeNotFound)` succeeds only when `Entity == "worktree"`.
 

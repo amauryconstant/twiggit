@@ -1,6 +1,7 @@
 # core-git Specification
 
 ## Purpose
+
 Defines the role-interface segregation contract for git operations.
 Establishes consumer-side role interfaces that mirror the method sets on
 the composite `*git.Client` (which embeds `*reader` and `*cliClient`),

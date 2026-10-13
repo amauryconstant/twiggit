@@ -1,26 +1,25 @@
-
-
 ## Purpose
+
 Pre-built git repos for fast, reproducible E2E tests
 
 ## Available Fixtures
 
-| Fixture | Branches | Use Cases |
-|---------|----------|-----------|
-| bare-main.tar.gz | main | Basic operations, bare repo handling |
-| single-branch.tar.gz | main | Create/list/delete tests |
-| multi-branch.tar.gz | main, feature-1, feature-2 | Multi-branch scenarios |
-| corrupted.tar.gz | main | Corrupted repository error handling |
-| detached.tar.gz | main (detached HEAD) | Detached HEAD state handling |
-| submodule.tar.gz | main + submodule | Repository with submodules |
+| Fixture              | Branches                   | Use Cases                            |
+| -------------------- | -------------------------- | ------------------------------------ |
+| bare-main.tar.gz     | main                       | Basic operations, bare repo handling |
+| single-branch.tar.gz | main                       | Create/list/delete tests             |
+| multi-branch.tar.gz  | main, feature-1, feature-2 | Multi-branch scenarios               |
+| corrupted.tar.gz     | main                       | Corrupted repository error handling  |
+| detached.tar.gz      | main (detached HEAD)       | Detached HEAD state handling         |
+| submodule.tar.gz     | main + submodule           | Repository with submodules           |
 
 ## Edge Case Fixtures
 
-| Fixture | State | Use Case |
-|---------|-------|----------|
-| corrupted.tar.gz | Invalid `.git/objects` | Test graceful error handling |
-| detached.tar.gz | HEAD detached at commit | Test detached HEAD detection |
-| submodule.tar.gz | Contains git submodule | Test submodule-aware operations |
+| Fixture          | State                   | Use Case                        |
+| ---------------- | ----------------------- | ------------------------------- |
+| corrupted.tar.gz | Invalid `.git/objects`  | Test graceful error handling    |
+| detached.tar.gz  | HEAD detached at commit | Test detached HEAD detection    |
+| submodule.tar.gz | Contains git submodule  | Test submodule-aware operations |
 
 ## Creating Fixtures
 
@@ -52,6 +51,7 @@ If fixture missing or extraction fails:
 ## Fixture States
 
 Requirements:
+
 - Clean working tree (no uncommitted changes)
 - Known commit SHAs for deterministic referencing
 - Minimal history (only necessary commits)
@@ -59,6 +59,7 @@ Requirements:
 ## Performance
 
 Fixture extraction times:
+
 - bare-main: ~10ms
 - single-branch: ~15ms
 - multi-branch: ~20ms

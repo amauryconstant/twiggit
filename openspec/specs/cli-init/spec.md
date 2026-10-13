@@ -223,7 +223,6 @@ config files SHALL use `git.ProbeShellConfigFile(shellType)`. Any
 `defer Close()` SHALL be applied immediately after resource
 acquisition. Emitted errors SHALL be lowercase with no trailing punctuation.
 
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised

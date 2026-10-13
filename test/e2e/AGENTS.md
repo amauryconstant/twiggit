@@ -1,4 +1,5 @@
 ## E2E Test Structure
+
 Purpose: Test CLI commands from user perspective
 
 **Framework:** Ginkgo/Gomega + gexec for binary execution
@@ -31,12 +32,14 @@ var _ = ginkgo.Describe("create command", func() {
 **Helper:** `fixtures.ExecuteCLI(fixture, args...)`
 
 Executes built CLI binary with:
+
 - Binary path from fixture
 - Arguments passed to command
 - Output/exit code capture
 - Timeout support
 
 **Example:**
+
 ```go
 session := fixtures.ExecuteCLI(fixture, "list", "--all")
 gomega.Eventually(session).Should(gexec.Exit(0))
@@ -63,6 +66,7 @@ ginkgo.It("fails with invalid project", func() {
 ```
 
 ## Running E2E Tests
+
 ```bash
 mise run test:e2e      # All E2E tests
 mise run build:e2e     # Build CLI for E2E testing
@@ -73,6 +77,7 @@ mise run build:e2e     # Build CLI for E2E testing
 The `--verbose` flag (`-v`, `-vv`) outputs to stderr. Use `ShouldVerboseOutput()` and `ShouldNotHaveVerboseOutput()` helpers.
 
 **Example:**
+
 ```go
 // Test no verbose output by default
 session := cli.Run("create", "feature-1")
@@ -92,5 +97,6 @@ cli.ShouldVerboseOutput(session, "from branch: main")
 ```
 
 **Helper Methods:**
+
 - `ShouldVerboseOutput(session, expected)` - Asserts stderr contains expected verbose text
 - `ShouldNotHaveVerboseOutput(session)` - Asserts no verbose messages in stderr

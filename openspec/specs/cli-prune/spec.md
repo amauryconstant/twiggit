@@ -180,7 +180,6 @@ configuration (default: `main`, `master`, `develop`, `staging`,
 `production`) and SHALL use this list for prune safety checks.
 See `git-config`.
 
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised

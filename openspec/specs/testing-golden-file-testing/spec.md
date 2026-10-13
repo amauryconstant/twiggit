@@ -67,13 +67,12 @@ Golden-file tests SHALL cover at minimum:
 - `twiggit list --output json` JSON output
 - Validation, service, and not-found error formatting
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: `mise` task integration
 
 The project SHALL provide `mise run test:golden` (run tests, fail on

@@ -28,7 +28,7 @@ Defines the progress reporter used by bulk operations (`prune --all`, future bul
 
 ### Requirement: ReportStart and ReportComplete bracket a phase
 
-`(*ProgressReporter).ReportStart(message string)` SHALL emit one line `<message>...` (no trailing newline-count). `(*ProgressReporter).ReportComplete(message string)` SHALL emit one line `<message>` complete`. These bracket a long-running phase. Per the `golang-cli` "single-handling-rule" rule, the reporter SHALL NOT log structured diagnostics; that channel is reserved for `iostreams.Logger`.
+`(*ProgressReporter).ReportStart(message string)` SHALL emit one line `<message>...` (no trailing newline-count). `(*ProgressReporter).ReportComplete(message string)` SHALL emit one line `<message>` complete`. These bracket a long-running phase. Per the `golang-cli`"single-handling-rule" rule, the reporter SHALL NOT log structured diagnostics; that channel is reserved for`iostreams.Logger`.
 
 #### Scenario: Bracket phase
 

@@ -12,11 +12,11 @@ the error-type taxonomy itself lives in `core-errors`.
 
 The system SHALL map error categories to exit codes via the `cmdutil.ExitCodeFor(err) ExitCode` helper returning `type ExitCode int`. The mapping SHALL be exactly:
 
-| Exit code | Constant | Meaning |
-|---|---|---|
-| 0 | `ExitOK` | Success |
-| 1 | `ExitError` | General unclassified error, runtime failure, or recovered panic |
-| 2 | `ExitUsage` | Usage error (invalid command syntax) |
+| Exit code | Constant    | Meaning                                                         |
+| --------- | ----------- | --------------------------------------------------------------- |
+| 0         | `ExitOK`    | Success                                                         |
+| 1         | `ExitError` | General unclassified error, runtime failure, or recovered panic |
+| 2         | `ExitUsage` | Usage error (invalid command syntax)                            |
 
 The cmd layer SHALL NOT define additional exit-code constants. See `core-errors` for the canonical definitions; per-resource NotFound categories are distinguished in user-facing output by the per-resource NotFound hints requirement, not by exit code. `ExitCodeFor` SHALL dispatch first via `errors.AsType[*core.UsageError](err)`, returning `ExitUsage`; otherwise returning `ExitError` for any non-nil error and `ExitOK` for nil.
 
@@ -80,12 +80,12 @@ The system SHALL dispatch formatters via an explicit matcher strategy using `err
 
 The system SHALL attach hints to common error cases, pointing the user at remediation. For errors matching a per-resource NotFound sentinel via `errors.Is`, the system SHALL attach a resource-specific hint as documented in the table below.
 
-| Sentinel | Hint |
-|---|---|
-| `core.ErrProjectNotFound` | "Use 'twiggit list --all' to see available projects" |
-| `core.ErrWorktreeNotFound` | "Use 'twiggit list' to see available worktrees" |
+| Sentinel                     | Hint                                                     |
+| ---------------------------- | -------------------------------------------------------- |
+| `core.ErrProjectNotFound`    | "Use 'twiggit list --all' to see available projects"     |
+| `core.ErrWorktreeNotFound`   | "Use 'twiggit list' to see available worktrees"          |
 | `core.ErrResolutionNotFound` | "Use 'twiggit list' to see available navigation targets" |
-| `core.ErrGitRepoNotFound` | "Verify the repository path" |
+| `core.ErrGitRepoNotFound`    | "Verify the repository path"                             |
 
 For non-NotFound errors the system SHALL retain a generic hint ("Check your configuration and try again" or equivalent).
 

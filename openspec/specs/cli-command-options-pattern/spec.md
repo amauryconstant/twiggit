@@ -17,13 +17,12 @@ non-essential output (success messages, hints, progress) but SHALL
 preserve errors on stderr and any essential output (paths printed for
 `-C` mode) on stdout. See `cli-quiet-mode`. The flag rejection path SHALL emit lowercase, no-trailing-punctuation errors.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: `--verbose` / `-v` / `-vv` levels
 
 The system SHALL expose `--verbose` (short `-v`) as a global persistent
@@ -31,13 +30,12 @@ flag. One `-v` SHALL set verbosity level 1 (high-level flow); `-vv` SHALL
 set level 2 (parameters and intermediate steps). Verbose output SHALL
 go to stderr only. See `cli-verbose-output`.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Mutual exclusion of `--quiet` and `--verbose`
 
 The system SHALL allow both `--quiet` and `--verbose` to be set;
@@ -59,21 +57,21 @@ verbose SHALL win over quiet when both are active.
 The system SHALL use the following short flags consistently across all
 subcommands where the concept applies:
 
-| Long | Short |
-|---|---|
-| `--force` | `-f` |
-| `--yes` | `-y` |
-| `--all` | `-a` |
-| `--dry-run` | `-n` |
-| `--output` | (none; long-only) |
-| `--cd` | `-C` |
-| `--config` | `-c` |
-| `--install` | `-i` |
-| `--delete-branches` | `-d` |
-| `--source` | (none; long-only) |
-| `--merged-only` | `-m` |
-| `--quiet` | (none; long-only) |
-| `--verbose` | `-v` (count: `-vv` = level 2) |
+| Long                | Short                         |
+| ------------------- | ----------------------------- |
+| `--force`           | `-f`                          |
+| `--yes`             | `-y`                          |
+| `--all`             | `-a`                          |
+| `--dry-run`         | `-n`                          |
+| `--output`          | (none; long-only)             |
+| `--cd`              | `-C`                          |
+| `--config`          | `-c`                          |
+| `--install`         | `-i`                          |
+| `--delete-branches` | `-d`                          |
+| `--source`          | (none; long-only)             |
+| `--merged-only`     | `-m`                          |
+| `--quiet`           | (none; long-only)             |
+| `--verbose`         | `-v` (count: `-vv` = level 2) |
 
 #### Scenario: Short flag accepted
 
@@ -85,9 +83,9 @@ subcommands where the concept applies:
 The system SHALL expose Unix-style aliases:
 
 | Subcommand | Alias |
-|---|---|
-| `list` | `ls` |
-| `delete` | `rm` |
+| ---------- | ----- |
+| `list`     | `ls`  |
+| `delete`   | `rm`  |
 
 #### Scenario: `ls` is `list`
 
@@ -152,7 +150,6 @@ so the shell wrapper can navigate the user.
 The `init` subcommand SHALL accept a positional `shell` argument and
 SHALL NOT accept a `--shell=` flag. The `--install`, `--config`, and
 `--force` flags on `init` are documented in `cli-init`.
-
 
 #### Scenario: Definition holds
 

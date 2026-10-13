@@ -29,11 +29,11 @@ Documents the Tier 2 split of shell-related logic. Pure derivation helpers (`Det
 
 Config-file probing (`os.Stat`) SHALL live in `internal/git/shell_detect.go`. For a given shell, the system SHALL probe the following config files in order, using the first one that exists:
 
-| Shell | Files (preference order) |
-|---|---|
-| bash | `.bashrc`, `.bash_profile`, `.profile` |
-| zsh | `.zshrc`, `.zprofile`, `.profile` |
-| fish | `.config/fish/config.fish`, `config.fish`, `.fishrc` |
+| Shell | Files (preference order)                             |
+| ----- | ---------------------------------------------------- |
+| bash  | `.bashrc`, `.bash_profile`, `.profile`               |
+| zsh   | `.zshrc`, `.zprofile`, `.profile`                    |
+| fish  | `.config/fish/config.fish`, `config.fish`, `.fishrc` |
 
 Stat failures SHALL be wrapped as `*core.OperationError` with `Op = "shell.probe"`.
 

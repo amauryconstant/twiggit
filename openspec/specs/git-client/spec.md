@@ -11,21 +11,21 @@ Documents the composite `git.Client` for the Tier 2 layout: a single client type
 The composite git client exposes operations to read-side roles or
 write-side roles as follows:
 
-| Operation | Concrete | Role | Rationale |
-|---|---|---|---|
-| `ValidateRepository` | go-git | `RepositoryOpener` | Portable, deterministic |
-| `ListBranches` | go-git | `BranchReader` | Portable, deterministic |
-| `BranchExists` | go-git | `BranchReader` | Portable, deterministic |
-| `GetRepositoryStatus` | go-git | `RepositoryReader` | Portable, deterministic |
-| `GetRepositoryInfo` | go-git | `RepositoryReader` | Portable, deterministic |
-| `GetCommitInfo` | go-git | `RepositoryReader` | Portable, deterministic |
-| `ListRemotes` | go-git | `RemoteReader` | Portable, deterministic |
-| `CreateWorktree` | git CLI | `WorktreeWriter` | go-git lacks support |
-| `DeleteWorktree` | git CLI | `WorktreeWriter` | go-git lacks support |
-| `ListWorktrees` | git CLI | `WorktreeWriter` | go-git lacks support |
-| `PruneWorktrees` | git CLI | `WorktreeWriter` | go-git lacks support |
-| `DeleteBranch` | git CLI | `BranchWriter` | Handles worktree-referenced branches |
-| `IsBranchMerged` | git CLI | `BranchWriter` | go-git limitations |
+| Operation             | Concrete | Role               | Rationale                            |
+| --------------------- | -------- | ------------------ | ------------------------------------ |
+| `ValidateRepository`  | go-git   | `RepositoryOpener` | Portable, deterministic              |
+| `ListBranches`        | go-git   | `BranchReader`     | Portable, deterministic              |
+| `BranchExists`        | go-git   | `BranchReader`     | Portable, deterministic              |
+| `GetRepositoryStatus` | go-git   | `RepositoryReader` | Portable, deterministic              |
+| `GetRepositoryInfo`   | go-git   | `RepositoryReader` | Portable, deterministic              |
+| `GetCommitInfo`       | go-git   | `RepositoryReader` | Portable, deterministic              |
+| `ListRemotes`         | go-git   | `RemoteReader`     | Portable, deterministic              |
+| `CreateWorktree`      | git CLI  | `WorktreeWriter`   | go-git lacks support                 |
+| `DeleteWorktree`      | git CLI  | `WorktreeWriter`   | go-git lacks support                 |
+| `ListWorktrees`       | git CLI  | `WorktreeWriter`   | go-git lacks support                 |
+| `PruneWorktrees`      | git CLI  | `WorktreeWriter`   | go-git lacks support                 |
+| `DeleteBranch`        | git CLI  | `BranchWriter`     | Handles worktree-referenced branches |
+| `IsBranchMerged`      | git CLI  | `BranchWriter`     | go-git limitations                   |
 
 `OpenRepository` (exposed by the read-side concrete but not in any role
 interface per `core-git`) is omitted from the table intentionally; it
@@ -174,7 +174,7 @@ SHALL return raw `go-git` or `os/exec` errors.
   inside the write-side concrete client
 - **THEN** `errors.AsType[*core.OperationError](err)` SHALL return a non-nil
   result with `Op = "git.worktree.<command>"` (or `Op =
-  "git.branch.<command>"`) and a `Cause` wrapping the underlying
+"git.branch.<command>"`) and a `Cause` wrapping the underlying
   exit-code error
 
 ### Requirement: Role interface segregation contract references core-git

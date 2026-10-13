@@ -91,22 +91,22 @@ point. Dispatch is `errors.AsType`-driven across the four `core.Error`
 types in the order mandated by `openspec/specs/cli-error-formatting/spec.md`
 § Type-matched dispatch (most specific first):
 
-| Order | Type | Notes |
-| ----- | ---- | ----- |
-| 1 | `*core.ValidationError` | leaf argument / input validation; wins over wrapper types |
-| 2 | `*core.NotFoundError` | resource missing; per-sentinel hint appended (see `cli-error-formatting/spec.md` § Actionable hints) |
-| 3 | `*core.OperationError` | runtime wrapper for shell/navigation/git failures |
-| 4 | `*core.UsageError` | invocation-level usage failure; renders `Usage:` prefix |
+| Order | Type                    | Notes                                                                                                |
+| ----- | ----------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1     | `*core.ValidationError` | leaf argument / input validation; wins over wrapper types                                            |
+| 2     | `*core.NotFoundError`   | resource missing; per-sentinel hint appended (see `cli-error-formatting/spec.md` § Actionable hints) |
+| 3     | `*core.OperationError`  | runtime wrapper for shell/navigation/git failures                                                    |
+| 4     | `*core.UsageError`      | invocation-level usage failure; renders `Usage:` prefix                                              |
 
 Exit-code mapping is centralised in `cmdutil.ExitCodeFor(err)`:
 
-| Error class | Exit code |
-| ----------- | --------- |
-| `*core.UsageError` (incl. cobra wrap) | `cmdutil.ExitUsage` (2) |
-| `*core.ValidationError`, `*core.NotFoundError`, anything else | `cmdutil.ExitError` (1) |
-| nil | `cmdutil.ExitOK` (0) |
-| SIGINT (signal context cancelled) | 130 (bypasses formatter) |
-| SIGTERM (signal context cancelled) | 143 (bypasses formatter) |
+| Error class                                                   | Exit code                |
+| ------------------------------------------------------------- | ------------------------ |
+| `*core.UsageError` (incl. cobra wrap)                         | `cmdutil.ExitUsage` (2)  |
+| `*core.ValidationError`, `*core.NotFoundError`, anything else | `cmdutil.ExitError` (1)  |
+| nil                                                           | `cmdutil.ExitOK` (0)     |
+| SIGINT (signal context cancelled)                             | 130 (bypasses formatter) |
+| SIGTERM (signal context cancelled)                            | 143 (bypasses formatter) |
 
 For command-level cobra usage failures, wrap with `core.UsageWrap(err)`
 inside `SetFlagErrorFunc` or `Args` validators so dispatch lands on
@@ -125,7 +125,7 @@ Carapace integration provides shell completion for all commands. Hidden
 command: `twiggit _carapace <shell>` generates completion scripts.
 
 | Shells | bash, zsh, fish, nushell, elvish, powershell, tcsh, oil, xonsh, cmd-clink |
-| ------ | ---------------------------------------------------------------------------- |
+| ------ | ------------------------------------------------------------------------- |
 
 **Wiring pattern:**
 
@@ -141,38 +141,46 @@ Helpers live in `cmd/suggestions.go`; see that file for `actionWorktreeTarget`,
 ## Command specifications
 
 ### list
+
 Alias: `ls` (Unix-style shortcut)
 Output: Tabular format with branch, last commit, status (clean/dirty) or JSON for scripting
 Flags:
+
 - `--all/-a` (show all projects, override context)
 - `--output/-o <format>`: `json` (default empty flag falls through to plain)
 
 ### create
+
 Required: Project name (inferred), branch name, source branch (default: main)
 Flags: `--source <branch>`, `-C, --cd`
 Behavior: Create worktree, execute post-create hooks if `.twiggit.toml` configured, display hook failure warnings
 
 ### delete
+
 Alias: `rm`
 Safety checks: Uncommitted changes, current worktree status
 Flags: `-f, --force`, `-m, --merged-only`, `-C, --cd`
 Default behavior: Remove worktree + delete branch
 
 ### cd
+
 Output: Absolute path to worktree (for shell wrapper)
 Flags: None (target required)
 
 ### init
+
 Default: Print shell wrapper to stdout (eval-safe, no metadata)
 Optional: `[shell]` (bash|zsh|fish, auto-detected from $SHELL if omitted)
 Flags: `-i, --install`, `-c, --config <path>`, `-f, --force`
 
 ### prune
+
 Purpose: Delete merged worktrees for post-merge cleanup
 Args: `[project/branch]` (optional)
 Flags: `-n, --dry-run`, `-f, --force`, `-y, --yes`, `-d, --delete-branches`, `-a, --all`
 
 ### rebase
+
 Purpose: Rebase the current (or named) worktree onto its tracked base
 Args: `[project/branch]` (optional; mutually exclusive with `--all`)
 Flags: `-a, --all`, `-f, --fetch`, `-c, --continue`, `-A, --abort`,
@@ -187,6 +195,7 @@ Files: `cmd/rebase.go` (`RebaseOptions`, `NewCmdRebase`, `runRebase`,
 reused by `twiggit sync --rebase`.
 
 ### sync
+
 Purpose: Fetch the project's tracking refs and (optionally) rebase
 Args: `[project]` (optional)
 Flags: `-a, --all`, `--remote <name>`, `--branch <name>`,

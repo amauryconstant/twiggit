@@ -37,13 +37,12 @@ operations when the user has not passed `--force`, `--yes`, or
 `--dry-run`, and SHALL prompt for confirmation on stdin. See `cli-prune`
 for the full prune behavior.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Short-flag coverage
 
 Every common operation flag SHALL have a short alias. The full mapping

@@ -34,6 +34,7 @@ test/e2e/
 ### 1. Robust Cleanup
 
 The `E2ETestFixture.Cleanup()` method now includes:
+
 - **Nil checks** for all helpers to prevent panics
 - **Retry logic** with exponential backoff for worktree removal
 - **Force flag** (`--force`) to handle uncommitted changes
@@ -149,16 +150,19 @@ AfterEach(func() {
 ## Running Tests
 
 ### Run all E2E tests
+
 ```bash
 mise run test:e2e
 ```
 
 ### Run specific test suite
+
 ```bash
 cd test/e2e && ginkgo --tags=e2e --focus="list command"
 ```
 
 ### Run with verbose output
+
 ```bash
 cd test/e2e && ginkgo --tags=e2e -v
 ```

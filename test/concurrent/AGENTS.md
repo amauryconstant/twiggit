@@ -1,4 +1,5 @@
 ## Purpose
+
 Race detector validation for concurrent worktree operations
 
 ## Build Tag
@@ -48,13 +49,13 @@ wg.Wait()
 
 ## What to Test
 
-| Scenario | Description |
-|----------|-------------|
-| Concurrent list | Multiple goroutines listing same project |
-| Concurrent create | Creating different worktrees simultaneously |
-| Concurrent delete | Deleting different worktrees simultaneously |
-| Mixed create/delete | Create and delete operations interleaved |
-| Prune while list | Prune operation during list |
+| Scenario            | Description                                 |
+| ------------------- | ------------------------------------------- |
+| Concurrent list     | Multiple goroutines listing same project    |
+| Concurrent create   | Creating different worktrees simultaneously |
+| Concurrent delete   | Deleting different worktrees simultaneously |
+| Mixed create/delete | Create and delete operations interleaved    |
+| Prune while list    | Prune operation during list                 |
 
 ## Goroutine Leak Detection
 

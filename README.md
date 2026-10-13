@@ -8,11 +8,13 @@ Pragmatic git worktree management tool with focus on rebase workflows.
 ## Installation
 
 ### Quick Install (Linux/macOS)
+
 ```bash
 curl -fsSL https://gitlab.com/amoconst/twiggit/-/raw/main/install.sh | bash
 ```
 
 The install script will prompt you to:
+
 - Install the twiggit binary
 - Enable shell completions (recommended)
 - Set up directory navigation for `twiggit cd`
@@ -20,23 +22,25 @@ The install script will prompt you to:
 ### Manual Install
 
 Download from:
+
 - **GitLab Releases**: https://gitlab.com/amoconst/twiggit/-/releases
 - **GitHub Releases**: https://github.com/amauryconstant/twiggit/releases
 
- After manual installation, run:
- ```bash
- # Enable completions
- twiggit completion zsh > ~/.local/share/zsh/site-functions/_twiggit  # zsh
- # or
- echo 'source <(twiggit completion bash)' >> ~/.bashrc  # bash
+After manual installation, run:
 
- # Enable directory navigation
- twiggit init                    # Auto-detects shell and config file
- # or
- twiggit init ~/.zshrc           # Specify config file explicitly
- # or
- twiggit init --shell=zsh        # Specify shell explicitly
-  ```
+```bash
+# Enable completions
+twiggit completion zsh > ~/.local/share/zsh/site-functions/_twiggit  # zsh
+# or
+echo 'source <(twiggit completion bash)' >> ~/.bashrc  # bash
+
+# Enable directory navigation
+twiggit init                    # Auto-detects shell and config file
+# or
+twiggit init ~/.zshrc           # Specify config file explicitly
+# or
+twiggit init --shell=zsh        # Specify shell explicitly
+```
 
 ### Verify Installation
 
@@ -49,6 +53,7 @@ twiggit version
 ## Shell Integration
 
 Shell integration enables:
+
 - **Directory navigation**: `twiggit cd <branch>` changes to the worktree
 - **Completions**: TAB-autocomplete for all commands and flags
 
@@ -63,6 +68,7 @@ See [contrib/zsh/README.md](contrib/zsh/README.md), [contrib/bash/README.md](con
 If you prefer manual configuration:
 
 **Zsh** (add to `~/.zshrc`):
+
 ```zsh
 if (( $+commands[twiggit] )); then
   eval "$(twiggit init zsh)"
@@ -71,6 +77,7 @@ fi
 ```
 
 **Bash** (add to `~/.bashrc`):
+
 ```bash
 if command -v twiggit &>/dev/null; then
   eval "$(twiggit init bash)"
@@ -79,6 +86,7 @@ fi
 ```
 
 **Fish** (add to `~/.config/fish/config.fish`):
+
 ```fish
 if type -q twiggit
     twiggit init fish | source
@@ -171,13 +179,13 @@ commands = [
 
 When you run `twiggit create`, these commands will execute in the new worktree directory with the following environment variables:
 
-| Variable | Description |
-|----------|-------------|
-| `TWIGGIT_WORKTREE_PATH` | Path to the new worktree |
-| `TWIGGIT_PROJECT_NAME` | Project identifier |
-| `TWIGGIT_BRANCH_NAME` | Name of the new branch |
-| `TWIGGIT_SOURCE_BRANCH` | Branch the worktree was created from |
-| `TWIGGIT_MAIN_REPO_PATH` | Path to the main repository |
+| Variable                 | Description                          |
+| ------------------------ | ------------------------------------ |
+| `TWIGGIT_WORKTREE_PATH`  | Path to the new worktree             |
+| `TWIGGIT_PROJECT_NAME`   | Project identifier                   |
+| `TWIGGIT_BRANCH_NAME`    | Name of the new branch               |
+| `TWIGGIT_SOURCE_BRANCH`  | Branch the worktree was created from |
+| `TWIGGIT_MAIN_REPO_PATH` | Path to the main repository          |
 
 ### Pre-rebase, post-rebase, and post-sync hooks
 
@@ -199,14 +207,14 @@ commands = ["echo synced"]
 
 The rebase and sync hooks also receive the variables above plus:
 
-| Variable | Description |
-|----------|-------------|
-| `TWIGGIT_REBASE_BASE` | Branch being rebased onto (pre/post-rebase) |
-| `TWIGGIT_REBASE_OLD_TIP` | Pre-rebase tip (post-rebase) |
-| `TWIGGIT_REBASE_NEW_TIP` | Post-rebase tip (post-rebase) |
-| `TWIGGIT_REBASE_RESULT` | "clean" / "conflicted" / "nothing-to-do" (post-rebase) |
-| `TWIGGIT_SYNC_REMOTE` | Remote that was fetched (post-sync) |
-| `TWIGGIT_SYNC_BRANCH` | Branch that was fetched (post-sync) |
+| Variable                 | Description                                            |
+| ------------------------ | ------------------------------------------------------ |
+| `TWIGGIT_REBASE_BASE`    | Branch being rebased onto (pre/post-rebase)            |
+| `TWIGGIT_REBASE_OLD_TIP` | Pre-rebase tip (post-rebase)                           |
+| `TWIGGIT_REBASE_NEW_TIP` | Post-rebase tip (post-rebase)                          |
+| `TWIGGIT_REBASE_RESULT`  | "clean" / "conflicted" / "nothing-to-do" (post-rebase) |
+| `TWIGGIT_SYNC_REMOTE`    | Remote that was fetched (post-sync)                    |
+| `TWIGGIT_SYNC_BRANCH`    | Branch that was fetched (post-sync)                    |
 
 ### Behavior
 
@@ -233,11 +241,11 @@ debug logs (Go's `slog.Default` writes to the binary's stderr). For deeper
 runtime diagnostics, the standard `GODEBUG` knob is also available and useful
 when investigating `twiggit` itself:
 
-| Env var | Purpose |
-| --- | --- |
-| `GODEBUG=gctrace=1` | Print GC traces to stderr at every collection; useful when `twiggit` is slow and you suspect GC pressure. |
-| `GODEBUG=schedtrace=10000` | Emit a scheduler trace every 10 000 ms; pairs well with `schedtrace=` to profile goroutine scheduling under concurrent worktree operations. |
-| `GODEBUG=asyncpreemptoff=1` | Disable async preemption; surfaces data races that preemption would otherwise hide when running `go test -race`. |
+| Env var                     | Purpose                                                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GODEBUG=gctrace=1`         | Print GC traces to stderr at every collection; useful when `twiggit` is slow and you suspect GC pressure.                                   |
+| `GODEBUG=schedtrace=10000`  | Emit a scheduler trace every 10 000 ms; pairs well with `schedtrace=` to profile goroutine scheduling under concurrent worktree operations. |
+| `GODEBUG=asyncpreemptoff=1` | Disable async preemption; surfaces data races that preemption would otherwise hide when running `go test -race`.                            |
 
 Example: `TWIGGIT_DEBUG=1 GODEBUG=gctrace=1 ./twiggit list` prints both the
 structured debug channel and GC traces on stderr.

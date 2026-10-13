@@ -171,13 +171,12 @@ and SHALL map to the corresponding `core.ShellType`. See
 `git-shell-detect` for the canonical detection rules. Emitted errors
 SHALL be lowercase without trailing punctuation.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Hidden Carapace entry point
 
 The system SHALL expose `twiggit _carapace <shell>` as a hidden command

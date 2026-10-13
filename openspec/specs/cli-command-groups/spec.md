@@ -10,12 +10,12 @@ The root `twiggit` command assigns subcommands to named groups so `--help` outpu
 
 The root `twiggit` command SHALL assign subcommands to groups via `cobra.Command.AddGroup` so `--help` output is scannable. Groups SHALL be registered before the `AddCommand` calls that reference them; cobra does not retroactively assign groups.
 
-| Group ID | Members |
-|---|---|
-| core | list, create, delete, prune, rebase, sync |
-| navigation | cd |
-| setup | init |
-| meta | version, completion |
+| Group ID   | Members                                   |
+| ---------- | ----------------------------------------- |
+| core       | list, create, delete, prune, rebase, sync |
+| navigation | cd                                        |
+| setup      | init                                      |
+| meta       | version, completion                       |
 
 #### Scenario: --help shows four groups
 

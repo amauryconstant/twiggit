@@ -2,14 +2,14 @@
 
 ## Test Organization
 
-| Type | Location | Framework | Build Tag |
-|------|----------|-----------|-----------|
-| Unit | `internal/**/*_test.go` | Standard Go | None |
-| Integration | `test/integration/` | Testify | `//go:build integration` |
-| E2E | `test/e2e/` | Ginkgo/Gomega | `//go:build e2e` |
-| Concurrent | `test/concurrent/` | Testify | `//go:build concurrent` |
-| Main | `main_test.go` | Testify | `//go:build integration` |
-| Mocks | `test/mocks/*.go` | testify/mock | - |
+| Type        | Location                | Framework     | Build Tag                |
+| ----------- | ----------------------- | ------------- | ------------------------ |
+| Unit        | `internal/**/*_test.go` | Standard Go   | None                     |
+| Integration | `test/integration/`     | Testify       | `//go:build integration` |
+| E2E         | `test/e2e/`             | Ginkgo/Gomega | `//go:build e2e`         |
+| Concurrent  | `test/concurrent/`      | Testify       | `//go:build concurrent`  |
+| Main        | `main_test.go`          | Testify       | `//go:build integration` |
+| Mocks       | `test/mocks/*.go`       | testify/mock  | -                        |
 
 **Detailed patterns:** See test/integration/AGENTS.md (Testify suites, mocks, assertions)
 
@@ -18,12 +18,14 @@
 Unit tests use standard Go testing with table-driven designs.
 
 **Key patterns:**
+
 - Use `t.Run()` for subtests (each subtest gets isolated `*testing.T`)
 - Register mock assertions via `t.Cleanup()` at test start
 - Table-driven pattern for 5+ test cases
 - Fresh dependencies per subtest (no suite-level state)
 
 **Table-driven pattern:**
+
 ```go
 tests := []struct {
     name      string
@@ -39,6 +41,7 @@ for _, tt := range tests {
 ```
 
 **Mock verification:**
+
 ```go
 mock := mocks.NewMockService(t)
 t.Cleanup(func() { mock.AssertExpectations(t) })
@@ -54,6 +57,7 @@ t.Cleanup(func() { mock.AssertExpectations(t) })
 ## Test Helpers
 
 Helpers live in content-named packages; see each for details:
+
 - `test/worktree/` — worktree creation, validation, cleanup
 - `test/shell/` — shell command execution, temp shell configs
 - `test/git/` — low-level git fixture helpers
@@ -75,6 +79,7 @@ Golden file testing provides snapshot testing for CLI output verification.
 **Location:** test/golden/<category>/<name>.golden
 
 **Usage:**
+
 ```go
 // In E2E tests (requires //go:build e2e build tag)
 actualOutput := executeCLICommand("list", "--all")
@@ -82,6 +87,7 @@ helpers.CompareGolden(t, "list/basic_output.golden", actualOutput)
 ```
 
 **Update Golden Files:**
+
 ```bash
 UPDATE_GOLDEN=true mise run test:golden
 # or
@@ -89,10 +95,12 @@ UPDATE_GOLDEN=true mise run test:golden:update
 ```
 
 **mise tasks:**
+
 - `mise run test:golden` - Run golden file tests
 - `mise run test:golden:update` - Update golden files
 
 **Benefits:**
+
 - Easy to review output changes via git diff
 - Clear diffs when tests fail
 - No hard-coded expectations in test code

@@ -38,13 +38,13 @@ after a successful worktree create.
 The system SHALL set the following environment variables in the hook
 process:
 
-| Variable | Value |
-|---|---|
-| `TWIGGIT_WORKTREE_PATH` | Absolute path to the new worktree (also cwd) |
-| `TWIGGIT_PROJECT_NAME` | Project identifier |
-| `TWIGGIT_BRANCH_NAME` | New branch name |
-| `TWIGGIT_SOURCE_BRANCH` | Branch created from |
-| `TWIGGIT_MAIN_REPO_PATH` | Path to the main repository |
+| Variable                 | Value                                        |
+| ------------------------ | -------------------------------------------- |
+| `TWIGGIT_WORKTREE_PATH`  | Absolute path to the new worktree (also cwd) |
+| `TWIGGIT_PROJECT_NAME`   | Project identifier                           |
+| `TWIGGIT_BRANCH_NAME`    | New branch name                              |
+| `TWIGGIT_SOURCE_BRANCH`  | Branch created from                          |
+| `TWIGGIT_MAIN_REPO_PATH` | Path to the main repository                  |
 
 #### Scenario: Env vars present
 
@@ -79,7 +79,6 @@ The cmd layer SHALL display a warning section after `twiggit create`
 when hooks failed, indicating the worktree is ready but setup may be
 incomplete. The hook runner itself SHALL NOT print; the cmd layer
 owns display.
-
 
 #### Scenario: Definition holds
 

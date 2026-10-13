@@ -1,6 +1,7 @@
 # cli-status Specification
 
 ## Purpose
+
 Lets users see the diagnostic view of every worktree in the current project (or every project with `--all`): ahead/behind counts against the tracked base, merge readiness, dirty state, last-commit date, and a stale flag. Output is human-readable by default and pipeable via `--output json|table|plain` per `cli-output-formats`. The command is read-only; no side effects, no hooks.
 
 ## Requirements

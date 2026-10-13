@@ -15,13 +15,12 @@ command: `list_test.go`, `create_test.go`, `delete_test.go`,
 `prune_test.go`, `cd_test.go`, `init_test.go`, `completion_test.go`,
 `version_test.go`, etc.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Test pyramid
 
 The project's test pyramid SHALL be, in order of increasing scope and
@@ -37,52 +36,48 @@ The cmd layer is covered by both unit tests in `cmd/*_test.go` and
 end-to-end tests in `test/e2e/`; the E2E suite verifies the full CLI
 contract including cobra wiring and exit codes.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Binary build
 
 Before E2E tests run, the suite SHALL build the twiggit binary into a
 temp directory using `go build`. The built binary path SHALL be
 exported to tests via an env var or shared helper.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Context isolation
 
 Each E2E test SHALL work in its own temp directory simulating
 `$HOME`, with fresh `Projects/` and `Worktrees/` subdirectories.
 Tests SHALL NOT touch the user's real `$HOME`.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Coverage of all commands
 
 The E2E suite SHALL cover, at minimum: list, create, delete, prune,
 cd, init, completion, version. Each command SHALL have at least one
 "happy path" test and one error-path test.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Fixtures
 
 Common git scenarios SHALL be available as fixtures:
@@ -91,13 +86,12 @@ a bare repo (`bare-main.tar.gz`), a repo with submodules
 (`submodule.tar.gz`), and a detached-HEAD repo (`detached.tar.gz`). See
 `testing-edge-case-fixtures`.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: Iostreams injection
 
 Tests SHALL inject a fake IOStreams when testing the cmd layer in
@@ -125,7 +119,6 @@ Ginkgo `BeforeEach` setup SHALL use `require.NoError` / `require.NotNil` for pre
 - **WHEN** a Ginkgo `AfterEach` runs after a suite that injected mocks via `WithMocks`
 - **THEN** `mock.AssertExpectations(GinkgoT())` SHALL be called
 - **AND** missing expectations SHALL fail the suite
-
 
 #### Scenario: Definition holds
 

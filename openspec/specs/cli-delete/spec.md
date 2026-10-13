@@ -108,18 +108,16 @@ deletes the worktree AND its branch; callers that previously requested
 only). Errors SHALL be lowercase without trailing punctuation. Each git
 invocation SHALL execute under a `context.WithTimeout`.
 
-
-
 #### Scenario: Definition holds
 
 - **WHEN** the surface described above is exercised
 - **THEN** it SHALL match the documented shape exactly
 - **AND** the implementation SHALL compile against the contract
+
 ### Requirement: `rm` alias
 
 The system SHALL accept `twiggit rm myproject/feature` as an alias for
 `twiggit delete myproject/feature`. See `cli-command-options-pattern`.
-
 
 #### Scenario: Definition holds
 

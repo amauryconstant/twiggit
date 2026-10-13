@@ -6,20 +6,20 @@ non-forced `git push --tags --force-with-lease`.
 
 ## Commands
 
-| Command                   | Purpose          |
-| ------------------------- | ---------------- |
-| mise run release:check    | Release prerequisites |
-| mise run release:dry-run  | Test GoReleaser  |
+| Command                  | Purpose               |
+| ------------------------ | --------------------- |
+| mise run release:check   | Release prerequisites |
+| mise run release:dry-run | Test GoReleaser       |
 
 ## Distribution surface ownership
 
 Split enforced at the goreleaser config layer:
 
-| Surface | CI owner | Config | What it publishes |
-| ------- | -------- | ------ | ----------------- |
-| GitLab release | GitLab CI `release` job (`.gitlab-ci.yml`) | `.goreleaser.yml` (`force_token: gitlab`) | Tarballs, checksums, SBOMs to `gitlab.com/amoconst/twiggit/-/releases/v<tag>` |
-| GitHub release | GitHub Actions `release.yml` | `.goreleaser.github.yml` (`force_token: github`) | Tarballs, checksums, SBOMs to `github.com/amauryconstant/twiggit/releases/tag/<tag>` |
-| Tag mirror to GitHub | GitLab CI `mirror-to-github` job | `.gitlab-ci.yml` | `git push --tags --force-with-lease` (tag pipelines: `when: never`) |
+| Surface              | CI owner                                   | Config                                           | What it publishes                                                                    |
+| -------------------- | ------------------------------------------ | ------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| GitLab release       | GitLab CI `release` job (`.gitlab-ci.yml`) | `.goreleaser.yml` (`force_token: gitlab`)        | Tarballs, checksums, SBOMs to `gitlab.com/amoconst/twiggit/-/releases/v<tag>`        |
+| GitHub release       | GitHub Actions `release.yml`               | `.goreleaser.github.yml` (`force_token: github`) | Tarballs, checksums, SBOMs to `github.com/amauryconstant/twiggit/releases/tag/<tag>` |
+| Tag mirror to GitHub | GitLab CI `mirror-to-github` job           | `.gitlab-ci.yml`                                 | `git push --tags --force-with-lease` (tag pipelines: `when: never`)                  |
 
 **Invariant:** The release job image MUST run a Go version that satisfies
 `go.mod`'s `go` directive (currently `go 1.27.2`). Goreleaser pins
@@ -48,6 +48,7 @@ archiving changes.
 ## Release verification
 
 Each release publishes:
+
 - `twiggit_<VERSION>_<OS>_<ARCH>.<ext>` archives (tar.gz / zip)
 - `twiggit_<VERSION>_<OS>_<ARCH>_sbom.spdx.json` SPDX SBOMs (one per archive)
 - `twiggit_<VERSION>_checksums.txt` containing sha256 of every archive and SBOM
