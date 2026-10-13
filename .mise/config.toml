@@ -44,7 +44,7 @@ run = "go test -race ./..."
 [tasks."test:e2e"]
 description = "Run CLI end-to-end tests"
 depends = ["build:e2e"]
-run = "ginkgo --tags=e2e --keep-going ./test/e2e/..."
+run = "ginkgo --tags=e2e --keep-going --succinct --no-color ./test/e2e/..."
 
 [tasks."test:golden"]
 description = "Run golden file tests"
@@ -64,7 +64,7 @@ run = "golangci-lint run --fix"
 
 [tasks."lint:md"]
 description = "Check markdown formatting with prettier"
-run = "prettier --check \"**/*.md\" --ignore-path .prettierignore"
+run = "prettier --check --log-level warn \"**/*.md\" --ignore-path .prettierignore"
 
 [tasks."format:md"]
 description = "Format markdown with prettier"
