@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 #MISE description="Install goreleaser, cosign, and syft prebuilt binaries into /usr/local/bin (CI image prep)"
 #
 # Run inside the golang:1.27.2-alpine3.23 release container used by the
@@ -15,7 +15,7 @@
 # and
 # https://github.com/sigstore/cosign/releases/download/vX.Y.Z/cosign_checksums.txt
 # respectively.
-set -euo pipefail
+set -eu
 
 apk add --no-cache bash git ca-certificates curl docker-cli
 

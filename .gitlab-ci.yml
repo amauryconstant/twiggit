@@ -19,9 +19,9 @@ stages:
 # Release tool install (shared)
 # --------------------------------
 # Installs goreleaser, cosign, and syft prebuilt binaries into /usr/local/bin.
-# Shared by goreleaser-dry-run and release. See .mise/tasks/ci/install-release-tools.
+# Shared by goreleaser-dry-run and release. See .mise/tasks/ci/install-release-tools.sh.
 .install_release_tools: &install_release_tools
-  - ./.mise/tasks/ci/install-release-tools
+  - ./.mise/tasks/ci/install-release-tools.sh
 
 # --------------------------------
 # Pipeline rules
