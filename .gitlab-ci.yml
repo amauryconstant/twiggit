@@ -16,6 +16,14 @@ stages:
     - .go/pkg/mod/
 
 # --------------------------------
+# Release tool install (shared)
+# --------------------------------
+# Installs goreleaser, cosign, and syft prebuilt binaries into /usr/local/bin.
+# Shared by goreleaser-dry-run and release. See scripts/ci/install-release-tools.sh.
+.install_release_tools: &install_release_tools
+  - ./scripts/ci/install-release-tools.sh
+
+# --------------------------------
 # Pipeline rules
 # --------------------------------
 workflow:
@@ -230,16 +238,7 @@ goreleaser-dry-run:
   interruptible: true
   variables:
     GIT_DEPTH: 10
-  before_script:
-    - apk add --no-cache bash git ca-certificates curl docker-cli
-    - go install github.com/goreleaser/goreleaser/v2@v2.18.2
-    - go install github.com/sigstore/cosign/v3/cmd/cosign@v3.1.3
-    - |
-      curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
-        | sh -s -- -b /usr/local/bin v1.51.1
-    - goreleaser --version
-    - syft --version
-    - cosign --version
+  before_script: *install_release_tools
   script:
     - goreleaser release --snapshot --clean --skip=sbom,before
   artifacts:
@@ -274,15 +273,7 @@ release:
     GITHUB_TOKEN: "$GITHUB_ACCESS_TOKEN"
     GORELEASER_FORCE_TOKEN: gitlab
   before_script:
-    - apk add --no-cache bash git ca-certificates curl docker-cli
-    - go install github.com/goreleaser/goreleaser/v2@v2.18.2
-    - go install github.com/sigstore/cosign/v3/cmd/cosign@v3.1.3
-    - |
-      curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
-        | sh -s -- -b /usr/local/bin v1.51.1
-    - goreleaser --version
-    - syft --version
-    - cosign --version
+    - *install_release_tools
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - |
       if [[ ! "$CI_COMMIT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then

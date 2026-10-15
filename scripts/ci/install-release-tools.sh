@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# Install goreleaser, cosign, and syft prebuilt binaries into /usr/local/bin
+# inside the golang:1.27.2-alpine3.23 release container used by the
+# `goreleaser-dry-run` and `release` jobs in .gitlab-ci.yml and by the
+# `release` job in .github/workflows/release.yml.
+#
+# Pins (cross-checked against the upstream checksums.txt files):
+#   goreleaser v2.18.2
+#   cosign     v3.1.3
+#   syft       v1.51.1
+#
+# Bump the version and SHA256 in the same edit. The SHA values come from
+# https://github.com/goreleaser/goreleaser/releases/download/vX.Y.Z/checksums.txt
+# and
+# https://github.com/sigstore/cosign/releases/download/vX.Y.Z/cosign_checksums.txt
+# respectively.
+set -euo pipefail
+
+apk add --no-cache bash git ca-certificates curl docker-cli
+
+# --- goreleaser (Linux amd64 prebuilt tarball; binary at tarball root) ---
+GR_VER="2.18.2"
+GR_SHA="0a96edc9d9bc594e4a41cc4d59467c182062910ab24d9d1f6dd7b667d32606d3"
+curl -fsSLO "https://github.com/goreleaser/goreleaser/releases/download/v${GR_VER}/goreleaser_Linux_x86_64.tar.gz"
+echo "${GR_SHA}  goreleaser_Linux_x86_64.tar.gz" | sha256sum -c -
+tar -xzf goreleaser_Linux_x86_64.tar.gz -C /usr/local/bin goreleaser
+rm -f goreleaser_Linux_x86_64.tar.gz
+
+# --- cosign (Linux amd64 prebuilt single binary) ---
+CS_VER="3.1.3"
+CS_SHA="4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71"
+curl -fsSLo /usr/local/bin/cosign \
+  "https://github.com/sigstore/cosign/releases/download/v${CS_VER}/cosign-linux-amd64"
+echo "${CS_SHA}  /usr/local/bin/cosign" | sha256sum -c -
+chmod 0755 /usr/local/bin/cosign
+
+# --- syft (upstream install script) ---
+curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+  | sh -s -- -b /usr/local/bin v1.51.1
+
+goreleaser --version
+syft --version
+cosign version
