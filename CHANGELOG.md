@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.3] - 2026-10-15
+
+
+
+### Fixed
+
+- Release installer fails to execute on the `golang:1.27.2-alpine3.23` release container: the shebang `#!/usr/bin/env bash` requires bash, which Alpine does not ship until the very first `apk add` line — and the install line is the first thing in `before_script`, so it dies with `env: can't execute 'bash': No such file or directory`. Renamed `.mise/tasks/ci/install-release-tools` to `.mise/tasks/ci/install-release-tools.sh` (matches the sibling `coverage.sh` and lets mise auto-detect the shell task without parsing the shebang), switched the shebang to `#!/bin/sh` so the script runs on the container's default shell with no PATH lookup, and dropped `-o pipefail` from `set -euo pipefail` (the option is a bash/ksh extension; the script's only pipe — `curl | sh` for syft — already fails loudly under `set -e`). The mise task name `ci:install-release-tools` and the `*install_release_tools` GitLab YAML anchor are unchanged; the three callers (`.gitlab-ci.yml` anchor, `.github/workflows/release.yml` `Install release tools` run step, `docs/release/AGENTS.md` release-image invariant) updated to the new filename. `sh -n` passes against the renamed script (`14e6fab`)
+
 ## [0.16.2] - 2026-10-15
 
 
