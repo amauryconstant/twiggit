@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.2] - 2026-10-15
+
+
+### Added
+
+- `.mise/tasks/ci/install-release-tools` — file-based mise task that downloads upstream prebuilt goreleaser v2.18.2 and cosign v3.1.3 release tarballs, SHA-pins each against its upstream `checksums.txt` / `cosign_checksums.txt`, extracts them into `/usr/local/bin`, and installs syft v1.51.1 via the upstream install script; replaces the `go install` recipe inside the release containers (saves ~3 min/run vs source compile) (`8581f67`)
+
+### Changed
+
+- `goreleaser-dry-run` and `release` jobs in `.gitlab-ci.yml` and the `release` job in `.github/workflows/release.yml` now call the shared installer instead of inlining `go install github.com/goreleaser/goreleaser/v2@v2.18.2` / `go install github.com/sigstore/cosign/v3/cmd/cosign@v3.1.3` + syft curl-pipe. GitLab CI shares the recipe via the new `*install_release_tools` YAML anchor on `.install_release_tools`; GitHub Actions invokes `./.mise/tasks/ci/install-release-tools` directly (`8581f67`)
+- Project scripts migrated into the mise task system: `scripts/generate-repo-fixtures.sh` → `.mise/tasks/fixtures/generate` (now invoked as `mise run fixtures:generate`), the six `scripts/fixtures/*.sh` recipes → `.mise/tasks/fixtures/<name>` with `#MISE hide=true` headers (they require `$REPO_DIR` and are sourced by `generate`, not invoked directly), `scripts/ci/install-release-tools.sh` → `.mise/tasks/ci/install-release-tools`, and `scripts/release/*.sh` helpers → `.mise/tasks/lib/release-lib.sh` (`#MISE hide=true`, sourced not invoked). `generate` now resolves fixture scripts via `${MISE_TASK_DIR}` instead of the hardcoded `scripts/fixtures` path, and references them by name (e.g. `bare-main`) instead of by `bare-main.sh` filename; the now-empty `scripts/` directory is removed. `.gitlab-ci.yml`, `.github/workflows/release.yml`, `docs/release/AGENTS.md`, and `test/e2e/fixtures/AGENTS.md` updated to reference the new paths and `mise run fixtures:generate` invocation (`f6355b9`)
+
+### Fixed
+
+- v0.16.1 release pipeline: `goreleaser-dry-run` and `release` jobs (`.gitlab-ci.yml`) and the GitHub Actions `release` job called `go install github.com/goreleaser/goreleaser/v2@v2.18.2` and `go install github.com/sigstore/cosign/v3/cmd/cosign@v3.1.3` in their `before_script` after switching the base image to `golang:1.27.2-alpine3.23`. The `.gitlab-ci.yml` global `variables:` block sets `GOPATH: "$CI_PROJECT_DIR/.go"`, so `go install` writes the binary into `$CI_PROJECT_DIR/.go/bin` — a directory not on `$PATH` — and the install "succeeds" while the next line fails with `goreleaser: not found`. `go install` has no `-o` flag (only `go build` does), and `GOBIN` only redirects within the same trap if the destination is also not on `$PATH`. Replace with prebuilt-upstream-tarball install, SHA-pinned against the upstream `checksums.txt` / `cosign_checksums.txt` (`8581f67`)
+- Latent release-script bugs caught while smoke-testing the prebuilt installer on Alpine: the busybox `tar` shipped in `golang:1.27.2-alpine3.23` needs `-f` explicitly when extracting from stdin (the `tar -xzf ...` in the goreleaser line was relying on a non-portable autodetect) and cosign v3 reports its version via `cosign version` (no dashes), not `cosign --version`. The new `.mise/tasks/ci/install-release-tools` script uses the portable invocations on all surfaces (`8581f67`)
+
 ## [0.16.1] - 2026-10-13
 
 
