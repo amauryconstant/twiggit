@@ -1,4 +1,6 @@
 #!/bin/bash
+#MISE hide=true
+
 set -e
 
 # Creates a repository in detached HEAD state

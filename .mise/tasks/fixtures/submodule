@@ -1,4 +1,6 @@
 #!/bin/bash
+#MISE hide=true
+
 set -e
 
 # Creates a repository with a git submodule

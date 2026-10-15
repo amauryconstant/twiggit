@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
+#MISE description="Install goreleaser, cosign, and syft prebuilt binaries into /usr/local/bin (CI image prep)"
 #
-# Install goreleaser, cosign, and syft prebuilt binaries into /usr/local/bin
-# inside the golang:1.27.2-alpine3.23 release container used by the
+# Run inside the golang:1.27.2-alpine3.23 release container used by the
 # `goreleaser-dry-run` and `release` jobs in .gitlab-ci.yml and by the
 # `release` job in .github/workflows/release.yml.
 #

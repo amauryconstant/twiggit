@@ -1,4 +1,5 @@
 #!/bin/bash
+#MISE hide=true
 
 set -e
 

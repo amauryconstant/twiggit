@@ -23,7 +23,7 @@ Pre-built git repos for fast, reproducible E2E tests
 
 ## Creating Fixtures
 
-Write script in `scripts/fixtures/<name>.sh`. Run: `./scripts/generate-repo-fixtures.sh`. Archives created at: `test/e2e/fixtures/repos/`
+Write script in `.mise/tasks/fixtures/<name>` (with `#MISE hide=true` header). Run: `mise run fixtures:generate`. Archives created at: `test/e2e/fixtures/repos/`
 
 ## Usage Pattern
 
@@ -46,7 +46,7 @@ var _ = ginkgo.Describe("create command", func() {
 ## Regeneration
 
 If fixture missing or extraction fails:
-`./scripts/generate-repo-fixtures.sh`
+`mise run fixtures:generate`
 
 ## Fixture States
 

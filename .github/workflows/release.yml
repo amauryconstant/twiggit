@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install release tools
-        run: ./scripts/ci/install-release-tools.sh
+        run: ./.mise/tasks/ci/install-release-tools
 
       - name: Tag format guard
         run: |

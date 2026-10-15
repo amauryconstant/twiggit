@@ -43,7 +43,7 @@ the same change. Do not reintroduce the goreleaser-pinned image as a
 release runner.
 
 **Invariant:** Release jobs install goreleaser and cosign from the
-upstream prebuilt release artifacts via `scripts/ci/install-release-tools.sh`,
+upstream prebuilt release artifacts via `.mise/tasks/ci/install-release-tools`,
 not via `go install`. The `.gitlab-ci.yml` global `variables:` block sets
 `GOPATH: "$CI_PROJECT_DIR/.go"`, so a bare `go install` writes to
 `$CI_PROJECT_DIR/.go/bin` — a directory not in `$PATH` — and the install

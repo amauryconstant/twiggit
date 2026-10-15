@@ -1,15 +1,16 @@
-#!/bin/bash
+#!/usr/bin/env bash
+#MISE description="Generate e2e git repo fixture tarballs under test/e2e/fixtures/repos/"
 
 set -e
 
 FIXTURES_DIR="test/e2e/fixtures/repos"
-SCRIPTS_DIR="scripts/fixtures"
+SCRIPTS_DIR="${MISE_TASK_DIR}"
 
 mkdir -p "$FIXTURES_DIR"
 
 generate_fixture() {
     local name=$1
-    local setup_script="$SCRIPTS_DIR/$2"
+    local setup_script="$SCRIPTS_DIR/$name"
 
     echo "Generating $name fixture..."
 
@@ -30,12 +31,12 @@ generate_fixture() {
     echo "✓ Created $name.tar.gz"
 }
 
-generate_fixture "bare-main" "bare-main.sh"
-generate_fixture "single-branch" "single-branch.sh"
-generate_fixture "multi-branch" "multi-branch.sh"
-generate_fixture "corrupted" "corrupted.sh"
-generate_fixture "submodule" "submodule.sh"
-generate_fixture "detached" "detached.sh"
+generate_fixture "bare-main"
+generate_fixture "single-branch"
+generate_fixture "multi-branch"
+generate_fixture "corrupted"
+generate_fixture "submodule"
+generate_fixture "detached"
 
 echo ""
 echo "All fixtures generated successfully!"
