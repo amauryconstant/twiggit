@@ -88,6 +88,21 @@ sparse-base image, restore the install-before-checkout ordering AND add
 `fetch-tags: true` to `actions/checkout@v5`, or you re-introduce the
 "current folder is not a git repository" failure.
 
+**Invariant:** On GitHub Actions, the calling workflow (`release.yml`)
+must declare a workflow-level `permissions:` block that is a superset of
+every permission the reusable workflow (`release-image.yml`) requests —
+GitHub Actions aborts the call with `startup_failure` if the reusable
+workflow's requested token scope (e.g. `packages: write` for the ghcr.io
+push) is not already granted by the caller. v0.16.6's `startup_failure`
+was exactly this omission: `release-image.yml` requested `packages:
+write`, `release.yml` granted only `contents: write` + `id-token: write`,
+and GitHub refused to start the run. Any new scope added to
+`release-image.yml`'s `permissions:` must be added to `release.yml`'s in
+the same change. The `release` job itself does not consume
+`packages: write`; the scope is required only as an inherited grant for
+the reusable workflow's `docker/login-action` + `docker/build-push-action`
+steps.
+
 **Invariant:** Release jobs install goreleaser, cosign, and syft from the
 upstream prebuilt release artifacts via `.mise/tasks/ci/install-release-tools.sh`,
 not via `go install`. The `.gitlab-ci.yml` global `variables:` block sets

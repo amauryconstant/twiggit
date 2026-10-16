@@ -12,6 +12,8 @@ concurrency:
 permissions:
   contents: write
   id-token: write
+  # required by the reusable build-image workflow; see docs/release/AGENTS.md invariant
+  packages: write
 
 jobs:
   # Build (or reuse) the self-owned release image. The reusable workflow
