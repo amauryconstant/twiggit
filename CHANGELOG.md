@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.7] - 2026-10-16
+
+
+
+### Fixed
+
+- `.github/workflows/release.yml`: add `packages: write` to the workflow-level `permissions:` block. `release-image.yml` (the reusable build-image workflow called via `uses:`) requests `packages: write` for its `docker/login-action` + `docker/build-push-action` ghcr.io push, and v0.16.6 was a `startup_failure` because the caller (`release.yml`) only granted `contents: write` + `id-token: write`. GitHub Actions rejects `uses:` calls when the reusable workflow asks for a token scope the caller doesn't grant — the failure mode is a workflow-parse-time `startup_failure`, not a job-level error, so no step ever ran. Fix is a one-line permissions addition; the inline comment points at the docs invariant. Follow-up to `8642380` ("Make release-image.yml reusable with content-hash skip") which shipped the reusable workflow but forgot to grant the inherited scope
+- `docs/release/AGENTS.md`: add an **Invariant:** paragraph documenting the lockstep rule — the calling workflow's `permissions:` block must be a superset of every scope the reusable workflow (`release-image.yml`) requests, and any new scope added to one must be added to the other in the same change. This is the rule that the v0.16.6 oversight violated; the inline comment in `release.yml` points at the invariant as the single source of truth
+
 ## [0.16.6] - 2026-10-16
 
 
