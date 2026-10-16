@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1.7
+#
+# Release job container for .github/workflows/release.yml. Mirrors the
+# goreleaser/goreleaser project Dockerfile but (a) bumps the Go base to
+# 1.27.2 to satisfy go.mod and (b) trims tools the release job does not
+# invoke (docker-cli, buildx, git-lfs, gpg, gpg-agent, mercurial, upx,
+# tini, build-base, make, openssh-client). Consumed by the GitHub Actions
+# release workflow as ghcr.io/amauryconstant/twiggit/release:latest.
+#
+# GitLab CI releases do NOT use this image — they stay on
+# golang:1.27.2-alpine3.23 with .mise/tasks/ci/install-release-tools.sh
+# invoked at job time. The two surfaces intentionally diverge to stop the
+# per-run installer cascade documented in docs/release/AGENTS.md.
+#
+# Tool-version SHA pins live in this file (GitHub) and in
+# .mise/tasks/ci/install-release-tools.sh (GitLab). Bump them in lockstep.
+
+FROM anchore/syft:v1.54.1@sha256:3eb5379ba7b409c3f4069b686110527af0c47df993fa5c10d13e7cf34f49b1aa AS syft
+FROM gcr.io/projectsigstore/cosign:v3.1.3@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8 AS cosign
+
+FROM golang:1.27.2-alpine3.23
+
+# Trimmed from goreleaser/goreleaser Dockerfile to what release.yml
+# actually invokes: bash (shells), git (checkout), curl (probes),
+# ca-certificates (HTTPS upstreams). No build-base/upx/tini/etc.
+RUN apk add --no-cache \
+      bash \
+      ca-certificates \
+      curl \
+      git
+
+COPY --from=syft   /syft          /usr/bin/syft
+COPY --from=cosign /ko-app/cosign /usr/bin/cosign
+
+# goreleaser: prebuilt Linux x86_64 tarball, SHA-pinned against upstream
+# checksums.txt (same version + SHA as .mise/tasks/ci/install-release-tools.sh).
+# Multi-arch `.apk` pattern from goreleaser/goreleaser is dropped — we ship
+# linux/amd64 only, which matches the GitHub-hosted runner arch.
+ARG GR_VERSION=2.18.2
+ARG GR_SHA=0a96edc9d9bc594e4a41cc4d59467c182062910ab24d9d1f6dd7b667d32606d3
+RUN curl -fsSLO "https://github.com/goreleaser/goreleaser/releases/download/v${GR_VERSION}/goreleaser_Linux_x86_64.tar.gz" \
+ && echo "${GR_SHA}  goreleaser_Linux_x86_64.tar.gz" | sha256sum -c - \
+ && tar -xzf goreleaser_Linux_x86_64.tar.gz -C /usr/local/bin goreleaser \
+ && rm -f goreleaser_Linux_x86_64.tar.gz
+
+# Smoke test the bundled toolchain so a Dockerfile.release regression
+# fails the build rather than a release run. Mirrors the shape used by
+# Dockerfile.ci's `mise ls && go version && goreleaser --version && ...`.
+RUN goreleaser --version \
+ && cosign version \
+ && syft version \
+ && git --version \
+ && go version
+
+ENTRYPOINT ["/bin/sh"]

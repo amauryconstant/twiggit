@@ -12,24 +12,17 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    # Self-owned release image built by .github/workflows/release-image.yml
+    # from Dockerfile.release. Bundles golang:1.27.2-alpine3.23 + git + bash +
+    # goreleaser v2.18.2 + cosign v3.1.3 + syft v1.54.1. Bumping the goreleaser
+    # base image is unavailable because goreleaser/goreleaser:v2.18.3 (and
+    # v2.19.0 nightly) still pin to golang:1.27.1 which fails go.mod's Go
+    # directive; see docs/release/AGENTS.md. GitLab CI releases do NOT use this
+    # image — they stay on the runtime-installer pattern.
     container:
-      image: golang:1.27.2-alpine3.23
+      image: ghcr.io/amauryconstant/twiggit/release:latest
       options: --entrypoint /bin/sh
     steps:
-      # Install git (and goreleaser/cosign/syft) BEFORE checkout. The
-      # golang:1.27.2-alpine3.23 base image does not ship `git`, so if
-      # actions/checkout@v5 runs first it detects no git on PATH and falls
-      # back to the GitHub REST API, downloading an archive with no
-      # `.git/` directory. goreleaser then refuses with
-      # "current folder is not a git repository". Keeping the GitLab
-      # invariant in mind: GitLab's runner uses its own git-aware helper
-      # to populate the workspace before `before_script`, so on GitLab
-      # the install order vs. checkout is unconstrained; on GitHub
-      # Actions, checkout runs inside the user-supplied container and
-      # therefore needs git installed first.
-      - name: Install release tools
-        run: ./.mise/tasks/ci/install-release-tools.sh
-
       - name: Checkout
         uses: actions/checkout@v5
         with:
@@ -51,6 +44,9 @@ jobs:
             echo "::error::Release ${{ github.ref_name }} already exists"
             exit 1
           fi
+
+      - name: Allow git inside release container
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Signing-mode fail-fast
         run: |

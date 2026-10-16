@@ -29,31 +29,50 @@ go.mod or the `before:` hook fails with
 `go: go.mod requires go >= 1.27.2 (running go 1.27.1; GOTOOLCHAIN=local)`.
 
 The `goreleaser/goreleaser:v2.18.2` Docker image ships Go 1.27.1 (and
-v2.18.3 still ships 1.27.1) because goreleaser's pre-baked `.apk` is
-compiled against the image's pinned Go. Using that image as the release
-job container while go.mod's `go` directive is newer is a hard trap. The
-release job therefore runs on `golang:1.27.2-alpine3.23` (matching the
-`Dockerfile.ci` base) with goreleaser v2.18.2, syft v1.51.1, and cosign
-v3.1.3 installed inside the job's `before_script`. This pattern applies
-symmetrically to the GitLab CI `release` and `goreleaser-dry-run` jobs and
-to the GitHub Actions `release` job.
+v2.18.3 / v2.19.0-nightly still ship 1.27.1) because goreleaser's pre-baked
+`.apk` is compiled against the image's pinned Go. Using that image as the
+release job container while go.mod's `go` directive is newer is a hard
+trap. The release job therefore runs on a self-owned container image,
+sourced differently per CI surface, that always satisfies go.mod's Go
+directive.
 
-When bumping go.mod's `go` directive, bump the release job image base in
-the same change. Do not reintroduce the goreleaser-pinned image as a
-release runner.
+- **GitLab CI** (`release`, `goreleaser-dry-run` in `.gitlab-ci.yml`)
+  runs on `golang:1.27.2-alpine3.23` (matching `Dockerfile.ci`) and
+  installs goreleaser/cosign/syft at job time via the
+  `*install_release_tools` YAML anchor —
+  `.mise/tasks/ci/install-release-tools.sh`. This is the unchanged
+  runtime-installer pattern that worked at v0.15.x.
+- **GitHub Actions** (`release` in `.github/workflows/release.yml`) runs
+  on `ghcr.io/amauryconstant/twiggit/release:latest`, built by
+  `.github/workflows/release-image.yml` from `Dockerfile.release`. That
+  Dockerfile is a fork of the goreleaser project's released-image
+  Dockerfile with `FROM golang:1.27.2-alpine3.23` (matching the Go
+  requirement) and goreleaser/cosign/syft SHA-pinned at build time. This
+  restores the bundled-image architecture that shipped v0.13.7 →
+  v0.15.1 reliably on GitHub.
 
-**Invariant:** On GitHub Actions, the `release` job installs release
-tools (which also `apk add`s `git`) **before** `actions/checkout@v5`.
-The `golang:1.27.2-alpine3.23` base image ships no `git`, so if checkout
-runs first it detects no git on PATH and falls back to the GitHub
-REST API, producing an archive with no `.git/` directory — goreleaser
-then refuses with `current folder is not a git repository`. The GitLab
-side is immune because the runner's own git-aware helper populates the
-workspace before `before_script` runs; on GitHub Actions checkout runs
-inside the user-supplied container and therefore needs git installed
-first. Do not reorder the steps.
+The two surfaces diverge on purpose: from v0.16.0 through v0.16.4 the
+GitHub release job cascaded through five separate failures, each
+introduced by the runtime-installer pattern (Go-version mismatch →
+`go install` PATH trap → busybox bash shebang → no-git REST-API fallback
+→ install-before-checkout chicken-and-egg). GitLab never exhibited the
+cascade because its runner's git-aware helper populates the workspace
+before `before_script` runs.
 
-**Invariant:** Release jobs install goreleaser and cosign from the
+When bumping go.mod's `go` directive, bump both release surfaces in the
+same change: `.gitlab-ci.yml` `release.job.image.name` (and the
+`*release` / `goreleaser-dry-run` job-level `image:` lines) and
+`Dockerfile.release` `FROM golang:…`. Do not reintroduce the
+goreleaser-pinned image as a release runner.
+
+**Invariant:** On GitHub Actions the release image ships `git` already,
+so the checkout/install-order constraint from the v0.16.x cascade no
+longer applies. If you switch the GitHub `release` job back to a
+sparse-base image, restore the install-before-checkout ordering AND add
+`fetch-tags: true` to `actions/checkout@v5`, or you re-introduce the
+"current folder is not a git repository" failure.
+
+**Invariant:** Release jobs install goreleaser, cosign, and syft from the
 upstream prebuilt release artifacts via `.mise/tasks/ci/install-release-tools.sh`,
 not via `go install`. The `.gitlab-ci.yml` global `variables:` block sets
 `GOPATH: "$CI_PROJECT_DIR/.go"`, so a bare `go install` writes to
@@ -64,12 +83,20 @@ same trap if the destination also isn't on `$PATH`. Prebuilt is strictly
 better: faster (~3 min saved per run by skipping the source compile), uses
 the same artifact family as goreleaser's own Docker image, and can be
 SHA-pinned against the upstream `checksums.txt` / `cosign_checksums.txt`.
-Current pins: goreleaser `v2.18.2` SHA
-`0a96edc9d9bc594e4a41cc4d59467c182062910ab24d9d1f6dd7b667d32606d3`, cosign
-`v3.1.3` SHA `4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71`.
-Bump the version and SHA in the same edit. The script is invoked from both
-`.gitlab-ci.yml` (via the `*install_release_tools` YAML anchor, shared by
-`goreleaser-dry-run` and `release`) and `.github/workflows/release.yml`.
+
+Tool-version SHA pins live in two places and must move together:
+
+| Tool       | GitLab CI (`install-release-tools.sh`)          | GitHub Actions (`Dockerfile.release`)                           |
+| ---------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| goreleaser | `v2.18.2` SHA `0a96e…06d3`                      | `v2.18.2` SHA `0a96e…06d3` (`ARG GR_SHA`)                       |
+| cosign     | `v3.1.3` SHA `4629c…f71`                        | `FROM gcr.io/projectsigstore/cosign:v3.1.3@sha256:9e5c2f…611b8` |
+| syft       | `v1.51.1` (upstream install script, no SHA pin) | `FROM anchore/syft:v1.54.1@sha256:3eb53…9b1aa`                  |
+
+The two pin sets are not identical today (syft `1.51.1` vs `1.54.1`); align
+them toward one version per tool in a follow-up change. The GitLab CI
+script is invoked via `.gitlab-ci.yml`'s `*install_release_tools` YAML
+anchor (shared by `goreleaser-dry-run` and `release`); the Dockerfile is
+invoked via `.github/workflows/release-image.yml`.
 
 **CHANGELOG**: Auto-generated via `openspec-generate-changelog` after
 archiving changes.
