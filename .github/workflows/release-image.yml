@@ -134,7 +134,12 @@ jobs:
             ghcr.io/amauryconstant/twiggit/release:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          outputs: type=image,push-by-digest=true,name=ghcr.io/amauryconstant/twiggit/release
+          # push-by-digest=true is incompatible with the :latest / :src-<hash> /
+          # :sha-<short> tags below (buildx rejects "tagged ref … by digest").
+          # Tag-based push is fine — docker/build-push-action@v6 still exposes
+          # `digest` as a step output, so the caller can pull
+          # ghcr.io/amauryconstant/twiggit/release@<digest> for reproducibility.
+          outputs: type=image,name=ghcr.io/amauryconstant/twiggit/release
 
       - name: Resolve digest
         id: resolve
