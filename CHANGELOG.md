@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.6] - 2026-10-16
+
+
+### Changed
+
+- `.github/workflows/release-image.yml`: convert to a `workflow_call`-triggered reusable workflow with `digest`/`skipped` outputs. Add `docker/setup-buildx-action@v3` — the docker-container driver is required for `cache-to: type=gha`, and the default `docker` driver rejected the v0.16.5 build with "Cache export is not supported for the docker driver". Add a content-hash skip check that reuses the existing `:src-<hash>` image (first 16 hex chars of `sha256sum(Dockerfile.release)`) and returns its digest when the Dockerfile is unchanged; `force: true` input (workflow_call + workflow_dispatch) bypasses. Add `concurrency: group: release-image, cancel-in-progress: false` to serialize same-class rebuilds
+- `.github/workflows/release.yml`: add a `build-image` job that calls the reusable workflow via `uses: ./.github/workflows/release-image.yml`; reference the returned digest in `container.image` (`ghcr.io/amauryconstant/twiggit/release@<digest>`) so the release uses byte-for-byte the right image and the v0.16.5 "manifest unknown" race — release job pulling `:latest` before the path-filter build had finished pushing — is impossible by construction. Add `concurrency: group: release, cancel-in-progress: false` so a v0.16.5 in flight is not cancelled by a v0.16.6 push
+- `docs/release/AGENTS.md`: GitHub Actions invariant describes the reusable workflow, the content-hash skip check, the digest reference, and the two `concurrency` groups
+
+`Dockerfile.release`, `.gitlab-ci.yml`, `install-release-tools.sh`, and `Dockerfile.ci` are unchanged.
+
 ## [0.16.5] - 2026-10-16
 
 
