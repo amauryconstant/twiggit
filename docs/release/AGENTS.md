@@ -42,6 +42,17 @@ When bumping go.mod's `go` directive, bump the release job image base in
 the same change. Do not reintroduce the goreleaser-pinned image as a
 release runner.
 
+**Invariant:** On GitHub Actions, the `release` job installs release
+tools (which also `apk add`s `git`) **before** `actions/checkout@v5`.
+The `golang:1.27.2-alpine3.23` base image ships no `git`, so if checkout
+runs first it detects no git on PATH and falls back to the GitHub
+REST API, producing an archive with no `.git/` directory — goreleaser
+then refuses with `current folder is not a git repository`. The GitLab
+side is immune because the runner's own git-aware helper populates the
+workspace before `before_script` runs; on GitHub Actions checkout runs
+inside the user-supplied container and therefore needs git installed
+first. Do not reorder the steps.
+
 **Invariant:** Release jobs install goreleaser and cosign from the
 upstream prebuilt release artifacts via `.mise/tasks/ci/install-release-tools.sh`,
 not via `go install`. The `.gitlab-ci.yml` global `variables:` block sets

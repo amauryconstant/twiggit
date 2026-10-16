@@ -16,13 +16,24 @@ jobs:
       image: golang:1.27.2-alpine3.23
       options: --entrypoint /bin/sh
     steps:
+      # Install git (and goreleaser/cosign/syft) BEFORE checkout. The
+      # golang:1.27.2-alpine3.23 base image does not ship `git`, so if
+      # actions/checkout@v5 runs first it detects no git on PATH and falls
+      # back to the GitHub REST API, downloading an archive with no
+      # `.git/` directory. goreleaser then refuses with
+      # "current folder is not a git repository". Keeping the GitLab
+      # invariant in mind: GitLab's runner uses its own git-aware helper
+      # to populate the workspace before `before_script`, so on GitLab
+      # the install order vs. checkout is unconstrained; on GitHub
+      # Actions, checkout runs inside the user-supplied container and
+      # therefore needs git installed first.
+      - name: Install release tools
+        run: ./.mise/tasks/ci/install-release-tools.sh
+
       - name: Checkout
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-
-      - name: Install release tools
-        run: ./.mise/tasks/ci/install-release-tools.sh
 
       - name: Tag format guard
         run: |
@@ -40,9 +51,6 @@ jobs:
             echo "::error::Release ${{ github.ref_name }} already exists"
             exit 1
           fi
-
-      - name: Allow git inside goreleaser container
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Signing-mode fail-fast
         run: |
