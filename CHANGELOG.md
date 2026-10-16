@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.4] - 2026-10-16
+
+
+
+### Fixed
+
+- GitHub Actions `release` job fails at the goreleaser `before:` hook with `current folder is not a git repository`. The `golang:1.27.2-alpine3.23` base image (introduced in `2f9a0d8` to fix the go.mod Go-version mismatch) ships no `git`, so `actions/checkout@v5` detects no git on PATH and silently falls back to the GitHub REST API, downloading an archive without a `.git/` directory — goreleaser then refuses without git metadata. The GitLab side is unaffected because the runner's own git-aware helper populates the workspace before `before_script` runs; on GitHub Actions checkout executes inside the user-supplied container, so git must be installed first. Reorder `.github/workflows/release.yml` so the `Install release tools` step (which `apk add`s git) runs ahead of `Checkout`, drop the `Allow git inside goreleaser container` step (the `safe.directory` workaround from `b5954a2` no longer applies after a real `git clone`), add a YAML comment locking the order, and record the GitHub-vs-GitLab checkout asymmetry as a new invariant in `docs/release/AGENTS.md`. The base image and `install-release-tools.sh` are unchanged (`7ea62c5`)
+
 ## [0.16.3] - 2026-10-15
 
 
