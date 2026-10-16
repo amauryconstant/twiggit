@@ -122,6 +122,12 @@ directory name when describing a cross-cutting concern:
 - `cli-status` (new in `add-status-command`) — owns the
   `twiggit status` command surface (flags, positional, four
   output shapes) and its exit-code contract.
+- `infrastructure-release` (new in `consolidate-release-invariants`) —
+  owns the CI and release pipeline invariants (goreleaser/cosign/syft
+  toolchain pin contract, GitLab and GitHub Actions release surfaces,
+  release-tag preflight, module-graph freshness gate, per-surface
+  architecture). Cross-referenced from the root `AGENTS.md` Release
+  / CI invariants block.
 
 ### Recent cross-layer moves
 
