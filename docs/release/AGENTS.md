@@ -43,13 +43,29 @@ directive.
   `.mise/tasks/ci/install-release-tools.sh`. This is the unchanged
   runtime-installer pattern that worked at v0.15.x.
 - **GitHub Actions** (`release` in `.github/workflows/release.yml`) runs
-  on `ghcr.io/amauryconstant/twiggit/release:latest`, built by
+  on a self-owned image, built by the reusable workflow
   `.github/workflows/release-image.yml` from `Dockerfile.release`. That
   Dockerfile is a fork of the goreleaser project's released-image
   Dockerfile with `FROM golang:1.27.2-alpine3.23` (matching the Go
   requirement) and goreleaser/cosign/syft SHA-pinned at build time. This
   restores the bundled-image architecture that shipped v0.13.7 →
   v0.15.1 reliably on GitHub.
+
+  The `release.yml` workflow calls `release-image.yml` as its first job
+  (`uses: ./.github/workflows/release-image.yml`) and waits on it via
+  `needs:`. The image workflow computes a content hash of
+  `Dockerfile.release` (`sha256sum | cut -c1-16`), tags every build with
+  `ghcr.io/amauryconstant/twiggit/release:src-<hash>`, and on a call
+  where `:src-<hash>` already exists (i.e. the Dockerfile has not
+  changed) it reuses the existing image and returns its digest without
+  rebuilding — `force: true` (workflow_call input or workflow_dispatch
+  checkbox) bypasses the skip. The release job then pulls the image by
+  digest (`ghcr.io/amauryconstant/twiggit/release@<digest>`), which
+  makes the release race-free against any parallel path-filter rebuild
+  on main. Two `concurrency: cancel-in-progress: false` groups
+  (`release-image`, `release`) serialize same-class rebuilds/releases so
+  a v0.16.5 release already in flight is not cancelled by a v0.16.6
+  push.
 
 The two surfaces diverge on purpose: from v0.16.0 through v0.16.4 the
 GitHub release job cascaded through five separate failures, each
@@ -96,7 +112,8 @@ The two pin sets are not identical today (syft `1.51.1` vs `1.54.1`); align
 them toward one version per tool in a follow-up change. The GitLab CI
 script is invoked via `.gitlab-ci.yml`'s `*install_release_tools` YAML
 anchor (shared by `goreleaser-dry-run` and `release`); the Dockerfile is
-invoked via `.github/workflows/release-image.yml`.
+invoked by `.github/workflows/release.yml`'s `build-image` job via
+`uses: ./.github/workflows/release-image.yml`.
 
 **CHANGELOG**: Auto-generated via `openspec-generate-changelog` after
 archiving changes.

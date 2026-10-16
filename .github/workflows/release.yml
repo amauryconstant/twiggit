@@ -5,12 +5,28 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 permissions:
   contents: write
   id-token: write
 
 jobs:
+  # Build (or reuse) the self-owned release image. The reusable workflow
+  # tags every build with :src-<hash> where <hash> is the content hash
+  # of Dockerfile.release, so when Dockerfile.release is unchanged since
+  # the last push the workflow reuses the existing image and returns its
+  # digest. The release job then pulls by digest, eliminating the race
+  # against any parallel image rebuild and the v0.16.x "manifest
+  # unknown" cascade. See docs/release/AGENTS.md for the full invariant
+  # and the per-surface architecture.
+  build-image:
+    uses: ./.github/workflows/release-image.yml
+
   release:
+    needs: build-image
     runs-on: ubuntu-latest
     # Self-owned release image built by .github/workflows/release-image.yml
     # from Dockerfile.release. Bundles golang:1.27.2-alpine3.23 + git + bash +
@@ -20,7 +36,7 @@ jobs:
     # directive; see docs/release/AGENTS.md. GitLab CI releases do NOT use this
     # image — they stay on the runtime-installer pattern.
     container:
-      image: ghcr.io/amauryconstant/twiggit/release:latest
+      image: ghcr.io/amauryconstant/twiggit/release@${{ needs.build-image.outputs.digest }}
       options: --entrypoint /bin/sh
     steps:
       - name: Checkout

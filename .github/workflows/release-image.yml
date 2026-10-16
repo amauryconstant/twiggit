@@ -1,17 +1,50 @@
 name: Release image
 
-# Builds and pushes the self-owned release container consumed by
-# .github/workflows/release.yml. The image is ghcr.io/amauryconstant/twiggit/release:latest.
-# Source of truth is Dockerfile.release. Triggers on Dockerfile.release changes to
-# main, on PRs touching the same path (build-only, no push), and on manual dispatch.
+# Reusable workflow: builds and pushes ghcr.io/amauryconstant/twiggit/release from
+# Dockerfile.release. Four triggers:
+#   - workflow_call       : called by .github/workflows/release.yml on tag push
+#   - push (main, path)   : proactive rebuild on Dockerfile.release changes
+#   - pull_request (path) : validation, build-only (no push)
+#   - workflow_dispatch   : manual rebuild (with optional force)
+#
+# Skip optimization: each build tags the image with
+# ghcr.io/amauryconstant/twiggit/release:src-<hash> where <hash> is the first
+# 16 hex chars of sha256sum(Dockerfile.release). On a workflow_call the
+# workflow checks ghcr.io for that tag and reuses the existing image if it
+# already exists, returning its digest without rebuilding. force=true
+# bypasses the check. The release job consumes the digest via
+# ghcr.io/.../release@<digest>, so the release uses byte-for-byte the right
+# image regardless of whether the build ran or was skipped.
 
 on:
+  workflow_call:
+    inputs:
+      force:
+        type: boolean
+        default: false
+        description: 'Force rebuild even if an image with this Dockerfile.release content already exists'
+    outputs:
+      digest:
+        description: 'Image digest (sha256:...) for the caller to pull'
+        value: ${{ jobs.build.outputs.digest }}
+      skipped:
+        description: 'Whether the build was skipped because the image already existed'
+        value: ${{ jobs.build.outputs.skipped }}
   push:
     branches: [main]
     paths: ['Dockerfile.release']
   pull_request:
     paths: ['Dockerfile.release']
   workflow_dispatch:
+    inputs:
+      force:
+        type: boolean
+        default: false
+        description: 'Force rebuild even if an image with this Dockerfile.release content already exists'
+
+concurrency:
+  group: release-image
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -20,26 +53,99 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      digest: ${{ steps.resolve.outputs.digest }}
+      skipped: ${{ steps.resolve.outputs.skipped }}
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
+      # docker-container driver is required for cache-to: type=gha. The
+      # default docker driver rejects it with "Cache export is not
+      # supported for the docker driver" — that was the v0.16.5 failure.
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Compute source hash
+        id: hash
+        run: |
+          hash=$(sha256sum Dockerfile.release | cut -c1-16)
+          echo "hash=$hash" >> "$GITHUB_OUTPUT"
+          echo "Dockerfile.release content hash: \`$hash\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check for existing image with this source hash
+        id: check
+        if: github.event_name != 'pull_request' && !inputs.force
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="src-${{ steps.hash.outputs.hash }}"
+          status=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json" \
+            "https://ghcr.io/v2/amauryconstant/twiggit/release/manifests/$tag")
+          if [ "$status" = "200" ]; then
+            digest=$(curl -s \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json" \
+              "https://ghcr.io/v2/amauryconstant/twiggit/release/manifests/$tag" \
+              | jq -r '.. | .digest? // empty' | head -1)
+            if [ -n "$digest" ]; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              echo "digest=$digest" >> "$GITHUB_OUTPUT"
+              {
+                echo "### ✓ Image already built for this Dockerfile.release content"
+                echo ""
+                echo "- Tag: \`$tag\`"
+                echo "- Digest: \`$digest\`"
+                echo "- Build skipped."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+          fi
+          echo "exists=false" >> "$GITHUB_OUTPUT"
+          {
+            echo "### ⚙️ No image found for this Dockerfile.release content"
+            echo ""
+            echo "- Tag queried: \`$tag\`"
+            echo "- HTTP status: $status"
+            echo "- Will build and push."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build and push
+        id: build
+        if: github.event_name == 'pull_request' || steps.check.outputs.exists != 'true' || inputs.force
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.release
-          push: ${{ github.event_name != 'pull_request' }}
+          push: ${{ github.event_name != 'pull_request' && (inputs.force || steps.check.outputs.exists != 'true') }}
           tags: |
             ghcr.io/amauryconstant/twiggit/release:latest
+            ghcr.io/amauryconstant/twiggit/release:src-${{ steps.hash.outputs.hash }}
             ghcr.io/amauryconstant/twiggit/release:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          provenance: false
+          outputs: type=image,push-by-digest=true,name=ghcr.io/amauryconstant/twiggit/release
+
+      - name: Resolve digest
+        id: resolve
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ "${{ steps.check.outputs.exists }}" = "true" ] && [ "${{ inputs.force }}" != "true" ]; then
+            # Skipped: reuse the existing image's digest
+            echo "digest=${{ steps.check.outputs.digest }}" >> "$GITHUB_OUTPUT"
+            echo "skipped=true" >> "$GITHUB_OUTPUT"
+          else
+            # Built fresh: digest is exposed by docker/build-push-action as a step output
+            echo "digest=${{ steps.build.outputs.digest }}" >> "$GITHUB_OUTPUT"
+            echo "skipped=false" >> "$GITHUB_OUTPUT"
+          fi
