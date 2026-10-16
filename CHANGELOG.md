@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.16.8] - 2026-10-16
+
+
+
+### Fixed
+
+- `.github/workflows/release-image.yml`: drop `push-by-digest=true` from the buildx step's `outputs:` config. v0.16.7's build-image job reached the buildx push step and failed with `failed to push ghcr.io/amauryconstant/twiggit/release:latest: can't push tagged ref ghcr.io/amauryconstant/twiggit/release:latest by digest`. `push-by-digest=true` told buildx to push the image by its content digest while the `tags:` input listed `:latest / :src-<hash> / :sha-<short>`, and buildx refuses to push any tagged ref by digest — a `:tag` pointing to a content digest is contradictory; `:latest` was the first to surface the constraint. Tag-based push is sufficient for the digest-reference architecture: `docker/build-push-action@v6` exposes `digest` as a step output regardless of push method, so `release.yml`'s `container.image: ghcr.io/amauryconstant/twiggit/release@<digest>` reference continues to work for byte-for-byte reproducibility. The content-hash skip optimization's `ghcr.io/.../manifests/src-<hash>` query was always a tag query and is unaffected. Follow-up to `8642380` ("Make release-image.yml reusable with content-hash skip") which introduced `push-by-digest=true` alongside the buildx + reusable-workflow refactor
+
 ## [0.16.7] - 2026-10-16
 
 
